@@ -3,6 +3,7 @@ import unlitFrag from '../shaders/templates/unlit.frag?raw';
 import noiseFrag from '../shaders/templates/noise.frag?raw';
 import blurFrag from '../shaders/templates/blur.frag?raw';
 import tonemapFrag from '../shaders/templates/tonemap.frag?raw';
+import uvDebugFrag from '../shaders/templates/uvDebug.frag?raw';
 import type { Graph } from '../core/graph/types';
 import type { NodePosition } from './graphStore';
 
@@ -111,4 +112,42 @@ export const CHAIN_DEMO_LAYOUT: Record<string, NodePosition> = {
   blur1: { x: -100, y: 60 },
   tonemap1: { x: 100, y: -60 },
   output1: { x: 300, y: 60 },
+};
+
+export function createTorusDemoGraph(): Graph {
+  return {
+    nodes: [
+      { id: 'mesh1', kind: 'mesh', primitive: 'torus' },
+      {
+        id: 'shader1',
+        kind: 'shader',
+        vertexSource: basicVert,
+        fragmentSource: uvDebugFrag,
+        uniformValues: {},
+      },
+      { id: 'output1', kind: 'output' },
+    ],
+    edges: [
+      {
+        id: 'e1',
+        source: 'mesh1',
+        sourceHandle: 'mesh',
+        target: 'shader1',
+        targetHandle: 'mesh',
+      },
+      {
+        id: 'e2',
+        source: 'shader1',
+        sourceHandle: 'texture',
+        target: 'output1',
+        targetHandle: 'texture',
+      },
+    ],
+  };
+}
+
+export const TORUS_DEMO_LAYOUT: Record<string, NodePosition> = {
+  mesh1: { x: -240, y: 0 },
+  shader1: { x: 80, y: 0 },
+  output1: { x: 400, y: 0 },
 };

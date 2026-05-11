@@ -25,15 +25,18 @@ button, input, select, textarea {
 .app-shell {
   display: grid;
   grid-template-columns: 1.1fr 2fr 0.9fr;
-  grid-template-rows: 1.2fr 1fr;
+  grid-template-rows: 1.2fr 1fr 22px;
   grid-template-areas:
-    "graph viewport  inspector"
-    "graph code      inspector";
+    "graph     viewport   inspector"
+    "graph     code       inspector"
+    "statusbar statusbar  statusbar";
   gap: 1px;
   background: #0a0a0a;
   height: 100vh;
   width: 100vw;
 }
+
+.statusbar { grid-area: statusbar; }
 
 .panel {
   background: #252526;

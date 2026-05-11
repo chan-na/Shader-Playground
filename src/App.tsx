@@ -2,6 +2,7 @@ import { NodeEditor } from './ui/NodeEditor';
 import { Viewport } from './ui/Viewport';
 import { CodeEditor } from './ui/CodeEditor';
 import { Inspector } from './ui/Panels/Inspector';
+import { StatusBar } from './ui/Panels/StatusBar';
 
 export function App() {
   return (
@@ -10,6 +11,9 @@ export function App() {
       <Viewport />
       <CodeEditor />
       <Inspector />
+      <div className="statusbar">
+        <StatusBar />
+      </div>
     </div>
   );
 }

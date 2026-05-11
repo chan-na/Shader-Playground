@@ -5,8 +5,11 @@ import {
   DEMO_LAYOUT,
   createChainDemoGraph,
   CHAIN_DEMO_LAYOUT,
+  createTorusDemoGraph,
+  TORUS_DEMO_LAYOUT,
 } from '../../state/demoGraph';
-import { importFiles } from '../../state/assetActions';
+import { importFiles, hydrateAssetsFor } from '../../state/assetActions';
+import { serializeProject, deserializeProject } from '../../state/serialization';
 import { nextId } from '../../utils/id';
 import basicVert from '../../shaders/basic.vert?raw';
 import unlitFrag from '../../shaders/templates/unlit.frag?raw';
@@ -28,6 +31,7 @@ export function Toolbar() {
   const reset = useGraphStore((s) => s.reset);
   const nodes = useGraphStore((s) => s.nodes);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const projectInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasOutput = nodes.some((n) => n.kind === 'output');
 
@@ -39,6 +43,58 @@ export function Toolbar() {
     }
     // Reset so the same file can be re-imported.
     e.target.value = '';
+  };
+
+  const exportProject = () => {
+    const s = useGraphStore.getState();
+    const project = serializeProject({ nodes: s.nodes, edges: s.edges }, s.positions);
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shader-playground-${Date.now()}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const onPickProject = () => projectInputRef.current?.click();
+  const onProjectChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = deserializeProject(JSON.parse(text));
+      setGraph(parsed.graph, parsed.positions);
+      const meshIds: string[] = [];
+      const imageIds: string[] = [];
+      for (const n of parsed.graph.nodes) {
+        if (n.kind === 'mesh' && n.assetId) meshIds.push(n.assetId);
+        if (n.kind === 'image' && n.assetId) imageIds.push(n.assetId);
+      }
+      if (meshIds.length || imageIds.length) {
+        void hydrateAssetsFor({ meshes: meshIds, images: imageIds });
+      }
+      if (parsed.warnings.length) {
+        console.warn('Project loaded with warnings:', parsed.warnings);
+      }
+    } catch (err) {
+      alert(`Failed to load project: ${(err as Error).message}`);
+    }
+  };
+
+  const screenshot = () => {
+    const canvas = document.querySelector('.viewport-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shader-playground-${Date.now()}.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, 'image/png');
   };
 
   const addMesh = () => {
@@ -93,9 +149,20 @@ export function Toolbar() {
         style={{ display: 'none' }}
         onChange={onFilesChosen}
       />
+      <button style={btn} onClick={exportProject} title="Save graph as JSON">⬇ Export</button>
+      <button style={btn} onClick={onPickProject} title="Load graph from JSON">⬆ Import</button>
+      <input
+        ref={projectInputRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: 'none' }}
+        onChange={onProjectChosen}
+      />
+      <button style={btn} onClick={screenshot} title="Save viewport PNG">📷 Snap</button>
       <div style={{ flex: 1 }} />
-      <button style={btn} onClick={() => setGraph(createDemoGraph(), DEMO_LAYOUT)}>Demo</button>
-      <button style={btn} onClick={() => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT)}>Chain Demo</button>
+      <button style={btn} onClick={() => setGraph(createDemoGraph(), DEMO_LAYOUT)}>Sphere</button>
+      <button style={btn} onClick={() => setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT)}>Torus UV</button>
+      <button style={btn} onClick={() => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT)}>Chain</button>
       <button style={btn} onClick={() => reset()}>Clear</button>
     </div>
   );

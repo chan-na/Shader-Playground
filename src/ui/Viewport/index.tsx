@@ -2,11 +2,13 @@ import { useEffect, useRef } from 'react';
 import { useGraphStore, snapshotGraph } from '../../state/graphStore';
 import { useRendererStore } from '../../state/rendererStore';
 import { useCameraStore } from '../../state/cameraStore';
+import { useDiagnosticsStore, emptyDiagnostics } from '../../state/diagnosticsStore';
 import { createGLContext } from '../../core/gl/context';
 import { compileGraph, emptyPlan, type ExecutionPlan } from '../../core/graph/compile';
 import { executePlan } from '../../core/graph/execute';
 import { createCameraController } from '../../core/camera/input';
 import { createDemoGraph } from '../../state/demoGraph';
+import { parseShaderInfoLog } from '../../core/graph/diagnostics';
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -58,13 +60,20 @@ export function Viewport() {
         if (plan.errors.length) {
           pushError(plan.errors.map((e) => e.message).join(' | '));
         }
-        const compileMsgs: string[] = [];
-        for (const [id, errs] of Object.entries(plan.shaderErrors)) {
+        // Publish diagnostics for shader nodes
+        const diagStore = useDiagnosticsStore.getState();
+        const shaderNodeIds = g.nodes.filter((n) => n.kind === 'shader').map((n) => n.id);
+        for (const id of shaderNodeIds) {
+          const errs = plan.shaderErrors[id] ?? [];
+          const d = emptyDiagnostics();
           for (const er of errs) {
-            compileMsgs.push(`[${id}:${er.stage}] ${er.message.trim()}`);
+            const parsed = parseShaderInfoLog(er.raw);
+            if (er.stage === 'vertex') d.vertex.push(...parsed);
+            else if (er.stage === 'fragment') d.fragment.push(...parsed);
+            else d.link.push(...parsed);
           }
+          diagStore.set(id, d);
         }
-        if (compileMsgs.length) pushError(compileMsgs.join(' | '));
       } catch (e) {
         pushError(String(e));
       }

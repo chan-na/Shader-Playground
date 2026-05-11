@@ -106,7 +106,7 @@ function structuredCloneNode(n: GraphNode): GraphNode {
         kind: "param",
         paramKind: n.paramKind,
         value: Array.isArray(n.value) ? [...n.value] : n.value,
-        label: n.label,
+        ...(n.label !== undefined && { label: n.label }),
       };
     case "math":
       return { id: n.id, kind: "math", op: n.op, a: n.a, b: n.b };

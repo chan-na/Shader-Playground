@@ -46,7 +46,7 @@ export function ProblemsPanel() {
       nodeId: entry.nodeId,
       stage: targetStage,
       line: entry.diag.line,
-      column: entry.diag.column,
+      ...(entry.diag.column !== undefined && { column: entry.diag.column }),
     });
   };
 

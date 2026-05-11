@@ -159,7 +159,10 @@ export function parseHintComment(text: string): UniformHints {
 
   // Explicit control override. Last-write-wins so `@slider` after `@color`
   // (or vice versa) on the same line behaves predictably.
-  const controlOrder: Array<{ re: RegExp; value: UniformHints["control"] }> = [
+  const controlOrder: Array<{
+    re: RegExp;
+    value: NonNullable<UniformHints["control"]>;
+  }> = [
     { re: /@color\b/g, value: "color" },
     { re: /@slider\b/g, value: "slider" },
     { re: /@multi\b/g, value: "multi" },

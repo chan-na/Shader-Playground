@@ -28,7 +28,7 @@ export function parseShaderInfoLog(log: string): GLSLDiagnostic[] {
       // Some drivers swap: ERROR: 0:line[:column]. column may be undefined.
       out.push({
         line: lineNo,
-        column: colOrLine,
+        ...(colOrLine !== undefined && { column: colOrLine }),
         severity: sev,
         message: m[5]!.trim(),
       });

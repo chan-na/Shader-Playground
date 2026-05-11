@@ -62,6 +62,7 @@ function awaitRequest<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 function serializeMesh(handle: GeometryHandle): SerializedMesh {
+  const { indices } = handle.data;
   return {
     id: handle.id,
     name: handle.name,
@@ -74,15 +75,15 @@ function serializeMesh(handle: GeometryHandle): SerializedMesh {
       ),
       size: a.size,
     })),
-    indices: handle.data.indices
-      ? {
-          buffer: handle.data.indices.buffer.slice(
-            handle.data.indices.byteOffset,
-            handle.data.indices.byteOffset + handle.data.indices.byteLength,
-          ) as ArrayBuffer,
-          bytesPerIndex: handle.data.indices instanceof Uint32Array ? 4 : 2,
-        }
-      : undefined,
+    ...(indices && {
+      indices: {
+        buffer: indices.buffer.slice(
+          indices.byteOffset,
+          indices.byteOffset + indices.byteLength,
+        ) as ArrayBuffer,
+        bytesPerIndex: (indices instanceof Uint32Array ? 4 : 2) as 2 | 4,
+      },
+    }),
   };
 }
 

@@ -35,18 +35,18 @@ async function loadGltfFromArrayBuffer(
   const first = parsed.meshes?.[0]?.primitives?.[0];
   if (!first) throw new Error("GLTF has no mesh primitives");
   const attrs = first.attributes;
+  const posValue = attrs.POSITION?.value;
+  const normValue = attrs.NORMAL?.value;
+  const uvValue = attrs.TEXCOORD_0?.value;
+  const indValue = first.indices?.value;
   // toGeometryHandle expects { attributes, indices } shape with `.value`.
   const reshape = {
     attributes: {
-      POSITION: attrs.POSITION?.value
-        ? { value: attrs.POSITION.value }
-        : undefined,
-      NORMAL: attrs.NORMAL?.value ? { value: attrs.NORMAL.value } : undefined,
-      TEXCOORD_0: attrs.TEXCOORD_0?.value
-        ? { value: attrs.TEXCOORD_0.value }
-        : undefined,
+      ...(posValue && { POSITION: { value: posValue } }),
+      ...(normValue && { NORMAL: { value: normValue } }),
+      ...(uvValue && { TEXCOORD_0: { value: uvValue } }),
     },
-    indices: first.indices?.value ? { value: first.indices.value } : undefined,
+    ...(indValue && { indices: { value: indValue } }),
   };
   const meshName = parsed.json.meshes?.[0]?.name ?? name;
   return toGeometryHandle(reshape, meshName);

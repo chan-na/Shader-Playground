@@ -26,14 +26,13 @@ export function StageTabs({
       <Tab
         active={active === "vertex"}
         hasError={vertexHasError}
-        dimmed={vertexDimmed}
+        dimmed={vertexDimmed ?? false}
         label="vertex"
         onClick={() => onChange("vertex")}
-        title={
-          vertexDimmed
-            ? "Vertex shader is overridden by fullscreen quad (no mesh input)"
-            : undefined
-        }
+        {...(vertexDimmed && {
+          title:
+            "Vertex shader is overridden by fullscreen quad (no mesh input)",
+        })}
       />
       <Tab
         active={active === "fragment"}

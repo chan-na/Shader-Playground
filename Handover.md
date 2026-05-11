@@ -8,13 +8,14 @@
 > - `ec47df1 refactor: graphStore ↔ historyStore 순환 의존성 해소 (P3)`
 > - `289f082 chore: Knip 미사용 dep/export/type 정리 (P2)`
 > - `f51008e chore: GitHub Actions CI 도입 (P6)`
-> - **이번 세션**: P4 (`noUncheckedIndexedAccess` 도입) — tsconfig 옵션 추가, 123 추가 오류 (19 파일) 처리. 비-테스트 파일은 인덱스/리졸브 가드로, 테스트 파일은 `!` 단언으로. 11개 파일에 `noUncheckedIndexedAccess` 결과의 구조적 `!` 사용을 명시한 `biome-ignore-all` 추가. `npm run check` exit 0 (182/182) + `npm run build` 성공.
+> - `1516da3 chore: tsconfig noUncheckedIndexedAccess 도입 (P4-a)`
+> - **이번 세션**: P4-b (`exactOptionalPropertyTypes` 도입) — tsconfig 옵션 추가, **7 errors / 7 files** (추정 130에 비해 훨씬 적음) 처리. 모두 동일한 "optional 필드에 명시적 `undefined` 전달" 패턴이라 conditional spread (`...(v && { key: v })`) 또는 분리 할당으로 일괄 처리. `biome-ignore` 추가 없음. `npm run check` exit 0 (182/182) + `npm run build` 성공.
 
 ## 현재 상태
 
 | 항목 | 상태 |
 |---|---|
-| `tsc --noEmit` (`noUncheckedIndexedAccess` 포함) | 0 errors |
+| `tsc --noEmit` (`noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` 포함) | 0 errors |
 | `vitest run` | 182/182 pass |
 | `vite build` | 성공 |
 | `vitest run --coverage` | lines 30.68% / branches 83.39% / functions 55.04% / statements 30.68% (임계값 통과, Vitest 3 기준) |
@@ -109,11 +110,31 @@
 
 **검증**: `npm run check` exit 0 (typecheck 0/lint 0/0/knip 0/dpdm 0/test 182/182), `npm run build` 성공.
 
-### P4-b. `exactOptionalPropertyTypes`
+### ~~P4-b. `exactOptionalPropertyTypes`~~ ✅ 완료 (2026-05-12)
 
-- 미측정. 추정 비슷한 양. P4-a 결과를 보면 평균 6-7건/파일이므로 약 130 errors 예상
-- 처리 패턴이 다름: `prop?: T` 와 `prop: T | undefined` 의 구분이 빡빡해짐 → 객체 리터럴/스프레드 사용처가 영향
-- 별도 세션에서 점진 도입 권장
+처리 요약:
+
+| 항목 | 처리 전 | 처리 후 |
+|---|---|---|
+| `tsc --noEmit` (옵션 ON) | **7 errors / 7 files** (추정 130 → 실측 7) | **0 errors** ✅ |
+| 변경 파일 | — | 7 (모두 비-테스트) |
+| 신규 `biome-ignore` | — | **0** (룰 위반 없음) |
+
+**케이스별 처리** — 모두 "optional 필드(`prop?: T`)에 명시적 `undefined` 또는 `T | undefined` 전달"이라는 동일 패턴:
+
+| 파일 | 위치 | 처리 |
+|---|---|---|
+| `core/assets/cache.ts` | `serializeMesh` 의 `indices: ... ? {...} : undefined` | conditional spread `...(indices && { indices: {...} })` |
+| `core/assets/gltfLoader.ts` | `reshape.attributes.{POSITION,NORMAL,TEXCOORD_0}` + `indices` | 각 값 캡처 후 conditional spread |
+| `core/graph/diagnostics.ts` | `out.push({ column: colOrLine })` | `...(colOrLine !== undefined && { column: colOrLine })` |
+| `core/graph/uniformParser.ts` | `controlOrder` 배열 element type | `value: NonNullable<UniformHints["control"]>` 로 narrow |
+| `state/serialization.ts` | `case "param"` 의 `label: n.label` | `...(n.label !== undefined && { label: n.label })` |
+| `ui/CodeEditor/StageTabs.tsx` | `<Tab dimmed={vertexDimmed} title={... : undefined} />` | `dimmed={vertexDimmed ?? false}` + JSX spread `{...(vertexDimmed && { title: "..." })}` |
+| `ui/Panels/ProblemsPanel.tsx` | `requestJump({ column: entry.diag.column })` | conditional spread |
+
+**왜 7개로 끝났나**: P4-a (`noUncheckedIndexedAccess`)가 인덱스/배열/정규식 접근 전반을 건드리는 광범위한 변화인 반면, `exactOptionalPropertyTypes`는 객체 리터럴 작성 시점만 영향. 이 코드베이스는 (1) 대부분 zustand store mutator가 명시적인 set/update 패턴이고 (2) 객체 spread 시 `key: undefined`를 직접 쓰는 곳이 적어서 실측값이 추정보다 훨씬 작음.
+
+**검증**: `npm run check` exit 0 (typecheck 0/lint 0/0/knip 0/dpdm 0/test 182/182), `npm run build` 성공.
 
 ### ~~P5. Vitest 3 업그레이드~~ ✅ 완료 (2026-05-11)
 

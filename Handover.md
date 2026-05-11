@@ -1,19 +1,22 @@
 # Handover — Lint/Static Analysis/Coverage 후속 작업
 
-> 2026-05-11 갱신. 진행 이력:
+> 2026-05-12 갱신. 진행 이력:
 > - `000aaca chore: Biome / Knip / dpdm / vitest coverage 도구 셋업`
 > - `7cad6bc style: Biome 포매팅 + 안전한 lint fix 일괄 적용`
 > - `72889d2 docs: Handover.md — lint/static-analysis/coverage 후속 작업 핸드오프`
 > - `313dd23 chore: Biome 잔여 진단 0 errors / 0 warnings 정리 (P1)`
 > - `ec47df1 refactor: graphStore ↔ historyStore 순환 의존성 해소 (P3)`
 > - `289f082 chore: Knip 미사용 dep/export/type 정리 (P2)`
-> - **이번 세션**: P6 (GitHub Actions CI 도입) — `.github/workflows/check.yml` 신설. `push`/`pull_request` to `main` 트리거, Node 22 + npm cache, `npm ci && npm run check` 단일 잡. 로컬에서 `npm run check` exit 0 재확인 (182/182).
+> - `f51008e chore: GitHub Actions CI 도입 (P6)`
+> - `1516da3 chore: tsconfig noUncheckedIndexedAccess 도입 (P4-a)`
+> - `b2ccebc chore: tsconfig exactOptionalPropertyTypes 도입 (P4-b)`
+> - **이번 세션**: P8 (Biome ignore 정당성 전수 감사). file-level 9개 + inline 7개를 모두 점검 → 리팩터로 제거 가능한 inline 2건만 정리(`assetActions.ts` `arr.entries()` 변환, `NodeEditor/index.tsx` `newEdge` const 추출). 나머지 14건은 정당성 확인 후 유지. 룰 자체 off는 보류 — UI 코드에서 `!`는 여전히 의심 대상이어야 함.
 
 ## 현재 상태
 
 | 항목 | 상태 |
 |---|---|
-| `tsc --noEmit` | 0 errors |
+| `tsc --noEmit` (`noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` 포함) | 0 errors |
 | `vitest run` | 182/182 pass |
 | `vite build` | 성공 |
 | `vitest run --coverage` | lines 30.68% / branches 83.39% / functions 55.04% / statements 30.68% (임계값 통과, Vitest 3 기준) |
@@ -88,10 +91,51 @@
 
 검증: `dpdm` 0건, `tsc --noEmit` 통과, `biome check` 0 errors/warnings, `historyStore.test.ts` + `graphStore.test.ts` 12/12 통과, `vite build` 성공.
 
-### P4. tsconfig 강화
+### ~~P4-a. `noUncheckedIndexedAccess`~~ ✅ 완료 (2026-05-12)
 
-- `noUncheckedIndexedAccess`: 켜면 **129 추가 오류** (이전 측정). 별도 PR로 점진 도입 필요. `arr[i]` 사용처마다 가드 추가 또는 `!` 처리. 가장 큰 거 — 시간 들임
-- `exactOptionalPropertyTypes`: 미측정. 추정 비슷한 양
+처리 요약:
+
+| 항목 | 처리 전 | 처리 후 |
+|---|---|---|
+| `tsc --noEmit` (옵션 ON) | 123 errors / 19 files | **0 errors** ✅ |
+| 변경 파일 | — | 19 (비-테스트 13 + 테스트 6) |
+| `biome.json` | 변경 없음 | 변경 없음 (`noNonNullAssertion` 정책 유지) |
+| 신규 file-level `biome-ignore-all` | 1 (`execute.ts`) | **9** (`objLoader`, `primitives`, `diagnostics`, `uniformParser`, `nodes/utility`, `thumbnail/readback`, `state/historyStore`, `state/shareUrl` 추가; `execute.ts`는 기존 유지) |
+| 신규 inline `biome-ignore` | 5 | 5 + **3** (`state/assetActions`, `NodeEditor/index`, `NodeEditor/nodes/UtilityNodeViews`) |
+
+**접근 방식**:
+- `noUncheckedIndexedAccess`는 `arr[i]`, `regex.exec[n]`, 타입 배열 등 모든 인덱스 접근을 `T | undefined`로 좁힘
+- 비-테스트 코드: 루프 경계가 수학적으로 안전한 hot path(메시 생성/파서)와 정규식 캡처가 다수 → `!` 단언이 가장 깔끔. 해당 파일들에 `// biome-ignore-all lint/style/noNonNullAssertion: <이유>` 추가
+- 테스트 코드: 이미 `noNonNullAssertion: off` override 적용 중 → `!` 단언만 추가
+- `out[i] += x` 같은 복합 할당은 LHS에 `!`가 안 먹어서 `out[i] = out[i]! + x` 형태로 풀어씀
+
+**검증**: `npm run check` exit 0 (typecheck 0/lint 0/0/knip 0/dpdm 0/test 182/182), `npm run build` 성공.
+
+### ~~P4-b. `exactOptionalPropertyTypes`~~ ✅ 완료 (2026-05-12)
+
+처리 요약:
+
+| 항목 | 처리 전 | 처리 후 |
+|---|---|---|
+| `tsc --noEmit` (옵션 ON) | **7 errors / 7 files** (추정 130 → 실측 7) | **0 errors** ✅ |
+| 변경 파일 | — | 7 (모두 비-테스트) |
+| 신규 `biome-ignore` | — | **0** (룰 위반 없음) |
+
+**케이스별 처리** — 모두 "optional 필드(`prop?: T`)에 명시적 `undefined` 또는 `T | undefined` 전달"이라는 동일 패턴:
+
+| 파일 | 위치 | 처리 |
+|---|---|---|
+| `core/assets/cache.ts` | `serializeMesh` 의 `indices: ... ? {...} : undefined` | conditional spread `...(indices && { indices: {...} })` |
+| `core/assets/gltfLoader.ts` | `reshape.attributes.{POSITION,NORMAL,TEXCOORD_0}` + `indices` | 각 값 캡처 후 conditional spread |
+| `core/graph/diagnostics.ts` | `out.push({ column: colOrLine })` | `...(colOrLine !== undefined && { column: colOrLine })` |
+| `core/graph/uniformParser.ts` | `controlOrder` 배열 element type | `value: NonNullable<UniformHints["control"]>` 로 narrow |
+| `state/serialization.ts` | `case "param"` 의 `label: n.label` | `...(n.label !== undefined && { label: n.label })` |
+| `ui/CodeEditor/StageTabs.tsx` | `<Tab dimmed={vertexDimmed} title={... : undefined} />` | `dimmed={vertexDimmed ?? false}` + JSX spread `{...(vertexDimmed && { title: "..." })}` |
+| `ui/Panels/ProblemsPanel.tsx` | `requestJump({ column: entry.diag.column })` | conditional spread |
+
+**왜 7개로 끝났나**: P4-a (`noUncheckedIndexedAccess`)가 인덱스/배열/정규식 접근 전반을 건드리는 광범위한 변화인 반면, `exactOptionalPropertyTypes`는 객체 리터럴 작성 시점만 영향. 이 코드베이스는 (1) 대부분 zustand store mutator가 명시적인 set/update 패턴이고 (2) 객체 spread 시 `key: undefined`를 직접 쓰는 곳이 적어서 실측값이 추정보다 훨씬 작음.
+
+**검증**: `npm run check` exit 0 (typecheck 0/lint 0/0/knip 0/dpdm 0/test 182/182), `npm run build` 성공.
 
 ### ~~P5. Vitest 3 업그레이드~~ ✅ 완료 (2026-05-11)
 
@@ -129,11 +173,22 @@
 
 ### ~~P7. `useButtonType` 일괄 처리 후 readability~~ ✅ P1과 함께 완료
 
-### P8. (선택) Biome ignore의 정당성 재검토
+### ~~P8. Biome ignore의 정당성 재검토~~ ✅ 완료 (2026-05-12)
 
-- 추가된 file-level `biome-ignore-all`: `src/core/graph/execute.ts` 2건 (useHookAtTopLevel, noNonNullAssertion). 모두 WebGL 코드 false positive로 정당.
-- inline `biome-ignore`: 5건 — `objLoader.ts` 영역은 없음, `uniformParser.ts:169` (RegExp.exec), `validate.ts:105` (queue.shift after length guard), `NodeEditor/index.tsx:63` (zustand subscription deps), `NodeEditor/index.tsx:220` (file drop zone)
-- 미래에 룰 자체를 `off`로 내릴지 검토 가능 (특히 `noNonNullAssertion`은 테스트만 끄도록 override 됨)
+전수 감사 결과 — **file-level 9개 + inline 7건** 점검:
+
+| 분류 | 처리 |
+|---|---|
+| 리팩터로 제거 (2) | `state/assetActions.ts:128` → `for (const [i, file] of arr.entries())`. `ui/NodeEditor/index.tsx:177` → `newEdge`를 const로 추출해 `tentative.edges[length-1]!` 패턴 제거 |
+| 유지 — file-level (9) | `execute.ts`(WebGL setup, 12 bangs), `objLoader.ts`(파서, 18), `uniformParser.ts`(regex, 10), `primitives.ts`(geometry loop, 5), `diagnostics.ts`(regex, 6), `readback.ts`(pixel loop, 4), `utility.ts`(arity loop, 3), `historyStore.ts`(undo/redo stack, 3), `shareUrl.ts`(byte/regex, 2). 한 파일에 동일 패턴 다발 → file-level이 inline 다발보다 가독성 우위 |
+| 유지 — inline (5) | `validate.ts:105` (queue idiom), `uniformParser.ts:173` (RegExp.exec 루프), `NodeEditor/index.tsx:63` (zustand 의도된 구독), `NodeEditor/index.tsx:222` (a11y, 키보드 대안은 Toolbar Import), `UtilityNodeViews.tsx:101` (arity 불변량) |
+
+**룰 자체 off 검토** — 보류:
+- `noNonNullAssertion` warn → off: 거부. UI 코드에서 `!`는 여전히 의심 대상. 현재 file-level ignore가 "이 파일은 hot-path/parser라 예외" 신호로 작동하며, 새 코드의 우발적 `!`를 잡는 안전망 유지.
+- `useExhaustiveDependencies` warn: 유지 (inline 1건만 존재).
+- `useHookAtTopLevel` error: 유지 (file-level false positive `execute.ts` 1건만).
+
+**검증**: `npm run check` exit 0 (typecheck 0/lint 0/0/knip 0/dpdm 0/test 182/182), `npm run build` 성공.
 
 ---
 

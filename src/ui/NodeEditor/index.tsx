@@ -158,23 +158,21 @@ export function NodeEditor() {
       );
       if (!srcOut || !tgtIn || srcOut.type !== tgtIn.type) return;
 
+      const newEdge = {
+        id: nextId("e"),
+        source: conn.source,
+        sourceHandle: conn.sourceHandle,
+        target: conn.target,
+        targetHandle: conn.targetHandle,
+      };
       // Cycle check on a hypothetical graph
       const tentative = {
         nodes: graphNodes,
-        edges: [
-          ...graphEdges,
-          {
-            id: nextId("e"),
-            source: conn.source,
-            sourceHandle: conn.sourceHandle,
-            target: conn.target,
-            targetHandle: conn.targetHandle,
-          },
-        ],
+        edges: [...graphEdges, newEdge],
       };
       if (validateGraph(tentative).some((e) => e.code === "cycle")) return;
 
-      addEdge(tentative.edges[tentative.edges.length - 1]);
+      addEdge(newEdge);
     },
     [graphEdges, graphNodes, addEdge],
   );

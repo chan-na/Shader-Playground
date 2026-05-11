@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + length-guarded undo/redo stack access
 import { create } from "zustand";
 import type { GraphEdge, GraphNode } from "../core/graph/types";
 import type { NodePosition } from "./types";
@@ -50,20 +51,20 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   undo: () => {
     const s = get();
     if (s.past.length === 0) return null;
-    const head = s.past[s.past.length - 1];
+    const head = s.past[s.past.length - 1]!;
     set({
       past: s.past.slice(0, -1),
       future: [head, ...s.future],
       suppressNext: true,
     });
-    if (s.past.length >= 2) return cloneSnapshot(s.past[s.past.length - 2]);
+    if (s.past.length >= 2) return cloneSnapshot(s.past[s.past.length - 2]!);
     // Past is now empty — return an empty snapshot to restore.
     return { nodes: [], edges: [], positions: {} };
   },
   redo: () => {
     const s = get();
     if (s.future.length === 0) return null;
-    const head = s.future[0];
+    const head = s.future[0]!;
     set({
       past: [...s.past, cloneSnapshot(head)],
       future: s.future.slice(1),

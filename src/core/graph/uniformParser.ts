@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + regex captures / line walk bounds
 type UniformType =
   | "float"
   | "vec2"
@@ -122,20 +123,20 @@ export function parseHintComment(text: string): UniformHints {
   const rangeMatch =
     /@range\s+(-?\d+(?:\.\d+)?)\s*\.\.\s*(-?\d+(?:\.\d+)?)/.exec(text);
   if (rangeMatch) {
-    hints.min = parseFloat(rangeMatch[1]);
-    hints.max = parseFloat(rangeMatch[2]);
+    hints.min = parseFloat(rangeMatch[1]!);
+    hints.max = parseFloat(rangeMatch[2]!);
   }
   const minMatch = /@min\s+(-?\d+(?:\.\d+)?)/.exec(text);
-  if (minMatch) hints.min = parseFloat(minMatch[1]);
+  if (minMatch) hints.min = parseFloat(minMatch[1]!);
   const maxMatch = /@max\s+(-?\d+(?:\.\d+)?)/.exec(text);
-  if (maxMatch) hints.max = parseFloat(maxMatch[1]);
+  if (maxMatch) hints.max = parseFloat(maxMatch[1]!);
 
   const stepMatch = /@step\s+(-?\d+(?:\.\d+)?)/.exec(text);
-  if (stepMatch) hints.step = parseFloat(stepMatch[1]);
+  if (stepMatch) hints.step = parseFloat(stepMatch[1]!);
 
   const defMatch = /@default\s+([^@\n]+)/.exec(text);
   if (defMatch) {
-    const raw = defMatch[1].trim();
+    const raw = defMatch[1]!.trim();
     if (raw.includes(",")) {
       const parts = raw
         .split(/[ ,]+/)
@@ -158,7 +159,10 @@ export function parseHintComment(text: string): UniformHints {
 
   // Explicit control override. Last-write-wins so `@slider` after `@color`
   // (or vice versa) on the same line behaves predictably.
-  const controlOrder: Array<{ re: RegExp; value: UniformHints["control"] }> = [
+  const controlOrder: Array<{
+    re: RegExp;
+    value: NonNullable<UniformHints["control"]>;
+  }> = [
     { re: /@color\b/g, value: "color" },
     { re: /@slider\b/g, value: "slider" },
     { re: /@multi\b/g, value: "multi" },
@@ -231,7 +235,7 @@ function applyHints(spec: UniformSpec, hints: UniformHints): UniformSpec {
       const target = out.defaultValue.slice();
       for (let i = 0; i < target.length; i++) {
         if (hints.defaultValue[i] !== undefined)
-          target[i] = hints.defaultValue[i];
+          target[i] = hints.defaultValue[i]!;
       }
       out.defaultValue = target;
     } else if (
@@ -258,7 +262,7 @@ export function parseUniforms(source: string): UniformSpec[] {
   const lines = noBlock.split(/\r?\n/);
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = lines[i]!;
     // Drop *inline* comments AFTER we capture them for hint parsing
     const commentIdx = line.indexOf("//");
     const code = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
@@ -267,7 +271,7 @@ export function parseUniforms(source: string): UniformSpec[] {
     const m = RE_UNIFORM.exec(code);
     if (!m) continue;
     const type = m[1] as UniformType;
-    const name = m[2];
+    const name = m[2]!;
     if (seen.has(name)) continue;
     seen.add(name);
 
@@ -304,7 +308,7 @@ export function parseUniforms(source: string): UniformSpec[] {
     const hintParts: string[] = [];
     if (trailingComment) hintParts.push(trailingComment);
     for (let j = i - 1; j >= 0; j--) {
-      const prev = rawLines[j].trim();
+      const prev = rawLines[j]!.trim();
       if (!prev) continue;
       if (prev.startsWith("//")) {
         hintParts.unshift(prev);

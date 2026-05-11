@@ -80,11 +80,17 @@ function bindUserUniforms(
     if (typeof value === "number") {
       setUniform(gl, loc ?? null, value);
     } else if (Array.isArray(value)) {
-      if (value.length === 2) setUniform(gl, loc ?? null, [value[0], value[1]]);
+      if (value.length === 2)
+        setUniform(gl, loc ?? null, [value[0]!, value[1]!]);
       else if (value.length === 3)
-        setUniform(gl, loc ?? null, [value[0], value[1], value[2]]);
+        setUniform(gl, loc ?? null, [value[0]!, value[1]!, value[2]!]);
       else if (value.length === 4)
-        setUniform(gl, loc ?? null, [value[0], value[1], value[2], value[3]]);
+        setUniform(gl, loc ?? null, [
+          value[0]!,
+          value[1]!,
+          value[2]!,
+          value[3]!,
+        ]);
     }
   }
 }
@@ -204,8 +210,8 @@ export function executePlan(
   }
   const cells = splitLayout(drawable.length, canvasWidth, canvasHeight);
   for (let i = 0; i < drawable.length; i++) {
-    const cell = cells[i];
-    const src = passByNode.get(drawable[i].sourceNodeId!)!;
+    const cell = cells[i]!;
+    const src = passByNode.get(drawable[i]!.sourceNodeId!)!;
     gl.viewport(cell.x, cell.y, Math.max(1, cell.w), Math.max(1, cell.h));
     blitToCanvas(gl, src.fbo.color.texture);
   }

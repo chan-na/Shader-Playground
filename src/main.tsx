@@ -10,6 +10,7 @@ import { useDiagnosticsStore } from './state/diagnosticsStore';
 import { useTimeStore } from './state/timeStore';
 import { useViewportStore } from './state/viewportStore';
 import { useHistoryStore } from './state/historyStore';
+import { useEditorStore } from './state/editorStore';
 
 if (import.meta.env.DEV) {
   // Expose stores for debugging / Playwright-style verification.
@@ -22,6 +23,7 @@ if (import.meta.env.DEV) {
     time: useTimeStore,
     viewport: useViewportStore,
     history: useHistoryStore,
+    editor: useEditorStore,
   };
 }
 

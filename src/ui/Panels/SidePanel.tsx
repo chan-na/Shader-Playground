@@ -24,7 +24,7 @@ export function SidePanel() {
   );
 
   return (
-    <div className="panel panel--inspector">
+    <div className="panel panel--inspector" data-testid="side-panel">
       <div className="panel-tabs">
         <button
           type="button"
@@ -32,6 +32,7 @@ export function SidePanel() {
             tab === "inspector" ? "panel-tab panel-tab--active" : "panel-tab"
           }
           onClick={() => setTab("inspector")}
+          data-testid="tab-inspector"
         >
           Inspector
         </button>
@@ -41,6 +42,7 @@ export function SidePanel() {
             tab === "assets" ? "panel-tab panel-tab--active" : "panel-tab"
           }
           onClick={() => setTab("assets")}
+          data-testid="tab-assets"
         >
           Assets
           {assetCount > 0 && (
@@ -54,6 +56,7 @@ export function SidePanel() {
           }
           onClick={() => setTab("problems")}
           data-variant={total > 0 ? "error" : undefined}
+          data-testid="tab-problems"
         >
           Problems
           {total > 0 && <span className="panel-tab-badge">{total}</span>}

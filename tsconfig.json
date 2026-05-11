@@ -23,5 +23,11 @@
 
     "types": ["vite/client", "vitest/globals"]
   },
-  "include": ["src", "vitest.config.ts", "vite.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "vitest.config.ts",
+    "vite.config.ts",
+    "playwright.config.ts"
+  ]
 }

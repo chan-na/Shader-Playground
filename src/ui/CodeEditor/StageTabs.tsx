@@ -57,6 +57,8 @@ function Tab(props: {
       type="button"
       onClick={props.onClick}
       title={props.title}
+      data-testid={`stage-tab-${props.label}`}
+      data-active={props.active}
       style={{
         background: props.active ? "#1e1e1e" : "transparent",
         border: "none",

@@ -6,6 +6,11 @@ coverage
 *.local
 .vite
 
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
 # Editor
 .vscode/*
 !.vscode/extensions.json

@@ -175,6 +175,9 @@ export function CodeEditor() {
       <div className="panel-body">
         <div
           ref={containerRef}
+          data-testid="code-editor"
+          data-active-node={effectiveId ?? ""}
+          data-active-stage={stage}
           style={{
             width: "100%",
             height: "100%",

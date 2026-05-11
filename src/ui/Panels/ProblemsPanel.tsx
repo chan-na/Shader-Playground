@@ -91,6 +91,10 @@ export function ProblemsPanel() {
                 className="problem-row"
                 onClick={() => goTo(e)}
                 title="Jump to source"
+                data-testid="problem-row"
+                data-node-id={e.nodeId}
+                data-stage={e.stage}
+                data-line={e.diag.line}
               >
                 <span
                   style={{

@@ -222,7 +222,11 @@ export function Viewport() {
     <div className="panel panel--viewport">
       <div className="panel-header">Viewport</div>
       <div className="panel-body">
-        <canvas ref={canvasRef} className="viewport-canvas" />
+        <canvas
+          ref={canvasRef}
+          className="viewport-canvas"
+          data-testid="viewport-canvas"
+        />
       </div>
     </div>
   );

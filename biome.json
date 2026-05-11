@@ -9,8 +9,10 @@
     "ignoreUnknown": false,
     "includes": [
       "src/**",
+      "tests/**",
       "vite.config.ts",
       "vitest.config.ts",
+      "playwright.config.ts",
       "package.json",
       "tsconfig.json",
       "biome.json",
@@ -66,7 +68,12 @@
   },
   "overrides": [
     {
-      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "tests/e2e/**/*.ts",
+        "tests/e2e/**/*.tsx"
+      ],
       "linter": {
         "rules": {
           "style": {

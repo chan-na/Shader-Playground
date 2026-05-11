@@ -93,7 +93,13 @@ export function Inspector({ embedded = false }: InspectorProps) {
                   </div>
                 )}
                 {visible.map((spec) => (
-                  <div key={spec.name} style={{ marginBottom: 10 }}>
+                  <div
+                    key={spec.name}
+                    style={{ marginBottom: 10 }}
+                    data-testid="uniform-row"
+                    data-uniform-name={spec.name}
+                    data-uniform-control={spec.control}
+                  >
                     <div
                       style={{
                         display: "flex",

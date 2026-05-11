@@ -12,6 +12,9 @@ import {
 } from '../../state/demoGraph';
 import { importFiles, hydrateAssetsFor } from '../../state/assetActions';
 import { serializeProject, deserializeProject } from '../../state/serialization';
+import { encodeShareUrl } from '../../state/shareUrl';
+import { useRecorderStore } from '../../state/recorder';
+import { downloadExportedHtml } from '../../export/htmlExport';
 import { nextId } from '../../utils/id';
 import basicVert from '../../shaders/basic.vert?raw';
 import unlitFrag from '../../shaders/templates/unlit.frag?raw';
@@ -102,6 +105,45 @@ export function Toolbar() {
     }, 'image/png');
   };
 
+  const shareUrl = async () => {
+    const s = useGraphStore.getState();
+    const url = await encodeShareUrl({ nodes: s.nodes, edges: s.edges }, s.positions);
+    try {
+      await navigator.clipboard.writeText(url);
+      alert(`Share URL copied to clipboard\n${url.length} chars`);
+    } catch {
+      window.prompt('Copy this share URL:', url);
+    }
+  };
+
+  const exportHtml = () => {
+    const s = useGraphStore.getState();
+    downloadExportedHtml({ nodes: s.nodes, edges: s.edges }, s.positions);
+  };
+
+  const recorderStatus = useRecorderStore((r) => r.status);
+  const recorderUrl = useRecorderStore((r) => r.lastBlobUrl);
+
+  const toggleRecord = async () => {
+    const r = useRecorderStore.getState();
+    const canvas = document.querySelector('.viewport-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    if (r.status === 'idle') {
+      await r.start(canvas, 30);
+    } else {
+      const blob = await r.stop();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `shader-playground-${Date.now()}.webm`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    }
+  };
+  void recorderUrl;
+
   const addMesh = () => {
     const id = nextId('mesh');
     addNode(
@@ -190,6 +232,19 @@ export function Toolbar() {
         onChange={onProjectChosen}
       />
       <button style={btn} onClick={screenshot} title="Save viewport PNG">📷 Snap</button>
+      <button
+        style={{
+          ...btn,
+          background: recorderStatus === 'recording' ? '#5c1a1a' : btn.background,
+          color: recorderStatus === 'recording' ? '#ff8484' : btn.color,
+        }}
+        onClick={toggleRecord}
+        title="Record viewport to WebM"
+      >
+        {recorderStatus === 'recording' ? '■ Stop' : '● Record'}
+      </button>
+      <button style={btn} onClick={shareUrl} title="Copy a shareable URL to clipboard">🔗 Share</button>
+      <button style={btn} onClick={exportHtml} title="Download a self-contained HTML file">📄 HTML</button>
       <div style={{ flex: 1 }} />
       <button style={btn} onClick={() => setGraph(createDemoGraph(), DEMO_LAYOUT)}>Sphere</button>
       <button style={btn} onClick={() => setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT)}>Torus UV</button>

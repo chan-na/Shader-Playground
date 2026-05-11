@@ -23,13 +23,31 @@ export function Viewport() {
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
 
-  // Bootstrap demo graph on first mount if empty. Clear history afterwards
-  // so the first Cmd+Z doesn't wipe the demo back to a blank canvas.
+  // Bootstrap: prefer a #share=... URL if present; otherwise demo. Clear
+  // history afterwards so the first Cmd+Z doesn't wipe back to a blank graph.
   useEffect(() => {
-    if (useGraphStore.getState().nodes.length === 0) {
-      useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
-      useHistoryStore.getState().clear();
+    if (useGraphStore.getState().nodes.length !== 0) return;
+    const hash = typeof location !== 'undefined' ? location.hash : '';
+    if (hash.includes('share=')) {
+      void (async () => {
+        try {
+          const mod = await import('../../state/shareUrl');
+          const decoded = await mod.decodeShareHash(hash);
+          if (decoded) {
+            useGraphStore.getState().setGraph(decoded.graph, decoded.positions);
+            useHistoryStore.getState().clear();
+            return;
+          }
+        } catch {
+          /* fall through to demo */
+        }
+        useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+        useHistoryStore.getState().clear();
+      })();
+      return;
     }
+    useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+    useHistoryStore.getState().clear();
   }, []);
 
   useEffect(() => {

@@ -155,6 +155,7 @@ export function Viewport() {
           camera: useCameraStore.getState().camera,
           background: bg,
           params,
+          graph: { nodes: graph.nodes, edges: graph.edges },
         },
         canvas.width,
         canvas.height,

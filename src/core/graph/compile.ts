@@ -175,7 +175,12 @@ export function compileGraph(
       if (e.targetHandle === 'mesh') continue;
       const src = graph.nodes.find((n) => n.id === e.source);
       if (!src) continue;
-      if (src.kind === 'param') {
+      if (
+        src.kind === 'param' ||
+        src.kind === 'math' ||
+        src.kind === 'swizzle' ||
+        src.kind === 'combine'
+      ) {
         paramBindings.push({ uniformName: e.targetHandle, sourceNodeId: e.source });
       } else {
         samplers.push({ uniformName: e.targetHandle, sourceNodeId: e.source, unit: unit++ });

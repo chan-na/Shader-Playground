@@ -24,9 +24,9 @@ import { ImageNodeView } from './nodes/ImageNodeView';
 import { ShaderNodeView } from './nodes/ShaderNodeView';
 import { OutputNodeView } from './nodes/OutputNodeView';
 import { ParamNodeView } from './nodes/ParamNodeView';
-import { NODE_META, paramOutputPort } from '../../core/nodes/registry';
+import { MathNodeView, SwizzleNodeView, CombineNodeView } from './nodes/UtilityNodeViews';
+import { nodeInputPorts, nodeOutputPorts } from '../../core/nodes/registry';
 import { nextId } from '../../utils/id';
-import type { ParamGraphNode, ShaderGraphNode } from '../../core/graph/types';
 import { validateGraph } from '../../core/graph/validate';
 
 const nodeTypes = {
@@ -35,6 +35,9 @@ const nodeTypes = {
   shader: ShaderNodeView,
   output: OutputNodeView,
   param: ParamNodeView,
+  math: MathNodeView,
+  swizzle: SwizzleNodeView,
+  combine: CombineNodeView,
 };
 
 export function NodeEditor() {
@@ -131,12 +134,8 @@ export function NodeEditor() {
       const srcNode = graphNodes.find((n) => n.id === conn.source);
       const tgtNode = graphNodes.find((n) => n.id === conn.target);
       if (!srcNode || !tgtNode) return;
-      const srcOut = srcNode.kind === 'param'
-        ? paramOutputPort((srcNode as ParamGraphNode).paramKind)
-        : NODE_META[srcNode.kind].outputs().find((p) => p.name === conn.sourceHandle);
-      const tgtIn = NODE_META[tgtNode.kind]
-        .inputs(tgtNode.kind === 'shader' ? (tgtNode as ShaderGraphNode) : null)
-        .find((p) => p.name === conn.targetHandle);
+      const srcOut = nodeOutputPorts(srcNode).find((p) => p.name === conn.sourceHandle);
+      const tgtIn = nodeInputPorts(tgtNode).find((p) => p.name === conn.targetHandle);
       if (!srcOut || !tgtIn || srcOut.type !== tgtIn.type) return;
 
       // Cycle check on a hypothetical graph
@@ -167,12 +166,8 @@ export function NodeEditor() {
       const srcNode = graphNodes.find((n) => n.id === c.source);
       const tgtNode = graphNodes.find((n) => n.id === c.target);
       if (!srcNode || !tgtNode) return false;
-      const srcOut = srcNode.kind === 'param'
-        ? paramOutputPort((srcNode as ParamGraphNode).paramKind)
-        : NODE_META[srcNode.kind].outputs().find((p) => p.name === c.sourceHandle);
-      const tgtIn = NODE_META[tgtNode.kind]
-        .inputs(tgtNode.kind === 'shader' ? (tgtNode as ShaderGraphNode) : null)
-        .find((p) => p.name === c.targetHandle);
+      const srcOut = nodeOutputPorts(srcNode).find((p) => p.name === c.sourceHandle);
+      const tgtIn = nodeInputPorts(tgtNode).find((p) => p.name === c.targetHandle);
       if (!srcOut || !tgtIn) return false;
       return srcOut.type === tgtIn.type;
     },

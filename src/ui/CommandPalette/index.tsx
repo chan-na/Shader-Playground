@@ -19,7 +19,13 @@ import blurFrag from '../../shaders/templates/blur.frag?raw';
 import tonemapFrag from '../../shaders/templates/tonemap.frag?raw';
 import uvDebugFrag from '../../shaders/templates/uvDebug.frag?raw';
 import blendFrag from '../../shaders/templates/blend.frag?raw';
-import type { GraphNode, MeshGraphNode, ParamKind } from '../../core/graph/types';
+import type {
+  CombineArity,
+  GraphNode,
+  MathOp,
+  MeshGraphNode,
+  ParamKind,
+} from '../../core/graph/types';
 import { MAX_OUTPUTS } from '../../core/graph/validate';
 
 interface Command {
@@ -123,6 +129,54 @@ function buildCommands(): Command[] {
         const value: number | number[] =
           k === 'float' ? 0.5 : k === 'time' ? [1, 0] : k === 'color' ? [1, 0.5, 0.2] : [0, 0, 0];
         addNode({ id, kind: 'param', paramKind: k, value }, { x: -240, y: 240 });
+        select(id);
+      },
+    });
+  }
+
+  const mathOps: MathOp[] = ['add', 'subtract', 'multiply', 'divide', 'pow', 'abs', 'sin', 'cos'];
+  for (const op of mathOps) {
+    cmds.push({
+      id: `add-math-${op}`,
+      category: 'Node',
+      label: `Add Math: ${op}`,
+      keywords: `add node math ${op} utility scalar arithmetic`,
+      run: () => {
+        const id = nextId('math');
+        addNode({ id, kind: 'math', op, a: 0, b: 0 }, { x: -240, y: 320 });
+        select(id);
+      },
+    });
+  }
+
+  const swizzleMasks = ['xyz', 'xy', 'zyx', 'xxxx', 'wzyx', 'x', 'y', 'z'];
+  for (const mask of swizzleMasks) {
+    cmds.push({
+      id: `add-swizzle-${mask}`,
+      category: 'Node',
+      label: `Add Swizzle: .${mask}`,
+      keywords: `add node swizzle vec decompose ${mask} utility`,
+      run: () => {
+        const id = nextId('swizzle');
+        addNode({ id, kind: 'swizzle', mask }, { x: -120, y: 320 });
+        select(id);
+      },
+    });
+  }
+
+  const combineArities: CombineArity[] = [2, 3, 4];
+  for (const arity of combineArities) {
+    cmds.push({
+      id: `add-combine-${arity}`,
+      category: 'Node',
+      label: `Add Combine: Float×${arity} → vec${arity}`,
+      keywords: `add node combine vec ${arity} compose utility`,
+      run: () => {
+        const id = nextId('combine');
+        addNode(
+          { id, kind: 'combine', arity, values: [0, 0, 0, 0] },
+          { x: 0, y: 320 },
+        );
         select(id);
       },
     });

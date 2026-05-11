@@ -1,10 +1,15 @@
 import { create } from 'zustand';
 import type {
+  CombineArity,
+  CombineGraphNode,
   Graph,
   GraphEdge,
   GraphNode,
+  MathGraphNode,
+  MathOp,
   ParamGraphNode,
   ShaderGraphNode,
+  SwizzleGraphNode,
 } from '../core/graph/types';
 import { useHistoryStore } from './historyStore';
 
@@ -31,6 +36,15 @@ export interface GraphState {
   setUniformValue: (id: string, name: string, value: number | number[]) => void;
   setParamValue: (id: string, value: number | number[]) => void;
   setParamLabel: (id: string, label: string) => void;
+  setMathConfig: (
+    id: string,
+    patch: { op?: MathOp; a?: number; b?: number },
+  ) => void;
+  setSwizzleMask: (id: string, mask: string) => void;
+  setCombineConfig: (
+    id: string,
+    patch: { arity?: CombineArity; values?: [number, number, number, number] },
+  ) => void;
   addEdge: (edge: GraphEdge) => void;
   removeEdge: (id: string) => void;
   reset: () => void;
@@ -134,6 +148,54 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       nodes: s.nodes.map((n) => {
         if (n.id !== id || n.kind !== 'param') return n;
         return { ...(n as ParamGraphNode), label } as ParamGraphNode;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
+  setMathConfig: (id, patch) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== 'math') return n;
+        const mn = n as MathGraphNode;
+        return {
+          ...mn,
+          op: patch.op ?? mn.op,
+          a: patch.a ?? mn.a,
+          b: patch.b ?? mn.b,
+        } as MathGraphNode;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
+  setSwizzleMask: (id, mask) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== 'swizzle') return n;
+        return { ...(n as SwizzleGraphNode), mask } as SwizzleGraphNode;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
+  setCombineConfig: (id, patch) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== 'combine') return n;
+        const cn = n as CombineGraphNode;
+        return {
+          ...cn,
+          arity: patch.arity ?? cn.arity,
+          values: patch.values
+            ? [
+                patch.values[0],
+                patch.values[1],
+                patch.values[2],
+                patch.values[3],
+              ]
+            : cn.values,
+        } as CombineGraphNode;
       }),
       rev: s.rev + 1,
     }));

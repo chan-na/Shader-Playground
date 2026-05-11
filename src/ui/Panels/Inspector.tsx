@@ -5,6 +5,7 @@ import { inspectorUniforms, parseUniforms, samplerUniforms } from '../../core/gr
 import { UniformControl } from './UniformControl';
 import { ViewportControls } from './ViewportControls';
 import { ParamInspector } from './ParamInspector';
+import { UtilityInspector } from './UtilityInspector';
 import type { ParamGraphNode, ShaderGraphNode } from '../../core/graph/types';
 
 export interface InspectorProps {
@@ -63,6 +64,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
 
           {node.kind === 'param' && (
             <ParamInspector node={node as ParamGraphNode} />
+          )}
+
+          {(node.kind === 'math' || node.kind === 'swizzle' || node.kind === 'combine') && (
+            <UtilityInspector node={node} />
           )}
 
           {shaderNode && (

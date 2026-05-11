@@ -1,5 +1,10 @@
 import { useGraphStore } from '../../state/graphStore';
-import { createDemoGraph } from '../../state/demoGraph';
+import {
+  createDemoGraph,
+  DEMO_LAYOUT,
+  createChainDemoGraph,
+  CHAIN_DEMO_LAYOUT,
+} from '../../state/demoGraph';
 import { nextId } from '../../utils/id';
 import basicVert from '../../shaders/basic.vert?raw';
 import unlitFrag from '../../shaders/templates/unlit.frag?raw';
@@ -67,11 +72,8 @@ export function Toolbar() {
       <button style={btn} onClick={addShader}>+ Shader</button>
       <button style={btn} onClick={addOutput} disabled={hasOutput}>+ Output</button>
       <div style={{ flex: 1 }} />
-      <button style={btn} onClick={() => setGraph(createDemoGraph(), {
-        mesh1: { x: -240, y: 0 },
-        shader1: { x: 80, y: 0 },
-        output1: { x: 400, y: 0 },
-      })}>Demo</button>
+      <button style={btn} onClick={() => setGraph(createDemoGraph(), DEMO_LAYOUT)}>Demo</button>
+      <button style={btn} onClick={() => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT)}>Chain Demo</button>
       <button style={btn} onClick={() => reset()}>Clear</button>
     </div>
   );

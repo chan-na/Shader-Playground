@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -9,6 +9,7 @@ import {
   type Node,
   type NodeChange,
   type EdgeChange,
+  type ReactFlowInstance,
   applyNodeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -37,11 +38,29 @@ export function NodeEditor() {
   const graphNodes = useGraphStore((s) => s.nodes);
   const graphEdges = useGraphStore((s) => s.edges);
   const positions = useGraphStore((s) => s.positions);
+  const rev = useGraphStore((s) => s.rev);
   const updateNodePosition = useGraphStore((s) => s.updateNodePosition);
   const removeNode = useGraphStore((s) => s.removeNode);
   const addEdge = useGraphStore((s) => s.addEdge);
   const removeEdge = useGraphStore((s) => s.removeEdge);
   const select = useSelectionStore((s) => s.select);
+  const flowRef = useRef<ReactFlowInstance | null>(null);
+
+  // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear) so
+  // small graph panels still show every node. Triggered by rev bumps, not by
+  // per-node drags (which don't bump rev).
+  const prevCountRef = useRef(graphNodes.length);
+  useEffect(() => {
+    const inst = flowRef.current;
+    if (!inst) return;
+    if (graphNodes.length === 0) return;
+    // Defer to next frame so the new node DOM has measured dimensions.
+    const id = requestAnimationFrame(() => {
+      inst.fitView({ padding: 0.15, minZoom: 0.2, maxZoom: 1.0, duration: 200 });
+    });
+    prevCountRef.current = graphNodes.length;
+    return () => cancelAnimationFrame(id);
+  }, [rev, graphNodes.length]);
 
   const rfNodes: Node[] = useMemo(
     () =>
@@ -166,6 +185,9 @@ export function NodeEditor() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           isValidConnection={isValidConnection}
+          onInit={(inst) => {
+            flowRef.current = inst;
+          }}
           fitView
           fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
           proOptions={{ hideAttribution: true }}

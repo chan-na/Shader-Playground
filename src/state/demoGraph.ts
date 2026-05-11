@@ -1,6 +1,10 @@
 import basicVert from '../shaders/basic.vert?raw';
 import unlitFrag from '../shaders/templates/unlit.frag?raw';
+import noiseFrag from '../shaders/templates/noise.frag?raw';
+import blurFrag from '../shaders/templates/blur.frag?raw';
+import tonemapFrag from '../shaders/templates/tonemap.frag?raw';
 import type { Graph } from '../core/graph/types';
+import type { NodePosition } from './graphStore';
 
 export function createDemoGraph(): Graph {
   return {
@@ -35,3 +39,76 @@ export function createDemoGraph(): Graph {
     ],
   };
 }
+
+export const DEMO_LAYOUT: Record<string, NodePosition> = {
+  mesh1: { x: -240, y: 0 },
+  shader1: { x: 80, y: 0 },
+  output1: { x: 400, y: 0 },
+};
+
+export function createChainDemoGraph(): Graph {
+  return {
+    nodes: [
+      {
+        id: 'noise1',
+        kind: 'shader',
+        vertexSource: basicVert,
+        fragmentSource: noiseFrag,
+        uniformValues: {
+          u_scale: 6.0,
+          u_tint: [0.4, 0.8, 1.0],
+        },
+      },
+      {
+        id: 'blur1',
+        kind: 'shader',
+        vertexSource: basicVert,
+        fragmentSource: blurFrag,
+        uniformValues: {
+          u_radius: 2.5,
+        },
+      },
+      {
+        id: 'tonemap1',
+        kind: 'shader',
+        vertexSource: basicVert,
+        fragmentSource: tonemapFrag,
+        uniformValues: {
+          u_exposure: 1.4,
+          u_gamma: 2.2,
+        },
+      },
+      { id: 'output1', kind: 'output' },
+    ],
+    edges: [
+      {
+        id: 'e1',
+        source: 'noise1',
+        sourceHandle: 'texture',
+        target: 'blur1',
+        targetHandle: 'u_tex',
+      },
+      {
+        id: 'e2',
+        source: 'blur1',
+        sourceHandle: 'texture',
+        target: 'tonemap1',
+        targetHandle: 'u_tex',
+      },
+      {
+        id: 'e3',
+        source: 'tonemap1',
+        sourceHandle: 'texture',
+        target: 'output1',
+        targetHandle: 'texture',
+      },
+    ],
+  };
+}
+
+export const CHAIN_DEMO_LAYOUT: Record<string, NodePosition> = {
+  noise1: { x: -300, y: -60 },
+  blur1: { x: -100, y: 60 },
+  tonemap1: { x: 100, y: -60 },
+  output1: { x: 300, y: 60 },
+};

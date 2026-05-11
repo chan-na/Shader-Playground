@@ -8,7 +8,15 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write",
+    "typecheck": "tsc --noEmit",
+    "deadcode": "knip",
+    "circular": "dpdm --no-warning --no-tree --exit-code circular:1 src/main.tsx",
+    "check": "npm run typecheck && npm run lint && npm run deadcode && npm run circular && npm run test"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -31,10 +39,14 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.15",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "@vitest/coverage-v8": "2.1.9",
+    "dpdm": "4.2.0",
     "jsdom": "^25.0.1",
+    "knip": "6.12.2",
     "typescript": "~5.6.3",
     "vite": "^6.0.0",
     "vitest": "^2.1.8"

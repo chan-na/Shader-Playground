@@ -7,7 +7,7 @@
 > - `313dd23 chore: Biome 잔여 진단 0 errors / 0 warnings 정리 (P1)`
 > - `ec47df1 refactor: graphStore ↔ historyStore 순환 의존성 해소 (P3)`
 > - `289f082 chore: Knip 미사용 dep/export/type 정리 (P2)`
-> - **이번 세션**: P5 (Vitest 3 업그레이드) — `vitest`/`@vitest/coverage-v8` 2.1.9 → 3.2.4. 코드 변경 0, 테스트 182/182 그대로 통과. AST 기반 V8 remapping 효과로 함수/브랜치 커버리지 정확도 미세 상승.
+> - **이번 세션**: P6 (GitHub Actions CI 도입) — `.github/workflows/check.yml` 신설. `push`/`pull_request` to `main` 트리거, Node 22 + npm cache, `npm ci && npm run check` 단일 잡. 로컬에서 `npm run check` exit 0 재확인 (182/182).
 
 ## 현재 상태
 
@@ -110,12 +110,22 @@
 
 미래에 Vitest 4로 한 번 더 올릴 때는 v3→v4 마이그레이션 가이드 별도 확인 필요.
 
-### P6. CI 추가 (GitHub Actions) — **다음 후속 작업으로 적합**
+### ~~P6. CI 추가 (GitHub Actions)~~ ✅ 완료 (2026-05-11)
 
-- `.github/workflows/check.yml` 신설
-- `npm ci && npm run check` 단일 잡으로 충분 (typecheck + lint + deadcode + circular + test). P2 완료 후 첫 exit 0 달성.
-- 커버리지 리포트는 옵션 — codecov/coveralls 또는 PR 코멘트
-- PR 트리거: `pull_request: branches: [main]`
+처리 요약:
+
+| 항목 | 내용 |
+|---|---|
+| 신설 파일 | `.github/workflows/check.yml` |
+| 트리거 | `push: branches: [main]` + `pull_request: branches: [main]` |
+| 동시성 제어 | `concurrency` 그룹 + PR에 한해 `cancel-in-progress: true` (push는 유지) |
+| 권한 | `permissions: contents: read` (최소 권한) |
+| 환경 | `ubuntu-latest`, Node 22 LTS, `actions/setup-node@v4`의 `cache: npm` 활용 |
+| 실행 | `npm ci` → `npm run check` (typecheck + lint + deadcode + circular + test) |
+
+로컬 재검증: `npm run check` exit 0 (typecheck 0 errors, biome 0/0, knip 0, dpdm 0, vitest 182/182). 워크플로 동작은 다음 push/PR에서 실제 확인 필요.
+
+커버리지 업로드(codecov/coveralls) 및 빌드 게이트(`vite build`)는 의도적으로 포함하지 않음 — Handover에서 "단일 잡으로 충분" 지침 준수. 필요해지면 같은 잡에 step 추가 또는 별도 잡으로 확장 가능.
 
 ### ~~P7. `useButtonType` 일괄 처리 후 readability~~ ✅ P1과 함께 완료
 

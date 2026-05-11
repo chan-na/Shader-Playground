@@ -6,7 +6,8 @@
 > - `72889d2 docs: Handover.md — lint/static-analysis/coverage 후속 작업 핸드오프`
 > - `313dd23 chore: Biome 잔여 진단 0 errors / 0 warnings 정리 (P1)`
 > - `ec47df1 refactor: graphStore ↔ historyStore 순환 의존성 해소 (P3)`
-> - **이번 세션**: P2 (Knip 미사용 dep/export/type) 정리 — `npm run check` 첫 exit 0
+> - `289f082 chore: Knip 미사용 dep/export/type 정리 (P2)`
+> - **이번 세션**: P5 (Vitest 3 업그레이드) — `vitest`/`@vitest/coverage-v8` 2.1.9 → 3.2.4. 코드 변경 0, 테스트 182/182 그대로 통과. AST 기반 V8 remapping 효과로 함수/브랜치 커버리지 정확도 미세 상승.
 
 ## 현재 상태
 
@@ -15,7 +16,7 @@
 | `tsc --noEmit` | 0 errors |
 | `vitest run` | 182/182 pass |
 | `vite build` | 성공 |
-| `vitest run --coverage` | lines 31% / branches 82% / functions 52% / statements 31% (임계값 통과) |
+| `vitest run --coverage` | lines 30.68% / branches 83.39% / functions 55.04% / statements 30.68% (임계값 통과, Vitest 3 기준) |
 | `biome check` | **0 errors / 0 warnings** ✅ |
 | `knip` | **0 errors** ✅ |
 | `dpdm` | **0건** ✅ |
@@ -25,7 +26,7 @@
 
 - `biome.json` — Biome 2.4.15 (린트 + 포매터)
 - `knip.json` — Knip 6.12.2 (dead code)
-- `vitest.config.ts` — `@vitest/coverage-v8` 2.1.9 블록 추가
+- `vitest.config.ts` — `vitest` / `@vitest/coverage-v8` 3.2.4 (P5에서 v2.1.9 → v3.2.4 업그레이드)
 - `package.json` 스크립트: `lint`, `lint:fix`, `format`, `typecheck`, `deadcode`, `circular`, `test:coverage`, `check`
 
 **중요 컨텍스트**:
@@ -92,11 +93,22 @@
 - `noUncheckedIndexedAccess`: 켜면 **129 추가 오류** (이전 측정). 별도 PR로 점진 도입 필요. `arr[i]` 사용처마다 가드 추가 또는 `!` 처리. 가장 큰 거 — 시간 들임
 - `exactOptionalPropertyTypes`: 미측정. 추정 비슷한 양
 
-### P5. Vitest 3 업그레이드 (선택)
+### ~~P5. Vitest 3 업그레이드~~ ✅ 완료 (2026-05-11)
 
-- 현재 2.1.8. 3.x는 AST 기반 V8 커버리지 remapping으로 정확도 향상
-- breaking change 있음 (config API 일부 변경) — 마이그레이션 가이드: https://vitest.dev/guide/migration.html
-- `@vitest/coverage-v8`도 동일 버전으로 함께 올려야 함
+처리 요약:
+
+| 항목 | 처리 전 | 처리 후 |
+|---|---|---|
+| `vitest` | 2.1.8 (실제 lock: 2.1.9) | **3.2.4** |
+| `@vitest/coverage-v8` | 2.1.9 | **3.2.4** |
+| 테스트 결과 | 182/182 pass | **182/182 pass** (회귀 0) |
+| 커버리지 (lines / branches / functions / statements) | 31 / 82 / 52 / 31 | **30.68 / 83.39 / 55.04 / 30.68** (AST remapping으로 함수/브랜치 정확도 ↑) |
+
+코드 변경 사항: **없음**. `package.json` devDependencies 두 줄만 교체. `vitest.config.ts`, `src/test-setup.ts`, 테스트 파일 모두 v3 API와 호환되어 마이그레이션 작업이 발생하지 않음 (Vite 6 + jsdom 25 + 기존 config가 그대로 동작).
+
+검증: `npm run typecheck`, `npm run check` (typecheck + lint + deadcode + circular + test), `npm run test:coverage`, `npm run build` 모두 exit 0.
+
+미래에 Vitest 4로 한 번 더 올릴 때는 v3→v4 마이그레이션 가이드 별도 확인 필요.
 
 ### P6. CI 추가 (GitHub Actions) — **다음 후속 작업으로 적합**
 
@@ -151,7 +163,7 @@ npm run check
 1. **standalonePlayer.js는 ES5라 Biome 대상 아님** — 수정 시 `biome.json`의 `files.includes`에서 의도적으로 제외하고 있음을 잊지 말 것
 2. **unsafe fix는 한 파일 단위로 검토하며 적용** — 전체 `--unsafe`는 zustand 구독 패턴 (`NodeEditor/index.tsx`) 등을 깨뜨릴 수 있음. 단, `objLoader.ts` 의 `if (a?.value)` 케이스는 TS 4.4+ 좁힘이 정상 동작하므로 안전 (이번 세션에서 검증)
 3. **`useExhaustiveDependencies` warn은 진짜 버그/false positive 혼재** — zustand `useStore((s) => s.x)` 부작용 구독은 deps에 들어가야 정상
-4. **Vitest 2.1.x V8 커버리지의 라인 매핑 부정확 가능성** — 정확한 줄 수가 필요하면 Vitest 3 업그레이드 또는 임시로 `provider: "istanbul"`로 교차 검증
+4. ~~**Vitest 2.1.x V8 커버리지의 라인 매핑 부정확 가능성**~~ — P5에서 Vitest 3.2.4 + AST 기반 V8 remapping으로 해소. 더 정확한 교차 검증이 필요하면 `provider: "istanbul"`로 임시 전환 가능
 5. ~~**순환 의존성 해결 시 history 동작 회귀 주의**~~ — P3 처리 시 양쪽 store 테스트 회귀 없음을 확인함 (12/12 통과)
 6. ~~**`npm run check` 는 현재 P2 (knip dead code) 때문에 exit 1**~~ — P2 처리 후 `npm run check` exit 0 달성. CI 도입(P6) 가능 상태
 7. **RTK 프록시 환경에서 `npx biome check` 출력이 잘려 보일 수 있음** — 정확한 진단 보려면 `rtk proxy npx biome check --reporter=summary --max-diagnostics=100` 등 raw 호출 사용

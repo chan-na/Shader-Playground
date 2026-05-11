@@ -134,15 +134,16 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 |---|---|---|
 | **MeshNode** | (없음) — 프리셋 선택/파일 핸들 | `mesh: GeometryHandle` |
 | **ImageNode** | (없음) — 파일 핸들 | `texture: TextureHandle` |
-| **ShaderNode** | `mesh: GeometryHandle?`, `samplers: TextureHandle[]`, `uniforms: scalar/vec` (자동 추출) | `texture: TextureHandle` (FBO 컬러 어태치먼트) |
-| **OutputNode** (명시적, 최대 1개) | `texture: TextureHandle` × 1 | (캔버스 출력) |
+| **ShaderNode** | `mesh: GeometryHandle?`, `samplers: TextureHandle[]`, `uniforms: scalar/vec` (자동 추출, 비-샘플러 uniform 도 입력 포트로 노출) | `texture: TextureHandle` (FBO 컬러 어태치먼트) |
+| **OutputNode** (명시적, 최대 4개 — Phase 10) | `texture: TextureHandle` × 1 | (캔버스 출력) |
+| **ParamNode** (Phase 10) — `float` / `vec3` / `color` / `time` | (없음) | `value: float | vec3` (kind 별 결정) |
 
 - 쉐이더 노드 출력은 항상 **오프스크린 텍스처**(FBO에 렌더). 이 텍스처를 다음 쉐이더의 sampler 입력으로 그대로 연결.
 - 메시 입력이 없는 쉐이더 노드는 **풀스크린 쿼드**로 자동 폴백(포스트프로세싱 패스).
 - 포트 타입이 다르면 React Flow 레벨에서 연결을 거부(`isValidConnection`).
 - 한 출력은 여러 입력으로 분기 가능(1:N), 단 한 입력에는 하나의 소스만(N:1 금지).
 - **Output 노드는 자동으로 추론하지 않는다.** 사용자가 명시적으로 배치하고 입력을 연결해야 캔버스에 그려진다. Output 노드가 없거나 입력이 비어 있으면 캔버스는 placeholder(어두운 배경 + "Connect an Output node to render" 안내)를 표시한다.
-- Output 노드는 그래프당 0~1개로 제한한다(컴파일러가 검증, 2개 이상이면 에러). 멀티뷰포트 사용 사례는 후속 페이즈에서 검토.
+- Output 노드는 그래프당 0~4개를 허용한다. 0개면 placeholder, 1개면 전체 캔버스, 2~4개면 분할 뷰포트(1=전체 / 2=좌우 / 3=상단2+하단1 / 4=2×2). 5개 이상이면 컴파일러가 에러를 보고한다. (Phase 10에서 단일 Output 제약을 완화)
 - Output 노드의 단일 입력 포트 타입은 `texture`. 메시·이미지를 직접 꽂을 수 없으며, 반드시 ShaderNode 출력을 거쳐야 한다(이미지를 그대로 보여주려면 패스스루 쉐이더 노드 사용).
 
 #### 2.2.1 ShaderNode 내부 구조
@@ -396,14 +397,38 @@ ShaderPlayground/
 - 프리셋 예제 그래프 2~3개 번들.
 - 스크린샷 캡처, 에러/통계 표시(StatusBar).
 
-### (선택) Phase 9 — 확장
-- GLSL 주석 힌트(`// @range`, `// @label`)로 유니폼 컨트롤 메타 오버라이드.
-- 파라미터 노드(Float/Vec/Color/Time)로 유니폼 외부화.
-- 썸네일 readback을 PBO 비동기 방식으로 전환(드라이버 stall 회피).
-- 멀티 Output 노드(분할 뷰포트).
-- 쉐이더 핫리로드 디스크 백업.
+### Phase 9 — 에디터 경험 강화 (완료)
+- **GLSL 주석 힌트**(`// @range a..b`, `// @min/@max`, `// @step`, `// @default`, `// @label "..."`)로 인스펙터 컨트롤 메타 오버라이드. 동일 라인 트레일링 주석과 바로 위 주석 양쪽 모두 지원.
+- **시간 컨트롤**: `simTime`이 wall-clock과 분리된 별도 store. 재생/정지, 스크럽 슬라이더, 0~4× 배속, Spacebar 토글. `u_time`은 `simTime`을 받음.
+- **카메라 컨트롤 UI**: 인스펙터에 Reset 버튼 + FOV 슬라이더(10°~120°).
+- **배경색 피커**: 출력 없을 때 placeholder 색, Output 합성 시 클리어 색에 사용.
+- **Problems 패널**(Inspector ↔ Assets ↔ Problems 탭 전환): 모든 노드의 GLSL Diagnostic + 런타임 에러를 한 곳에 모음. 클릭 시 해당 노드 선택 + vertex/fragment 탭 자동 전환. 탭 헤더에 에러 카운트 빨간 뱃지.
+- **Undo/Redo** (Cmd+Z / Cmd+Shift+Z, Cmd+Y): 최대 100건 히스토리. 데모 부트스트랩과 슬라이더 드래그(uniformRev)는 히스토리에 포함하지 않음.
+- **Command Palette** (Cmd+K): 노드 추가, 프리셋 로드, 그래프 클리어 — 퍼지 매칭.
+- **검증**: GLSL에 `// @range 0..5 @default 2` 추가 → 인스펙터 슬라이더 즉시 반영. Cmd+Z로 노드 추가/삭제 되돌리기. Cmd+K로 프리셋 즉시 로드.
+
+### Phase 10 — 표현력 확장 (완료)
+- **Parameter 노드** 4종: `Float` / `Vec3` / `Color` / `Time`. Time은 `simTime × scale + offset` 으로 매 프레임 재평가되어 단일 float 출력. 인스펙터에서 값/레이블 편집.
+- **셰이더의 비-샘플러 uniform**도 입력 포트로 노출 (`float`/`vec2`/`vec3`/`vec4`). 동일 이름 핸들에 파라미터 노드를 연결하면 인스펙터 값 대신 파라미터가 매 프레임 uniform 을 덮어씀.
+- **포트 타입 확장**: 기존 `mesh`/`texture`에 `float`/`vec2`/`vec3`/`vec4` 추가. React Flow `isValidConnection`에서 동일 타입만 허용.
+- **Multi-Output**: 그래프당 1~4개 Output 노드 허용. 분할 뷰포트 레이아웃(1=전체, 2=좌우, 3=상단2+하단1, 4=2×2). `splitLayout()` 단위 테스트.
+- **Blend 셰이더 템플릿**: 두 sampler 입력 + `u_mix` + `u_mode`(0=mix, 1=add, 2=multiply, 3=screen). 툴바와 팔레트에서 1클릭으로 추가.
+- **AssetBrowser 탭**: 메시/이미지 카탈로그 + 썸네일, 'Forget' 버튼, '+ Node' 버튼으로 즉시 그래프에 추가.
+- **Split 데모 프리셋**: noise→blur→tonemap 체이닝의 각 단계를 동시에 보여주는 3-Output 예제.
+- **검증**: Color 파라미터를 sphere의 `u_baseColor`에 연결하면 인스펙터 슬라이더 무시하고 파라미터 색이 적용됨. Split 프리셋 로드 시 캔버스가 3분할로 동시 렌더.
+
+### Phase 11 — 공유/배포 (완료)
+- **Share URL** (`#share=<payload>`): gzip(`CompressionStream`) + URL-safe base64로 직렬화한 프로젝트를 URL hash 에 인코딩. 앱 부트 시 hash 감지 → 자동 import (실패 시 데모 폴백). Sphere 데모 ≈ 900자.
+- **캔버스 녹화 → WebM**: `MediaRecorder` + `canvas.captureStream(30fps)`. 툴바 ● Record / ■ Stop 토글, 녹화 중 빨간 강조. 멈추면 자동 다운로드. VP9 → VP8 → WebM → mp4 순으로 mimeType 폴백.
+- **정적 HTML export**: 의존성 0인 단일 파일(~26KB) 생성. `src/export/standalonePlayer.js`에 자체 mat4·primitive 생성기·compile·execute 미니 런타임을 인라인(Vite `?raw`). 프로젝트 JSON은 `window.__SP_PROJECT`로 임베드. split-output, 파라미터 노드, FBO 체인까지 그대로 동작. 익스포트된 HTML 내 `</script>` 인젝션 방지 이스케이프.
+- **검증**: Share URL 복사 → 다른 탭에서 열어 동일한 그래프 복원. `Export HTML`로 받은 파일을 `iframe srcdoc`에 마운트 → 메인 뷰포트와 동일한 셰이더 체인 렌더.
+
+### (백로그)
+- 썸네일 readback PBO 비동기 전환(드라이버 stall 회피).
+- 쉐이더 핫리로드 디스크 백업(File System Access API).
 - 컴퓨트(Transform Feedback) 노드.
-- GLSL LSP 도입 검토(Monaco로 전환).
+- GLSL LSP 도입(Monaco 전환 검토).
+- GIF 녹화(gif.js / WASM gifenc).
 
 ---
 
@@ -433,7 +458,7 @@ ShaderPlayground/
 | GLTF 범위 | 지오메트리만 | 머티리얼/애니메이션 무시 |
 | 컴파일 트리거 | 디바운스 자동 재컴파일 | 향후 수동 컴파일 단축키 추가 가능 |
 | 직렬화 | JSON export/import (Phase 8), 에셋은 IndexedDB 캐시 | |
-| 노드 종류 | Mesh / Image / Shader / Output(명시적) 4종 | 파라미터 노드는 Phase 9 |
+| 노드 종류 | Mesh / Image / Shader / Output / Parameter (Phase 10에서 Parameter 추가) | Output은 최대 4개(Phase 10 분할 뷰포트) |
 | 의존성 무게 | 경량 우선 | three.js·Monaco는 의도적으로 회피 |
 
 이 디폴트 중 바꾸고 싶은 항목이 있으면 알려줘. 아니면 이대로 Phase 1부터 진행.

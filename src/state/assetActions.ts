@@ -124,9 +124,7 @@ export async function importFiles(
 ): Promise<ImportResult[]> {
   const arr = Array.from(files);
   const results: ImportResult[] = [];
-  for (let i = 0; i < arr.length; i++) {
-    // biome-ignore lint/style/noNonNullAssertion: loop bound by arr.length
-    const file = arr[i]!;
+  for (const [i, file] of arr.entries()) {
     const offset = basePosition ?? { x: -240, y: 0 };
     const pos = { x: offset.x, y: offset.y + i * 100 };
     try {

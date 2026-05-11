@@ -9,7 +9,8 @@
 > - `289f082 chore: Knip 미사용 dep/export/type 정리 (P2)`
 > - `f51008e chore: GitHub Actions CI 도입 (P6)`
 > - `1516da3 chore: tsconfig noUncheckedIndexedAccess 도입 (P4-a)`
-> - **이번 세션**: P4-b (`exactOptionalPropertyTypes` 도입) — tsconfig 옵션 추가, **7 errors / 7 files** (추정 130에 비해 훨씬 적음) 처리. 모두 동일한 "optional 필드에 명시적 `undefined` 전달" 패턴이라 conditional spread (`...(v && { key: v })`) 또는 분리 할당으로 일괄 처리. `biome-ignore` 추가 없음. `npm run check` exit 0 (182/182) + `npm run build` 성공.
+> - `b2ccebc chore: tsconfig exactOptionalPropertyTypes 도입 (P4-b)`
+> - **이번 세션**: P8 (Biome ignore 정당성 전수 감사). file-level 9개 + inline 7개를 모두 점검 → 리팩터로 제거 가능한 inline 2건만 정리(`assetActions.ts` `arr.entries()` 변환, `NodeEditor/index.tsx` `newEdge` const 추출). 나머지 14건은 정당성 확인 후 유지. 룰 자체 off는 보류 — UI 코드에서 `!`는 여전히 의심 대상이어야 함.
 
 ## 현재 상태
 
@@ -172,13 +173,22 @@
 
 ### ~~P7. `useButtonType` 일괄 처리 후 readability~~ ✅ P1과 함께 완료
 
-### P8. (선택) Biome ignore의 정당성 재검토
+### ~~P8. Biome ignore의 정당성 재검토~~ ✅ 완료 (2026-05-12)
 
-- file-level `biome-ignore-all`:
-  - `src/core/graph/execute.ts` — useHookAtTopLevel(WebGL false positive) + noNonNullAssertion(WebGL 세팅)
-  - **P4-a에서 추가된 9개 파일** (모두 `noUncheckedIndexedAccess`로 인한 구조적 `!` 사용): `core/assets/objLoader`, `core/assets/primitives`, `core/graph/diagnostics`, `core/graph/uniformParser`, `core/nodes/utility`, `core/thumbnail/readback`, `state/historyStore`, `state/shareUrl`. 각 파일 첫 줄에 사용 패턴 명시
-- inline `biome-ignore`: 기존 5건 + P4-a에서 추가 3건 (`state/assetActions`, `NodeEditor/index` line 178, `NodeEditor/nodes/UtilityNodeViews`)
-- 미래에 룰 자체를 `off`로 내릴지 검토 가능 (특히 `noNonNullAssertion`은 테스트만 끄도록 override 됨). `noUncheckedIndexedAccess` 도입 후 hot-path 파일은 file-level ignore가 더 자연스러움
+전수 감사 결과 — **file-level 9개 + inline 7건** 점검:
+
+| 분류 | 처리 |
+|---|---|
+| 리팩터로 제거 (2) | `state/assetActions.ts:128` → `for (const [i, file] of arr.entries())`. `ui/NodeEditor/index.tsx:177` → `newEdge`를 const로 추출해 `tentative.edges[length-1]!` 패턴 제거 |
+| 유지 — file-level (9) | `execute.ts`(WebGL setup, 12 bangs), `objLoader.ts`(파서, 18), `uniformParser.ts`(regex, 10), `primitives.ts`(geometry loop, 5), `diagnostics.ts`(regex, 6), `readback.ts`(pixel loop, 4), `utility.ts`(arity loop, 3), `historyStore.ts`(undo/redo stack, 3), `shareUrl.ts`(byte/regex, 2). 한 파일에 동일 패턴 다발 → file-level이 inline 다발보다 가독성 우위 |
+| 유지 — inline (5) | `validate.ts:105` (queue idiom), `uniformParser.ts:173` (RegExp.exec 루프), `NodeEditor/index.tsx:63` (zustand 의도된 구독), `NodeEditor/index.tsx:222` (a11y, 키보드 대안은 Toolbar Import), `UtilityNodeViews.tsx:101` (arity 불변량) |
+
+**룰 자체 off 검토** — 보류:
+- `noNonNullAssertion` warn → off: 거부. UI 코드에서 `!`는 여전히 의심 대상. 현재 file-level ignore가 "이 파일은 hot-path/parser라 예외" 신호로 작동하며, 새 코드의 우발적 `!`를 잡는 안전망 유지.
+- `useExhaustiveDependencies` warn: 유지 (inline 1건만 존재).
+- `useHookAtTopLevel` error: 유지 (file-level false positive `execute.ts` 1건만).
+
+**검증**: `npm run check` exit 0 (typecheck 0/lint 0/0/knip 0/dpdm 0/test 182/182), `npm run build` 성공.
 
 ---
 

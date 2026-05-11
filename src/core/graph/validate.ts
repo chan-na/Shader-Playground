@@ -102,6 +102,7 @@ export function topologicalOrder(graph: Graph): GraphNode[] {
   for (const [id, d] of indeg) if (d === 0) queue.push(id);
   const out: GraphNode[] = [];
   while (queue.length) {
+    // biome-ignore lint/style/noNonNullAssertion: queue.length > 0 guard above
     const id = queue.shift()!;
     const n = byId.get(id);
     if (n) out.push(n);

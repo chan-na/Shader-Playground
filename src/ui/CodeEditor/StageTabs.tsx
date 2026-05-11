@@ -55,6 +55,7 @@ function Tab(props: {
 }) {
   return (
     <button
+      type="button"
       onClick={props.onClick}
       title={props.title}
       style={{

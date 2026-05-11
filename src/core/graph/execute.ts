@@ -1,3 +1,5 @@
+// biome-ignore-all lint/correctness/useHookAtTopLevel: gl.useProgram is a WebGL API, not a React hook
+// biome-ignore-all lint/style/noNonNullAssertion: WebGL setup; null only on context loss, treated as fatal upstream
 import { mat4 } from "gl-matrix";
 import {
   modelMatrix,

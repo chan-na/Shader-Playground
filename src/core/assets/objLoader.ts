@@ -12,7 +12,7 @@ function pickAttribute(
 ) {
   for (const k of keys) {
     const a = attrs[k];
-    if (a && a.value) return a;
+    if (a?.value) return a;
   }
   return undefined;
 }

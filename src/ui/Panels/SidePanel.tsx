@@ -27,6 +27,7 @@ export function SidePanel() {
     <div className="panel panel--inspector">
       <div className="panel-tabs">
         <button
+          type="button"
           className={
             tab === "inspector" ? "panel-tab panel-tab--active" : "panel-tab"
           }
@@ -35,6 +36,7 @@ export function SidePanel() {
           Inspector
         </button>
         <button
+          type="button"
           className={
             tab === "assets" ? "panel-tab panel-tab--active" : "panel-tab"
           }
@@ -46,6 +48,7 @@ export function SidePanel() {
           )}
         </button>
         <button
+          type="button"
           className={
             tab === "problems" ? "panel-tab panel-tab--active" : "panel-tab"
           }

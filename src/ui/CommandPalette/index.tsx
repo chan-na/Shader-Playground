@@ -349,8 +349,10 @@ export function CommandPalette() {
         <div className="cmdk-list">
           {ranked.length === 0 && <div className="cmdk-empty">No matches</div>}
           {ranked.map((cmd, i) => (
-            <div
+            <button
+              type="button"
               key={cmd.id}
+              tabIndex={-1}
               className={
                 i === active ? "cmdk-row cmdk-row--active" : "cmdk-row"
               }
@@ -359,7 +361,7 @@ export function CommandPalette() {
             >
               <span className="cmdk-cat">{cmd.category}</span>
               <span className="cmdk-label">{cmd.label}</span>
-            </div>
+            </button>
           ))}
         </div>
         <div className="cmdk-hint">

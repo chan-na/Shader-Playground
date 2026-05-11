@@ -60,6 +60,7 @@ export function NodeEditor() {
   // small graph panels still show every node. Triggered by rev bumps, not by
   // per-node drags (which don't bump rev).
   const prevCountRef = useRef(graphNodes.length);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rev is the intentional trigger for wholesale-graph-replace refits
   useEffect(() => {
     const inst = flowRef.current;
     if (!inst) return;
@@ -217,6 +218,7 @@ export function NodeEditor() {
   }, []);
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the toolbar Import button
     <div className="panel panel--graph" onDragOver={onDragOver} onDrop={onDrop}>
       <div className="panel-header">Node Graph</div>
       <Toolbar />

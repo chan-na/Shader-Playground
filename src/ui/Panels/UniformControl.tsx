@@ -46,7 +46,7 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
     return (
       <div>
         {arr.map((component, i) => (
-          <div className="inspector-row" key={i}>
+          <div className="inspector-row" key={labels[i] ?? `c${i}`}>
             <span style={{ width: 12, color: "#888", fontFamily: "monospace" }}>
               {labels[i]}
             </span>

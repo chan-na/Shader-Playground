@@ -230,8 +230,15 @@ textarea {
 }
 
 .problem-row {
-  padding: 6px 4px;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
   border-bottom: 1px solid #1a1a1a;
+  color: inherit;
+  font: inherit;
+  padding: 6px 4px;
   cursor: pointer;
 }
 .problem-row:hover {
@@ -298,9 +305,15 @@ textarea {
 }
 .cmdk-row {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 12px;
   padding: 8px 14px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
   font-size: 13px;
 }

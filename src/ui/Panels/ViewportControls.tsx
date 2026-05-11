@@ -44,6 +44,7 @@ export function ViewportControls() {
         </div>
         <div className="inspector-row">
           <button
+            type="button"
             className="btn-small"
             onClick={() => setPlaying(!playing)}
             title={playing ? "Pause (Space)" : "Play (Space)"}
@@ -52,6 +53,7 @@ export function ViewportControls() {
             {playing ? "⏸ Pause" : "▶ Play"}
           </button>
           <button
+            type="button"
             className="btn-small"
             onClick={() => resetTime()}
             title="Reset time"
@@ -107,6 +109,7 @@ export function ViewportControls() {
         <div className="inspector-label">Camera</div>
         <div className="inspector-row">
           <button
+            type="button"
             className="btn-small"
             onClick={() => resetCamera()}
             title="Reset camera"

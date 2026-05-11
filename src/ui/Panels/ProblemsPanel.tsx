@@ -60,8 +60,12 @@ export function ProblemsPanel() {
           <div className="inspector-label">
             Runtime errors ({runtimeErrors.length})
           </div>
-          {runtimeErrors.map((e, i) => (
-            <div key={i} className="problem-row" style={{ color: "#ff8484" }}>
+          {runtimeErrors.map((e) => (
+            <div
+              key={`runtime:${e}`}
+              className="problem-row"
+              style={{ color: "#ff8484" }}
+            >
               <span style={{ fontFamily: "monospace", fontSize: 11 }}>{e}</span>
             </div>
           ))}
@@ -79,9 +83,11 @@ export function ProblemsPanel() {
                 : e.diag.severity === "warning"
                   ? "#dcc46c"
                   : "#7aa6e8";
+            const rowKey = `${e.nodeId}:${e.stage}:${e.diag.line}:${e.diag.column ?? "_"}:${i}`;
             return (
-              <div
-                key={i}
+              <button
+                type="button"
+                key={rowKey}
                 className="problem-row"
                 onClick={() => goTo(e)}
                 title="Jump to source"
@@ -101,8 +107,9 @@ export function ProblemsPanel() {
                   {e.diag.line}
                   {e.diag.column !== undefined ? `:${e.diag.column}` : ""}
                 </span>
-                <div
+                <span
                   style={{
+                    display: "block",
                     color: "#ddd",
                     fontSize: 12,
                     marginTop: 2,
@@ -111,8 +118,8 @@ export function ProblemsPanel() {
                   }}
                 >
                   {e.diag.message}
-                </div>
-              </div>
+                </span>
+              </button>
             );
           })}
         </div>

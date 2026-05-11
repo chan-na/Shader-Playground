@@ -42,6 +42,7 @@ export function AssetBrowser() {
           </span>
         </div>
         <button
+          type="button"
           className="btn-small"
           onClick={() => fileRef.current?.click()}
           title="Import OBJ / GLTF / images"
@@ -96,12 +97,14 @@ export function AssetBrowser() {
                 </div>
               </div>
               <button
+                type="button"
                 className="btn-small"
                 onClick={() => addImageNodeFor(img.id)}
               >
                 + Node
               </button>
               <button
+                type="button"
                 className="btn-small"
                 onClick={() => removeImage(img.id)}
                 title="Forget"
@@ -144,12 +147,14 @@ export function AssetBrowser() {
                 </div>
               </div>
               <button
+                type="button"
                 className="btn-small"
                 onClick={() => addMeshNodeFor(m.id)}
               >
                 + Node
               </button>
               <button
+                type="button"
                 className="btn-small"
                 onClick={() => removeMesh(m.id)}
                 title="Forget"

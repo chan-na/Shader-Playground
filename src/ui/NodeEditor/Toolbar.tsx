@@ -218,16 +218,17 @@ export function Toolbar() {
         flexWrap: "wrap",
       }}
     >
-      <button style={btn} onClick={addMesh}>
+      <button type="button" style={btn} onClick={addMesh}>
         + Mesh
       </button>
-      <button style={btn} onClick={addImage}>
+      <button type="button" style={btn} onClick={addImage}>
         + Image
       </button>
-      <button style={btn} onClick={addShader}>
+      <button type="button" style={btn} onClick={addShader}>
         + Shader
       </button>
       <button
+        type="button"
         style={btn}
         onClick={addBlend}
         title="Two-input blend/composite shader"
@@ -235,6 +236,7 @@ export function Toolbar() {
         + Blend
       </button>
       <button
+        type="button"
         style={btn}
         onClick={addOutput}
         disabled={outputsFull}
@@ -242,16 +244,21 @@ export function Toolbar() {
       >
         + Output{outputCount > 0 ? ` (${outputCount}/${MAX_OUTPUTS})` : ""}
       </button>
-      <button style={btn} onClick={() => addParam("float")}>
+      <button type="button" style={btn} onClick={() => addParam("float")}>
         + Float
       </button>
-      <button style={btn} onClick={() => addParam("color")}>
+      <button type="button" style={btn} onClick={() => addParam("color")}>
         + Color
       </button>
-      <button style={btn} onClick={() => addParam("time")}>
+      <button type="button" style={btn} onClick={() => addParam("time")}>
         + Time
       </button>
-      <button style={btn} onClick={onPickFiles} title="Import OBJ/GLTF/PNG/JPG">
+      <button
+        type="button"
+        style={btn}
+        onClick={onPickFiles}
+        title="Import OBJ/GLTF/PNG/JPG"
+      >
         ↑ Load…
       </button>
       <input
@@ -262,10 +269,20 @@ export function Toolbar() {
         style={{ display: "none" }}
         onChange={onFilesChosen}
       />
-      <button style={btn} onClick={exportProject} title="Save graph as JSON">
+      <button
+        type="button"
+        style={btn}
+        onClick={exportProject}
+        title="Save graph as JSON"
+      >
         ⬇ Export
       </button>
-      <button style={btn} onClick={onPickProject} title="Load graph from JSON">
+      <button
+        type="button"
+        style={btn}
+        onClick={onPickProject}
+        title="Load graph from JSON"
+      >
         ⬆ Import
       </button>
       <input
@@ -275,10 +292,16 @@ export function Toolbar() {
         style={{ display: "none" }}
         onChange={onProjectChosen}
       />
-      <button style={btn} onClick={screenshot} title="Save viewport PNG">
+      <button
+        type="button"
+        style={btn}
+        onClick={screenshot}
+        title="Save viewport PNG"
+      >
         📷 Snap
       </button>
       <button
+        type="button"
         style={{
           ...btn,
           background:
@@ -291,6 +314,7 @@ export function Toolbar() {
         {recorderStatus === "recording" ? "■ Stop" : "● Record"}
       </button>
       <button
+        type="button"
         style={btn}
         onClick={shareUrl}
         title="Copy a shareable URL to clipboard"
@@ -298,6 +322,7 @@ export function Toolbar() {
         🔗 Share
       </button>
       <button
+        type="button"
         style={btn}
         onClick={exportHtml}
         title="Download a self-contained HTML file"
@@ -306,30 +331,34 @@ export function Toolbar() {
       </button>
       <div style={{ flex: 1 }} />
       <button
+        type="button"
         style={btn}
         onClick={() => setGraph(createDemoGraph(), DEMO_LAYOUT)}
       >
         Sphere
       </button>
       <button
+        type="button"
         style={btn}
         onClick={() => setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT)}
       >
         Torus UV
       </button>
       <button
+        type="button"
         style={btn}
         onClick={() => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT)}
       >
         Chain
       </button>
       <button
+        type="button"
         style={btn}
         onClick={() => setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT)}
       >
         Split
       </button>
-      <button style={btn} onClick={() => reset()}>
+      <button type="button" style={btn} onClick={() => reset()}>
         Clear
       </button>
     </div>

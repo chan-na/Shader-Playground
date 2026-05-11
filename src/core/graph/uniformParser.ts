@@ -166,6 +166,7 @@ export function parseHintComment(text: string): UniformHints {
   let bestIndex = -1;
   for (const { re, value } of controlOrder) {
     let m: RegExpExecArray | null;
+    // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
     while ((m = re.exec(text)) !== null) {
       if (m.index > bestIndex) {
         bestIndex = m.index;

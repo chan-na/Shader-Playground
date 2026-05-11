@@ -126,6 +126,7 @@ export function BootstrapGate() {
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button
+            type="button"
             data-testid="recovery-discard"
             onClick={discard}
             style={{
@@ -141,6 +142,7 @@ export function BootstrapGate() {
             새로 시작
           </button>
           <button
+            type="button"
             data-testid="recovery-restore"
             onClick={restore}
             style={{

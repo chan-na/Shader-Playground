@@ -1,8 +1,10 @@
 # Handover — Lint/Static Analysis/Coverage 후속 작업
 
-> 2026-05-11 시작. 직전 두 커밋:
+> 2026-05-11 갱신. 진행 이력:
 > - `000aaca chore: Biome / Knip / dpdm / vitest coverage 도구 셋업`
 > - `7cad6bc style: Biome 포매팅 + 안전한 lint fix 일괄 적용`
+> - `72889d2 docs: Handover.md — lint/static-analysis/coverage 후속 작업 핸드오프`
+> - **이번 세션**: P1 (Biome 진단 정리) 완료 — errors/warnings 모두 0
 
 ## 현재 상태
 
@@ -12,9 +14,9 @@
 | `vitest run` | 182/182 pass |
 | `vite build` | 성공 |
 | `vitest run --coverage` | lines 31% / branches 82% / functions 52% / statements 31% (임계값 통과) |
-| `biome check` | **45 errors / 32 warnings** (자동 수정 더 없음, 수동 검토 필요) |
-| `knip` | 미사용 dep 4 + export 13 + type 13 + 설정 힌트 5 |
-| `dpdm` | 순환 1건 (`graphStore ↔ historyStore`) |
+| `biome check` | **0 errors / 0 warnings** ✅ |
+| `knip` | 미사용 dep 4 + export 13 + type 13 + 설정 힌트 5 (P2 미해결) |
+| `dpdm` | 순환 1건 (`graphStore ↔ historyStore`) (P3 미해결) |
 
 ## 도입된 도구 / 설정
 
@@ -34,26 +36,28 @@
 
 ## 미해결 항목 (우선순위)
 
-### P1. Biome 잔여 진단 정리 (45 errors / 32 warnings)
+### ~~P1. Biome 잔여 진단 정리~~ ✅ 완료 (2026-05-11)
 
-| 룰 | 건수 | 분류 | 처리 방향 |
-|---|---|---|---|
-| `a11y/useButtonType` | 34 errors | 일괄 자동 가능 | `<button>` → `<button type="button">` 일괄 추가 → 31 errors 감소 |
-| `style/noNonNullAssertion` | 30 warnings | 수동 검토 | `!` 사용처 살펴보고 안전한 곳은 가드 추가, 명백한 곳은 `// biome-ignore` 또는 룰 자체를 off |
-| `a11y/noStaticElementInteractions` | 3 errors | 수동 | `<div onClick>` → `<button>` 또는 `role/tabIndex/onKeyDown` 추가 |
-| `suspicious/noArrayIndexKey` | 3 errors | 수동 | `key={index}` → 안정적 id 사용 |
-| `correctness/useHookAtTopLevel` | 2 errors | **수동 (구조 변경)** | 조건문 안 hook 호출 — 컴포넌트 분리 필요 |
-| `a11y/useKeyWithClickEvents` | 2 errors | 수동 | `onClick` 있는 곳에 `onKeyDown` 추가 |
-| `suspicious/noAssignInExpressions` | 1 error | 수동 | `while ((m = re.exec(...)))` — 거의 항상 의도적이라 룰 자체를 off 권장 |
-| `complexity/useOptionalChain` | 1 warning | 검토 후 적용 | 위 회귀 사례 주의하면서 수동 적용 |
-| `correctness/useExhaustiveDependencies` | 1 warning | **신중 검토** | zustand 구독 부작용 deps는 의도된 패턴 — false positive 가능 |
+처리 요약:
 
-**파일별 분포** (errors 위주):
-- `src/ui/Panels/ViewportControls.tsx` 3 errors
-- `src/ui/Panels/UniformControl.tsx` 1 error
-- (기타 패널 컴포넌트들에 a11y errors가 산재)
+| 룰 | 처리 전 | 처리 방식 |
+|---|---|---|
+| `a11y/useButtonType` | 34 errors | 6개 파일에 `type="button"` 일괄 추가 |
+| `a11y/noStaticElementInteractions` (×3) + `a11y/useKeyWithClickEvents` (×2) | 5 errors | `ProblemsPanel`/`CommandPalette` 행을 `<button>`로 변환 + CSS reset 추가. `NodeEditor/index.tsx`의 파일 드롭 zone은 `// biome-ignore` (키보드 대안은 툴바 Import 버튼) |
+| `suspicious/noArrayIndexKey` | 3 errors | `UniformControl`은 `key={labels[i]}` (x/y/z/w 고정), `ProblemsPanel`은 composite stable key |
+| `correctness/useHookAtTopLevel` | 2 errors | `execute.ts` 파일 상단에 `// biome-ignore-all` — `gl.useProgram` 은 WebGL API false positive |
+| `suspicious/noAssignInExpressions` | 1 error | `RegExp.exec` 루프에 inline biome-ignore |
+| `complexity/useOptionalChain` | 1 warning | `objLoader.ts:15` `if (a?.value) return a` 적용 — TS 좁힘 OK (이전 우려 무효) |
+| `correctness/useExhaustiveDependencies` | 1 warning | `NodeEditor/index.tsx`의 zustand 구독 deps는 의도된 패턴, biome-ignore |
+| `style/noNonNullAssertion` | 30 warnings | `biome.json` overrides로 `**/*.test.ts*` 에서 off (23건). 프로덕션은 `execute.ts` 파일-레벨 ignore (6건) + `validate.ts:105` inline ignore (1건) |
 
-**전체 분포 확인**: `npm run lint -- --reporter=summary | tail -30`
+**변경 사항 위치**:
+- `biome.json` — `overrides` 추가 (테스트는 `noNonNullAssertion` off)
+- `src/index.css` — `.problem-row` / `.cmdk-row` button 기본 스타일 reset
+- `src/ui/{Panels/ProblemsPanel,CommandPalette/index,NodeEditor/index,Panels/AssetBrowser,Panels/SidePanel,Panels/ViewportControls,Panels/UniformControl,NodeEditor/Toolbar,BootstrapGate,CodeEditor/StageTabs}.tsx`
+- `src/core/graph/{execute,validate,uniformParser}.ts`, `src/core/assets/objLoader.ts`
+
+`npm run typecheck`, `npm run lint`, `npm run test`, `npm run build` 모두 통과.
 
 ### P2. Knip false positive 정리 + 설정 다듬기
 
@@ -95,10 +99,13 @@
 - 커버리지 리포트는 옵션 — codecov/coveralls 또는 PR 코멘트
 - PR 트리거: `pull_request: branches: [main]`
 
-### P7. (이전 추천) `useButtonType` 일괄 처리 후 readability 한 번 더
+### ~~P7. `useButtonType` 일괄 처리 후 readability~~ ✅ P1과 함께 완료
 
-- 잔여 lint 진단 정리 → CI에서 errors=0이 되어야 의미 있음
-- errors 0 도달까지 `biome.json`의 일부 룰을 `warn`/`off`로 잠시 낮추는 것도 한 방법
+### P8. (선택) Biome ignore의 정당성 재검토
+
+- 추가된 file-level `biome-ignore-all`: `src/core/graph/execute.ts` 2건 (useHookAtTopLevel, noNonNullAssertion). 모두 WebGL 코드 false positive로 정당.
+- inline `biome-ignore`: 5건 — `objLoader.ts` 영역은 없음, `uniformParser.ts:169` (RegExp.exec), `validate.ts:105` (queue.shift after length guard), `NodeEditor/index.tsx:63` (zustand subscription deps), `NodeEditor/index.tsx:220` (file drop zone)
+- 미래에 룰 자체를 `off`로 내릴지 검토 가능 (특히 `noNonNullAssertion`은 테스트만 끄도록 override 됨)
 
 ---
 
@@ -136,10 +143,12 @@ npm run check
 ## 알려진 함정
 
 1. **standalonePlayer.js는 ES5라 Biome 대상 아님** — 수정 시 `biome.json`의 `files.includes`에서 의도적으로 제외하고 있음을 잊지 말 것
-2. **unsafe fix는 한 파일 단위로 검토하며 적용** — 전체 `--unsafe`는 zustand 구독 패턴/타입 좁힘 깨뜨림
+2. **unsafe fix는 한 파일 단위로 검토하며 적용** — 전체 `--unsafe`는 zustand 구독 패턴 (`NodeEditor/index.tsx`) 등을 깨뜨릴 수 있음. 단, `objLoader.ts` 의 `if (a?.value)` 케이스는 TS 4.4+ 좁힘이 정상 동작하므로 안전 (이번 세션에서 검증)
 3. **`useExhaustiveDependencies` warn은 진짜 버그/false positive 혼재** — zustand `useStore((s) => s.x)` 부작용 구독은 deps에 들어가야 정상
 4. **Vitest 2.1.x V8 커버리지의 라인 매핑 부정확 가능성** — 정확한 줄 수가 필요하면 Vitest 3 업그레이드 또는 임시로 `provider: "istanbul"`로 교차 검증
 5. **순환 의존성 해결 시 history 동작 회귀 주의** — `src/state/historyStore.test.ts`와 `graphStore.test.ts` 둘 다 통과시켜야 함
+6. **`npm run check` 는 현재 P3 (순환 1건) 때문에 exit 1** — typecheck/lint/test/build 개별로는 모두 통과. CI는 P3 처리 후 의미를 가짐
+7. **RTK 프록시 환경에서 `npx biome check` 출력이 잘려 보일 수 있음** — 정확한 진단 보려면 `rtk proxy npx biome check --reporter=summary --max-diagnostics=100` 등 raw 호출 사용
 
 ## 참고 파일
 

@@ -1,0 +1,89 @@
+.node-card {
+  background: #2d2d30;
+  border: 1px solid #3a3a3d;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #d4d4d4;
+  min-width: 132px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.react-flow__node.selected .node-card {
+  border-color: #569cd6;
+  box-shadow: 0 0 0 2px rgba(86, 156, 214, 0.3);
+}
+
+.node-card__header {
+  padding: 6px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #ddd;
+  border-bottom: 1px solid #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.node-card__header--mesh   { background: rgba(86, 214, 152, 0.12); }
+.node-card__header--image  { background: rgba(214, 156, 86, 0.12); }
+.node-card__header--shader { background: rgba(86, 156, 214, 0.12); }
+.node-card__header--output { background: rgba(214, 86, 156, 0.12); }
+
+.node-card__body {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.node-card__meta {
+  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-size: 10px;
+  color: #888;
+  padding: 0 4px;
+}
+
+.node-card__placeholder {
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  border-radius: 3px;
+  color: #555;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.node-card__port-label {
+  position: absolute;
+  font-size: 9px;
+  color: #888;
+  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  pointer-events: none;
+}
+
+.node-card__port-label--in {
+  left: 12px;
+  transform: translateY(-50%);
+}
+.node-card__port-label--out {
+  right: 12px;
+  transform: translateY(-50%);
+  text-align: right;
+}
+
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border: 2px solid #1e1e1e;
+  background: #888;
+}
+.react-flow__handle.handle-mesh    { background: #56d698; }
+.react-flow__handle.handle-texture { background: #d69c56; }

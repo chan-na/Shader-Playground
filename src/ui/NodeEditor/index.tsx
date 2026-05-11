@@ -1,120 +1,195 @@
+import { useCallback, useMemo } from 'react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  type Connection,
+  type Edge,
+  type Node,
+  type NodeChange,
+  type EdgeChange,
+  applyNodeChanges,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import './nodeCard.css';
+
 import { useGraphStore } from '../../state/graphStore';
-import { createDemoGraph } from '../../state/demoGraph';
-import type { MeshGraphNode, OutputGraphNode } from '../../core/graph/types';
-import { PRIMITIVE_NAMES, type PrimitiveName } from '../../core/assets/primitives';
+import { useSelectionStore } from '../../state/selectionStore';
+import { Toolbar } from './Toolbar';
+import { MeshNodeView } from './nodes/MeshNodeView';
+import { ImageNodeView } from './nodes/ImageNodeView';
+import { ShaderNodeView } from './nodes/ShaderNodeView';
+import { OutputNodeView } from './nodes/OutputNodeView';
+import { NODE_META } from '../../core/nodes/registry';
+import { nextId } from '../../utils/id';
+import type { ShaderGraphNode } from '../../core/graph/types';
+import { validateGraph } from '../../core/graph/validate';
+
+const nodeTypes = {
+  mesh: MeshNodeView,
+  image: ImageNodeView,
+  shader: ShaderNodeView,
+  output: OutputNodeView,
+};
 
 export function NodeEditor() {
-  const nodes = useGraphStore((s) => s.nodes);
-  const edges = useGraphStore((s) => s.edges);
-  const addNode = useGraphStore((s) => s.addNode);
+  const graphNodes = useGraphStore((s) => s.nodes);
+  const graphEdges = useGraphStore((s) => s.edges);
+  const positions = useGraphStore((s) => s.positions);
+  const updateNodePosition = useGraphStore((s) => s.updateNodePosition);
   const removeNode = useGraphStore((s) => s.removeNode);
-  const setGraph = useGraphStore((s) => s.setGraph);
   const addEdge = useGraphStore((s) => s.addEdge);
+  const removeEdge = useGraphStore((s) => s.removeEdge);
+  const select = useSelectionStore((s) => s.select);
 
-  const meshNode = nodes.find((n) => n.kind === 'mesh') as MeshGraphNode | undefined;
-  const outputNode = nodes.find((n) => n.kind === 'output') as OutputGraphNode | undefined;
+  const rfNodes: Node[] = useMemo(
+    () =>
+      graphNodes.map((n) => ({
+        id: n.id,
+        type: n.kind,
+        position: positions[n.id] ?? { x: 0, y: 0 },
+        data: { node: n },
+      })),
+    [graphNodes, positions],
+  );
 
-  const setPrimitive = (p: PrimitiveName) => {
-    if (!meshNode) return;
-    setGraph({
-      nodes: nodes.map((n) =>
-        n.id === meshNode.id ? ({ ...n, primitive: p } as MeshGraphNode) : n,
-      ),
-      edges,
-    });
-  };
+  const rfEdges: Edge[] = useMemo(
+    () =>
+      graphEdges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        sourceHandle: e.sourceHandle,
+        target: e.target,
+        targetHandle: e.targetHandle,
+        animated: false,
+        style: { stroke: '#888' },
+      })),
+    [graphEdges],
+  );
 
-  const toggleOutput = () => {
-    if (outputNode) {
-      removeNode(outputNode.id);
-    } else {
-      addNode({ id: 'output1', kind: 'output' });
-      // Re-link last shader → output if a shader exists
-      const shader = nodes.find((n) => n.kind === 'shader');
-      if (shader) {
-        addEdge({
-          id: `e-out-${Date.now()}`,
-          source: shader.id,
-          sourceHandle: 'texture',
-          target: 'output1',
-          targetHandle: 'texture',
-        });
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const updated = applyNodeChanges(changes, rfNodes);
+      // Persist position drags + removals
+      for (const c of changes) {
+        if (c.type === 'position' && c.position) {
+          updateNodePosition(c.id, { x: c.position.x, y: c.position.y });
+        } else if (c.type === 'remove') {
+          removeNode(c.id);
+        } else if (c.type === 'select') {
+          if (c.selected) select(c.id);
+        }
       }
-    }
-  };
+      void updated;
+    },
+    [rfNodes, updateNodePosition, removeNode, select],
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      for (const c of changes) {
+        if (c.type === 'remove') removeEdge(c.id);
+      }
+    },
+    [removeEdge],
+  );
+
+  const onConnect = useCallback(
+    (conn: Connection) => {
+      if (!conn.source || !conn.target || !conn.sourceHandle || !conn.targetHandle) return;
+
+      // N:1 enforcement: refuse if target handle already has an edge
+      const inUse = graphEdges.some(
+        (e) => e.target === conn.target && e.targetHandle === conn.targetHandle,
+      );
+      if (inUse) return;
+
+      // Type compatibility
+      const srcNode = graphNodes.find((n) => n.id === conn.source);
+      const tgtNode = graphNodes.find((n) => n.id === conn.target);
+      if (!srcNode || !tgtNode) return;
+      const srcOut = NODE_META[srcNode.kind].outputs().find((p) => p.name === conn.sourceHandle);
+      const tgtIn = NODE_META[tgtNode.kind]
+        .inputs(tgtNode.kind === 'shader' ? (tgtNode as ShaderGraphNode) : null)
+        .find((p) => p.name === conn.targetHandle);
+      if (!srcOut || !tgtIn || srcOut.type !== tgtIn.type) return;
+
+      // Cycle check on a hypothetical graph
+      const tentative = {
+        nodes: graphNodes,
+        edges: [
+          ...graphEdges,
+          {
+            id: nextId('e'),
+            source: conn.source,
+            sourceHandle: conn.sourceHandle,
+            target: conn.target,
+            targetHandle: conn.targetHandle,
+          },
+        ],
+      };
+      if (validateGraph(tentative).some((e) => e.code === 'cycle')) return;
+
+      addEdge(tentative.edges[tentative.edges.length - 1]);
+    },
+    [graphEdges, graphNodes, addEdge],
+  );
+
+  const isValidConnection = useCallback(
+    (conn: Connection | Edge) => {
+      const c = conn as Connection;
+      if (!c.source || !c.target || !c.sourceHandle || !c.targetHandle) return false;
+      const srcNode = graphNodes.find((n) => n.id === c.source);
+      const tgtNode = graphNodes.find((n) => n.id === c.target);
+      if (!srcNode || !tgtNode) return false;
+      const srcOut = NODE_META[srcNode.kind].outputs().find((p) => p.name === c.sourceHandle);
+      const tgtIn = NODE_META[tgtNode.kind]
+        .inputs(tgtNode.kind === 'shader' ? (tgtNode as ShaderGraphNode) : null)
+        .find((p) => p.name === c.targetHandle);
+      if (!srcOut || !tgtIn) return false;
+      return srcOut.type === tgtIn.type;
+    },
+    [graphNodes],
+  );
 
   return (
     <div className="panel panel--graph">
       <div className="panel-header">Node Graph</div>
-      <div className="panel-body" style={{ padding: 16, overflow: 'auto' }}>
-        <div style={{ marginBottom: 12, color: '#969696', fontSize: 11 }}>
-          Phase 2 dev controls — full React Flow GUI in Phase 5
-        </div>
-        <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button
-            onClick={() => setGraph(createDemoGraph())}
-            style={btnStyle}
-          >
-            Reset to demo graph
-          </button>
-          <button onClick={toggleOutput} style={btnStyle}>
-            {outputNode ? 'Remove Output node' : 'Add Output node'}
-          </button>
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: '#969696', marginBottom: 4 }}>Mesh primitive</div>
-          <select
-            value={meshNode?.primitive ?? 'sphere'}
-            onChange={(e) => setPrimitive(e.target.value as PrimitiveName)}
-            disabled={!meshNode}
-            style={selectStyle}
-          >
-            {PRIMITIVE_NAMES.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
-        <div style={{ fontSize: 11, color: '#969696' }}>
-          Nodes ({nodes.length}):
-        </div>
-        <ul style={{ margin: '4px 0 12px', paddingLeft: 18, color: '#ccc' }}>
-          {nodes.map((n) => (
-            <li key={n.id}>
-              {n.kind} · <span style={{ color: '#888' }}>{n.id}</span>
-              {n.kind === 'mesh' ? ` (${(n as MeshGraphNode).primitive})` : ''}
-            </li>
-          ))}
-        </ul>
-        <div style={{ fontSize: 11, color: '#969696' }}>
-          Edges ({edges.length}):
-        </div>
-        <ul style={{ margin: '4px 0 0', paddingLeft: 18, color: '#ccc' }}>
-          {edges.map((e) => (
-            <li key={e.id}>
-              {e.source}.{e.sourceHandle} → {e.target}.{e.targetHandle}
-            </li>
-          ))}
-        </ul>
+      <Toolbar />
+      <div className="panel-body" style={{ background: '#1a1a1a' }}>
+        <ReactFlow
+          nodes={rfNodes}
+          edges={rfEdges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          isValidConnection={isValidConnection}
+          fitView
+          fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
+          proOptions={{ hideAttribution: true }}
+          colorMode="dark"
+        >
+          <Background color="#333" gap={16} />
+          <Controls />
+          <MiniMap
+            pannable
+            zoomable
+            nodeColor={(n) => {
+              switch ((n as Node).type) {
+                case 'mesh':   return '#56d698';
+                case 'image':  return '#d69c56';
+                case 'shader': return '#569cd6';
+                case 'output': return '#d6569c';
+                default: return '#888';
+              }
+            }}
+            style={{ background: '#252526' }}
+          />
+        </ReactFlow>
       </div>
     </div>
   );
 }
 
-const btnStyle: React.CSSProperties = {
-  background: '#3a3a3d',
-  border: '1px solid #555',
-  color: '#ddd',
-  padding: '6px 10px',
-  cursor: 'pointer',
-  borderRadius: 3,
-  textAlign: 'left',
-};
-
-const selectStyle: React.CSSProperties = {
-  background: '#3a3a3d',
-  border: '1px solid #555',
-  color: '#ddd',
-  padding: '4px 6px',
-  borderRadius: 3,
-  width: '100%',
-};

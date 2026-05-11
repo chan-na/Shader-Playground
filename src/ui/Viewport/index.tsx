@@ -9,6 +9,8 @@ import { executePlan } from '../../core/graph/execute';
 import { createCameraController } from '../../core/camera/input';
 import { createDemoGraph } from '../../state/demoGraph';
 import { parseShaderInfoLog } from '../../core/graph/diagnostics';
+import { thumbnailScheduler } from '../../state/thumbnailScheduler';
+import { readbackThumbnail } from '../../core/thumbnail/readback';
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -20,7 +22,11 @@ export function Viewport() {
   // Bootstrap demo graph on first mount if empty
   useEffect(() => {
     if (useGraphStore.getState().nodes.length === 0) {
-      useGraphStore.getState().setGraph(createDemoGraph());
+      useGraphStore.getState().setGraph(createDemoGraph(), {
+        mesh1: { x: -240, y: 0 },
+        shader1: { x: 80, y: 0 },
+        output1: { x: 400, y: 0 },
+      });
     }
   }, []);
 
@@ -42,6 +48,7 @@ export function Viewport() {
 
     let plan: ExecutionPlan = emptyPlan(canvas.width || 1, canvas.height || 1);
     let lastRev = -1;
+    let lastUniformRev = -1;
     let alive = true;
     let rafId = 0;
     const start = performance.now();
@@ -99,9 +106,15 @@ export function Viewport() {
       if (!alive) return;
       const resized = resize();
       const rev = useGraphStore.getState().rev;
+      const uniformRev = useGraphStore.getState().uniformRev;
       if (rev !== lastRev || resized || plan.width !== canvas.width || plan.height !== canvas.height) {
         lastRev = rev;
         recompile();
+        thumbnailScheduler.bumpAll();
+      }
+      if (uniformRev !== lastUniformRev) {
+        lastUniformRev = uniformRev;
+        thumbnailScheduler.bumpAll();
       }
       // Pull current uniform values into the plan (cheap)
       const graph = useGraphStore.getState();
@@ -137,6 +150,21 @@ export function Viewport() {
         canvas.width,
         canvas.height,
       );
+
+      // Thumbnail readback (10Hz throttle handled by scheduler)
+      const ready = thumbnailScheduler.pickReady(now);
+      if (ready.length) {
+        for (const id of ready) {
+          const pass = plan.passes.find((p) => p.nodeId === id);
+          if (!pass) continue;
+          try {
+            const img = readbackThumbnail(gl, pass.fbo);
+            thumbnailScheduler.commit(id, img, now);
+          } catch {
+            // Readback can fail right after a resize; just skip this frame.
+          }
+        }
+      }
 
       rafId = requestAnimationFrame(tick);
     };

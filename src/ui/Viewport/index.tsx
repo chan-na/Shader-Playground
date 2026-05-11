@@ -8,13 +8,11 @@ import { createGLContext } from '../../core/gl/context';
 import { compileGraph, emptyPlan, type ExecutionPlan } from '../../core/graph/compile';
 import { executePlan } from '../../core/graph/execute';
 import { createCameraController } from '../../core/camera/input';
-import { createDemoGraph, DEMO_LAYOUT } from '../../state/demoGraph';
 import { parseShaderInfoLog } from '../../core/graph/diagnostics';
 import { thumbnailScheduler } from '../../state/thumbnailScheduler';
 import { readbackThumbnail } from '../../core/thumbnail/readback';
 import { useTimeStore } from '../../state/timeStore';
 import { useViewportStore } from '../../state/viewportStore';
-import { useHistoryStore } from '../../state/historyStore';
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -22,33 +20,6 @@ export function Viewport() {
   const setStats = useRendererStore((s) => s.setStats);
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
-
-  // Bootstrap: prefer a #share=... URL if present; otherwise demo. Clear
-  // history afterwards so the first Cmd+Z doesn't wipe back to a blank graph.
-  useEffect(() => {
-    if (useGraphStore.getState().nodes.length !== 0) return;
-    const hash = typeof location !== 'undefined' ? location.hash : '';
-    if (hash.includes('share=')) {
-      void (async () => {
-        try {
-          const mod = await import('../../state/shareUrl');
-          const decoded = await mod.decodeShareHash(hash);
-          if (decoded) {
-            useGraphStore.getState().setGraph(decoded.graph, decoded.positions);
-            useHistoryStore.getState().clear();
-            return;
-          }
-        } catch {
-          /* fall through to demo */
-        }
-        useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
-        useHistoryStore.getState().clear();
-      })();
-      return;
-    }
-    useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
-    useHistoryStore.getState().clear();
-  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;

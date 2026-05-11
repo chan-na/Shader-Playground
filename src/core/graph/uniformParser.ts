@@ -1,4 +1,4 @@
-export type UniformType =
+type UniformType =
   | "float"
   | "vec2"
   | "vec3"

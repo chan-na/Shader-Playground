@@ -7,7 +7,7 @@ const DB_VERSION = 1;
 const STORE = "session";
 const KEY = "autosave";
 
-export const AUTOSAVE_DEBOUNCE_MS = 30_000;
+const AUTOSAVE_DEBOUNCE_MS = 30_000;
 
 let _dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -35,7 +35,7 @@ function awaitRequest<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
-export async function saveSession(payload: SerializedProject): Promise<void> {
+async function saveSession(payload: SerializedProject): Promise<void> {
   const db = await openDb();
   const tx = db.transaction(STORE, "readwrite").objectStore(STORE);
   await awaitRequest(tx.put(payload, KEY));
@@ -146,15 +146,4 @@ export function startAutoSave(): AutoSaveHandle {
     persist: saveSession,
   });
   return _activeHandle;
-}
-
-export function stopAutoSave(): void {
-  if (!_activeHandle) return;
-  _activeHandle.stop();
-  _activeHandle = null;
-}
-
-/** For tests only — reset the singleton. */
-export function _resetAutoSaveForTests(): void {
-  stopAutoSave();
 }

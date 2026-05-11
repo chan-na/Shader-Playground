@@ -1,6 +1,6 @@
 import type { ImageHandle } from "./types";
 
-export async function loadImageFromBlob(
+async function loadImageFromBlob(
   blob: Blob,
   name = "image",
 ): Promise<ImageHandle> {

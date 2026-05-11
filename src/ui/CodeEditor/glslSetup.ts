@@ -7,7 +7,7 @@ import {
   syntaxHighlighting,
 } from "@codemirror/language";
 import { lintGutter } from "@codemirror/lint";
-import { EditorState, type Extension } from "@codemirror/state";
+import type { Extension } from "@codemirror/state";
 import {
   drawSelection,
   EditorView,
@@ -77,8 +77,4 @@ export function glslExtensions(): Extension[] {
     darkTheme,
     EditorView.lineWrapping,
   ];
-}
-
-export function makeEditorState(doc: string): EditorState {
-  return EditorState.create({ doc, extensions: glslExtensions() });
 }

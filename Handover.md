@@ -5,7 +5,8 @@
 > - `7cad6bc style: Biome 포매팅 + 안전한 lint fix 일괄 적용`
 > - `72889d2 docs: Handover.md — lint/static-analysis/coverage 후속 작업 핸드오프`
 > - `313dd23 chore: Biome 잔여 진단 0 errors / 0 warnings 정리 (P1)`
-> - **이번 세션**: P3 (graphStore ↔ historyStore 순환 의존성) 해소 — 공유 타입을 `src/state/types.ts`로 추출
+> - `ec47df1 refactor: graphStore ↔ historyStore 순환 의존성 해소 (P3)`
+> - **이번 세션**: P2 (Knip 미사용 dep/export/type) 정리 — `npm run check` 첫 exit 0
 
 ## 현재 상태
 
@@ -16,8 +17,9 @@
 | `vite build` | 성공 |
 | `vitest run --coverage` | lines 31% / branches 82% / functions 52% / statements 31% (임계값 통과) |
 | `biome check` | **0 errors / 0 warnings** ✅ |
-| `knip` | 미사용 dep 4 + export 13 + type 13 + 설정 힌트 5 (P2 미해결) |
+| `knip` | **0 errors** ✅ |
 | `dpdm` | **0건** ✅ |
+| `npm run check` | **exit 0** (typecheck + lint + deadcode + circular + test 일괄 통과) ✅ |
 
 ## 도입된 도구 / 설정
 
@@ -60,16 +62,22 @@
 
 `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build` 모두 통과.
 
-### P2. Knip false positive 정리 + 설정 다듬기
+### ~~P2. Knip false positive 정리 + 설정 다듬기~~ ✅ 완료 (2026-05-11)
 
-`knip.json` 설정 힌트:
-- `dist/**` ignore 제거 권장 (이미 `.gitignore`에 있어 중복)
-- `src/main.tsx`, `src/test-setup.ts`, `vite.config.ts`, `vitest.config.ts` entry 패턴은 plugin이 자동 감지 — redundant
+처리 요약:
 
-실제 미사용 dependencies (4) — **제거 전에 동적 import / re-export 여부 grep으로 검증할 것**:
-- `@codemirror/search` `@lezer/highlight` `@loaders.gl/images` `codemirror`
+| 항목 | 처리 전 | 처리 방식 |
+|---|---|---|
+| `knip.json` 설정 힌트 | 5 hints | `dist/**` ignore + redundant entry 4개 제거 |
+| 미사용 dependencies | 4 | `npm uninstall @codemirror/search @lezer/highlight @loaders.gl/images codemirror` — grep으로 src 사용 0건 검증 후 |
+| 진짜 dead 함수/타입 (정의만 있고 호출 없음) | 8 | 함수 자체 삭제: `listCachedIds`/`clearCache` (`cache.ts`), `readbackThumbnail` (`thumbnail/readback.ts`), `makeEditorState` (`glslSetup.ts`), `totalProblems` (`ProblemsPanel.tsx`), `_resetAutoSaveForTests` + `stopAutoSave` (`autoSave.ts`, 연쇄). 타입: `Port`, `SwizzleVecKind` (`graph/types.ts`) |
+| 파일 내부에서만 쓰이는 export | 18 | `export` 키워드만 제거 (로컬화). 함수 4건 (`loadGltfFromArrayBuffer`, `loadImageFromBlob`, `paramValue`, `importFile`) + 상수/함수 2건 (`AUTOSAVE_DEBOUNCE_MS`, `saveSession`) + 타입 12건 (`AssetCatalog`/`SamplerBinding`/`ParamBinding`/`OutputBinding`/`BaseNode`/`OutputGraphNode`/`UniformType`/`Vec`/`JumpRequest`/`RecorderStatus`/`RendererStats`) |
 
-실제 미사용 exports (13) + types (13): `src/core/assets/cache.ts:listCachedIds/clearCache`, `src/core/graph/compile.ts` 4 type 등 — 점진 제거. `_resetAutoSaveForTests` 같은 test 헬퍼는 의도적으로 export 됐을 수 있어 개별 판단.
+`_resetAutoSaveForTests` 는 현재 어떤 테스트도 호출하지 않아 삭제. 미래에 다시 필요하면 export로 재공개 가능. YAGNI 원칙.
+
+부수 정리: `readback.ts`의 unused `Framebuffer` 타입 import + `glslSetup.ts`의 unused `EditorState` value import 제거.
+
+검증: `npm run check` exit 0 (전 단계 통과). 빌드/테스트/순환 모두 클린.
 
 ### ~~P3. 순환 의존성 (1건)~~ ✅ 완료 (2026-05-11)
 
@@ -90,10 +98,10 @@
 - breaking change 있음 (config API 일부 변경) — 마이그레이션 가이드: https://vitest.dev/guide/migration.html
 - `@vitest/coverage-v8`도 동일 버전으로 함께 올려야 함
 
-### P6. CI 추가 (GitHub Actions)
+### P6. CI 추가 (GitHub Actions) — **다음 후속 작업으로 적합**
 
 - `.github/workflows/check.yml` 신설
-- `npm ci && npm run check` 단일 잡으로 충분 (typecheck + lint + deadcode + circular + test)
+- `npm ci && npm run check` 단일 잡으로 충분 (typecheck + lint + deadcode + circular + test). P2 완료 후 첫 exit 0 달성.
 - 커버리지 리포트는 옵션 — codecov/coveralls 또는 PR 코멘트
 - PR 트리거: `pull_request: branches: [main]`
 
@@ -145,12 +153,12 @@ npm run check
 3. **`useExhaustiveDependencies` warn은 진짜 버그/false positive 혼재** — zustand `useStore((s) => s.x)` 부작용 구독은 deps에 들어가야 정상
 4. **Vitest 2.1.x V8 커버리지의 라인 매핑 부정확 가능성** — 정확한 줄 수가 필요하면 Vitest 3 업그레이드 또는 임시로 `provider: "istanbul"`로 교차 검증
 5. ~~**순환 의존성 해결 시 history 동작 회귀 주의**~~ — P3 처리 시 양쪽 store 테스트 회귀 없음을 확인함 (12/12 통과)
-6. **`npm run check` 는 현재 P2 (knip dead code) 때문에 exit 1** — typecheck/lint/circular/test/build 개별로는 모두 통과. CI는 P2 처리 후 의미를 가짐
+6. ~~**`npm run check` 는 현재 P2 (knip dead code) 때문에 exit 1**~~ — P2 처리 후 `npm run check` exit 0 달성. CI 도입(P6) 가능 상태
 7. **RTK 프록시 환경에서 `npx biome check` 출력이 잘려 보일 수 있음** — 정확한 진단 보려면 `rtk proxy npx biome check --reporter=summary --max-diagnostics=100` 등 raw 호출 사용
 
 ## 참고 파일
 
 - `biome.json` — 룰 튜닝 시 수정. `linter.rules` 트리에 룰명 그대로 명시 (`"style": { "noNonNullAssertion": "off" }` 식)
-- `knip.json` — 의도적 export(`_resetAutoSaveForTests` 등) 보호하려면 `ignoreExportsUsedInFile`/`ignore` 추가
+- `knip.json` — 의도적 export(테스트 헬퍼 등)를 보호하려면 `ignoreExportsUsedInFile`/`ignore` 추가. 현재는 0 errors 상태
 - `vitest.config.ts` — 커버리지 임계값. UI/WebGL 테스트가 추가되면 점진적으로 상향
 - 직전 측정 시점의 진단 분포는 본 문서 P1 표 기준 — 잔여 항목 처리하면 갱신할 것

@@ -36,20 +36,20 @@ import {
   validateGraph,
 } from "./validate";
 
-export interface AssetCatalog {
+interface AssetCatalog {
   meshes: Record<string, GeometryHandle>;
   images: Record<string, ImageHandle>;
 }
 
 const EMPTY_ASSETS: AssetCatalog = { meshes: {}, images: {} };
 
-export interface SamplerBinding {
+interface SamplerBinding {
   uniformName: string;
   sourceNodeId: string;
   unit: number;
 }
 
-export interface ParamBinding {
+interface ParamBinding {
   uniformName: string;
   sourceNodeId: string;
 }
@@ -66,7 +66,7 @@ export interface ShaderPass {
   uniformValues: Record<string, number | number[]>;
 }
 
-export interface OutputBinding {
+interface OutputBinding {
   outputNodeId: string;
   sourceNodeId: string | null;
 }

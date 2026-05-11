@@ -1,5 +1,3 @@
-import type { Framebuffer } from "../gl/framebuffer";
-
 export const THUMB_SIZE = 96;
 
 const _scratch = new Uint8Array(THUMB_SIZE * THUMB_SIZE * 4);
@@ -59,23 +57,4 @@ export function downsampleToThumb(
       ? new Uint8ClampedArray(_scratchClamped)
       : new Uint8ClampedArray(out.buffer.slice(0));
   return new ImageData(copy, thumb, thumb);
-}
-
-/**
- * Synchronous fallback used when async readback is unavailable. Stalls the
- * GPU pipeline while the readPixels finishes, so prefer
- * `AsyncThumbnailReadback` in the hot path.
- */
-export function readbackThumbnail(
-  gl: WebGL2RenderingContext,
-  fb: Framebuffer,
-): ImageData {
-  const w = fb.width;
-  const h = fb.height;
-  const prevFB = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
-  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fb.fbo);
-  const buf = new Uint8Array(w * h * 4);
-  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevFB);
-  return downsampleToThumb(buf, w, h, THUMB_SIZE);
 }

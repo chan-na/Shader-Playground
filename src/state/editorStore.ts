@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export type ShaderStage = "vertex" | "fragment";
 
-export interface JumpRequest {
+interface JumpRequest {
   /** Bumped on every request so the editor can react even if line is identical. */
   rev: number;
   nodeId: string;

@@ -39,7 +39,7 @@ export interface ImportResult {
   assetId: string;
 }
 
-export async function importFile(
+async function importFile(
   file: File,
   position?: { x: number; y: number },
 ): Promise<ImportResult | null> {

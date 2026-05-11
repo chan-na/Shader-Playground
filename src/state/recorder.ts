@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type RecorderStatus = "idle" | "recording";
+type RecorderStatus = "idle" | "recording";
 
 export interface RecorderState {
   status: RecorderStatus;

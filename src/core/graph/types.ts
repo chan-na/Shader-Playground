@@ -1,10 +1,5 @@
 export type PortType = "mesh" | "texture" | "float" | "vec2" | "vec3" | "vec4";
 
-export interface Port {
-  name: string;
-  type: PortType;
-}
-
 export type GraphNodeKind =
   | "mesh"
   | "image"
@@ -17,7 +12,7 @@ export type GraphNodeKind =
 
 export type ParamKind = "float" | "vec3" | "color" | "time";
 
-export interface BaseNode {
+interface BaseNode {
   id: string;
   kind: GraphNodeKind;
 }
@@ -43,7 +38,7 @@ export interface ShaderGraphNode extends BaseNode {
   uniformValues: Record<string, number | number[]>;
 }
 
-export interface OutputGraphNode extends BaseNode {
+interface OutputGraphNode extends BaseNode {
   kind: "output";
 }
 
@@ -78,8 +73,6 @@ export interface MathGraphNode extends BaseNode {
   a: number;
   b: number;
 }
-
-export type SwizzleVecKind = "vec2" | "vec3" | "vec4";
 
 export interface SwizzleGraphNode extends BaseNode {
   kind: "swizzle";

@@ -166,23 +166,3 @@ export async function loadCachedImage(id: string): Promise<{
     return null;
   }
 }
-
-export async function listCachedIds(): Promise<{
-  meshes: string[];
-  images: string[];
-}> {
-  const db = await openDb();
-  const meshes = (await awaitRequest<IDBValidKey[]>(
-    tx(db, STORE_MESH, "readonly").getAllKeys(),
-  )) as string[];
-  const images = (await awaitRequest<IDBValidKey[]>(
-    tx(db, STORE_IMAGE, "readonly").getAllKeys(),
-  )) as string[];
-  return { meshes, images };
-}
-
-export async function clearCache(): Promise<void> {
-  const db = await openDb();
-  await awaitRequest(tx(db, STORE_MESH, "readwrite").clear());
-  await awaitRequest(tx(db, STORE_IMAGE, "readwrite").clear());
-}

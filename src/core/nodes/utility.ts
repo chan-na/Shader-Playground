@@ -10,7 +10,7 @@ import type {
 import { MATH_UNARY_OPS } from "../graph/types";
 
 export type Scalar = number;
-export type Vec = number[];
+type Vec = number[];
 export type Value = Scalar | Vec;
 
 export interface EvalContext {
@@ -74,7 +74,7 @@ export function computeMath(op: MathOp, a: Scalar, b: Scalar): Scalar {
   }
 }
 
-export function paramValue(node: ParamGraphNode, time: number): Value {
+function paramValue(node: ParamGraphNode, time: number): Value {
   if (node.paramKind === "time") {
     const [scale = 1, offset = 0] = Array.isArray(node.value)
       ? node.value

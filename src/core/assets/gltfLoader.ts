@@ -27,7 +27,7 @@ interface GLTFParsed {
   meshes?: GLTFMeshSpec[];
 }
 
-export async function loadGltfFromArrayBuffer(
+async function loadGltfFromArrayBuffer(
   buffer: ArrayBuffer,
   name = "gltf",
 ): Promise<GeometryHandle> {

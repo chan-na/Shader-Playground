@@ -127,13 +127,3 @@ export function ProblemsPanel() {
     </div>
   );
 }
-
-export function totalProblems(): number {
-  const byNode = useDiagnosticsStore.getState().byNode;
-  let total = 0;
-  for (const d of Object.values(byNode)) {
-    total += d.vertex.length + d.fragment.length + d.link.length;
-  }
-  total += useRendererStore.getState().stats.errors.length;
-  return total;
-}

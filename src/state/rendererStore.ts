@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export interface RendererStats {
+interface RendererStats {
   fps: number;
   frame: number;
   drawCalls: number;

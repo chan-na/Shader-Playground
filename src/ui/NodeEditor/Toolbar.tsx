@@ -7,13 +7,20 @@ import {
   CHAIN_DEMO_LAYOUT,
   createTorusDemoGraph,
   TORUS_DEMO_LAYOUT,
+  createSplitDemoGraph,
+  SPLIT_DEMO_LAYOUT,
 } from '../../state/demoGraph';
 import { importFiles, hydrateAssetsFor } from '../../state/assetActions';
 import { serializeProject, deserializeProject } from '../../state/serialization';
+import { encodeShareUrl } from '../../state/shareUrl';
+import { useRecorderStore } from '../../state/recorder';
+import { downloadExportedHtml } from '../../export/htmlExport';
 import { nextId } from '../../utils/id';
 import basicVert from '../../shaders/basic.vert?raw';
 import unlitFrag from '../../shaders/templates/unlit.frag?raw';
-import type { GraphNode } from '../../core/graph/types';
+import blendFrag from '../../shaders/templates/blend.frag?raw';
+import type { GraphNode, ParamKind } from '../../core/graph/types';
+import { MAX_OUTPUTS } from '../../core/graph/validate';
 
 const btn: React.CSSProperties = {
   background: '#3a3a3d',
@@ -33,7 +40,8 @@ export function Toolbar() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
 
-  const hasOutput = nodes.some((n) => n.kind === 'output');
+  const outputCount = nodes.filter((n) => n.kind === 'output').length;
+  const outputsFull = outputCount >= MAX_OUTPUTS;
 
   const onPickFiles = () => fileInputRef.current?.click();
   const onFilesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,6 +105,45 @@ export function Toolbar() {
     }, 'image/png');
   };
 
+  const shareUrl = async () => {
+    const s = useGraphStore.getState();
+    const url = await encodeShareUrl({ nodes: s.nodes, edges: s.edges }, s.positions);
+    try {
+      await navigator.clipboard.writeText(url);
+      alert(`Share URL copied to clipboard\n${url.length} chars`);
+    } catch {
+      window.prompt('Copy this share URL:', url);
+    }
+  };
+
+  const exportHtml = () => {
+    const s = useGraphStore.getState();
+    downloadExportedHtml({ nodes: s.nodes, edges: s.edges }, s.positions);
+  };
+
+  const recorderStatus = useRecorderStore((r) => r.status);
+  const recorderUrl = useRecorderStore((r) => r.lastBlobUrl);
+
+  const toggleRecord = async () => {
+    const r = useRecorderStore.getState();
+    const canvas = document.querySelector('.viewport-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    if (r.status === 'idle') {
+      await r.start(canvas, 30);
+    } else {
+      const blob = await r.stop();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `shader-playground-${Date.now()}.webm`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    }
+  };
+  void recorderUrl;
+
   const addMesh = () => {
     const id = nextId('mesh');
     addNode(
@@ -120,9 +167,29 @@ export function Toolbar() {
     addNode(node, { x: 100, y: 0 });
   };
   const addOutput = () => {
-    if (hasOutput) return;
+    if (outputsFull) return;
     const id = nextId('output');
     addNode({ id, kind: 'output' }, { x: 400, y: 0 });
+  };
+  const addParam = (paramKind: ParamKind) => {
+    const id = nextId(`param-${paramKind}`);
+    const value: number | number[] =
+      paramKind === 'float' ? 0.5 :
+      paramKind === 'time' ? [1, 0] :
+      paramKind === 'color' ? [1, 0.5, 0.2] :
+      [0, 0, 0];
+    addNode({ id, kind: 'param', paramKind, value }, { x: -240, y: 240 });
+  };
+  const addBlend = () => {
+    const id = nextId('blend');
+    const node: GraphNode = {
+      id,
+      kind: 'shader',
+      vertexSource: basicVert,
+      fragmentSource: blendFrag,
+      uniformValues: { u_mix: 0.5, u_mode: 0 },
+    };
+    addNode(node, { x: 200, y: 200 });
   };
 
   return (
@@ -139,7 +206,13 @@ export function Toolbar() {
       <button style={btn} onClick={addMesh}>+ Mesh</button>
       <button style={btn} onClick={addImage}>+ Image</button>
       <button style={btn} onClick={addShader}>+ Shader</button>
-      <button style={btn} onClick={addOutput} disabled={hasOutput}>+ Output</button>
+      <button style={btn} onClick={addBlend} title="Two-input blend/composite shader">+ Blend</button>
+      <button style={btn} onClick={addOutput} disabled={outputsFull} title={`Up to ${MAX_OUTPUTS} outputs (split viewport)`}>
+        + Output{outputCount > 0 ? ` (${outputCount}/${MAX_OUTPUTS})` : ''}
+      </button>
+      <button style={btn} onClick={() => addParam('float')}>+ Float</button>
+      <button style={btn} onClick={() => addParam('color')}>+ Color</button>
+      <button style={btn} onClick={() => addParam('time')}>+ Time</button>
       <button style={btn} onClick={onPickFiles} title="Import OBJ/GLTF/PNG/JPG">↑ Load…</button>
       <input
         ref={fileInputRef}
@@ -159,10 +232,24 @@ export function Toolbar() {
         onChange={onProjectChosen}
       />
       <button style={btn} onClick={screenshot} title="Save viewport PNG">📷 Snap</button>
+      <button
+        style={{
+          ...btn,
+          background: recorderStatus === 'recording' ? '#5c1a1a' : btn.background,
+          color: recorderStatus === 'recording' ? '#ff8484' : btn.color,
+        }}
+        onClick={toggleRecord}
+        title="Record viewport to WebM"
+      >
+        {recorderStatus === 'recording' ? '■ Stop' : '● Record'}
+      </button>
+      <button style={btn} onClick={shareUrl} title="Copy a shareable URL to clipboard">🔗 Share</button>
+      <button style={btn} onClick={exportHtml} title="Download a self-contained HTML file">📄 HTML</button>
       <div style={{ flex: 1 }} />
       <button style={btn} onClick={() => setGraph(createDemoGraph(), DEMO_LAYOUT)}>Sphere</button>
       <button style={btn} onClick={() => setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT)}>Torus UV</button>
       <button style={btn} onClick={() => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT)}>Chain</button>
+      <button style={btn} onClick={() => setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT)}>Split</button>
       <button style={btn} onClick={() => reset()}>Clear</button>
     </div>
   );

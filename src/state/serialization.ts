@@ -100,6 +100,14 @@ function structuredCloneNode(n: GraphNode): GraphNode {
       };
     case 'output':
       return { id: n.id, kind: 'output' };
+    case 'param':
+      return {
+        id: n.id,
+        kind: 'param',
+        paramKind: n.paramKind,
+        value: Array.isArray(n.value) ? [...n.value] : n.value,
+        label: n.label,
+      };
   }
 }
 

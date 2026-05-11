@@ -4,7 +4,9 @@ precision highp float;
 in vec2 v_uv;
 
 uniform float u_time;
+// @range 1..30 @step 0.1 @default 6 @label "Scale"
 uniform float u_scale;
+// @label "Tint"
 uniform vec3 u_tint;
 
 out vec4 outColor;

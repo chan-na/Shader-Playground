@@ -12,6 +12,9 @@ import { createDemoGraph, DEMO_LAYOUT } from '../../state/demoGraph';
 import { parseShaderInfoLog } from '../../core/graph/diagnostics';
 import { thumbnailScheduler } from '../../state/thumbnailScheduler';
 import { readbackThumbnail } from '../../core/thumbnail/readback';
+import { useTimeStore } from '../../state/timeStore';
+import { useViewportStore } from '../../state/viewportStore';
+import { useHistoryStore } from '../../state/historyStore';
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -20,11 +23,31 @@ export function Viewport() {
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
 
-  // Bootstrap demo graph on first mount if empty
+  // Bootstrap: prefer a #share=... URL if present; otherwise demo. Clear
+  // history afterwards so the first Cmd+Z doesn't wipe back to a blank graph.
   useEffect(() => {
-    if (useGraphStore.getState().nodes.length === 0) {
-      useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+    if (useGraphStore.getState().nodes.length !== 0) return;
+    const hash = typeof location !== 'undefined' ? location.hash : '';
+    if (hash.includes('share=')) {
+      void (async () => {
+        try {
+          const mod = await import('../../state/shareUrl');
+          const decoded = await mod.decodeShareHash(hash);
+          if (decoded) {
+            useGraphStore.getState().setGraph(decoded.graph, decoded.positions);
+            useHistoryStore.getState().clear();
+            return;
+          }
+        } catch {
+          /* fall through to demo */
+        }
+        useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+        useHistoryStore.getState().clear();
+      })();
+      return;
     }
+    useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+    useHistoryStore.getState().clear();
   }, []);
 
   useEffect(() => {
@@ -49,10 +72,10 @@ export function Viewport() {
     let lastUniformRev = -1;
     let alive = true;
     let rafId = 0;
-    const start = performance.now();
-    let prev = start;
+    let prev = performance.now();
     let frameCount = 0;
     let fpsAccum = 0;
+    const timeStore = useTimeStore;
 
     const recompile = () => {
       const w = Math.max(1, canvas.width);
@@ -135,6 +158,8 @@ export function Viewport() {
       const now = performance.now();
       const dt = now - prev;
       prev = now;
+      // Advance simulated shader time honoring play/pause/speed.
+      timeStore.getState().advance(dt / 1000);
       frameCount++;
       fpsAccum += dt;
       if (fpsAccum >= 500) {
@@ -144,7 +169,11 @@ export function Viewport() {
         fpsAccum = 0;
       }
 
-      const t = (now - start) / 1000;
+      const t = useTimeStore.getState().simTime;
+      const bg = useViewportStore.getState().background;
+      // Build a snapshot of param nodes for the frame.
+      const params: Record<string, typeof graph.nodes[number]> = {};
+      for (const n of graph.nodes) if (n.kind === 'param') params[n.id] = n;
       executePlan(
         gl,
         plan,
@@ -153,6 +182,8 @@ export function Viewport() {
           width: plan.width,
           height: plan.height,
           camera: useCameraStore.getState().camera,
+          background: bg,
+          params,
         },
         canvas.width,
         canvas.height,

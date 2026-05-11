@@ -1,5 +1,7 @@
 import type { Graph, GraphEdge, GraphNode } from './types';
 
+export const MAX_OUTPUTS = 4;
+
 export interface ValidationError {
   code: 'cycle' | 'multiple_outputs' | 'multi_input' | 'missing_node';
   message: string;
@@ -22,12 +24,12 @@ export function validateGraph(graph: Graph): ValidationError[] {
     }
   }
 
-  // Output count
+  // Output count — split viewport supports up to 4 outputs.
   const outputs = graph.nodes.filter((n) => n.kind === 'output');
-  if (outputs.length > 1) {
+  if (outputs.length > MAX_OUTPUTS) {
     errors.push({
       code: 'multiple_outputs',
-      message: `Graph has ${outputs.length} Output nodes; max 1 allowed`,
+      message: `Graph has ${outputs.length} Output nodes; max ${MAX_OUTPUTS} allowed`,
       nodeIds: outputs.map((o) => o.id),
     });
   }

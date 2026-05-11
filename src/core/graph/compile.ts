@@ -21,6 +21,11 @@ export interface SamplerBinding {
   unit: number;
 }
 
+export interface ParamBinding {
+  uniformName: string;
+  sourceNodeId: string;
+}
+
 export interface ShaderPass {
   nodeId: string;
   program: CompiledProgram;
@@ -28,12 +33,22 @@ export interface ShaderPass {
   mesh: GLMesh;
   meshIsFullscreen: boolean;
   samplers: SamplerBinding[];
+  /** Edges that override a uniform's value with a parameter node. */
+  paramBindings: ParamBinding[];
   uniformValues: Record<string, number | number[]>;
+}
+
+export interface OutputBinding {
+  outputNodeId: string;
+  sourceNodeId: string | null;
 }
 
 export interface ExecutionPlan {
   passes: ShaderPass[];
   imageTextures: Record<string, GLTexture>;
+  /** One entry per Output node in document order. */
+  outputs: OutputBinding[];
+  /** @deprecated kept for backward compat; mirrors outputs[0]. */
   outputNodeId: string | null;
   outputSourceNodeId: string | null;
   errors: ValidationError[];
@@ -53,6 +68,7 @@ export function emptyPlan(width: number, height: number): ExecutionPlan {
   return {
     passes: [],
     imageTextures: {},
+    outputs: [],
     outputNodeId: null,
     outputSourceNodeId: null,
     errors: [],
@@ -149,12 +165,21 @@ export function compileGraph(
     const fbo = createFramebuffer(gl, opts.width, opts.height);
     const mesh = uploadMesh(gl, meshData, built.program.attributes);
 
-    // Sampler bindings: any edge with targetHandle starting with sampler/u_tex
+    // Routing inputs: classify each incoming edge as sampler (texture) vs
+    // parameter (scalar/vec). Texture edges become sampler bindings; param
+    // edges override uniform values at draw time.
     const samplers: SamplerBinding[] = [];
+    const paramBindings: ParamBinding[] = [];
     let unit = 0;
     for (const e of findEdgesToTarget(graph, sn.id)) {
       if (e.targetHandle === 'mesh') continue;
-      samplers.push({ uniformName: e.targetHandle, sourceNodeId: e.source, unit: unit++ });
+      const src = graph.nodes.find((n) => n.id === e.source);
+      if (!src) continue;
+      if (src.kind === 'param') {
+        paramBindings.push({ uniformName: e.targetHandle, sourceNodeId: e.source });
+      } else {
+        samplers.push({ uniformName: e.targetHandle, sourceNodeId: e.source, unit: unit++ });
+      }
     }
 
     const pass: ShaderPass = {
@@ -164,6 +189,7 @@ export function compileGraph(
       mesh,
       meshIsFullscreen,
       samplers,
+      paramBindings,
       uniformValues: { ...sn.uniformValues },
     };
     passes.push(pass);
@@ -176,18 +202,18 @@ export function compileGraph(
     });
   }
 
-  const output = graph.nodes.find((n) => n.kind === 'output') ?? null;
-  let outputSourceNodeId: string | null = null;
-  if (output) {
-    const edge = findEdgeTo(graph, output.id, 'texture');
-    if (edge) outputSourceNodeId = edge.source;
-  }
+  const outputNodes = graph.nodes.filter((n) => n.kind === 'output');
+  const outputs: OutputBinding[] = outputNodes.map((o) => {
+    const edge = findEdgeTo(graph, o.id, 'texture');
+    return { outputNodeId: o.id, sourceNodeId: edge?.source ?? null };
+  });
 
   return {
     passes,
     imageTextures,
-    outputNodeId: output?.id ?? null,
-    outputSourceNodeId,
+    outputs,
+    outputNodeId: outputs[0]?.outputNodeId ?? null,
+    outputSourceNodeId: outputs[0]?.sourceNodeId ?? null,
     errors,
     shaderErrors,
     width: opts.width,

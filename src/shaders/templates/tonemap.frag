@@ -4,7 +4,9 @@ precision highp float;
 in vec2 v_uv;
 
 uniform sampler2D u_tex;
+// @range 0..4 @step 0.01 @default 1.4 @label "Exposure"
 uniform float u_exposure;
+// @range 0.1..4 @step 0.01 @default 2.2 @label "Gamma"
 uniform float u_gamma;
 
 out vec4 outColor;

@@ -6,8 +6,15 @@ export interface UniformControlProps {
   onChange: (v: number | number[]) => void;
 }
 
+function stepFor(spec: UniformSpec): number {
+  if (spec.step && spec.step > 0) return spec.step;
+  const range = spec.max - spec.min;
+  return range > 0 ? range / 1000 : 0.001;
+}
+
 export function UniformControl({ spec, value, onChange }: UniformControlProps) {
   const v = value ?? spec.defaultValue;
+  const step = stepFor(spec);
 
   if (spec.control === 'slider') {
     const num = typeof v === 'number' ? v : 0;
@@ -17,7 +24,7 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
           type="range"
           min={spec.min}
           max={spec.max}
-          step={(spec.max - spec.min) / 1000}
+          step={step}
           value={num}
           onChange={(e) => onChange(parseFloat(e.target.value))}
         />
@@ -25,7 +32,7 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
           type="number"
           min={spec.min}
           max={spec.max}
-          step={(spec.max - spec.min) / 1000}
+          step={step}
           value={num.toFixed(3)}
           onChange={(e) => onChange(parseFloat(e.target.value))}
         />
@@ -45,7 +52,7 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
               type="range"
               min={spec.min}
               max={spec.max}
-              step={(spec.max - spec.min) / 1000}
+              step={step}
               value={component}
               onChange={(e) => {
                 const next = arr.slice();
@@ -55,7 +62,7 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
             />
             <input
               type="number"
-              step={(spec.max - spec.min) / 1000}
+              step={step}
               value={component.toFixed(3)}
               onChange={(e) => {
                 const next = arr.slice();

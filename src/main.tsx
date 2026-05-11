@@ -6,6 +6,10 @@ import { useGraphStore } from './state/graphStore';
 import { useSelectionStore } from './state/selectionStore';
 import { useAssetStore } from './state/assetStore';
 import * as assetActions from './state/assetActions';
+import { useDiagnosticsStore } from './state/diagnosticsStore';
+import { useTimeStore } from './state/timeStore';
+import { useViewportStore } from './state/viewportStore';
+import { useHistoryStore } from './state/historyStore';
 
 if (import.meta.env.DEV) {
   // Expose stores for debugging / Playwright-style verification.
@@ -14,6 +18,10 @@ if (import.meta.env.DEV) {
     selection: useSelectionStore,
     assets: useAssetStore,
     assetActions,
+    diagnostics: useDiagnosticsStore,
+    time: useTimeStore,
+    viewport: useViewportStore,
+    history: useHistoryStore,
   };
 }
 

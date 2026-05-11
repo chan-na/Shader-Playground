@@ -21,14 +21,20 @@ describe('validateGraph', () => {
     expect(validateGraph({ nodes: [], edges: [] })).toEqual([]);
   });
 
-  it('flags multiple Output nodes', () => {
-    const g: Graph = { nodes: [out('o1'), out('o2')], edges: [] };
+  it('flags more than 4 Output nodes', () => {
+    const g: Graph = {
+      nodes: [out('o1'), out('o2'), out('o3'), out('o4'), out('o5')],
+      edges: [],
+    };
     const errors = validateGraph(g);
     expect(errors.some((e) => e.code === 'multiple_outputs')).toBe(true);
   });
 
-  it('allows one Output node', () => {
-    const g: Graph = { nodes: [shader('s1'), out('o1')], edges: [] };
+  it('allows up to 4 Output nodes (split viewport)', () => {
+    const g: Graph = {
+      nodes: [shader('s1'), out('o1'), out('o2'), out('o3'), out('o4')],
+      edges: [],
+    };
     expect(validateGraph(g).filter((e) => e.code !== 'missing_node')).toEqual([]);
   });
 

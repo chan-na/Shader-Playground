@@ -142,3 +142,157 @@ button, input, select, textarea {
   font-size: 12px;
   pointer-events: none;
 }
+
+.btn-small {
+  background: #3a3a3d;
+  border: 1px solid #555;
+  color: #ddd;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.btn-small:hover { background: #4a4a4d; }
+.btn-small:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Side-panel tabs ────────────────────────────────────────────── */
+.panel-tabs {
+  display: flex;
+  background: #2d2d30;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+.panel-tab {
+  background: transparent;
+  border: none;
+  color: #969696;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.panel-tab:hover { color: #d4d4d4; }
+.panel-tab--active {
+  color: #d4d4d4;
+  background: #252526;
+  border-bottom: 2px solid #569cd6;
+}
+.panel-tab-badge {
+  background: #3a3a3d;
+  color: #d4d4d4;
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.panel-tab--active .panel-tab-badge { background: #094771; color: #fff; }
+/* Red badge specifically for the problems tab when it has issues. */
+.panel-tab[data-variant="error"] .panel-tab-badge,
+.panel-tab--active[data-variant="error"] .panel-tab-badge {
+  background: #ff6b6b;
+  color: #1e1e1e;
+}
+
+.problem-row {
+  padding: 6px 4px;
+  border-bottom: 1px solid #1a1a1a;
+  cursor: pointer;
+}
+.problem-row:hover { background: #2a2a2d; }
+
+.asset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+.asset-row:last-child { border-bottom: none; }
+.asset-image-icon, .asset-mesh-icon {
+  width: 32px;
+  height: 32px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.asset-mesh-icon {
+  background: linear-gradient(135deg, #2a2a2d 0%, #1a1a1a 100%);
+  border: 1px solid #3a3a3d;
+}
+
+/* ── Command Palette ────────────────────────────────────────────── */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 9999;
+}
+.cmdk-modal {
+  width: 560px;
+  max-width: 92vw;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3d;
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cmdk-input {
+  border: none;
+  background: transparent;
+  color: #f0f0f0;
+  font-size: 15px;
+  padding: 12px 14px;
+  outline: none;
+  border-bottom: 1px solid #2c2c2c;
+}
+.cmdk-list {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.cmdk-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.cmdk-row--active { background: #094771; color: #fff; }
+.cmdk-cat {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  background: #2d2d30;
+  padding: 2px 6px;
+  border-radius: 3px;
+  min-width: 60px;
+  text-align: center;
+}
+.cmdk-row--active .cmdk-cat { color: #d4d4d4; }
+.cmdk-label { flex: 1; color: #ddd; }
+.cmdk-row--active .cmdk-label { color: #fff; }
+.cmdk-empty {
+  padding: 18px;
+  color: #888;
+  font-size: 13px;
+  text-align: center;
+}
+.cmdk-hint {
+  display: flex;
+  gap: 14px;
+  padding: 6px 14px;
+  border-top: 1px solid #2c2c2c;
+  color: #666;
+  font-size: 11px;
+}

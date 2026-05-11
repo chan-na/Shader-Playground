@@ -23,9 +23,10 @@ import { MeshNodeView } from './nodes/MeshNodeView';
 import { ImageNodeView } from './nodes/ImageNodeView';
 import { ShaderNodeView } from './nodes/ShaderNodeView';
 import { OutputNodeView } from './nodes/OutputNodeView';
-import { NODE_META } from '../../core/nodes/registry';
+import { ParamNodeView } from './nodes/ParamNodeView';
+import { NODE_META, paramOutputPort } from '../../core/nodes/registry';
 import { nextId } from '../../utils/id';
-import type { ShaderGraphNode } from '../../core/graph/types';
+import type { ParamGraphNode, ShaderGraphNode } from '../../core/graph/types';
 import { validateGraph } from '../../core/graph/validate';
 
 const nodeTypes = {
@@ -33,6 +34,7 @@ const nodeTypes = {
   image: ImageNodeView,
   shader: ShaderNodeView,
   output: OutputNodeView,
+  param: ParamNodeView,
 };
 
 export function NodeEditor() {
@@ -129,7 +131,9 @@ export function NodeEditor() {
       const srcNode = graphNodes.find((n) => n.id === conn.source);
       const tgtNode = graphNodes.find((n) => n.id === conn.target);
       if (!srcNode || !tgtNode) return;
-      const srcOut = NODE_META[srcNode.kind].outputs().find((p) => p.name === conn.sourceHandle);
+      const srcOut = srcNode.kind === 'param'
+        ? paramOutputPort((srcNode as ParamGraphNode).paramKind)
+        : NODE_META[srcNode.kind].outputs().find((p) => p.name === conn.sourceHandle);
       const tgtIn = NODE_META[tgtNode.kind]
         .inputs(tgtNode.kind === 'shader' ? (tgtNode as ShaderGraphNode) : null)
         .find((p) => p.name === conn.targetHandle);
@@ -163,7 +167,9 @@ export function NodeEditor() {
       const srcNode = graphNodes.find((n) => n.id === c.source);
       const tgtNode = graphNodes.find((n) => n.id === c.target);
       if (!srcNode || !tgtNode) return false;
-      const srcOut = NODE_META[srcNode.kind].outputs().find((p) => p.name === c.sourceHandle);
+      const srcOut = srcNode.kind === 'param'
+        ? paramOutputPort((srcNode as ParamGraphNode).paramKind)
+        : NODE_META[srcNode.kind].outputs().find((p) => p.name === c.sourceHandle);
       const tgtIn = NODE_META[tgtNode.kind]
         .inputs(tgtNode.kind === 'shader' ? (tgtNode as ShaderGraphNode) : null)
         .find((p) => p.name === c.targetHandle);
@@ -223,6 +229,7 @@ export function NodeEditor() {
                 case 'image':  return '#d69c56';
                 case 'shader': return '#569cd6';
                 case 'output': return '#d6569c';
+                case 'param':  return '#d6d656';
                 default: return '#888';
               }
             }}

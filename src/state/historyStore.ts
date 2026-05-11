@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { GraphEdge, GraphNode } from "../core/graph/types";
-import type { NodePosition } from "./graphStore";
+import type { NodePosition } from "./types";
 
 export interface GraphSnapshot {
   nodes: GraphNode[];

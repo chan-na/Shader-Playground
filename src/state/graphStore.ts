@@ -12,11 +12,7 @@ import type {
   SwizzleGraphNode,
 } from "../core/graph/types";
 import { useHistoryStore } from "./historyStore";
-
-export interface NodePosition {
-  x: number;
-  y: number;
-}
+import type { NodePosition } from "./types";
 
 export interface GraphState {
   nodes: GraphNode[];

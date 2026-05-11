@@ -1,10 +1,10 @@
 import type { Graph } from "../core/graph/types";
-import type { NodePosition } from "./graphStore";
 import {
   deserializeProject,
   type SerializedProject,
   serializeProject,
 } from "./serialization";
+import type { NodePosition } from "./types";
 
 /**
  * URL-safe base64 round-trip helpers (no padding, replacing +/ with -_).

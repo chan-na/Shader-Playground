@@ -1,6 +1,6 @@
 import type { Graph, GraphEdge, GraphNode } from "../core/graph/types";
 import { validateGraph } from "../core/graph/validate";
-import type { NodePosition } from "./graphStore";
+import type { NodePosition } from "./types";
 
 export const PROJECT_FORMAT_VERSION = 1;
 

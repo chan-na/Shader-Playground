@@ -1,6 +1,6 @@
 import type { Graph } from "../core/graph/types";
-import type { NodePosition } from "../state/graphStore";
 import { serializeProject } from "../state/serialization";
+import type { NodePosition } from "../state/types";
 import standalonePlayer from "./standalonePlayer.js?raw";
 
 /**

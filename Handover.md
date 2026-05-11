@@ -4,7 +4,8 @@
 > - `000aaca chore: Biome / Knip / dpdm / vitest coverage 도구 셋업`
 > - `7cad6bc style: Biome 포매팅 + 안전한 lint fix 일괄 적용`
 > - `72889d2 docs: Handover.md — lint/static-analysis/coverage 후속 작업 핸드오프`
-> - **이번 세션**: P1 (Biome 진단 정리) 완료 — errors/warnings 모두 0
+> - `313dd23 chore: Biome 잔여 진단 0 errors / 0 warnings 정리 (P1)`
+> - **이번 세션**: P3 (graphStore ↔ historyStore 순환 의존성) 해소 — 공유 타입을 `src/state/types.ts`로 추출
 
 ## 현재 상태
 
@@ -16,7 +17,7 @@
 | `vitest run --coverage` | lines 31% / branches 82% / functions 52% / statements 31% (임계값 통과) |
 | `biome check` | **0 errors / 0 warnings** ✅ |
 | `knip` | 미사용 dep 4 + export 13 + type 13 + 설정 힌트 5 (P2 미해결) |
-| `dpdm` | 순환 1건 (`graphStore ↔ historyStore`) (P3 미해결) |
+| `dpdm` | **0건** ✅ |
 
 ## 도입된 도구 / 설정
 
@@ -70,16 +71,13 @@
 
 실제 미사용 exports (13) + types (13): `src/core/assets/cache.ts:listCachedIds/clearCache`, `src/core/graph/compile.ts` 4 type 등 — 점진 제거. `_resetAutoSaveForTests` 같은 test 헬퍼는 의도적으로 export 됐을 수 있어 개별 판단.
 
-### P3. 순환 의존성 (1건)
+### ~~P3. 순환 의존성 (1건)~~ ✅ 완료 (2026-05-11)
 
-`src/state/graphStore.ts ↔ src/state/historyStore.ts`
+원인: `historyStore.ts`가 `graphStore.ts`에서 `NodePosition`을 type-only import. dpdm은 `import type`도 의존으로 집계하므로 순환으로 잡힘.
 
-- `graphStore.pushHistory()`가 `historyStore.push()` 호출
-- `historyStore`가 graphStore 타입 import?
-- 해결 옵션:
-  - history push를 이벤트/콜백으로 뒤집기
-  - 공유 타입을 제3의 파일로 추출
-  - 한쪽이 다른 쪽을 lazy import (간이 방편)
+처리: 공유 타입을 `src/state/types.ts`로 추출 (옵션 2). 모든 사용처(`graphStore`, `historyStore`, `serialization`, `demoGraph`, `shareUrl`, `htmlExport`) import 경로를 `./types` / `../state/types`로 일괄 변경. graphStore의 `NodePosition` 정의 제거.
+
+검증: `dpdm` 0건, `tsc --noEmit` 통과, `biome check` 0 errors/warnings, `historyStore.test.ts` + `graphStore.test.ts` 12/12 통과, `vite build` 성공.
 
 ### P4. tsconfig 강화
 
@@ -146,8 +144,8 @@ npm run check
 2. **unsafe fix는 한 파일 단위로 검토하며 적용** — 전체 `--unsafe`는 zustand 구독 패턴 (`NodeEditor/index.tsx`) 등을 깨뜨릴 수 있음. 단, `objLoader.ts` 의 `if (a?.value)` 케이스는 TS 4.4+ 좁힘이 정상 동작하므로 안전 (이번 세션에서 검증)
 3. **`useExhaustiveDependencies` warn은 진짜 버그/false positive 혼재** — zustand `useStore((s) => s.x)` 부작용 구독은 deps에 들어가야 정상
 4. **Vitest 2.1.x V8 커버리지의 라인 매핑 부정확 가능성** — 정확한 줄 수가 필요하면 Vitest 3 업그레이드 또는 임시로 `provider: "istanbul"`로 교차 검증
-5. **순환 의존성 해결 시 history 동작 회귀 주의** — `src/state/historyStore.test.ts`와 `graphStore.test.ts` 둘 다 통과시켜야 함
-6. **`npm run check` 는 현재 P3 (순환 1건) 때문에 exit 1** — typecheck/lint/test/build 개별로는 모두 통과. CI는 P3 처리 후 의미를 가짐
+5. ~~**순환 의존성 해결 시 history 동작 회귀 주의**~~ — P3 처리 시 양쪽 store 테스트 회귀 없음을 확인함 (12/12 통과)
+6. **`npm run check` 는 현재 P2 (knip dead code) 때문에 exit 1** — typecheck/lint/circular/test/build 개별로는 모두 통과. CI는 P2 처리 후 의미를 가짐
 7. **RTK 프록시 환경에서 `npx biome check` 출력이 잘려 보일 수 있음** — 정확한 진단 보려면 `rtk proxy npx biome check --reporter=summary --max-diagnostics=100` 등 raw 호출 사용
 
 ## 참고 파일

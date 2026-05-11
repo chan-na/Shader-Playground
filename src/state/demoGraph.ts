@@ -5,7 +5,7 @@ import noiseFrag from "../shaders/templates/noise.frag?raw";
 import tonemapFrag from "../shaders/templates/tonemap.frag?raw";
 import unlitFrag from "../shaders/templates/unlit.frag?raw";
 import uvDebugFrag from "../shaders/templates/uvDebug.frag?raw";
-import type { NodePosition } from "./graphStore";
+import type { NodePosition } from "./types";
 
 export function createDemoGraph(): Graph {
   return {

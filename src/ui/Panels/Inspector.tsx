@@ -1,0 +1,107 @@
+import { useMemo } from 'react';
+import { useGraphStore } from '../../state/graphStore';
+import { useSelectionStore } from '../../state/selectionStore';
+import { inspectorUniforms, parseUniforms, samplerUniforms } from '../../core/graph/uniformParser';
+import { UniformControl } from './UniformControl';
+import type { ShaderGraphNode } from '../../core/graph/types';
+
+export function Inspector() {
+  const selectedId = useSelectionStore((s) => s.selectedNodeId);
+  const firstShaderId = useGraphStore((s) =>
+    s.nodes.find((n) => n.kind === 'shader')?.id ?? null,
+  );
+  const effectiveId = selectedId ?? firstShaderId;
+
+  const node = useGraphStore((s) =>
+    s.nodes.find((n) => n.id === effectiveId) ?? null,
+  );
+  const setUniformValue = useGraphStore((s) => s.setUniformValue);
+
+  const shaderNode = node?.kind === 'shader' ? (node as ShaderGraphNode) : null;
+
+  const specs = useMemo(() => {
+    if (!shaderNode) return [];
+    return parseUniforms(`${shaderNode.vertexSource}\n${shaderNode.fragmentSource}`);
+  }, [shaderNode?.vertexSource, shaderNode?.fragmentSource]);
+
+  const visible = inspectorUniforms(specs);
+  const samplers = samplerUniforms(specs);
+  const systemUniforms = specs.filter((u) => u.system);
+
+  return (
+    <div className="panel panel--inspector">
+      <div className="panel-header">Inspector</div>
+      <div className="panel-body" style={{ overflowY: 'auto' }}>
+        {!node && (
+          <div className="inspector-empty">No node selected</div>
+        )}
+        {node && (
+          <>
+            <div className="inspector-section">
+              <div className="inspector-label">Node</div>
+              <div style={{ color: '#ddd', fontSize: 13 }}>
+                <div><strong>{node.kind}</strong> · <span style={{ color: '#888', fontFamily: 'monospace' }}>{node.id}</span></div>
+                {node.kind === 'mesh' && (
+                  <div style={{ color: '#888', fontSize: 11, marginTop: 4 }}>
+                    primitive: {node.primitive}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {shaderNode && (
+              <>
+                <div className="inspector-section">
+                  <div className="inspector-label">Uniforms ({visible.length})</div>
+                  {visible.length === 0 && (
+                    <div style={{ color: '#777', fontSize: 12 }}>
+                      Add a <code>uniform float</code> or <code>uniform vec3</code> declaration in the shader to see controls here.
+                    </div>
+                  )}
+                  {visible.map((spec) => (
+                    <div key={spec.name} style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                        <span style={{ color: '#ccc', fontFamily: 'monospace' }}>{spec.name}</span>
+                        <span style={{ color: '#666' }}>{spec.type}</span>
+                      </div>
+                      <UniformControl
+                        spec={spec}
+                        value={shaderNode.uniformValues[spec.name]}
+                        onChange={(v) => setUniformValue(shaderNode.id, spec.name, v)}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {samplers.length > 0 && (
+                  <div className="inspector-section">
+                    <div className="inspector-label">Sampler inputs</div>
+                    {samplers.map((s) => (
+                      <div key={s.name} style={{ fontSize: 12, color: '#bbb', fontFamily: 'monospace' }}>
+                        {s.name} <span style={{ color: '#666' }}>({s.type})</span>
+                      </div>
+                    ))}
+                    <div style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
+                      Connect via the node graph
+                    </div>
+                  </div>
+                )}
+
+                {systemUniforms.length > 0 && (
+                  <div className="inspector-section">
+                    <div className="inspector-label">System uniforms (auto)</div>
+                    {systemUniforms.map((s) => (
+                      <div key={s.name} style={{ fontSize: 11, color: '#777', fontFamily: 'monospace' }}>
+                        {s.name} <span style={{ color: '#555' }}>· {s.type}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,4 +1,4 @@
-import { createColorTexture, disposeTexture, type GLTexture } from './texture';
+import { createColorTexture, disposeTexture, type GLTexture } from "./texture";
 
 export interface Framebuffer {
   fbo: WebGLFramebuffer;
@@ -16,7 +16,7 @@ export function createFramebuffer(
 ): Framebuffer {
   const color = createColorTexture(gl, width, height);
   const fbo = gl.createFramebuffer();
-  if (!fbo) throw new Error('createFramebuffer returned null');
+  if (!fbo) throw new Error("createFramebuffer returned null");
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
   gl.framebufferTexture2D(
     gl.FRAMEBUFFER,
@@ -29,9 +29,14 @@ export function createFramebuffer(
   let depth: WebGLRenderbuffer | null = null;
   if (withDepth) {
     depth = gl.createRenderbuffer();
-    if (!depth) throw new Error('createRenderbuffer returned null');
+    if (!depth) throw new Error("createRenderbuffer returned null");
     gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, width, height);
+    gl.renderbufferStorage(
+      gl.RENDERBUFFER,
+      gl.DEPTH_COMPONENT24,
+      width,
+      height,
+    );
     gl.framebufferRenderbuffer(
       gl.FRAMEBUFFER,
       gl.DEPTH_ATTACHMENT,
@@ -49,7 +54,10 @@ export function createFramebuffer(
   return { fbo, color, depth, width, height };
 }
 
-export function disposeFramebuffer(gl: WebGL2RenderingContext, fb: Framebuffer) {
+export function disposeFramebuffer(
+  gl: WebGL2RenderingContext,
+  fb: Framebuffer,
+) {
   gl.deleteFramebuffer(fb.fbo);
   disposeTexture(gl, fb.color);
   if (fb.depth) gl.deleteRenderbuffer(fb.depth);

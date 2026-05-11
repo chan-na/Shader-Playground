@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4, type vec3 } from "gl-matrix";
 
 export interface OrbitCameraState {
   target: [number, number, number];
@@ -114,7 +114,11 @@ export function pan(
   };
 }
 
-export function zoom(c: OrbitCameraState, delta: number, speed = 0.0015): OrbitCameraState {
+export function zoom(
+  c: OrbitCameraState,
+  delta: number,
+  speed = 0.0015,
+): OrbitCameraState {
   return clampCamera({
     ...c,
     distance: c.distance * (1 + delta * speed),

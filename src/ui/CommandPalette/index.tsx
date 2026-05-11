@@ -1,32 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useGraphStore } from '../../state/graphStore';
-import { useSelectionStore } from '../../state/selectionStore';
-import {
-  createDemoGraph,
-  DEMO_LAYOUT,
-  createChainDemoGraph,
-  CHAIN_DEMO_LAYOUT,
-  createTorusDemoGraph,
-  TORUS_DEMO_LAYOUT,
-  createSplitDemoGraph,
-  SPLIT_DEMO_LAYOUT,
-} from '../../state/demoGraph';
-import { nextId } from '../../utils/id';
-import basicVert from '../../shaders/basic.vert?raw';
-import unlitFrag from '../../shaders/templates/unlit.frag?raw';
-import noiseFrag from '../../shaders/templates/noise.frag?raw';
-import blurFrag from '../../shaders/templates/blur.frag?raw';
-import tonemapFrag from '../../shaders/templates/tonemap.frag?raw';
-import uvDebugFrag from '../../shaders/templates/uvDebug.frag?raw';
-import blendFrag from '../../shaders/templates/blend.frag?raw';
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   CombineArity,
   GraphNode,
   MathOp,
   MeshGraphNode,
   ParamKind,
-} from '../../core/graph/types';
-import { MAX_OUTPUTS } from '../../core/graph/validate';
+} from "../../core/graph/types";
+import { MAX_OUTPUTS } from "../../core/graph/validate";
+import basicVert from "../../shaders/basic.vert?raw";
+import blendFrag from "../../shaders/templates/blend.frag?raw";
+import blurFrag from "../../shaders/templates/blur.frag?raw";
+import noiseFrag from "../../shaders/templates/noise.frag?raw";
+import tonemapFrag from "../../shaders/templates/tonemap.frag?raw";
+import unlitFrag from "../../shaders/templates/unlit.frag?raw";
+import uvDebugFrag from "../../shaders/templates/uvDebug.frag?raw";
+import {
+  CHAIN_DEMO_LAYOUT,
+  createChainDemoGraph,
+  createDemoGraph,
+  createSplitDemoGraph,
+  createTorusDemoGraph,
+  DEMO_LAYOUT,
+  SPLIT_DEMO_LAYOUT,
+  TORUS_DEMO_LAYOUT,
+} from "../../state/demoGraph";
+import { useGraphStore } from "../../state/graphStore";
+import { useSelectionStore } from "../../state/selectionStore";
+import { nextId } from "../../utils/id";
 
 interface Command {
   id: string;
@@ -36,7 +36,13 @@ interface Command {
   run: () => void;
 }
 
-const PRIMITIVES: MeshGraphNode['primitive'][] = ['cube', 'sphere', 'plane', 'torus', 'quad'];
+const PRIMITIVES: MeshGraphNode["primitive"][] = [
+  "cube",
+  "sphere",
+  "plane",
+  "torus",
+  "quad",
+];
 
 function buildCommands(): Command[] {
   const cmds: Command[] = [];
@@ -46,16 +52,16 @@ function buildCommands(): Command[] {
   const reset = store.reset;
   const select = useSelectionStore.getState().select;
 
-  const addMesh = (primitive: MeshGraphNode['primitive']) => {
-    const id = nextId('mesh');
-    addNode({ id, kind: 'mesh', primitive }, { x: -200, y: 0 });
+  const addMesh = (primitive: MeshGraphNode["primitive"]) => {
+    const id = nextId("mesh");
+    addNode({ id, kind: "mesh", primitive }, { x: -200, y: 0 });
     select(id);
   };
 
   for (const p of PRIMITIVES) {
     cmds.push({
       id: `add-mesh-${p}`,
-      category: 'Node',
+      category: "Node",
       label: `Add Mesh: ${p}`,
       keywords: `add node mesh ${p} primitive geometry`,
       run: () => addMesh(p),
@@ -63,36 +69,36 @@ function buildCommands(): Command[] {
   }
 
   cmds.push({
-    id: 'add-image',
-    category: 'Node',
-    label: 'Add Image node',
-    keywords: 'add node image texture',
+    id: "add-image",
+    category: "Node",
+    label: "Add Image node",
+    keywords: "add node image texture",
     run: () => {
-      const id = nextId('image');
-      addNode({ id, kind: 'image', assetId: null }, { x: -200, y: 200 });
+      const id = nextId("image");
+      addNode({ id, kind: "image", assetId: null }, { x: -200, y: 200 });
       select(id);
     },
   });
 
   const shaderTemplates: Array<{ name: string; frag: string }> = [
-    { name: 'Unlit', frag: unlitFrag },
-    { name: 'Noise', frag: noiseFrag },
-    { name: 'Blur', frag: blurFrag },
-    { name: 'Tonemap', frag: tonemapFrag },
-    { name: 'UV Debug', frag: uvDebugFrag },
-    { name: 'Blend', frag: blendFrag },
+    { name: "Unlit", frag: unlitFrag },
+    { name: "Noise", frag: noiseFrag },
+    { name: "Blur", frag: blurFrag },
+    { name: "Tonemap", frag: tonemapFrag },
+    { name: "UV Debug", frag: uvDebugFrag },
+    { name: "Blend", frag: blendFrag },
   ];
   for (const tpl of shaderTemplates) {
     cmds.push({
       id: `add-shader-${tpl.name.toLowerCase()}`,
-      category: 'Node',
+      category: "Node",
       label: `Add Shader: ${tpl.name}`,
       keywords: `add node shader ${tpl.name} fragment glsl`,
       run: () => {
-        const id = nextId('shader');
+        const id = nextId("shader");
         const node: GraphNode = {
           id,
-          kind: 'shader',
+          kind: "shader",
           vertexSource: basicVert,
           fragmentSource: tpl.frag,
           uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
@@ -104,61 +110,81 @@ function buildCommands(): Command[] {
   }
 
   cmds.push({
-    id: 'add-output',
-    category: 'Node',
-    label: 'Add Output node',
-    keywords: 'add node output canvas display split viewport',
+    id: "add-output",
+    category: "Node",
+    label: "Add Output node",
+    keywords: "add node output canvas display split viewport",
     run: () => {
-      const outputs = useGraphStore.getState().nodes.filter((n) => n.kind === 'output').length;
+      const outputs = useGraphStore
+        .getState()
+        .nodes.filter((n) => n.kind === "output").length;
       if (outputs >= MAX_OUTPUTS) return;
-      const id = nextId('output');
-      addNode({ id, kind: 'output' }, { x: 400, y: 0 });
+      const id = nextId("output");
+      addNode({ id, kind: "output" }, { x: 400, y: 0 });
       select(id);
     },
   });
 
-  const paramKinds: ParamKind[] = ['float', 'color', 'vec3', 'time'];
+  const paramKinds: ParamKind[] = ["float", "color", "vec3", "time"];
   for (const k of paramKinds) {
     cmds.push({
       id: `add-param-${k}`,
-      category: 'Node',
+      category: "Node",
       label: `Add Parameter: ${k}`,
       keywords: `add node parameter param ${k}`,
       run: () => {
         const id = nextId(`param-${k}`);
         const value: number | number[] =
-          k === 'float' ? 0.5 : k === 'time' ? [1, 0] : k === 'color' ? [1, 0.5, 0.2] : [0, 0, 0];
-        addNode({ id, kind: 'param', paramKind: k, value }, { x: -240, y: 240 });
+          k === "float"
+            ? 0.5
+            : k === "time"
+              ? [1, 0]
+              : k === "color"
+                ? [1, 0.5, 0.2]
+                : [0, 0, 0];
+        addNode(
+          { id, kind: "param", paramKind: k, value },
+          { x: -240, y: 240 },
+        );
         select(id);
       },
     });
   }
 
-  const mathOps: MathOp[] = ['add', 'subtract', 'multiply', 'divide', 'pow', 'abs', 'sin', 'cos'];
+  const mathOps: MathOp[] = [
+    "add",
+    "subtract",
+    "multiply",
+    "divide",
+    "pow",
+    "abs",
+    "sin",
+    "cos",
+  ];
   for (const op of mathOps) {
     cmds.push({
       id: `add-math-${op}`,
-      category: 'Node',
+      category: "Node",
       label: `Add Math: ${op}`,
       keywords: `add node math ${op} utility scalar arithmetic`,
       run: () => {
-        const id = nextId('math');
-        addNode({ id, kind: 'math', op, a: 0, b: 0 }, { x: -240, y: 320 });
+        const id = nextId("math");
+        addNode({ id, kind: "math", op, a: 0, b: 0 }, { x: -240, y: 320 });
         select(id);
       },
     });
   }
 
-  const swizzleMasks = ['xyz', 'xy', 'zyx', 'xxxx', 'wzyx', 'x', 'y', 'z'];
+  const swizzleMasks = ["xyz", "xy", "zyx", "xxxx", "wzyx", "x", "y", "z"];
   for (const mask of swizzleMasks) {
     cmds.push({
       id: `add-swizzle-${mask}`,
-      category: 'Node',
+      category: "Node",
       label: `Add Swizzle: .${mask}`,
       keywords: `add node swizzle vec decompose ${mask} utility`,
       run: () => {
-        const id = nextId('swizzle');
-        addNode({ id, kind: 'swizzle', mask }, { x: -120, y: 320 });
+        const id = nextId("swizzle");
+        addNode({ id, kind: "swizzle", mask }, { x: -120, y: 320 });
         select(id);
       },
     });
@@ -168,13 +194,13 @@ function buildCommands(): Command[] {
   for (const arity of combineArities) {
     cmds.push({
       id: `add-combine-${arity}`,
-      category: 'Node',
+      category: "Node",
       label: `Add Combine: Float×${arity} → vec${arity}`,
       keywords: `add node combine vec ${arity} compose utility`,
       run: () => {
-        const id = nextId('combine');
+        const id = nextId("combine");
         addNode(
-          { id, kind: 'combine', arity, values: [0, 0, 0, 0] },
+          { id, kind: "combine", arity, values: [0, 0, 0, 0] },
           { x: 0, y: 320 },
         );
         select(id);
@@ -184,38 +210,38 @@ function buildCommands(): Command[] {
 
   cmds.push(
     {
-      id: 'preset-sphere',
-      category: 'Preset',
-      label: 'Load preset: Sphere',
-      keywords: 'preset demo sphere',
+      id: "preset-sphere",
+      category: "Preset",
+      label: "Load preset: Sphere",
+      keywords: "preset demo sphere",
       run: () => setGraph(createDemoGraph(), DEMO_LAYOUT),
     },
     {
-      id: 'preset-torus',
-      category: 'Preset',
-      label: 'Load preset: Torus UV',
-      keywords: 'preset demo torus uv',
+      id: "preset-torus",
+      category: "Preset",
+      label: "Load preset: Torus UV",
+      keywords: "preset demo torus uv",
       run: () => setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT),
     },
     {
-      id: 'preset-chain',
-      category: 'Preset',
-      label: 'Load preset: Chain (noise → blur → tonemap)',
-      keywords: 'preset demo chain noise blur tonemap',
+      id: "preset-chain",
+      category: "Preset",
+      label: "Load preset: Chain (noise → blur → tonemap)",
+      keywords: "preset demo chain noise blur tonemap",
       run: () => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT),
     },
     {
-      id: 'preset-split',
-      category: 'Preset',
-      label: 'Load preset: Split viewport (3 outputs)',
-      keywords: 'preset demo split viewport multi output',
+      id: "preset-split",
+      category: "Preset",
+      label: "Load preset: Split viewport (3 outputs)",
+      keywords: "preset demo split viewport multi output",
       run: () => setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT),
     },
     {
-      id: 'graph-clear',
-      category: 'Graph',
-      label: 'Clear graph',
-      keywords: 'clear empty reset',
+      id: "graph-clear",
+      category: "Graph",
+      label: "Clear graph",
+      keywords: "clear empty reset",
       run: () => reset(),
     },
   );
@@ -241,7 +267,7 @@ function fuzzyMatch(haystack: string, query: string): number {
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -249,17 +275,17 @@ export function CommandPalette() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === 'k') {
+      if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((v) => !v);
-        setQuery('');
+        setQuery("");
         setActive(0);
-      } else if (e.key === 'Escape' && open) {
+      } else if (e.key === "Escape" && open) {
         setOpen(false);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
   useEffect(() => {
@@ -269,7 +295,7 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  const commands = useMemo(() => buildCommands(), [open]);
+  const commands = useMemo(() => buildCommands(), []);
   const ranked = useMemo(() => {
     if (!query) return commands;
     return commands
@@ -307,13 +333,13 @@ export function CommandPalette() {
             setActive(0);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') {
+            if (e.key === "ArrowDown") {
               e.preventDefault();
               setActive((a) => Math.min(a + 1, Math.max(0, ranked.length - 1)));
-            } else if (e.key === 'ArrowUp') {
+            } else if (e.key === "ArrowUp") {
               e.preventDefault();
               setActive((a) => Math.max(a - 1, 0));
-            } else if (e.key === 'Enter') {
+            } else if (e.key === "Enter") {
               e.preventDefault();
               const cmd = ranked[active];
               if (cmd) run(cmd);
@@ -321,13 +347,13 @@ export function CommandPalette() {
           }}
         />
         <div className="cmdk-list">
-          {ranked.length === 0 && (
-            <div className="cmdk-empty">No matches</div>
-          )}
+          {ranked.length === 0 && <div className="cmdk-empty">No matches</div>}
           {ranked.map((cmd, i) => (
             <div
               key={cmd.id}
-              className={i === active ? 'cmdk-row cmdk-row--active' : 'cmdk-row'}
+              className={
+                i === active ? "cmdk-row cmdk-row--active" : "cmdk-row"
+              }
               onMouseEnter={() => setActive(i)}
               onClick={() => run(cmd)}
             >

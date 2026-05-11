@@ -1,10 +1,10 @@
-import { useRef } from 'react';
-import { useAssetStore } from '../../state/assetStore';
-import { useGraphStore } from '../../state/graphStore';
-import { useSelectionStore } from '../../state/selectionStore';
-import { importFiles } from '../../state/assetActions';
-import { nextId } from '../../utils/id';
-import type { GraphNode } from '../../core/graph/types';
+import { useRef } from "react";
+import type { GraphNode } from "../../core/graph/types";
+import { importFiles } from "../../state/assetActions";
+import { useAssetStore } from "../../state/assetStore";
+import { useGraphStore } from "../../state/graphStore";
+import { useSelectionStore } from "../../state/selectionStore";
+import { nextId } from "../../utils/id";
 
 export function AssetBrowser() {
   const meshes = useAssetStore((s) => s.meshes);
@@ -19,25 +19,27 @@ export function AssetBrowser() {
   const imageList = Object.values(images);
 
   const addMeshNodeFor = (assetId: string) => {
-    const id = nextId('mesh');
-    const node: GraphNode = { id, kind: 'mesh', primitive: 'cube', assetId };
+    const id = nextId("mesh");
+    const node: GraphNode = { id, kind: "mesh", primitive: "cube", assetId };
     addNode(node, { x: -240, y: 0 });
     select(id);
   };
 
   const addImageNodeFor = (assetId: string) => {
-    const id = nextId('image');
-    const node: GraphNode = { id, kind: 'image', assetId };
+    const id = nextId("image");
+    const node: GraphNode = { id, kind: "image", assetId };
     addNode(node, { x: -240, y: 160 });
     select(id);
   };
 
   return (
-    <div className="panel-body" style={{ overflowY: 'auto' }}>
+    <div className="panel-body" style={{ overflowY: "auto" }}>
       <div className="inspector-section">
         <div className="inspector-label">
           <span>Assets</span>
-          <span style={{ color: '#666' }}>{meshList.length + imageList.length}</span>
+          <span style={{ color: "#666" }}>
+            {meshList.length + imageList.length}
+          </span>
         </div>
         <button
           className="btn-small"
@@ -51,14 +53,14 @@ export function AssetBrowser() {
           type="file"
           multiple
           accept=".obj,.gltf,.glb,image/*"
-          style={{ display: 'none' }}
+          style={{ display: "none" }}
           onChange={(e) => {
             const f = e.target.files;
-            if (f && f.length) void importFiles(f);
-            e.target.value = '';
+            if (f?.length) void importFiles(f);
+            e.target.value = "";
           }}
         />
-        <div style={{ color: '#666', fontSize: 11, marginTop: 6 }}>
+        <div style={{ color: "#666", fontSize: 11, marginTop: 6 }}>
           Drag &amp; drop also works on the graph.
         </div>
       </div>
@@ -72,15 +74,40 @@ export function AssetBrowser() {
                 bitmap={img.bitmap as ImageBitmap | HTMLImageElement | null}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: '#ddd', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div
+                  style={{
+                    color: "#ddd",
+                    fontSize: 12,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {img.name}
                 </div>
-                <div style={{ color: '#888', fontSize: 10, fontFamily: 'monospace' }}>
+                <div
+                  style={{
+                    color: "#888",
+                    fontSize: 10,
+                    fontFamily: "monospace",
+                  }}
+                >
                   {img.width}×{img.height}
                 </div>
               </div>
-              <button className="btn-small" onClick={() => addImageNodeFor(img.id)}>+ Node</button>
-              <button className="btn-small" onClick={() => removeImage(img.id)} title="Forget">✕</button>
+              <button
+                className="btn-small"
+                onClick={() => addImageNodeFor(img.id)}
+              >
+                + Node
+              </button>
+              <button
+                className="btn-small"
+                onClick={() => removeImage(img.id)}
+                title="Forget"
+              >
+                ✕
+              </button>
             </div>
           ))}
         </div>
@@ -93,15 +120,42 @@ export function AssetBrowser() {
             <div key={m.id} className="asset-row">
               <div className="asset-mesh-icon" />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: '#ddd', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div
+                  style={{
+                    color: "#ddd",
+                    fontSize: 12,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {m.name}
                 </div>
-                <div style={{ color: '#888', fontSize: 10, fontFamily: 'monospace' }}>
-                  {m.data.indices ? `${m.data.indices.length / 3} tri` : `${m.data.vertexCount} vtx`}
+                <div
+                  style={{
+                    color: "#888",
+                    fontSize: 10,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {m.data.indices
+                    ? `${m.data.indices.length / 3} tri`
+                    : `${m.data.vertexCount} vtx`}
                 </div>
               </div>
-              <button className="btn-small" onClick={() => addMeshNodeFor(m.id)}>+ Node</button>
-              <button className="btn-small" onClick={() => removeMesh(m.id)} title="Forget">✕</button>
+              <button
+                className="btn-small"
+                onClick={() => addMeshNodeFor(m.id)}
+              >
+                + Node
+              </button>
+              <button
+                className="btn-small"
+                onClick={() => removeMesh(m.id)}
+                title="Forget"
+              >
+                ✕
+              </button>
             </div>
           ))}
         </div>
@@ -114,7 +168,11 @@ export function AssetBrowser() {
   );
 }
 
-function ImageThumbnail({ bitmap }: { bitmap: ImageBitmap | HTMLImageElement | null }) {
+function ImageThumbnail({
+  bitmap,
+}: {
+  bitmap: ImageBitmap | HTMLImageElement | null;
+}) {
   if (!bitmap) {
     return <div className="asset-image-icon" />;
   }
@@ -125,7 +183,7 @@ function ImageThumbnail({ bitmap }: { bitmap: ImageBitmap | HTMLImageElement | n
     <canvas
       ref={(c) => {
         if (!c) return;
-        const ctx = c.getContext('2d');
+        const ctx = c.getContext("2d");
         if (!ctx) return;
         c.width = 32;
         c.height = 32;
@@ -136,7 +194,7 @@ function ImageThumbnail({ bitmap }: { bitmap: ImageBitmap | HTMLImageElement | n
           /* ignore */
         }
       }}
-      style={{ width: 32, height: 32, borderRadius: 2, background: '#1a1a1a' }}
+      style={{ width: 32, height: 32, borderRadius: 2, background: "#1a1a1a" }}
     />
   );
 }

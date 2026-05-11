@@ -1,4 +1,4 @@
-import type { UniformSpec } from '../../core/graph/uniformParser';
+import type { UniformSpec } from "../../core/graph/uniformParser";
 
 export interface UniformControlProps {
   spec: UniformSpec;
@@ -16,8 +16,8 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
   const v = value ?? spec.defaultValue;
   const step = stepFor(spec);
 
-  if (spec.control === 'slider') {
-    const num = typeof v === 'number' ? v : 0;
+  if (spec.control === "slider") {
+    const num = typeof v === "number" ? v : 0;
     return (
       <div className="inspector-row">
         <input
@@ -40,14 +40,16 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
     );
   }
 
-  if (spec.control === 'multi') {
+  if (spec.control === "multi") {
     const arr = Array.isArray(v) ? v : (spec.defaultValue as number[]);
-    const labels = ['x', 'y', 'z', 'w'];
+    const labels = ["x", "y", "z", "w"];
     return (
       <div>
         {arr.map((component, i) => (
           <div className="inspector-row" key={i}>
-            <span style={{ width: 12, color: '#888', fontFamily: 'monospace' }}>{labels[i]}</span>
+            <span style={{ width: 12, color: "#888", fontFamily: "monospace" }}>
+              {labels[i]}
+            </span>
             <input
               type="range"
               min={spec.min}
@@ -76,12 +78,12 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
     );
   }
 
-  if (spec.control === 'color') {
+  if (spec.control === "color") {
     const arr = Array.isArray(v) ? v : (spec.defaultValue as number[]);
     const r = Math.round(Math.max(0, Math.min(1, arr[0] ?? 0)) * 255);
     const g = Math.round(Math.max(0, Math.min(1, arr[1] ?? 0)) * 255);
     const b = Math.round(Math.max(0, Math.min(1, arr[2] ?? 0)) * 255);
-    const hex = '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('');
+    const hex = `#${[r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
     return (
       <div className="inspector-row">
         <input
@@ -99,15 +101,18 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
             onChange(next);
           }}
         />
-        <span style={{ color: '#888', fontFamily: 'monospace', fontSize: 11 }}>
-          {arr.slice(0, 3).map((x) => x.toFixed(2)).join(', ')}
+        <span style={{ color: "#888", fontFamily: "monospace", fontSize: 11 }}>
+          {arr
+            .slice(0, 3)
+            .map((x) => x.toFixed(2))
+            .join(", ")}
         </span>
       </div>
     );
   }
 
-  if (spec.control === 'bool') {
-    const num = typeof v === 'number' ? v : 0;
+  if (spec.control === "bool") {
+    const num = typeof v === "number" ? v : 0;
     return (
       <div className="inspector-row">
         <input

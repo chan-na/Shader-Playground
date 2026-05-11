@@ -1,16 +1,16 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { App } from './App';
-import './index.css';
-import { useGraphStore } from './state/graphStore';
-import { useSelectionStore } from './state/selectionStore';
-import { useAssetStore } from './state/assetStore';
-import * as assetActions from './state/assetActions';
-import { useDiagnosticsStore } from './state/diagnosticsStore';
-import { useTimeStore } from './state/timeStore';
-import { useViewportStore } from './state/viewportStore';
-import { useHistoryStore } from './state/historyStore';
-import { useEditorStore } from './state/editorStore';
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./App";
+import "./index.css";
+import * as assetActions from "./state/assetActions";
+import { useAssetStore } from "./state/assetStore";
+import { useDiagnosticsStore } from "./state/diagnosticsStore";
+import { useEditorStore } from "./state/editorStore";
+import { useGraphStore } from "./state/graphStore";
+import { useHistoryStore } from "./state/historyStore";
+import { useSelectionStore } from "./state/selectionStore";
+import { useTimeStore } from "./state/timeStore";
+import { useViewportStore } from "./state/viewportStore";
 
 if (import.meta.env.DEV) {
   // Expose stores for debugging / Playwright-style verification.
@@ -27,8 +27,8 @@ if (import.meta.env.DEV) {
   };
 }
 
-const root = document.getElementById('root');
-if (!root) throw new Error('#root not found');
+const root = document.getElementById("root");
+if (!root) throw new Error("#root not found");
 
 createRoot(root).render(
   <React.StrictMode>

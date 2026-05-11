@@ -1,5 +1,8 @@
-import { create } from 'zustand';
-import { defaultCameraState, type OrbitCameraState } from '../core/camera/orbitCamera';
+import { create } from "zustand";
+import {
+  defaultCameraState,
+  type OrbitCameraState,
+} from "../core/camera/orbitCamera";
 
 export interface CameraStoreState {
   camera: OrbitCameraState;

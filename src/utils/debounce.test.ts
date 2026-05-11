@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { debounce } from './debounce';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { debounce } from "./debounce";
 
-describe('debounce', () => {
+describe("debounce", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('coalesces rapid calls into a single trailing call', () => {
+  it("coalesces rapid calls into a single trailing call", () => {
     const fn = vi.fn();
     const d = debounce(fn, 50);
     d(1);
@@ -17,7 +17,7 @@ describe('debounce', () => {
     expect(fn).toHaveBeenCalledWith(3);
   });
 
-  it('cancel prevents the pending call', () => {
+  it("cancel prevents the pending call", () => {
     const fn = vi.fn();
     const d = debounce(fn, 50);
     d();

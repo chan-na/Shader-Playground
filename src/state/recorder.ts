@@ -1,6 +1,6 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-export type RecorderStatus = 'idle' | 'recording';
+export type RecorderStatus = "idle" | "recording";
 
 export interface RecorderState {
   status: RecorderStatus;
@@ -27,12 +27,12 @@ let _active: InternalRecorder | null = null;
 
 function pickMimeType(): string | null {
   const candidates = [
-    'video/webm;codecs=vp9',
-    'video/webm;codecs=vp8',
-    'video/webm',
-    'video/mp4',
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+    "video/mp4",
   ];
-  if (typeof MediaRecorder === 'undefined') return null;
+  if (typeof MediaRecorder === "undefined") return null;
   for (const m of candidates) {
     try {
       if (MediaRecorder.isTypeSupported(m)) return m;
@@ -44,7 +44,7 @@ function pickMimeType(): string | null {
 }
 
 export const useRecorderStore = create<RecorderState>((set, get) => ({
-  status: 'idle',
+  status: "idle",
   startedAt: null,
   elapsedMs: 0,
   lastBlobUrl: null,
@@ -53,28 +53,38 @@ export const useRecorderStore = create<RecorderState>((set, get) => ({
     if (_active) return;
     const mime = pickMimeType();
     if (!mime) {
-      set({ error: 'MediaRecorder is not supported in this browser' });
+      set({ error: "MediaRecorder is not supported in this browser" });
       return;
     }
     // `captureStream` may be missing on some browsers (Safari requires the
     // experimental flag in older versions).
     const stream =
-      typeof canvas.captureStream === 'function'
+      typeof canvas.captureStream === "function"
         ? canvas.captureStream(fps)
         : null;
     if (!stream) {
-      set({ error: 'canvas.captureStream() is not supported' });
+      set({ error: "canvas.captureStream() is not supported" });
       return;
     }
     try {
       const recorder = new MediaRecorder(stream, { mimeType: mime });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size) chunks.push(e.data);
+        if (e.data?.size) chunks.push(e.data);
       };
       recorder.start(250);
-      _active = { recorder, chunks, startAt: performance.now(), mimeType: mime };
-      set({ status: 'recording', startedAt: _active.startAt, elapsedMs: 0, error: null });
+      _active = {
+        recorder,
+        chunks,
+        startAt: performance.now(),
+        mimeType: mime,
+      };
+      set({
+        status: "recording",
+        startedAt: _active.startAt,
+        elapsedMs: 0,
+        error: null,
+      });
     } catch (err) {
       set({ error: (err as Error).message });
     }
@@ -90,13 +100,13 @@ export const useRecorderStore = create<RecorderState>((set, get) => ({
         const prev = get().lastBlobUrl;
         if (prev) URL.revokeObjectURL(prev);
         const url = URL.createObjectURL(blob);
-        set({ status: 'idle', startedAt: null, lastBlobUrl: url });
+        set({ status: "idle", startedAt: null, lastBlobUrl: url });
         resolve(blob);
       };
       try {
         active.recorder.stop();
       } catch {
-        set({ status: 'idle', startedAt: null });
+        set({ status: "idle", startedAt: null });
         resolve(null);
       }
     });

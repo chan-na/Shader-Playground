@@ -1,7 +1,7 @@
-import standalonePlayer from './standalonePlayer.js?raw';
-import { serializeProject } from '../state/serialization';
-import type { Graph } from '../core/graph/types';
-import type { NodePosition } from '../state/graphStore';
+import type { Graph } from "../core/graph/types";
+import type { NodePosition } from "../state/graphStore";
+import { serializeProject } from "../state/serialization";
+import standalonePlayer from "./standalonePlayer.js?raw";
 
 /**
  * Build a self-contained HTML file string that renders `graph` against a
@@ -14,13 +14,13 @@ export function buildExportedHtml(
   opts?: { title?: string; width?: number; height?: number },
 ): string {
   const project = serializeProject(graph, positions);
-  const title = opts?.title ?? 'Shader Playground export';
+  const title = opts?.title ?? "Shader Playground export";
   const w = opts?.width ?? 800;
   const h = opts?.height ?? 600;
   // Inline JSON safely — close </script> and -- escapes prevent injection.
   const safeJson = JSON.stringify(project)
-    .replace(/<\/script>/gi, '<\\/script>')
-    .replace(/<!--/g, '<\\!--');
+    .replace(/<\/script>/gi, "<\\/script>")
+    .replace(/<!--/g, "<\\!--");
 
   return `<!doctype html>
 <html lang="en">
@@ -48,21 +48,21 @@ export function buildExportedHtml(
 
 function escapeHtml(s: string): string {
   return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 export function downloadExportedHtml(
   graph: Graph,
   positions: Record<string, NodePosition>,
-  title = 'shader-playground',
+  title = "shader-playground",
 ) {
   const html = buildExportedHtml(graph, positions, { title });
-  const blob = new Blob([html], { type: 'text/html' });
+  const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = `${title}-${Date.now()}.html`;
   a.click();

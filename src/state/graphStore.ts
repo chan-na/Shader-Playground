@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 import type {
   CombineArity,
   CombineGraphNode,
@@ -10,8 +10,8 @@ import type {
   ParamGraphNode,
   ShaderGraphNode,
   SwizzleGraphNode,
-} from '../core/graph/types';
-import { useHistoryStore } from './historyStore';
+} from "../core/graph/types";
+import { useHistoryStore } from "./historyStore";
 
 export interface NodePosition {
   x: number;
@@ -111,7 +111,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     pushHistory(get());
     set((s) => ({
       nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== 'shader') return n;
+        if (n.id !== id || n.kind !== "shader") return n;
         const sn = n as ShaderGraphNode;
         return {
           ...sn,
@@ -125,7 +125,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setUniformValue: (id, name, value) =>
     set((s) => ({
       nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== 'shader') return n;
+        if (n.id !== id || n.kind !== "shader") return n;
         const sn = n as ShaderGraphNode;
         return {
           ...sn,
@@ -137,7 +137,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setParamValue: (id, value) =>
     set((s) => ({
       nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== 'param') return n;
+        if (n.id !== id || n.kind !== "param") return n;
         return { ...(n as ParamGraphNode), value } as ParamGraphNode;
       }),
       uniformRev: s.uniformRev + 1,
@@ -146,7 +146,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     pushHistory(get());
     set((s) => ({
       nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== 'param') return n;
+        if (n.id !== id || n.kind !== "param") return n;
         return { ...(n as ParamGraphNode), label } as ParamGraphNode;
       }),
       rev: s.rev + 1,
@@ -156,7 +156,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     pushHistory(get());
     set((s) => ({
       nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== 'math') return n;
+        if (n.id !== id || n.kind !== "math") return n;
         const mn = n as MathGraphNode;
         return {
           ...mn,
@@ -172,7 +172,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     pushHistory(get());
     set((s) => ({
       nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== 'swizzle') return n;
+        if (n.id !== id || n.kind !== "swizzle") return n;
         return { ...(n as SwizzleGraphNode), mask } as SwizzleGraphNode;
       }),
       rev: s.rev + 1,
@@ -182,7 +182,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     pushHistory(get());
     set((s) => ({
       nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== 'combine') return n;
+        if (n.id !== id || n.kind !== "combine") return n;
         const cn = n as CombineGraphNode;
         return {
           ...cn,

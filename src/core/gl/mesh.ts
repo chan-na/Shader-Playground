@@ -27,7 +27,7 @@ export function uploadMesh(
   attribLocations: Record<string, number>,
 ): GLMesh {
   const vao = gl.createVertexArray();
-  if (!vao) throw new Error('createVertexArray returned null');
+  if (!vao) throw new Error("createVertexArray returned null");
   gl.bindVertexArray(vao);
 
   const vbos: WebGLBuffer[] = [];
@@ -35,7 +35,7 @@ export function uploadMesh(
     const loc = attribLocations[attr.name];
     if (loc === undefined || loc < 0) continue;
     const vbo = gl.createBuffer();
-    if (!vbo) throw new Error('createBuffer returned null');
+    if (!vbo) throw new Error("createBuffer returned null");
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
     gl.bufferData(gl.ARRAY_BUFFER, attr.data, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(loc);
@@ -48,10 +48,11 @@ export function uploadMesh(
   let indexCount = 0;
   if (data.indices) {
     ibo = gl.createBuffer();
-    if (!ibo) throw new Error('createBuffer (IBO) returned null');
+    if (!ibo) throw new Error("createBuffer (IBO) returned null");
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data.indices, gl.STATIC_DRAW);
-    indexType = data.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+    indexType =
+      data.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
     indexCount = data.indices.length;
   }
 

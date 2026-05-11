@@ -1,24 +1,19 @@
-import type { MeshData } from '../gl/mesh';
+import type { MeshData } from "../gl/mesh";
 
 export function makeQuad(): MeshData {
   // Fullscreen NDC quad, used for post passes
   const positions = new Float32Array([
-    -1, -1, 0, 1, -1, 0, -1, 1, 0,
-    -1, 1, 0, 1, -1, 0, 1, 1, 0,
+    -1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0,
   ]);
   const normals = new Float32Array([
-    0, 0, 1, 0, 0, 1, 0, 0, 1,
-    0, 0, 1, 0, 0, 1, 0, 0, 1,
+    0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
   ]);
-  const uvs = new Float32Array([
-    0, 0, 1, 0, 0, 1,
-    0, 1, 1, 0, 1, 1,
-  ]);
+  const uvs = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
   return {
     attributes: [
-      { name: 'a_position', data: positions, size: 3 },
-      { name: 'a_normal', data: normals, size: 3 },
-      { name: 'a_uv', data: uvs, size: 2 },
+      { name: "a_position", data: positions, size: 3 },
+      { name: "a_normal", data: normals, size: 3 },
+      { name: "a_uv", data: uvs, size: 2 },
     ],
     vertexCount: 6,
   };
@@ -27,22 +22,34 @@ export function makeQuad(): MeshData {
 export function makePlane(size = 1): MeshData {
   const s = size;
   const positions = new Float32Array([
-    -s, 0, -s,  s, 0, -s,  -s, 0,  s,
-    -s, 0,  s,  s, 0, -s,   s, 0,  s,
+    -s,
+    0,
+    -s,
+    s,
+    0,
+    -s,
+    -s,
+    0,
+    s,
+    -s,
+    0,
+    s,
+    s,
+    0,
+    -s,
+    s,
+    0,
+    s,
   ]);
   const normals = new Float32Array([
-    0, 1, 0, 0, 1, 0, 0, 1, 0,
-    0, 1, 0, 0, 1, 0, 0, 1, 0,
+    0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0,
   ]);
-  const uvs = new Float32Array([
-    0, 0, 1, 0, 0, 1,
-    0, 1, 1, 0, 1, 1,
-  ]);
+  const uvs = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
   return {
     attributes: [
-      { name: 'a_position', data: positions, size: 3 },
-      { name: 'a_normal', data: normals, size: 3 },
-      { name: 'a_uv', data: uvs, size: 2 },
+      { name: "a_position", data: positions, size: 3 },
+      { name: "a_normal", data: normals, size: 3 },
+      { name: "a_uv", data: uvs, size: 2 },
     ],
     vertexCount: 6,
   };
@@ -52,17 +59,125 @@ export function makeCube(size = 1): MeshData {
   const s = size;
   const faces: Array<{ p: number[][]; n: number[]; u: number[][] }> = [
     // +X
-    { p: [[ s,-s,-s],[ s, s,-s],[ s,-s, s],[ s, s,-s],[ s, s, s],[ s,-s, s]], n: [1,0,0], u: [[0,0],[0,1],[1,0],[0,1],[1,1],[1,0]] },
+    {
+      p: [
+        [s, -s, -s],
+        [s, s, -s],
+        [s, -s, s],
+        [s, s, -s],
+        [s, s, s],
+        [s, -s, s],
+      ],
+      n: [1, 0, 0],
+      u: [
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+        [1, 0],
+      ],
+    },
     // -X
-    { p: [[-s,-s, s],[-s, s, s],[-s,-s,-s],[-s, s, s],[-s, s,-s],[-s,-s,-s]], n: [-1,0,0], u: [[0,0],[0,1],[1,0],[0,1],[1,1],[1,0]] },
+    {
+      p: [
+        [-s, -s, s],
+        [-s, s, s],
+        [-s, -s, -s],
+        [-s, s, s],
+        [-s, s, -s],
+        [-s, -s, -s],
+      ],
+      n: [-1, 0, 0],
+      u: [
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+        [1, 0],
+      ],
+    },
     // +Y
-    { p: [[-s, s, s],[ s, s, s],[-s, s,-s],[ s, s, s],[ s, s,-s],[-s, s,-s]], n: [0,1,0], u: [[0,0],[1,0],[0,1],[1,0],[1,1],[0,1]] },
+    {
+      p: [
+        [-s, s, s],
+        [s, s, s],
+        [-s, s, -s],
+        [s, s, s],
+        [s, s, -s],
+        [-s, s, -s],
+      ],
+      n: [0, 1, 0],
+      u: [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
+    },
     // -Y
-    { p: [[-s,-s,-s],[ s,-s,-s],[-s,-s, s],[ s,-s,-s],[ s,-s, s],[-s,-s, s]], n: [0,-1,0], u: [[0,0],[1,0],[0,1],[1,0],[1,1],[0,1]] },
+    {
+      p: [
+        [-s, -s, -s],
+        [s, -s, -s],
+        [-s, -s, s],
+        [s, -s, -s],
+        [s, -s, s],
+        [-s, -s, s],
+      ],
+      n: [0, -1, 0],
+      u: [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
+    },
     // +Z
-    { p: [[-s,-s, s],[ s,-s, s],[-s, s, s],[ s,-s, s],[ s, s, s],[-s, s, s]], n: [0,0,1], u: [[0,0],[1,0],[0,1],[1,0],[1,1],[0,1]] },
+    {
+      p: [
+        [-s, -s, s],
+        [s, -s, s],
+        [-s, s, s],
+        [s, -s, s],
+        [s, s, s],
+        [-s, s, s],
+      ],
+      n: [0, 0, 1],
+      u: [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
+    },
     // -Z
-    { p: [[ s,-s,-s],[-s,-s,-s],[ s, s,-s],[-s,-s,-s],[-s, s,-s],[ s, s,-s]], n: [0,0,-1], u: [[0,0],[1,0],[0,1],[1,0],[1,1],[0,1]] },
+    {
+      p: [
+        [s, -s, -s],
+        [-s, -s, -s],
+        [s, s, -s],
+        [-s, -s, -s],
+        [-s, s, -s],
+        [s, s, -s],
+      ],
+      n: [0, 0, -1],
+      u: [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
+    },
   ];
   const positions: number[] = [];
   const normals: number[] = [];
@@ -76,9 +191,9 @@ export function makeCube(size = 1): MeshData {
   }
   return {
     attributes: [
-      { name: 'a_position', data: new Float32Array(positions), size: 3 },
-      { name: 'a_normal', data: new Float32Array(normals), size: 3 },
-      { name: 'a_uv', data: new Float32Array(uvs), size: 2 },
+      { name: "a_position", data: new Float32Array(positions), size: 3 },
+      { name: "a_normal", data: new Float32Array(normals), size: 3 },
+      { name: "a_uv", data: new Float32Array(uvs), size: 2 },
     ],
     vertexCount: positions.length / 3,
   };
@@ -118,16 +233,21 @@ export function makeSphere(radius = 1, segments = 32, rings = 16): MeshData {
 
   return {
     attributes: [
-      { name: 'a_position', data: new Float32Array(positions), size: 3 },
-      { name: 'a_normal', data: new Float32Array(normals), size: 3 },
-      { name: 'a_uv', data: new Float32Array(uvs), size: 2 },
+      { name: "a_position", data: new Float32Array(positions), size: 3 },
+      { name: "a_normal", data: new Float32Array(normals), size: 3 },
+      { name: "a_uv", data: new Float32Array(uvs), size: 2 },
     ],
     indices: new Uint16Array(indices),
     vertexCount: positions.length / 3,
   };
 }
 
-export function makeTorus(radius = 1, tube = 0.35, radialSegments = 32, tubularSegments = 48): MeshData {
+export function makeTorus(
+  radius = 1,
+  tube = 0.35,
+  radialSegments = 32,
+  tubularSegments = 48,
+): MeshData {
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
@@ -162,24 +282,35 @@ export function makeTorus(radius = 1, tube = 0.35, radialSegments = 32, tubularS
   }
   return {
     attributes: [
-      { name: 'a_position', data: new Float32Array(positions), size: 3 },
-      { name: 'a_normal', data: new Float32Array(normals), size: 3 },
-      { name: 'a_uv', data: new Float32Array(uvs), size: 2 },
+      { name: "a_position", data: new Float32Array(positions), size: 3 },
+      { name: "a_normal", data: new Float32Array(normals), size: 3 },
+      { name: "a_uv", data: new Float32Array(uvs), size: 2 },
     ],
     indices: new Uint16Array(indices),
     vertexCount: positions.length / 3,
   };
 }
 
-export const PRIMITIVE_NAMES = ['cube', 'sphere', 'plane', 'torus', 'quad'] as const;
+export const PRIMITIVE_NAMES = [
+  "cube",
+  "sphere",
+  "plane",
+  "torus",
+  "quad",
+] as const;
 export type PrimitiveName = (typeof PRIMITIVE_NAMES)[number];
 
 export function makePrimitive(name: PrimitiveName) {
   switch (name) {
-    case 'cube':   return makeCube();
-    case 'sphere': return makeSphere();
-    case 'plane':  return makePlane();
-    case 'torus':  return makeTorus();
-    case 'quad':   return makeQuad();
+    case "cube":
+      return makeCube();
+    case "sphere":
+      return makeSphere();
+    case "plane":
+      return makePlane();
+    case "torus":
+      return makeTorus();
+    case "quad":
+      return makeQuad();
   }
 }

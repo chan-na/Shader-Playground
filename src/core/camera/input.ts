@@ -1,10 +1,10 @@
 import {
   defaultCameraState,
+  type OrbitCameraState,
   orbit,
   pan,
   zoom,
-  type OrbitCameraState,
-} from './orbitCamera';
+} from "./orbitCamera";
 
 export interface CameraController {
   state: OrbitCameraState;
@@ -14,11 +14,13 @@ export interface CameraController {
   setOnChange(cb: (s: OrbitCameraState) => void): void;
 }
 
-export function createCameraController(initial?: Partial<OrbitCameraState>): CameraController {
+export function createCameraController(
+  initial?: Partial<OrbitCameraState>,
+): CameraController {
   let state: OrbitCameraState = { ...defaultCameraState(), ...initial };
   let canvas: HTMLCanvasElement | null = null;
   let onChange: ((s: OrbitCameraState) => void) | null = null;
-  let dragMode: 'orbit' | 'pan' | null = null;
+  let dragMode: "orbit" | "pan" | null = null;
   let lastX = 0;
   let lastY = 0;
 
@@ -28,8 +30,8 @@ export function createCameraController(initial?: Partial<OrbitCameraState>): Cam
 
   const onPointerDown = (e: PointerEvent) => {
     if (!canvas) return;
-    if (e.button === 0) dragMode = 'orbit';
-    else if (e.button === 2) dragMode = 'pan';
+    if (e.button === 0) dragMode = "orbit";
+    else if (e.button === 2) dragMode = "pan";
     else return;
     lastX = e.clientX;
     lastY = e.clientY;
@@ -43,7 +45,7 @@ export function createCameraController(initial?: Partial<OrbitCameraState>): Cam
     const dy = e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
-    if (dragMode === 'orbit') state = orbit(state, dx, dy);
+    if (dragMode === "orbit") state = orbit(state, dx, dy);
     else state = pan(state, dx, dy);
     notify();
   };
@@ -51,7 +53,8 @@ export function createCameraController(initial?: Partial<OrbitCameraState>): Cam
   const onPointerUp = (e: PointerEvent) => {
     if (!dragMode) return;
     dragMode = null;
-    if (canvas?.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    if (canvas?.hasPointerCapture(e.pointerId))
+      canvas.releasePointerCapture(e.pointerId);
   };
 
   const onWheel = (e: WheelEvent) => {
@@ -73,21 +76,21 @@ export function createCameraController(initial?: Partial<OrbitCameraState>): Cam
     },
     attach(c: HTMLCanvasElement) {
       canvas = c;
-      c.addEventListener('pointerdown', onPointerDown);
-      c.addEventListener('pointermove', onPointerMove);
-      c.addEventListener('pointerup', onPointerUp);
-      c.addEventListener('pointercancel', onPointerUp);
-      c.addEventListener('wheel', onWheel, { passive: false });
-      c.addEventListener('contextmenu', onContextMenu);
+      c.addEventListener("pointerdown", onPointerDown);
+      c.addEventListener("pointermove", onPointerMove);
+      c.addEventListener("pointerup", onPointerUp);
+      c.addEventListener("pointercancel", onPointerUp);
+      c.addEventListener("wheel", onWheel, { passive: false });
+      c.addEventListener("contextmenu", onContextMenu);
     },
     detach() {
       if (!canvas) return;
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerUp);
-      canvas.removeEventListener('wheel', onWheel);
-      canvas.removeEventListener('contextmenu', onContextMenu);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("contextmenu", onContextMenu);
       canvas = null;
     },
     reset() {

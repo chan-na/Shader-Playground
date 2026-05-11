@@ -1,16 +1,16 @@
-import { mat4 } from 'gl-matrix';
-import { bindFramebuffer } from '../gl/framebuffer';
-import { drawMesh } from '../gl/mesh';
-import { setUniform } from '../gl/uniforms';
-import type { ExecutionPlan, ShaderPass } from './compile';
-import type { Graph, GraphNode } from './types';
+import { mat4 } from "gl-matrix";
 import {
   modelMatrix,
+  type OrbitCameraState,
   projMatrix,
   viewMatrix,
-  type OrbitCameraState,
-} from '../camera/orbitCamera';
-import { resolveValueFor, type Value } from '../nodes/utility';
+} from "../camera/orbitCamera";
+import { bindFramebuffer } from "../gl/framebuffer";
+import { drawMesh } from "../gl/mesh";
+import { setUniform } from "../gl/uniforms";
+import { resolveValueFor, type Value } from "../nodes/utility";
+import type { ExecutionPlan, ShaderPass } from "./compile";
+import type { Graph, GraphNode } from "./types";
 
 export interface FrameContext {
   time: number;
@@ -39,15 +39,15 @@ function bindSystemUniforms(
   ctx: FrameContext,
 ) {
   const u = pass.program.uniforms;
-  setUniform(gl, u['u_time'] ?? null, ctx.time);
-  setUniform(gl, u['u_resolution'] ?? null, [ctx.width, ctx.height]);
+  setUniform(gl, u.u_time ?? null, ctx.time);
+  setUniform(gl, u.u_resolution ?? null, [ctx.width, ctx.height]);
   if (!pass.meshIsFullscreen) {
     viewMatrix(ctx.camera, _view);
     projMatrix(ctx.camera, ctx.width / Math.max(1, ctx.height), _proj);
     modelMatrix(_model);
-    setUniform(gl, u['u_view'] ?? null, _view as Float32Array);
-    setUniform(gl, u['u_proj'] ?? null, _proj as Float32Array);
-    setUniform(gl, u['u_model'] ?? null, _model as Float32Array);
+    setUniform(gl, u.u_view ?? null, _view as Float32Array);
+    setUniform(gl, u.u_proj ?? null, _proj as Float32Array);
+    setUniform(gl, u.u_model ?? null, _model as Float32Array);
   }
 }
 
@@ -58,7 +58,9 @@ function bindUserUniforms(
   resolveCache: Map<string, Value>,
 ) {
   // Build an effective uniform map: explicit values overridden by param edges.
-  const effective: Record<string, number | number[]> = { ...pass.uniformValues };
+  const effective: Record<string, number | number[]> = {
+    ...pass.uniformValues,
+  };
   if (ctx.graph && pass.paramBindings.length) {
     for (const b of pass.paramBindings) {
       effective[b.uniformName] = resolveValueFor(
@@ -73,12 +75,14 @@ function bindUserUniforms(
   for (const [name, value] of Object.entries(effective)) {
     const loc = pass.program.uniforms[name];
     if (loc === undefined) continue;
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       setUniform(gl, loc ?? null, value);
     } else if (Array.isArray(value)) {
       if (value.length === 2) setUniform(gl, loc ?? null, [value[0], value[1]]);
-      else if (value.length === 3) setUniform(gl, loc ?? null, [value[0], value[1], value[2]]);
-      else if (value.length === 4) setUniform(gl, loc ?? null, [value[0], value[1], value[2], value[3]]);
+      else if (value.length === 3)
+        setUniform(gl, loc ?? null, [value[0], value[1], value[2]]);
+      else if (value.length === 4)
+        setUniform(gl, loc ?? null, [value[0], value[1], value[2], value[3]]);
     }
   }
 }
@@ -102,7 +106,7 @@ function bindSamplers(
     const loc = pass.program.uniforms[s.uniformName];
     if (loc === undefined) continue;
     setUniform(gl, loc ?? null, {
-      kind: 'sampler2D',
+      kind: "sampler2D",
       texture,
       unit: s.unit,
     });
@@ -189,7 +193,9 @@ export function executePlan(
   gl.clearColor(bg[0], bg[1], bg[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  const drawable = plan.outputs.filter((o) => o.sourceNodeId && passByNode.has(o.sourceNodeId));
+  const drawable = plan.outputs.filter(
+    (o) => o.sourceNodeId && passByNode.has(o.sourceNodeId),
+  );
   if (drawable.length === 0) {
     drawPlaceholder(gl, bg);
     return;
@@ -241,8 +247,8 @@ void main() {
   gl.deleteShader(v);
   gl.deleteShader(f);
   _blitProgram = p;
-  _blitTexLoc = gl.getUniformLocation(p, 'u_tex');
-  const loc = gl.getAttribLocation(p, 'a_position');
+  _blitTexLoc = gl.getUniformLocation(p, "u_tex");
+  const loc = gl.getAttribLocation(p, "a_position");
   const vao = gl.createVertexArray()!;
   gl.bindVertexArray(vao);
   const vbo = gl.createBuffer()!;
@@ -270,7 +276,10 @@ function blitToCanvas(gl: WebGL2RenderingContext, tex: WebGLTexture) {
   gl.bindVertexArray(null);
 }
 
-function drawPlaceholder(gl: WebGL2RenderingContext, bg: [number, number, number]) {
+function drawPlaceholder(
+  gl: WebGL2RenderingContext,
+  bg: [number, number, number],
+) {
   gl.disable(gl.DEPTH_TEST);
   gl.clearColor(bg[0], bg[1], bg[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT);

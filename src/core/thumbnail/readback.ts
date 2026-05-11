@@ -1,4 +1,4 @@
-import type { Framebuffer } from '../gl/framebuffer';
+import type { Framebuffer } from "../gl/framebuffer";
 
 export const THUMB_SIZE = 96;
 
@@ -20,16 +20,18 @@ export function downsampleToThumb(
   // Re-use the module scratch buffer only for the canonical thumb size to
   // avoid leaking module state across odd sizes (tests may call with custom).
   const out =
-    thumb === THUMB_SIZE
-      ? _scratch
-      : new Uint8Array(thumb * thumb * 4);
+    thumb === THUMB_SIZE ? _scratch : new Uint8Array(thumb * thumb * 4);
   for (let ty = 0; ty < thumb; ty++) {
     const sy0 = Math.floor((ty / thumb) * h);
     const sy1 = Math.max(sy0 + 1, Math.floor(((ty + 1) / thumb) * h));
     for (let tx = 0; tx < thumb; tx++) {
       const sx0 = Math.floor((tx / thumb) * w);
       const sx1 = Math.max(sx0 + 1, Math.floor(((tx + 1) / thumb) * w));
-      let r = 0, g = 0, b = 0, a = 0, n = 0;
+      let r = 0,
+        g = 0,
+        b = 0,
+        a = 0,
+        n = 0;
       const dx = Math.max(1, Math.floor((sx1 - sx0) / 2));
       const dy = Math.max(1, Math.floor((sy1 - sy0) / 2));
       for (let sy = sy0; sy < sy1; sy += dy) {

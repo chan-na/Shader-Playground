@@ -1,18 +1,25 @@
-import { useEffect, useRef } from 'react';
-import { useGraphStore, snapshotGraph } from '../../state/graphStore';
-import { useAssetStore, snapshotAssets } from '../../state/assetStore';
-import { useRendererStore } from '../../state/rendererStore';
-import { useCameraStore } from '../../state/cameraStore';
-import { useDiagnosticsStore, emptyDiagnostics } from '../../state/diagnosticsStore';
-import { createGLContext } from '../../core/gl/context';
-import { compileGraph, emptyPlan, type ExecutionPlan } from '../../core/graph/compile';
-import { executePlan } from '../../core/graph/execute';
-import { createCameraController } from '../../core/camera/input';
-import { parseShaderInfoLog } from '../../core/graph/diagnostics';
-import { thumbnailScheduler } from '../../state/thumbnailScheduler';
-import { AsyncThumbnailReadback } from '../../core/thumbnail/asyncReadback';
-import { useTimeStore } from '../../state/timeStore';
-import { useViewportStore } from '../../state/viewportStore';
+import { useEffect, useRef } from "react";
+import { createCameraController } from "../../core/camera/input";
+import { createGLContext } from "../../core/gl/context";
+import {
+  compileGraph,
+  type ExecutionPlan,
+  emptyPlan,
+} from "../../core/graph/compile";
+import { parseShaderInfoLog } from "../../core/graph/diagnostics";
+import { executePlan } from "../../core/graph/execute";
+import { AsyncThumbnailReadback } from "../../core/thumbnail/asyncReadback";
+import { snapshotAssets, useAssetStore } from "../../state/assetStore";
+import { useCameraStore } from "../../state/cameraStore";
+import {
+  emptyDiagnostics,
+  useDiagnosticsStore,
+} from "../../state/diagnosticsStore";
+import { snapshotGraph, useGraphStore } from "../../state/graphStore";
+import { useRendererStore } from "../../state/rendererStore";
+import { thumbnailScheduler } from "../../state/thumbnailScheduler";
+import { useTimeStore } from "../../state/timeStore";
+import { useViewportStore } from "../../state/viewportStore";
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -60,18 +67,20 @@ export function Viewport() {
         plan = compileGraph(gl, g, { width: w, height: h, assets });
         clearErrors();
         if (plan.errors.length) {
-          pushError(plan.errors.map((e) => e.message).join(' | '));
+          pushError(plan.errors.map((e) => e.message).join(" | "));
         }
         // Publish diagnostics for shader nodes
         const diagStore = useDiagnosticsStore.getState();
-        const shaderNodeIds = g.nodes.filter((n) => n.kind === 'shader').map((n) => n.id);
+        const shaderNodeIds = g.nodes
+          .filter((n) => n.kind === "shader")
+          .map((n) => n.id);
         for (const id of shaderNodeIds) {
           const errs = plan.shaderErrors[id] ?? [];
           const d = emptyDiagnostics();
           for (const er of errs) {
             const parsed = parseShaderInfoLog(er.raw);
-            if (er.stage === 'vertex') d.vertex.push(...parsed);
-            else if (er.stage === 'fragment') d.fragment.push(...parsed);
+            if (er.stage === "vertex") d.vertex.push(...parsed);
+            else if (er.stage === "fragment") d.fragment.push(...parsed);
             else d.link.push(...parsed);
           }
           diagStore.set(id, d);
@@ -130,7 +139,7 @@ export function Viewport() {
       const graph = useGraphStore.getState();
       for (const pass of plan.passes) {
         const node = graph.nodes.find((n) => n.id === pass.nodeId);
-        if (node && node.kind === 'shader') {
+        if (node && node.kind === "shader") {
           pass.uniformValues = node.uniformValues;
         }
       }
@@ -152,8 +161,8 @@ export function Viewport() {
       const t = useTimeStore.getState().simTime;
       const bg = useViewportStore.getState().background;
       // Build a snapshot of param nodes for the frame.
-      const params: Record<string, typeof graph.nodes[number]> = {};
-      for (const n of graph.nodes) if (n.kind === 'param') params[n.id] = n;
+      const params: Record<string, (typeof graph.nodes)[number]> = {};
+      for (const n of graph.nodes) if (n.kind === "param") params[n.id] = n;
       executePlan(
         gl,
         plan,

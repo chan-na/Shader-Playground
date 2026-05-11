@@ -1,41 +1,41 @@
-import basicVert from '../shaders/basic.vert?raw';
-import unlitFrag from '../shaders/templates/unlit.frag?raw';
-import noiseFrag from '../shaders/templates/noise.frag?raw';
-import blurFrag from '../shaders/templates/blur.frag?raw';
-import tonemapFrag from '../shaders/templates/tonemap.frag?raw';
-import uvDebugFrag from '../shaders/templates/uvDebug.frag?raw';
-import type { Graph } from '../core/graph/types';
-import type { NodePosition } from './graphStore';
+import type { Graph } from "../core/graph/types";
+import basicVert from "../shaders/basic.vert?raw";
+import blurFrag from "../shaders/templates/blur.frag?raw";
+import noiseFrag from "../shaders/templates/noise.frag?raw";
+import tonemapFrag from "../shaders/templates/tonemap.frag?raw";
+import unlitFrag from "../shaders/templates/unlit.frag?raw";
+import uvDebugFrag from "../shaders/templates/uvDebug.frag?raw";
+import type { NodePosition } from "./graphStore";
 
 export function createDemoGraph(): Graph {
   return {
     nodes: [
-      { id: 'mesh1', kind: 'mesh', primitive: 'sphere' },
+      { id: "mesh1", kind: "mesh", primitive: "sphere" },
       {
-        id: 'shader1',
-        kind: 'shader',
+        id: "shader1",
+        kind: "shader",
         vertexSource: basicVert,
         fragmentSource: unlitFrag,
         uniformValues: {
           u_baseColor: [0.3, 0.7, 1.0],
         },
       },
-      { id: 'output1', kind: 'output' },
+      { id: "output1", kind: "output" },
     ],
     edges: [
       {
-        id: 'e1',
-        source: 'mesh1',
-        sourceHandle: 'mesh',
-        target: 'shader1',
-        targetHandle: 'mesh',
+        id: "e1",
+        source: "mesh1",
+        sourceHandle: "mesh",
+        target: "shader1",
+        targetHandle: "mesh",
       },
       {
-        id: 'e2',
-        source: 'shader1',
-        sourceHandle: 'texture',
-        target: 'output1',
-        targetHandle: 'texture',
+        id: "e2",
+        source: "shader1",
+        sourceHandle: "texture",
+        target: "output1",
+        targetHandle: "texture",
       },
     ],
   };
@@ -51,8 +51,8 @@ export function createChainDemoGraph(): Graph {
   return {
     nodes: [
       {
-        id: 'noise1',
-        kind: 'shader',
+        id: "noise1",
+        kind: "shader",
         vertexSource: basicVert,
         fragmentSource: noiseFrag,
         uniformValues: {
@@ -61,8 +61,8 @@ export function createChainDemoGraph(): Graph {
         },
       },
       {
-        id: 'blur1',
-        kind: 'shader',
+        id: "blur1",
+        kind: "shader",
         vertexSource: basicVert,
         fragmentSource: blurFrag,
         uniformValues: {
@@ -70,8 +70,8 @@ export function createChainDemoGraph(): Graph {
         },
       },
       {
-        id: 'tonemap1',
-        kind: 'shader',
+        id: "tonemap1",
+        kind: "shader",
         vertexSource: basicVert,
         fragmentSource: tonemapFrag,
         uniformValues: {
@@ -79,29 +79,29 @@ export function createChainDemoGraph(): Graph {
           u_gamma: 2.2,
         },
       },
-      { id: 'output1', kind: 'output' },
+      { id: "output1", kind: "output" },
     ],
     edges: [
       {
-        id: 'e1',
-        source: 'noise1',
-        sourceHandle: 'texture',
-        target: 'blur1',
-        targetHandle: 'u_tex',
+        id: "e1",
+        source: "noise1",
+        sourceHandle: "texture",
+        target: "blur1",
+        targetHandle: "u_tex",
       },
       {
-        id: 'e2',
-        source: 'blur1',
-        sourceHandle: 'texture',
-        target: 'tonemap1',
-        targetHandle: 'u_tex',
+        id: "e2",
+        source: "blur1",
+        sourceHandle: "texture",
+        target: "tonemap1",
+        targetHandle: "u_tex",
       },
       {
-        id: 'e3',
-        source: 'tonemap1',
-        sourceHandle: 'texture',
-        target: 'output1',
-        targetHandle: 'texture',
+        id: "e3",
+        source: "tonemap1",
+        sourceHandle: "texture",
+        target: "output1",
+        targetHandle: "texture",
       },
     ],
   };
@@ -117,30 +117,30 @@ export const CHAIN_DEMO_LAYOUT: Record<string, NodePosition> = {
 export function createTorusDemoGraph(): Graph {
   return {
     nodes: [
-      { id: 'mesh1', kind: 'mesh', primitive: 'torus' },
+      { id: "mesh1", kind: "mesh", primitive: "torus" },
       {
-        id: 'shader1',
-        kind: 'shader',
+        id: "shader1",
+        kind: "shader",
         vertexSource: basicVert,
         fragmentSource: uvDebugFrag,
         uniformValues: {},
       },
-      { id: 'output1', kind: 'output' },
+      { id: "output1", kind: "output" },
     ],
     edges: [
       {
-        id: 'e1',
-        source: 'mesh1',
-        sourceHandle: 'mesh',
-        target: 'shader1',
-        targetHandle: 'mesh',
+        id: "e1",
+        source: "mesh1",
+        sourceHandle: "mesh",
+        target: "shader1",
+        targetHandle: "mesh",
       },
       {
-        id: 'e2',
-        source: 'shader1',
-        sourceHandle: 'texture',
-        target: 'output1',
-        targetHandle: 'texture',
+        id: "e2",
+        source: "shader1",
+        sourceHandle: "texture",
+        target: "output1",
+        targetHandle: "texture",
       },
     ],
   };
@@ -160,36 +160,66 @@ export function createSplitDemoGraph(): Graph {
   return {
     nodes: [
       {
-        id: 'noise1',
-        kind: 'shader',
+        id: "noise1",
+        kind: "shader",
         vertexSource: basicVert,
         fragmentSource: noiseFrag,
         uniformValues: { u_scale: 6.0, u_tint: [0.4, 0.8, 1.0] },
       },
       {
-        id: 'blur1',
-        kind: 'shader',
+        id: "blur1",
+        kind: "shader",
         vertexSource: basicVert,
         fragmentSource: blurFrag,
         uniformValues: { u_radius: 2.5 },
       },
       {
-        id: 'tonemap1',
-        kind: 'shader',
+        id: "tonemap1",
+        kind: "shader",
         vertexSource: basicVert,
         fragmentSource: tonemapFrag,
         uniformValues: { u_exposure: 1.4, u_gamma: 2.2 },
       },
-      { id: 'out_noise', kind: 'output' },
-      { id: 'out_blur', kind: 'output' },
-      { id: 'out_tone', kind: 'output' },
+      { id: "out_noise", kind: "output" },
+      { id: "out_blur", kind: "output" },
+      { id: "out_tone", kind: "output" },
     ],
     edges: [
-      { id: 'e1', source: 'noise1', sourceHandle: 'texture', target: 'blur1', targetHandle: 'u_tex' },
-      { id: 'e2', source: 'blur1', sourceHandle: 'texture', target: 'tonemap1', targetHandle: 'u_tex' },
-      { id: 'eo1', source: 'noise1', sourceHandle: 'texture', target: 'out_noise', targetHandle: 'texture' },
-      { id: 'eo2', source: 'blur1', sourceHandle: 'texture', target: 'out_blur', targetHandle: 'texture' },
-      { id: 'eo3', source: 'tonemap1', sourceHandle: 'texture', target: 'out_tone', targetHandle: 'texture' },
+      {
+        id: "e1",
+        source: "noise1",
+        sourceHandle: "texture",
+        target: "blur1",
+        targetHandle: "u_tex",
+      },
+      {
+        id: "e2",
+        source: "blur1",
+        sourceHandle: "texture",
+        target: "tonemap1",
+        targetHandle: "u_tex",
+      },
+      {
+        id: "eo1",
+        source: "noise1",
+        sourceHandle: "texture",
+        target: "out_noise",
+        targetHandle: "texture",
+      },
+      {
+        id: "eo2",
+        source: "blur1",
+        sourceHandle: "texture",
+        target: "out_blur",
+        targetHandle: "texture",
+      },
+      {
+        id: "eo3",
+        source: "tonemap1",
+        sourceHandle: "texture",
+        target: "out_tone",
+        targetHandle: "texture",
+      },
     ],
   };
 }

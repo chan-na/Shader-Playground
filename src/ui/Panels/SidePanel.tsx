@@ -1,19 +1,20 @@
-import { useState } from 'react';
-import { Inspector } from './Inspector';
-import { ProblemsPanel } from './ProblemsPanel';
-import { AssetBrowser } from './AssetBrowser';
-import { useDiagnosticsStore } from '../../state/diagnosticsStore';
-import { useRendererStore } from '../../state/rendererStore';
-import { useAssetStore } from '../../state/assetStore';
+import { useState } from "react";
+import { useAssetStore } from "../../state/assetStore";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useRendererStore } from "../../state/rendererStore";
+import { AssetBrowser } from "./AssetBrowser";
+import { Inspector } from "./Inspector";
+import { ProblemsPanel } from "./ProblemsPanel";
 
-type Tab = 'inspector' | 'problems' | 'assets';
+type Tab = "inspector" | "problems" | "assets";
 
 export function SidePanel() {
-  const [tab, setTab] = useState<Tab>('inspector');
+  const [tab, setTab] = useState<Tab>("inspector");
 
   const problemCount = useDiagnosticsStore((s) => {
     let n = 0;
-    for (const d of Object.values(s.byNode)) n += d.vertex.length + d.fragment.length + d.link.length;
+    for (const d of Object.values(s.byNode))
+      n += d.vertex.length + d.fragment.length + d.link.length;
     return n;
   });
   const runtimeErrors = useRendererStore((s) => s.stats.errors.length);
@@ -26,30 +27,38 @@ export function SidePanel() {
     <div className="panel panel--inspector">
       <div className="panel-tabs">
         <button
-          className={tab === 'inspector' ? 'panel-tab panel-tab--active' : 'panel-tab'}
-          onClick={() => setTab('inspector')}
+          className={
+            tab === "inspector" ? "panel-tab panel-tab--active" : "panel-tab"
+          }
+          onClick={() => setTab("inspector")}
         >
           Inspector
         </button>
         <button
-          className={tab === 'assets' ? 'panel-tab panel-tab--active' : 'panel-tab'}
-          onClick={() => setTab('assets')}
+          className={
+            tab === "assets" ? "panel-tab panel-tab--active" : "panel-tab"
+          }
+          onClick={() => setTab("assets")}
         >
           Assets
-          {assetCount > 0 && <span className="panel-tab-badge">{assetCount}</span>}
+          {assetCount > 0 && (
+            <span className="panel-tab-badge">{assetCount}</span>
+          )}
         </button>
         <button
-          className={tab === 'problems' ? 'panel-tab panel-tab--active' : 'panel-tab'}
-          onClick={() => setTab('problems')}
-          data-variant={total > 0 ? 'error' : undefined}
+          className={
+            tab === "problems" ? "panel-tab panel-tab--active" : "panel-tab"
+          }
+          onClick={() => setTab("problems")}
+          data-variant={total > 0 ? "error" : undefined}
         >
           Problems
           {total > 0 && <span className="panel-tab-badge">{total}</span>}
         </button>
       </div>
-      {tab === 'inspector' && <InspectorBody />}
-      {tab === 'assets' && <AssetBrowser />}
-      {tab === 'problems' && <ProblemsPanel />}
+      {tab === "inspector" && <InspectorBody />}
+      {tab === "assets" && <AssetBrowser />}
+      {tab === "problems" && <ProblemsPanel />}
     </div>
   );
 }

@@ -6,8 +6,8 @@ import type {
   MathOp,
   ParamGraphNode,
   SwizzleGraphNode,
-} from '../graph/types';
-import { MATH_UNARY_OPS } from '../graph/types';
+} from "../graph/types";
+import { MATH_UNARY_OPS } from "../graph/types";
 
 export type Scalar = number;
 export type Vec = number[];
@@ -38,7 +38,7 @@ function asVec(v: Value, fallbackLen = 4): Vec {
 }
 
 function asScalar(v: Value): Scalar {
-  if (typeof v === 'number') return v;
+  if (typeof v === "number") return v;
   return v[0] ?? 0;
 }
 
@@ -47,7 +47,7 @@ export function applySwizzle(input: Value, mask: string): Value {
   const out: number[] = [];
   for (const c of mask) {
     const idx = MASK_INDEX[c];
-    out.push(idx === undefined ? 0 : src[idx] ?? 0);
+    out.push(idx === undefined ? 0 : (src[idx] ?? 0));
   }
   if (out.length === 1) return out[0];
   return out;
@@ -55,27 +55,27 @@ export function applySwizzle(input: Value, mask: string): Value {
 
 export function computeMath(op: MathOp, a: Scalar, b: Scalar): Scalar {
   switch (op) {
-    case 'add':
+    case "add":
       return a + b;
-    case 'subtract':
+    case "subtract":
       return a - b;
-    case 'multiply':
+    case "multiply":
       return a * b;
-    case 'divide':
+    case "divide":
       return b === 0 ? 0 : a / b;
-    case 'pow':
-      return Math.pow(a, b);
-    case 'abs':
+    case "pow":
+      return a ** b;
+    case "abs":
       return Math.abs(a);
-    case 'sin':
+    case "sin":
       return Math.sin(a);
-    case 'cos':
+    case "cos":
       return Math.cos(a);
   }
 }
 
 export function paramValue(node: ParamGraphNode, time: number): Value {
-  if (node.paramKind === 'time') {
+  if (node.paramKind === "time") {
     const [scale = 1, offset = 0] = Array.isArray(node.value)
       ? node.value
       : [node.value as number, 0];
@@ -121,16 +121,16 @@ function computeValueForNode(
   ctx: EvalContext,
   cache: Map<string, Value>,
 ): Value {
-  if (node.kind === 'param') {
+  if (node.kind === "param") {
     return paramValue(node as ParamGraphNode, ctx.time);
   }
-  if (node.kind === 'math') {
+  if (node.kind === "math") {
     return evalMath(node as MathGraphNode, graph, ctx, cache);
   }
-  if (node.kind === 'swizzle') {
+  if (node.kind === "swizzle") {
     return evalSwizzle(node as SwizzleGraphNode, graph, ctx, cache);
   }
-  if (node.kind === 'combine') {
+  if (node.kind === "combine") {
     return evalCombine(node as CombineGraphNode, graph, ctx, cache);
   }
   return 0;
@@ -157,9 +157,9 @@ function evalMath(
   ctx: EvalContext,
   cache: Map<string, Value>,
 ): Scalar {
-  const a = asScalar(inputValue(node.id, 'a', node.a, graph, ctx, cache));
+  const a = asScalar(inputValue(node.id, "a", node.a, graph, ctx, cache));
   if (MATH_UNARY_OPS.has(node.op)) return computeMath(node.op, a, 0);
-  const b = asScalar(inputValue(node.id, 'b', node.b, graph, ctx, cache));
+  const b = asScalar(inputValue(node.id, "b", node.b, graph, ctx, cache));
   return computeMath(node.op, a, b);
 }
 
@@ -169,7 +169,7 @@ function evalSwizzle(
   ctx: EvalContext,
   cache: Map<string, Value>,
 ): Value {
-  const src = inputValue(node.id, 'in', [0, 0, 0, 0], graph, ctx, cache);
+  const src = inputValue(node.id, "in", [0, 0, 0, 0], graph, ctx, cache);
   return applySwizzle(src, node.mask);
 }
 
@@ -179,7 +179,7 @@ function evalCombine(
   ctx: EvalContext,
   cache: Map<string, Value>,
 ): Vec {
-  const channels = ['x', 'y', 'z', 'w'] as const;
+  const channels = ["x", "y", "z", "w"] as const;
   const out: number[] = [];
   for (let i = 0; i < node.arity; i++) {
     const v = inputValue(

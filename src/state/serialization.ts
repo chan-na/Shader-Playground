@@ -1,11 +1,11 @@
-import type { Graph, GraphEdge, GraphNode } from '../core/graph/types';
-import type { NodePosition } from './graphStore';
-import { validateGraph } from '../core/graph/validate';
+import type { Graph, GraphEdge, GraphNode } from "../core/graph/types";
+import { validateGraph } from "../core/graph/validate";
+import type { NodePosition } from "./graphStore";
 
 export const PROJECT_FORMAT_VERSION = 1;
 
 export interface SerializedProject {
-  format: 'shader-playground';
+  format: "shader-playground";
   version: number;
   exportedAt: string;
   graph: Graph;
@@ -23,7 +23,7 @@ export function serializeProject(
     if (knownIds.has(id)) trimmedPositions[id] = { x: p.x, y: p.y };
   }
   return {
-    format: 'shader-playground',
+    format: "shader-playground",
     version: PROJECT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
     graph: {
@@ -42,15 +42,15 @@ export interface DeserializedProject {
 
 export function deserializeProject(raw: unknown): DeserializedProject {
   const warnings: string[] = [];
-  if (!raw || typeof raw !== 'object') {
-    throw new Error('Project payload is not an object');
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Project payload is not an object");
   }
   const obj = raw as Partial<SerializedProject> & Record<string, unknown>;
-  if (obj.format !== 'shader-playground') {
-    throw new Error('Unrecognized project format');
+  if (obj.format !== "shader-playground") {
+    throw new Error("Unrecognized project format");
   }
-  if (typeof obj.version !== 'number') {
-    throw new Error('Project version is missing');
+  if (typeof obj.version !== "number") {
+    throw new Error("Project version is missing");
   }
   if (obj.version > PROJECT_FORMAT_VERSION) {
     warnings.push(
@@ -59,12 +59,12 @@ export function deserializeProject(raw: unknown): DeserializedProject {
   }
   const graph = obj.graph as Graph | undefined;
   if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
-    throw new Error('Project graph is missing or malformed');
+    throw new Error("Project graph is missing or malformed");
   }
   const positions = (obj.positions ?? {}) as Record<string, NodePosition>;
   const errors = validateGraph(graph);
   for (const e of errors) {
-    if (e.code === 'missing_node' || e.code === 'multiple_outputs') {
+    if (e.code === "missing_node" || e.code === "multiple_outputs") {
       warnings.push(`Validation: ${e.message}`);
     }
   }
@@ -81,41 +81,41 @@ export function deserializeProject(raw: unknown): DeserializedProject {
 function structuredCloneNode(n: GraphNode): GraphNode {
   // Hand-rolled to keep the shape narrow and avoid leaking unrelated keys.
   switch (n.kind) {
-    case 'mesh':
+    case "mesh":
       return {
         id: n.id,
-        kind: 'mesh',
+        kind: "mesh",
         primitive: n.primitive,
         assetId: n.assetId ?? null,
       };
-    case 'image':
-      return { id: n.id, kind: 'image', assetId: n.assetId ?? null };
-    case 'shader':
+    case "image":
+      return { id: n.id, kind: "image", assetId: n.assetId ?? null };
+    case "shader":
       return {
         id: n.id,
-        kind: 'shader',
+        kind: "shader",
         vertexSource: n.vertexSource,
         fragmentSource: n.fragmentSource,
         uniformValues: deepCloneUniformValues(n.uniformValues),
       };
-    case 'output':
-      return { id: n.id, kind: 'output' };
-    case 'param':
+    case "output":
+      return { id: n.id, kind: "output" };
+    case "param":
       return {
         id: n.id,
-        kind: 'param',
+        kind: "param",
         paramKind: n.paramKind,
         value: Array.isArray(n.value) ? [...n.value] : n.value,
         label: n.label,
       };
-    case 'math':
-      return { id: n.id, kind: 'math', op: n.op, a: n.a, b: n.b };
-    case 'swizzle':
-      return { id: n.id, kind: 'swizzle', mask: n.mask };
-    case 'combine':
+    case "math":
+      return { id: n.id, kind: "math", op: n.op, a: n.a, b: n.b };
+    case "swizzle":
+      return { id: n.id, kind: "swizzle", mask: n.mask };
+    case "combine":
       return {
         id: n.id,
-        kind: 'combine',
+        kind: "combine",
         arity: n.arity,
         values: [n.values[0], n.values[1], n.values[2], n.values[3]],
       };

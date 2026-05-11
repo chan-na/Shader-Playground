@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { thumbnailScheduler } from '../../state/thumbnailScheduler';
-import { THUMB_SIZE } from '../../core/thumbnail/readback';
+import { useEffect, useRef } from "react";
+import { THUMB_SIZE } from "../../core/thumbnail/readback";
+import { thumbnailScheduler } from "../../state/thumbnailScheduler";
 
 export interface NodeThumbnailProps {
   nodeId: string;
@@ -8,7 +8,11 @@ export interface NodeThumbnailProps {
   height?: number;
 }
 
-export function NodeThumbnail({ nodeId, width = 96, height = 96 }: NodeThumbnailProps) {
+export function NodeThumbnail({
+  nodeId,
+  width = 96,
+  height = 96,
+}: NodeThumbnailProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -16,7 +20,7 @@ export function NodeThumbnail({ nodeId, width = 96, height = 96 }: NodeThumbnail
     if (!canvas) return;
     canvas.width = THUMB_SIZE;
     canvas.height = THUMB_SIZE;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const stop = thumbnailScheduler.subscribe(nodeId, (img) => {
@@ -26,7 +30,8 @@ export function NodeThumbnail({ nodeId, width = 96, height = 96 }: NodeThumbnail
     // Visibility via IntersectionObserver
     const obs = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) thumbnailScheduler.setVisibility(nodeId, e.isIntersecting);
+        for (const e of entries)
+          thumbnailScheduler.setVisibility(nodeId, e.isIntersecting);
       },
       { threshold: 0 },
     );
@@ -44,9 +49,9 @@ export function NodeThumbnail({ nodeId, width = 96, height = 96 }: NodeThumbnail
       style={{
         width,
         height,
-        display: 'block',
-        background: '#0a0a0a',
-        imageRendering: 'pixelated',
+        display: "block",
+        background: "#0a0a0a",
+        imageRendering: "pixelated",
         borderRadius: 3,
       }}
     />

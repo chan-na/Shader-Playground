@@ -1,6 +1,6 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-export type ShaderStage = 'vertex' | 'fragment';
+export type ShaderStage = "vertex" | "fragment";
 
 export interface JumpRequest {
   /** Bumped on every request so the editor can react even if line is identical. */
@@ -15,12 +15,12 @@ export interface EditorState {
   activeStage: ShaderStage;
   setStage: (s: ShaderStage) => void;
   jumpRequest: JumpRequest | null;
-  requestJump: (req: Omit<JumpRequest, 'rev'>) => void;
+  requestJump: (req: Omit<JumpRequest, "rev">) => void;
   clearJump: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
-  activeStage: 'fragment',
+  activeStage: "fragment",
   setStage: (s) => set({ activeStage: s }),
   jumpRequest: null,
   requestJump: (req) =>

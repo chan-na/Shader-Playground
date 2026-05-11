@@ -1,5 +1,5 @@
-import { useRendererStore } from '../../state/rendererStore';
-import { useGraphStore } from '../../state/graphStore';
+import { useGraphStore } from "../../state/graphStore";
+import { useRendererStore } from "../../state/rendererStore";
 
 export function StatusBar() {
   const stats = useRendererStore((s) => s.stats);
@@ -12,19 +12,19 @@ export function StatusBar() {
   return (
     <div
       style={{
-        display: 'flex',
+        display: "flex",
         gap: 14,
-        alignItems: 'center',
-        padding: '4px 10px',
-        background: '#181818',
-        borderTop: '1px solid #0f0f0f',
-        color: '#bbb',
+        alignItems: "center",
+        padding: "4px 10px",
+        background: "#181818",
+        borderTop: "1px solid #0f0f0f",
+        color: "#bbb",
         fontSize: 11,
         height: 22,
       }}
     >
-      <span style={{ color: ready ? '#56d698' : '#888' }}>
-        ● {ready ? 'GL ready' : 'GL init'}
+      <span style={{ color: ready ? "#56d698" : "#888" }}>
+        ● {ready ? "GL ready" : "GL init"}
       </span>
       <span title="Frames per second">{stats.fps} FPS</span>
       <span title="Draw calls per frame">{stats.drawCalls} draws</span>
@@ -33,14 +33,11 @@ export function StatusBar() {
       </span>
       <div style={{ flex: 1 }} />
       {errorCount > 0 ? (
-        <span
-          style={{ color: '#ff6b6b' }}
-          title={stats.errors.join('\n')}
-        >
-          ⚠ {errorCount} error{errorCount === 1 ? '' : 's'}
+        <span style={{ color: "#ff6b6b" }} title={stats.errors.join("\n")}>
+          ⚠ {errorCount} error{errorCount === 1 ? "" : "s"}
         </span>
       ) : (
-        <span style={{ color: '#666' }}>no errors</span>
+        <span style={{ color: "#666" }}>no errors</span>
       )}
     </div>
   );

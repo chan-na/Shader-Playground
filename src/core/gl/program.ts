@@ -1,5 +1,5 @@
 export interface ShaderError {
-  stage: 'vertex' | 'fragment' | 'link';
+  stage: "vertex" | "fragment" | "link";
   line?: number;
   column?: number;
   message: string;
@@ -21,18 +21,18 @@ function compileShader(
   if (!shader) {
     return {
       shader: null,
-      error: { stage: 'link', message: 'createShader returned null', raw: '' },
+      error: { stage: "link", message: "createShader returned null", raw: "" },
     };
   }
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(shader) ?? '';
+    const log = gl.getShaderInfoLog(shader) ?? "";
     gl.deleteShader(shader);
     return {
       shader: null,
       error: {
-        stage: type === gl.VERTEX_SHADER ? 'vertex' : 'fragment',
+        stage: type === gl.VERTEX_SHADER ? "vertex" : "fragment",
         message: log,
         raw: log,
       },
@@ -61,7 +61,9 @@ export function createProgram(
   if (!prog) {
     return {
       program: null,
-      errors: [{ stage: 'link', message: 'createProgram returned null', raw: '' }],
+      errors: [
+        { stage: "link", message: "createProgram returned null", raw: "" },
+      ],
     };
   }
   gl.attachShader(prog, vs.shader);
@@ -71,29 +73,35 @@ export function createProgram(
   gl.deleteShader(fs.shader);
 
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    const log = gl.getProgramInfoLog(prog) ?? '';
+    const log = gl.getProgramInfoLog(prog) ?? "";
     gl.deleteProgram(prog);
     return {
       program: null,
-      errors: [...errors, { stage: 'link', message: log, raw: log }],
+      errors: [...errors, { stage: "link", message: log, raw: log }],
     };
   }
 
   const attributes: Record<string, number> = {};
   const uniforms: Record<string, WebGLUniformLocation | null> = {};
 
-  const numAttribs = gl.getProgramParameter(prog, gl.ACTIVE_ATTRIBUTES) as number;
+  const numAttribs = gl.getProgramParameter(
+    prog,
+    gl.ACTIVE_ATTRIBUTES,
+  ) as number;
   for (let i = 0; i < numAttribs; i++) {
     const info = gl.getActiveAttrib(prog, i);
     if (!info) continue;
     attributes[info.name] = gl.getAttribLocation(prog, info.name);
   }
 
-  const numUniforms = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS) as number;
+  const numUniforms = gl.getProgramParameter(
+    prog,
+    gl.ACTIVE_UNIFORMS,
+  ) as number;
   for (let i = 0; i < numUniforms; i++) {
     const info = gl.getActiveUniform(prog, i);
     if (!info) continue;
-    const baseName = info.name.replace(/\[\d+\]$/, '');
+    const baseName = info.name.replace(/\[\d+\]$/, "");
     uniforms[baseName] = gl.getUniformLocation(prog, info.name);
   }
 

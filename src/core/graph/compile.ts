@@ -1,12 +1,40 @@
-import { createProgram, disposeProgram, type CompiledProgram, type ShaderError } from '../gl/program';
-import { createFramebuffer, disposeFramebuffer, type Framebuffer } from '../gl/framebuffer';
-import { uploadMesh, disposeMesh, type GLMesh, type MeshData } from '../gl/mesh';
-import { createImageTexture, disposeTexture, type GLTexture } from '../gl/texture';
-import type { Graph, GraphNode, ShaderGraphNode, MeshGraphNode, ImageGraphNode } from './types';
-import { topologicalOrder, validateGraph, type ValidationError } from './validate';
-import { makePrimitive } from '../assets/primitives';
-import type { GeometryHandle, ImageHandle } from '../assets/types';
-import fullscreenVert from '../../shaders/fullscreen.vert?raw';
+import fullscreenVert from "../../shaders/fullscreen.vert?raw";
+import { makePrimitive } from "../assets/primitives";
+import type { GeometryHandle, ImageHandle } from "../assets/types";
+import {
+  createFramebuffer,
+  disposeFramebuffer,
+  type Framebuffer,
+} from "../gl/framebuffer";
+import {
+  disposeMesh,
+  type GLMesh,
+  type MeshData,
+  uploadMesh,
+} from "../gl/mesh";
+import {
+  type CompiledProgram,
+  createProgram,
+  disposeProgram,
+  type ShaderError,
+} from "../gl/program";
+import {
+  createImageTexture,
+  disposeTexture,
+  type GLTexture,
+} from "../gl/texture";
+import type {
+  Graph,
+  GraphNode,
+  ImageGraphNode,
+  MeshGraphNode,
+  ShaderGraphNode,
+} from "./types";
+import {
+  topologicalOrder,
+  type ValidationError,
+  validateGraph,
+} from "./validate";
 
 export interface AssetCatalog {
   meshes: Record<string, GeometryHandle>;
@@ -80,7 +108,9 @@ export function emptyPlan(width: number, height: number): ExecutionPlan {
 }
 
 function findEdgeTo(graph: Graph, target: string, handle: string) {
-  return graph.edges.find((e) => e.target === target && e.targetHandle === handle);
+  return graph.edges.find(
+    (e) => e.target === target && e.targetHandle === handle,
+  );
 }
 
 function findEdgesToTarget(graph: Graph, target: string) {
@@ -88,7 +118,7 @@ function findEdgesToTarget(graph: Graph, target: string) {
 }
 
 function meshDataFor(node: GraphNode, assets: AssetCatalog): MeshData | null {
-  if (node.kind !== 'mesh') return null;
+  if (node.kind !== "mesh") return null;
   const mn = node as MeshGraphNode;
   if (mn.assetId) {
     const handle = assets.meshes[mn.assetId];
@@ -106,13 +136,20 @@ export function compileGraph(
   const assets = opts.assets ?? EMPTY_ASSETS;
   const errors = validateGraph(graph);
   const shaderErrors: Record<string, ShaderError[]> = {};
-  const fatal = errors.some((e) => e.code === 'cycle' || e.code === 'multi_input' || e.code === 'multiple_outputs');
+  const fatal = errors.some(
+    (e) =>
+      e.code === "cycle" ||
+      e.code === "multi_input" ||
+      e.code === "multiple_outputs",
+  );
   if (fatal) {
     return { ...emptyPlan(opts.width, opts.height), errors };
   }
 
   const ordered = topologicalOrder(graph);
-  const shaderNodes = ordered.filter((n): n is ShaderGraphNode => n.kind === 'shader');
+  const shaderNodes = ordered.filter(
+    (n): n is ShaderGraphNode => n.kind === "shader",
+  );
 
   const passes: ShaderPass[] = [];
   const disposers: Array<() => void> = [];
@@ -121,7 +158,7 @@ export function compileGraph(
   // sample them through the existing sampler-routing path.
   const imageTextures: Record<string, GLTexture> = {};
   for (const node of graph.nodes) {
-    if (node.kind !== 'image') continue;
+    if (node.kind !== "image") continue;
     const inode = node as ImageGraphNode;
     if (!inode.assetId) continue;
     const handle = assets.images[inode.assetId];
@@ -139,14 +176,14 @@ export function compileGraph(
   const passByNode = new Map<string, ShaderPass>();
   for (const sn of shaderNodes) {
     // Determine mesh input
-    const meshEdge = findEdgeTo(graph, sn.id, 'mesh');
+    const meshEdge = findEdgeTo(graph, sn.id, "mesh");
     let meshIsFullscreen = true;
-    let meshData: MeshData = makePrimitive('quad');
+    let meshData: MeshData = makePrimitive("quad");
     let vertexSource = sn.vertexSource;
 
     if (meshEdge) {
       const meshNode = graph.nodes.find((n) => n.id === meshEdge.source);
-      if (meshNode && meshNode.kind === 'mesh') {
+      if (meshNode && meshNode.kind === "mesh") {
         const md = meshDataFor(meshNode, assets);
         if (md) {
           meshData = md;
@@ -172,18 +209,25 @@ export function compileGraph(
     const paramBindings: ParamBinding[] = [];
     let unit = 0;
     for (const e of findEdgesToTarget(graph, sn.id)) {
-      if (e.targetHandle === 'mesh') continue;
+      if (e.targetHandle === "mesh") continue;
       const src = graph.nodes.find((n) => n.id === e.source);
       if (!src) continue;
       if (
-        src.kind === 'param' ||
-        src.kind === 'math' ||
-        src.kind === 'swizzle' ||
-        src.kind === 'combine'
+        src.kind === "param" ||
+        src.kind === "math" ||
+        src.kind === "swizzle" ||
+        src.kind === "combine"
       ) {
-        paramBindings.push({ uniformName: e.targetHandle, sourceNodeId: e.source });
+        paramBindings.push({
+          uniformName: e.targetHandle,
+          sourceNodeId: e.source,
+        });
       } else {
-        samplers.push({ uniformName: e.targetHandle, sourceNodeId: e.source, unit: unit++ });
+        samplers.push({
+          uniformName: e.targetHandle,
+          sourceNodeId: e.source,
+          unit: unit++,
+        });
       }
     }
 
@@ -207,9 +251,9 @@ export function compileGraph(
     });
   }
 
-  const outputNodes = graph.nodes.filter((n) => n.kind === 'output');
+  const outputNodes = graph.nodes.filter((n) => n.kind === "output");
   const outputs: OutputBinding[] = outputNodes.map((o) => {
-    const edge = findEdgeTo(graph, o.id, 'texture');
+    const edge = findEdgeTo(graph, o.id, "texture");
     return { outputNodeId: o.id, sourceNodeId: edge?.source ?? null };
   });
 
@@ -228,4 +272,3 @@ export function compileGraph(
     },
   };
 }
-

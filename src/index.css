@@ -1,13 +1,18 @@
 :root {
   color-scheme: dark;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
   color: #d4d4d4;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-html, body, #root {
+html,
+body,
+#root {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -16,7 +21,10 @@ html, body, #root {
   overflow: hidden;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   font-family: inherit;
   font-size: inherit;
   color: inherit;
@@ -36,7 +44,9 @@ button, input, select, textarea {
   width: 100vw;
 }
 
-.statusbar { grid-area: statusbar; }
+.statusbar {
+  grid-area: statusbar;
+}
 
 .panel {
   background: #252526;
@@ -47,10 +57,18 @@ button, input, select, textarea {
   overflow: hidden;
 }
 
-.panel--graph     { grid-area: graph; }
-.panel--viewport  { grid-area: viewport; }
-.panel--code      { grid-area: code; }
-.panel--inspector { grid-area: inspector; }
+.panel--graph {
+  grid-area: graph;
+}
+.panel--viewport {
+  grid-area: viewport;
+}
+.panel--code {
+  grid-area: code;
+}
+.panel--inspector {
+  grid-area: inspector;
+}
 
 .inspector-section {
   padding: 12px 14px;
@@ -86,7 +104,11 @@ button, input, select, textarea {
   color: #ddd;
   padding: 2px 4px;
   border-radius: 2px;
-  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-family:
+    ui-monospace,
+    SF Mono,
+    Menlo,
+    monospace;
   font-size: 11px;
 }
 
@@ -152,8 +174,13 @@ button, input, select, textarea {
   border-radius: 3px;
   font-size: 11px;
 }
-.btn-small:hover { background: #4a4a4d; }
-.btn-small:disabled { opacity: 0.5; cursor: default; }
+.btn-small:hover {
+  background: #4a4a4d;
+}
+.btn-small:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 
 /* ── Side-panel tabs ────────────────────────────────────────────── */
 .panel-tabs {
@@ -175,7 +202,9 @@ button, input, select, textarea {
   align-items: center;
   gap: 6px;
 }
-.panel-tab:hover { color: #d4d4d4; }
+.panel-tab:hover {
+  color: #d4d4d4;
+}
 .panel-tab--active {
   color: #d4d4d4;
   background: #252526;
@@ -189,7 +218,10 @@ button, input, select, textarea {
   font-size: 10px;
   font-weight: 700;
 }
-.panel-tab--active .panel-tab-badge { background: #094771; color: #fff; }
+.panel-tab--active .panel-tab-badge {
+  background: #094771;
+  color: #fff;
+}
 /* Red badge specifically for the problems tab when it has issues. */
 .panel-tab[data-variant="error"] .panel-tab-badge,
 .panel-tab--active[data-variant="error"] .panel-tab-badge {
@@ -202,7 +234,9 @@ button, input, select, textarea {
   border-bottom: 1px solid #1a1a1a;
   cursor: pointer;
 }
-.problem-row:hover { background: #2a2a2d; }
+.problem-row:hover {
+  background: #2a2a2d;
+}
 
 .asset-row {
   display: flex;
@@ -211,8 +245,11 @@ button, input, select, textarea {
   padding: 6px 0;
   border-bottom: 1px solid #1a1a1a;
 }
-.asset-row:last-child { border-bottom: none; }
-.asset-image-icon, .asset-mesh-icon {
+.asset-row:last-child {
+  border-bottom: none;
+}
+.asset-image-icon,
+.asset-mesh-icon {
   width: 32px;
   height: 32px;
   background: #1a1a1a;
@@ -267,7 +304,10 @@ button, input, select, textarea {
   cursor: pointer;
   font-size: 13px;
 }
-.cmdk-row--active { background: #094771; color: #fff; }
+.cmdk-row--active {
+  background: #094771;
+  color: #fff;
+}
 .cmdk-cat {
   font-size: 10px;
   text-transform: uppercase;
@@ -279,9 +319,16 @@ button, input, select, textarea {
   min-width: 60px;
   text-align: center;
 }
-.cmdk-row--active .cmdk-cat { color: #d4d4d4; }
-.cmdk-label { flex: 1; color: #ddd; }
-.cmdk-row--active .cmdk-label { color: #fff; }
+.cmdk-row--active .cmdk-cat {
+  color: #d4d4d4;
+}
+.cmdk-label {
+  flex: 1;
+  color: #ddd;
+}
+.cmdk-row--active .cmdk-label {
+  color: #fff;
+}
 .cmdk-empty {
   padding: 18px;
   color: #888;

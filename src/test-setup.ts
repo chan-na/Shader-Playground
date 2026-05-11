@@ -1,15 +1,11 @@
 // Minimal ImageData polyfill for jsdom (which omits the Canvas/ImageData APIs).
-if (typeof globalThis.ImageData === 'undefined') {
+if (typeof globalThis.ImageData === "undefined") {
   class ImageDataPolyfill {
     data: Uint8ClampedArray;
     width: number;
     height: number;
-    colorSpace: 'srgb' = 'srgb';
-    constructor(
-      arg1: Uint8ClampedArray | number,
-      arg2: number,
-      arg3?: number,
-    ) {
+    colorSpace: "srgb" = "srgb";
+    constructor(arg1: Uint8ClampedArray | number, arg2: number, arg3?: number) {
       if (arg1 instanceof Uint8ClampedArray) {
         this.data = arg1;
         this.width = arg2;

@@ -1,9 +1,9 @@
-import type { Graph, GraphEdge, GraphNode } from './types';
+import type { Graph, GraphEdge, GraphNode } from "./types";
 
 export const MAX_OUTPUTS = 4;
 
 export interface ValidationError {
-  code: 'cycle' | 'multiple_outputs' | 'multi_input' | 'missing_node';
+  code: "cycle" | "multiple_outputs" | "multi_input" | "missing_node";
   message: string;
   nodeIds?: string[];
   edgeIds?: string[];
@@ -17,7 +17,7 @@ export function validateGraph(graph: Graph): ValidationError[] {
   for (const e of graph.edges) {
     if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) {
       errors.push({
-        code: 'missing_node',
+        code: "missing_node",
         message: `Edge ${e.id} references missing node`,
         edgeIds: [e.id],
       });
@@ -25,10 +25,10 @@ export function validateGraph(graph: Graph): ValidationError[] {
   }
 
   // Output count — split viewport supports up to 4 outputs.
-  const outputs = graph.nodes.filter((n) => n.kind === 'output');
+  const outputs = graph.nodes.filter((n) => n.kind === "output");
   if (outputs.length > MAX_OUTPUTS) {
     errors.push({
-      code: 'multiple_outputs',
+      code: "multiple_outputs",
       message: `Graph has ${outputs.length} Output nodes; max ${MAX_OUTPUTS} allowed`,
       nodeIds: outputs.map((o) => o.id),
     });
@@ -42,7 +42,7 @@ export function validateGraph(graph: Graph): ValidationError[] {
     const prev = seen.get(k);
     if (prev) {
       errors.push({
-        code: 'multi_input',
+        code: "multi_input",
         message: `Input ${k} has multiple sources`,
         edgeIds: [prev.id, e.id],
       });
@@ -56,7 +56,7 @@ export function validateGraph(graph: Graph): ValidationError[] {
   for (const n of graph.nodes) adj.set(n.id, []);
   for (const e of graph.edges) {
     if (nodeIds.has(e.source) && nodeIds.has(e.target)) {
-      adj.get(e.source)!.push(e.target);
+      adj.get(e.source)?.push(e.target);
     }
   }
   const VISITING = 1;
@@ -66,8 +66,8 @@ export function validateGraph(graph: Graph): ValidationError[] {
     const s = state.get(id);
     if (s === VISITING) {
       errors.push({
-        code: 'cycle',
-        message: `Cycle detected: ${[...path, id].join(' -> ')}`,
+        code: "cycle",
+        message: `Cycle detected: ${[...path, id].join(" -> ")}`,
         nodeIds: [...path, id],
       });
       return true;
@@ -95,7 +95,8 @@ export function topologicalOrder(graph: Graph): GraphNode[] {
     byId.set(n.id, n);
   }
   for (const e of graph.edges) {
-    if (indeg.has(e.target)) indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1);
+    if (indeg.has(e.target))
+      indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1);
   }
   const queue: string[] = [];
   for (const [id, d] of indeg) if (d === 0) queue.push(id);

@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import type { GLSLDiagnostic } from '../core/graph/diagnostics';
+import { create } from "zustand";
+import type { GLSLDiagnostic } from "../core/graph/diagnostics";
 
 export interface NodeDiagnostics {
   vertex: GLSLDiagnostic[];

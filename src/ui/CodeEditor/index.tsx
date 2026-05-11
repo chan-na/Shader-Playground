@@ -1,26 +1,26 @@
-import { useEffect, useRef } from 'react';
-import { EditorView } from '@codemirror/view';
-import { EditorState, EditorSelection } from '@codemirror/state';
-import { setDiagnostics } from '@codemirror/lint';
-import { useGraphStore } from '../../state/graphStore';
-import { useSelectionStore } from '../../state/selectionStore';
-import { useEditorStore } from '../../state/editorStore';
-import { useDiagnosticsStore } from '../../state/diagnosticsStore';
-import { useRendererStore } from '../../state/rendererStore';
-import { glslExtensions } from './glslSetup';
-import { toCMDiagnostics } from './lintAdapter';
-import { StageTabs } from './StageTabs';
-import { debounce } from '../../utils/debounce';
-import type { ShaderGraphNode } from '../../core/graph/types';
+import { setDiagnostics } from "@codemirror/lint";
+import { EditorSelection, EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import { useEffect, useRef } from "react";
+import type { ShaderGraphNode } from "../../core/graph/types";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useEditorStore } from "../../state/editorStore";
+import { useGraphStore } from "../../state/graphStore";
+import { useRendererStore } from "../../state/rendererStore";
+import { useSelectionStore } from "../../state/selectionStore";
+import { debounce } from "../../utils/debounce";
+import { glslExtensions } from "./glslSetup";
+import { toCMDiagnostics } from "./lintAdapter";
+import { StageTabs } from "./StageTabs";
 
 export function CodeEditor() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const loadedKeyRef = useRef<string>('');
-  const lastCommittedRef = useRef<string>('');
-  const ctxRef = useRef<{ id: string | null; stage: 'vertex' | 'fragment' }>({
+  const loadedKeyRef = useRef<string>("");
+  const lastCommittedRef = useRef<string>("");
+  const ctxRef = useRef<{ id: string | null; stage: "vertex" | "fragment" }>({
     id: null,
-    stage: 'fragment',
+    stage: "fragment",
   });
 
   const selectedId = useSelectionStore((s) => s.selectedNodeId);
@@ -30,18 +30,23 @@ export function CodeEditor() {
   const clearJump = useEditorStore((s) => s.clearJump);
   const fps = useRendererStore((s) => s.stats.fps);
 
-  const firstShaderId = useGraphStore((s) =>
-    s.nodes.find((n) => n.kind === 'shader')?.id ?? null,
+  const firstShaderId = useGraphStore(
+    (s) => s.nodes.find((n) => n.kind === "shader")?.id ?? null,
   );
   const effectiveId = selectedId ?? firstShaderId;
 
-  const node = useGraphStore((s) =>
-    s.nodes.find((n) => n.id === effectiveId && n.kind === 'shader') as
-      | ShaderGraphNode
-      | undefined,
+  const node = useGraphStore(
+    (s) =>
+      s.nodes.find((n) => n.id === effectiveId && n.kind === "shader") as
+        | ShaderGraphNode
+        | undefined,
   );
 
-  const source = node ? (stage === 'vertex' ? node.vertexSource : node.fragmentSource) : '';
+  const source = node
+    ? stage === "vertex"
+      ? node.vertexSource
+      : node.fragmentSource
+    : "";
 
   const diags = useDiagnosticsStore((s) =>
     effectiveId ? s.byNode[effectiveId] : undefined,
@@ -58,16 +63,20 @@ export function CodeEditor() {
       const { id, stage: st } = ctxRef.current;
       if (!id) return;
       const cur = useGraphStore.getState().nodes.find((n) => n.id === id);
-      if (!cur || cur.kind !== 'shader') return;
+      if (!cur || cur.kind !== "shader") return;
       const sn = cur as ShaderGraphNode;
-      if (st === 'vertex') {
+      if (st === "vertex") {
         if (sn.vertexSource === value) return;
         lastCommittedRef.current = value;
-        useGraphStore.getState().updateShaderSource(id, { vertexSource: value });
+        useGraphStore
+          .getState()
+          .updateShaderSource(id, { vertexSource: value });
       } else {
         if (sn.fragmentSource === value) return;
         lastCommittedRef.current = value;
-        useGraphStore.getState().updateShaderSource(id, { fragmentSource: value });
+        useGraphStore
+          .getState()
+          .updateShaderSource(id, { fragmentSource: value });
       }
     }, 50);
 
@@ -77,7 +86,7 @@ export function CodeEditor() {
 
     const view = new EditorView({
       state: EditorState.create({
-        doc: '',
+        doc: "",
         extensions: [...glslExtensions(), updateListener],
       }),
       parent: containerRef.current,
@@ -99,7 +108,7 @@ export function CodeEditor() {
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    const key = `${effectiveId ?? '∅'}::${stage}`;
+    const key = `${effectiveId ?? "∅"}::${stage}`;
     const switching = loadedKeyRef.current !== key;
     const externalChange = source !== lastCommittedRef.current;
     if (!switching && !externalChange) return;
@@ -126,30 +135,36 @@ export function CodeEditor() {
       : line.from;
     view.dispatch({
       selection: EditorSelection.cursor(pos),
-      effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+      effects: EditorView.scrollIntoView(pos, { y: "center" }),
       scrollIntoView: true,
     });
     view.focus();
     clearJump();
-  }, [jumpRequest, effectiveId, stage, source]);
+  }, [jumpRequest, effectiveId, stage, clearJump]);
 
   // Push diagnostics to CM
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    const stageDiags = diags ? (stage === 'vertex' ? diags.vertex : diags.fragment) : [];
+    const stageDiags = diags
+      ? stage === "vertex"
+        ? diags.vertex
+        : diags.fragment
+      : [];
     const linkDiags = diags?.link ?? [];
     const all = [...stageDiags, ...linkDiags];
     view.dispatch(setDiagnostics(view.state, toCMDiagnostics(view, all)));
   }, [diags, stage]);
 
-  const vertexHasError = (diags?.vertex.length ?? 0) > 0 || (diags?.link.length ?? 0) > 0;
-  const fragmentHasError = (diags?.fragment.length ?? 0) > 0 || (diags?.link.length ?? 0) > 0;
+  const vertexHasError =
+    (diags?.vertex.length ?? 0) > 0 || (diags?.link.length ?? 0) > 0;
+  const fragmentHasError =
+    (diags?.fragment.length ?? 0) > 0 || (diags?.link.length ?? 0) > 0;
 
   return (
     <div className="panel panel--code">
       <div className="panel-header">
-        Code · {fps} fps {effectiveId ? `· ${effectiveId}` : ''}
+        Code · {fps} fps {effectiveId ? `· ${effectiveId}` : ""}
       </div>
       <StageTabs
         active={stage}
@@ -160,7 +175,11 @@ export function CodeEditor() {
       <div className="panel-body">
         <div
           ref={containerRef}
-          style={{ width: '100%', height: '100%', display: node ? 'block' : 'none' }}
+          style={{
+            width: "100%",
+            height: "100%",
+            display: node ? "block" : "none",
+          }}
         />
         {!node && (
           <div className="placeholder-message">No shader node selected</div>

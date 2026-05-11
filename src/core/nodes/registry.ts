@@ -8,12 +8,16 @@ import type {
   ParamGraphNode,
   ParamKind,
   PortType,
+  ShaderGraphNode,
   SwizzleGraphNode,
-} from '../graph/types';
-import { MATH_UNARY_OPS } from '../graph/types';
-import { inspectorUniforms, parseUniforms, samplerUniforms } from '../graph/uniformParser';
-import type { ShaderGraphNode } from '../graph/types';
-import { isValidSwizzleMask } from './utility';
+} from "../graph/types";
+import { MATH_UNARY_OPS } from "../graph/types";
+import {
+  inspectorUniforms,
+  parseUniforms,
+  samplerUniforms,
+} from "../graph/uniformParser";
+import { isValidSwizzleMask } from "./utility";
 
 export interface PortSpec {
   name: string;
@@ -30,14 +34,14 @@ export interface NodeKindMeta {
 /** Map a GLSL uniform type to the corresponding edge port type. */
 export function uniformTypeToPort(type: string): PortType | null {
   switch (type) {
-    case 'float':
-      return 'float';
-    case 'vec2':
-      return 'vec2';
-    case 'vec3':
-      return 'vec3';
-    case 'vec4':
-      return 'vec4';
+    case "float":
+      return "float";
+    case "vec2":
+      return "vec2";
+    case "vec3":
+      return "vec3";
+    case "vec4":
+      return "vec4";
     default:
       return null;
   }
@@ -45,37 +49,37 @@ export function uniformTypeToPort(type: string): PortType | null {
 
 export function paramOutputPort(paramKind: ParamKind): PortSpec {
   switch (paramKind) {
-    case 'float':
-    case 'time':
-      return { name: 'value', type: 'float' };
-    case 'vec3':
-    case 'color':
-      return { name: 'value', type: 'vec3' };
+    case "float":
+    case "time":
+      return { name: "value", type: "float" };
+    case "vec3":
+    case "color":
+      return { name: "value", type: "vec3" };
   }
 }
 
 export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
   mesh: {
-    kind: 'mesh',
-    label: 'Mesh',
+    kind: "mesh",
+    label: "Mesh",
     inputs: () => [],
-    outputs: () => [{ name: 'mesh', type: 'mesh' }],
+    outputs: () => [{ name: "mesh", type: "mesh" }],
   },
   image: {
-    kind: 'image',
-    label: 'Image',
+    kind: "image",
+    label: "Image",
     inputs: () => [],
-    outputs: () => [{ name: 'texture', type: 'texture' }],
+    outputs: () => [{ name: "texture", type: "texture" }],
   },
   shader: {
-    kind: 'shader',
-    label: 'Shader',
+    kind: "shader",
+    label: "Shader",
     inputs: (sn) => {
-      const ports: PortSpec[] = [{ name: 'mesh', type: 'mesh' }];
+      const ports: PortSpec[] = [{ name: "mesh", type: "mesh" }];
       if (sn) {
         const specs = parseUniforms(`${sn.vertexSource}\n${sn.fragmentSource}`);
         for (const s of samplerUniforms(specs)) {
-          ports.push({ name: s.name, type: 'texture' });
+          ports.push({ name: s.name, type: "texture" });
         }
         for (const s of inspectorUniforms(specs)) {
           const t = uniformTypeToPort(s.type);
@@ -84,86 +88,86 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
       }
       return ports;
     },
-    outputs: () => [{ name: 'texture', type: 'texture' }],
+    outputs: () => [{ name: "texture", type: "texture" }],
   },
   output: {
-    kind: 'output',
-    label: 'Output',
-    inputs: () => [{ name: 'texture', type: 'texture' }],
+    kind: "output",
+    label: "Output",
+    inputs: () => [{ name: "texture", type: "texture" }],
     outputs: () => [],
   },
   param: {
-    kind: 'param',
-    label: 'Parameter',
+    kind: "param",
+    label: "Parameter",
     inputs: () => [],
     // The actual output type depends on the param kind. Callers that need
     // per-instance accuracy should use paramOutputPort(node.paramKind).
-    outputs: () => [{ name: 'value', type: 'float' }],
+    outputs: () => [{ name: "value", type: "float" }],
   },
   math: {
-    kind: 'math',
-    label: 'Math',
+    kind: "math",
+    label: "Math",
     // Binary ops surface (a,b); unary ops expose just (a). The runtime
     // evaluator ignores any edge connected to a port that isn't listed here.
     inputs: () => [
-      { name: 'a', type: 'float' },
-      { name: 'b', type: 'float' },
+      { name: "a", type: "float" },
+      { name: "b", type: "float" },
     ],
-    outputs: () => [{ name: 'value', type: 'float' }],
+    outputs: () => [{ name: "value", type: "float" }],
   },
   swizzle: {
-    kind: 'swizzle',
-    label: 'Swizzle',
-    inputs: () => [{ name: 'in', type: 'vec4' }],
-    outputs: () => [{ name: 'value', type: 'vec4' }],
+    kind: "swizzle",
+    label: "Swizzle",
+    inputs: () => [{ name: "in", type: "vec4" }],
+    outputs: () => [{ name: "value", type: "vec4" }],
   },
   combine: {
-    kind: 'combine',
-    label: 'Combine',
+    kind: "combine",
+    label: "Combine",
     inputs: () => [
-      { name: 'x', type: 'float' },
-      { name: 'y', type: 'float' },
-      { name: 'z', type: 'float' },
-      { name: 'w', type: 'float' },
+      { name: "x", type: "float" },
+      { name: "y", type: "float" },
+      { name: "z", type: "float" },
+      { name: "w", type: "float" },
     ],
-    outputs: () => [{ name: 'value', type: 'vec4' }],
+    outputs: () => [{ name: "value", type: "vec4" }],
   },
 };
 
 /** Math-node port surface depends on the chosen op (unary vs binary). */
 export function mathInputPorts(op: MathOp): PortSpec[] {
-  if (MATH_UNARY_OPS.has(op)) return [{ name: 'a', type: 'float' }];
+  if (MATH_UNARY_OPS.has(op)) return [{ name: "a", type: "float" }];
   return [
-    { name: 'a', type: 'float' },
-    { name: 'b', type: 'float' },
+    { name: "a", type: "float" },
+    { name: "b", type: "float" },
   ];
 }
 
 /** Swizzle output port type depends on the mask length. */
 export function swizzleOutputPort(mask: string): PortSpec {
-  if (!isValidSwizzleMask(mask)) return { name: 'value', type: 'float' };
-  if (mask.length === 1) return { name: 'value', type: 'float' };
-  if (mask.length === 2) return { name: 'value', type: 'vec2' };
-  if (mask.length === 3) return { name: 'value', type: 'vec3' };
-  return { name: 'value', type: 'vec4' };
+  if (!isValidSwizzleMask(mask)) return { name: "value", type: "float" };
+  if (mask.length === 1) return { name: "value", type: "float" };
+  if (mask.length === 2) return { name: "value", type: "vec2" };
+  if (mask.length === 3) return { name: "value", type: "vec3" };
+  return { name: "value", type: "vec4" };
 }
 
 /** Combine input ports surface only as many channels as the arity asks for. */
 export function combineInputPorts(arity: CombineArity): PortSpec[] {
   const all: PortSpec[] = [
-    { name: 'x', type: 'float' },
-    { name: 'y', type: 'float' },
-    { name: 'z', type: 'float' },
-    { name: 'w', type: 'float' },
+    { name: "x", type: "float" },
+    { name: "y", type: "float" },
+    { name: "z", type: "float" },
+    { name: "w", type: "float" },
   ];
   return all.slice(0, arity);
 }
 
 /** Combine output type tracks the arity (vec2/vec3/vec4). */
 export function combineOutputPort(arity: CombineArity): PortSpec {
-  if (arity === 2) return { name: 'value', type: 'vec2' };
-  if (arity === 3) return { name: 'value', type: 'vec3' };
-  return { name: 'value', type: 'vec4' };
+  if (arity === 2) return { name: "value", type: "vec2" };
+  if (arity === 3) return { name: "value", type: "vec3" };
+  return { name: "value", type: "vec4" };
 }
 
 /**
@@ -171,11 +175,11 @@ export function combineOutputPort(arity: CombineArity): PortSpec {
  * for node kinds whose ports do not depend on configuration.
  */
 export function nodeInputPorts(node: GraphNode): PortSpec[] {
-  if (node.kind === 'math') return mathInputPorts((node as MathGraphNode).op);
-  if (node.kind === 'combine')
+  if (node.kind === "math") return mathInputPorts((node as MathGraphNode).op);
+  if (node.kind === "combine")
     return combineInputPorts((node as CombineGraphNode).arity);
   return NODE_META[node.kind].inputs(
-    node.kind === 'shader' ? (node as ShaderGraphNode) : null,
+    node.kind === "shader" ? (node as ShaderGraphNode) : null,
   );
 }
 
@@ -184,11 +188,11 @@ export function nodeInputPorts(node: GraphNode): PortSpec[] {
  * Swizzle/Combine so connection validation reflects the real output type.
  */
 export function nodeOutputPorts(node: GraphNode): PortSpec[] {
-  if (node.kind === 'param')
+  if (node.kind === "param")
     return [paramOutputPort((node as ParamGraphNode).paramKind)];
-  if (node.kind === 'swizzle')
+  if (node.kind === "swizzle")
     return [swizzleOutputPort((node as SwizzleGraphNode).mask)];
-  if (node.kind === 'combine')
+  if (node.kind === "combine")
     return [combineOutputPort((node as CombineGraphNode).arity)];
   return NODE_META[node.kind].outputs();
 }

@@ -1,31 +1,33 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { useEffect, useRef } from 'react';
-import type { ImageGraphNode } from '../../../core/graph/types';
-import { useAssetStore } from '../../../state/assetStore';
+import { Handle, type NodeProps, Position } from "@xyflow/react";
+import { useEffect, useRef } from "react";
+import type { ImageGraphNode } from "../../../core/graph/types";
+import { useAssetStore } from "../../../state/assetStore";
 
 const THUMB_W = 96;
 const THUMB_H = 64;
 
 export function ImageNodeView({ id, data }: NodeProps) {
   const node = data.node as ImageGraphNode;
-  const asset = useAssetStore((s) => (node.assetId ? s.images[node.assetId] : undefined));
+  const asset = useAssetStore((s) =>
+    node.assetId ? s.images[node.assetId] : undefined,
+  );
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (asset?.bitmap) {
       ctx.drawImage(asset.bitmap, 0, 0, canvas.width, canvas.height);
     }
-  }, [asset?.bitmap, asset?.id]);
+  }, [asset?.bitmap]);
 
   return (
     <div className="node-card">
       <div className="node-card__header node-card__header--image">
-        Image{asset ? ` · ${truncate(asset.name, 14)}` : ''}
+        Image{asset ? ` · ${truncate(asset.name, 14)}` : ""}
       </div>
       <div className="node-card__body">
         {asset?.bitmap ? (
@@ -36,8 +38,8 @@ export function ImageNodeView({ id, data }: NodeProps) {
             style={{
               width: THUMB_W,
               height: THUMB_H,
-              display: 'block',
-              imageRendering: 'pixelated',
+              display: "block",
+              imageRendering: "pixelated",
               borderRadius: 2,
             }}
           />

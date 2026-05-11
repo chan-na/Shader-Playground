@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
 export interface TimeState {
   /** Simulated shader time in seconds — what u_time sees. */

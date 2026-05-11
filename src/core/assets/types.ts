@@ -1,4 +1,4 @@
-import type { MeshData } from '../gl/mesh';
+import type { MeshData } from "../gl/mesh";
 
 export interface GeometryHandle {
   id: string;

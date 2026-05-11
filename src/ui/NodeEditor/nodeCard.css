@@ -28,10 +28,18 @@
   border-top-right-radius: 6px;
 }
 
-.node-card__header--mesh   { background: rgba(86, 214, 152, 0.12); }
-.node-card__header--image  { background: rgba(214, 156, 86, 0.12); }
-.node-card__header--shader { background: rgba(86, 156, 214, 0.12); }
-.node-card__header--output { background: rgba(214, 86, 156, 0.12); }
+.node-card__header--mesh {
+  background: rgba(86, 214, 152, 0.12);
+}
+.node-card__header--image {
+  background: rgba(214, 156, 86, 0.12);
+}
+.node-card__header--shader {
+  background: rgba(86, 156, 214, 0.12);
+}
+.node-card__header--output {
+  background: rgba(214, 86, 156, 0.12);
+}
 
 .node-card__body {
   padding: 6px;
@@ -41,7 +49,11 @@
 }
 
 .node-card__meta {
-  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-family:
+    ui-monospace,
+    SF Mono,
+    Menlo,
+    monospace;
   font-size: 10px;
   color: #888;
   padding: 0 4px;
@@ -65,7 +77,11 @@
   position: absolute;
   font-size: 9px;
   color: #888;
-  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-family:
+    ui-monospace,
+    SF Mono,
+    Menlo,
+    monospace;
   pointer-events: none;
 }
 
@@ -79,7 +95,9 @@
   text-align: right;
 }
 
-.node-card__header--param  { background: rgba(214, 214, 86, 0.12); }
+.node-card__header--param {
+  background: rgba(214, 214, 86, 0.12);
+}
 
 .react-flow__handle {
   width: 8px;
@@ -87,15 +105,31 @@
   border: 2px solid #1e1e1e;
   background: #888;
 }
-.react-flow__handle.handle-mesh    { background: #56d698; }
-.react-flow__handle.handle-texture { background: #d69c56; }
-.react-flow__handle.handle-float   { background: #d6d656; }
-.react-flow__handle.handle-vec2    { background: #d6d656; }
-.react-flow__handle.handle-vec3    { background: #d6d656; }
-.react-flow__handle.handle-vec4    { background: #d6d656; }
+.react-flow__handle.handle-mesh {
+  background: #56d698;
+}
+.react-flow__handle.handle-texture {
+  background: #d69c56;
+}
+.react-flow__handle.handle-float {
+  background: #d6d656;
+}
+.react-flow__handle.handle-vec2 {
+  background: #d6d656;
+}
+.react-flow__handle.handle-vec3 {
+  background: #d6d656;
+}
+.react-flow__handle.handle-vec4 {
+  background: #d6d656;
+}
 
 .node-card__param-value {
-  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-family:
+    ui-monospace,
+    SF Mono,
+    Menlo,
+    monospace;
   font-size: 11px;
   color: #ddd;
   background: #1a1a1a;

@@ -1,12 +1,12 @@
-import { useCameraStore } from '../../state/cameraStore';
-import { useTimeStore } from '../../state/timeStore';
-import { useViewportStore } from '../../state/viewportStore';
+import { useCameraStore } from "../../state/cameraStore";
+import { useTimeStore } from "../../state/timeStore";
+import { useViewportStore } from "../../state/viewportStore";
 
 function rgbToHex(rgb: [number, number, number]) {
   const c = (v: number) =>
     Math.round(Math.max(0, Math.min(1, v)) * 255)
       .toString(16)
-      .padStart(2, '0');
+      .padStart(2, "0");
   return `#${c(rgb[0])}${c(rgb[1])}${c(rgb[2])}`;
 }
 
@@ -40,16 +40,16 @@ export function ViewportControls() {
       <div className="inspector-section">
         <div className="inspector-label">
           <span>Time</span>
-          <span style={{ color: '#666' }}>{time.toFixed(2)}s</span>
+          <span style={{ color: "#666" }}>{time.toFixed(2)}s</span>
         </div>
         <div className="inspector-row">
           <button
             className="btn-small"
             onClick={() => setPlaying(!playing)}
-            title={playing ? 'Pause (Space)' : 'Play (Space)'}
+            title={playing ? "Pause (Space)" : "Play (Space)"}
             data-testid="time-playpause"
           >
-            {playing ? '⏸ Pause' : '▶ Play'}
+            {playing ? "⏸ Pause" : "▶ Play"}
           </button>
           <button
             className="btn-small"
@@ -79,7 +79,7 @@ export function ViewportControls() {
           />
         </div>
         <div className="inspector-row">
-          <span style={{ width: 36, color: '#888', fontSize: 11 }}>Speed</span>
+          <span style={{ width: 36, color: "#888", fontSize: 11 }}>Speed</span>
           <input
             type="range"
             min={0}
@@ -89,7 +89,15 @@ export function ViewportControls() {
             onChange={(e) => setSpeed(parseFloat(e.target.value))}
             data-testid="time-speed"
           />
-          <span style={{ color: '#888', fontSize: 11, fontFamily: 'monospace', width: 36, textAlign: 'right' }}>
+          <span
+            style={{
+              color: "#888",
+              fontSize: 11,
+              fontFamily: "monospace",
+              width: 36,
+              textAlign: "right",
+            }}
+          >
             {speed.toFixed(2)}×
           </span>
         </div>
@@ -98,12 +106,16 @@ export function ViewportControls() {
       <div className="inspector-section">
         <div className="inspector-label">Camera</div>
         <div className="inspector-row">
-          <button className="btn-small" onClick={() => resetCamera()} title="Reset camera">
+          <button
+            className="btn-small"
+            onClick={() => resetCamera()}
+            title="Reset camera"
+          >
             ⟲ Reset camera
           </button>
         </div>
         <div className="inspector-row">
-          <span style={{ width: 36, color: '#888', fontSize: 11 }}>FOV</span>
+          <span style={{ width: 36, color: "#888", fontSize: 11 }}>FOV</span>
           <input
             type="range"
             min={10}
@@ -116,7 +128,15 @@ export function ViewportControls() {
             }}
             data-testid="camera-fov"
           />
-          <span style={{ color: '#888', fontSize: 11, fontFamily: 'monospace', width: 36, textAlign: 'right' }}>
+          <span
+            style={{
+              color: "#888",
+              fontSize: 11,
+              fontFamily: "monospace",
+              width: 36,
+              textAlign: "right",
+            }}
+          >
             {fovDeg.toFixed(0)}°
           </span>
         </div>
@@ -125,15 +145,19 @@ export function ViewportControls() {
       <div className="inspector-section">
         <div className="inspector-label">Viewport</div>
         <div className="inspector-row">
-          <span style={{ width: 56, color: '#888', fontSize: 11 }}>Background</span>
+          <span style={{ width: 56, color: "#888", fontSize: 11 }}>
+            Background
+          </span>
           <input
             type="color"
             value={rgbToHex(background)}
             onChange={(e) => setBackground(hexToRgb(e.target.value))}
             data-testid="bg-color"
           />
-          <span style={{ color: '#888', fontFamily: 'monospace', fontSize: 11 }}>
-            {background.map((x) => x.toFixed(2)).join(', ')}
+          <span
+            style={{ color: "#888", fontFamily: "monospace", fontSize: 11 }}
+          >
+            {background.map((x) => x.toFixed(2)).join(", ")}
           </span>
         </div>
       </div>

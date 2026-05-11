@@ -1,33 +1,37 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  ReactFlow,
+  applyNodeChanges,
   Background,
-  Controls,
-  MiniMap,
   type Connection,
+  Controls,
   type Edge,
+  type EdgeChange,
+  MiniMap,
   type Node,
   type NodeChange,
-  type EdgeChange,
+  ReactFlow,
   type ReactFlowInstance,
-  applyNodeChanges,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import './nodeCard.css';
+} from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import "@xyflow/react/dist/style.css";
+import "./nodeCard.css";
 
-import { useGraphStore } from '../../state/graphStore';
-import { useSelectionStore } from '../../state/selectionStore';
-import { importFiles } from '../../state/assetActions';
-import { Toolbar } from './Toolbar';
-import { MeshNodeView } from './nodes/MeshNodeView';
-import { ImageNodeView } from './nodes/ImageNodeView';
-import { ShaderNodeView } from './nodes/ShaderNodeView';
-import { OutputNodeView } from './nodes/OutputNodeView';
-import { ParamNodeView } from './nodes/ParamNodeView';
-import { MathNodeView, SwizzleNodeView, CombineNodeView } from './nodes/UtilityNodeViews';
-import { nodeInputPorts, nodeOutputPorts } from '../../core/nodes/registry';
-import { nextId } from '../../utils/id';
-import { validateGraph } from '../../core/graph/validate';
+import { validateGraph } from "../../core/graph/validate";
+import { nodeInputPorts, nodeOutputPorts } from "../../core/nodes/registry";
+import { importFiles } from "../../state/assetActions";
+import { useGraphStore } from "../../state/graphStore";
+import { useSelectionStore } from "../../state/selectionStore";
+import { nextId } from "../../utils/id";
+import { ImageNodeView } from "./nodes/ImageNodeView";
+import { MeshNodeView } from "./nodes/MeshNodeView";
+import { OutputNodeView } from "./nodes/OutputNodeView";
+import { ParamNodeView } from "./nodes/ParamNodeView";
+import { ShaderNodeView } from "./nodes/ShaderNodeView";
+import {
+  CombineNodeView,
+  MathNodeView,
+  SwizzleNodeView,
+} from "./nodes/UtilityNodeViews";
+import { Toolbar } from "./Toolbar";
 
 const nodeTypes = {
   mesh: MeshNodeView,
@@ -62,7 +66,12 @@ export function NodeEditor() {
     if (graphNodes.length === 0) return;
     // Defer to next frame so the new node DOM has measured dimensions.
     const id = requestAnimationFrame(() => {
-      inst.fitView({ padding: 0.15, minZoom: 0.2, maxZoom: 1.0, duration: 200 });
+      inst.fitView({
+        padding: 0.15,
+        minZoom: 0.2,
+        maxZoom: 1.0,
+        duration: 200,
+      });
     });
     prevCountRef.current = graphNodes.length;
     return () => cancelAnimationFrame(id);
@@ -88,7 +97,7 @@ export function NodeEditor() {
         target: e.target,
         targetHandle: e.targetHandle,
         animated: false,
-        style: { stroke: '#888' },
+        style: { stroke: "#888" },
       })),
     [graphEdges],
   );
@@ -98,11 +107,11 @@ export function NodeEditor() {
       const updated = applyNodeChanges(changes, rfNodes);
       // Persist position drags + removals
       for (const c of changes) {
-        if (c.type === 'position' && c.position) {
+        if (c.type === "position" && c.position) {
           updateNodePosition(c.id, { x: c.position.x, y: c.position.y });
-        } else if (c.type === 'remove') {
+        } else if (c.type === "remove") {
           removeNode(c.id);
-        } else if (c.type === 'select') {
+        } else if (c.type === "select") {
           if (c.selected) select(c.id);
         }
       }
@@ -114,7 +123,7 @@ export function NodeEditor() {
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       for (const c of changes) {
-        if (c.type === 'remove') removeEdge(c.id);
+        if (c.type === "remove") removeEdge(c.id);
       }
     },
     [removeEdge],
@@ -122,7 +131,13 @@ export function NodeEditor() {
 
   const onConnect = useCallback(
     (conn: Connection) => {
-      if (!conn.source || !conn.target || !conn.sourceHandle || !conn.targetHandle) return;
+      if (
+        !conn.source ||
+        !conn.target ||
+        !conn.sourceHandle ||
+        !conn.targetHandle
+      )
+        return;
 
       // N:1 enforcement: refuse if target handle already has an edge
       const inUse = graphEdges.some(
@@ -134,8 +149,12 @@ export function NodeEditor() {
       const srcNode = graphNodes.find((n) => n.id === conn.source);
       const tgtNode = graphNodes.find((n) => n.id === conn.target);
       if (!srcNode || !tgtNode) return;
-      const srcOut = nodeOutputPorts(srcNode).find((p) => p.name === conn.sourceHandle);
-      const tgtIn = nodeInputPorts(tgtNode).find((p) => p.name === conn.targetHandle);
+      const srcOut = nodeOutputPorts(srcNode).find(
+        (p) => p.name === conn.sourceHandle,
+      );
+      const tgtIn = nodeInputPorts(tgtNode).find(
+        (p) => p.name === conn.targetHandle,
+      );
       if (!srcOut || !tgtIn || srcOut.type !== tgtIn.type) return;
 
       // Cycle check on a hypothetical graph
@@ -144,7 +163,7 @@ export function NodeEditor() {
         edges: [
           ...graphEdges,
           {
-            id: nextId('e'),
+            id: nextId("e"),
             source: conn.source,
             sourceHandle: conn.sourceHandle,
             target: conn.target,
@@ -152,7 +171,7 @@ export function NodeEditor() {
           },
         ],
       };
-      if (validateGraph(tentative).some((e) => e.code === 'cycle')) return;
+      if (validateGraph(tentative).some((e) => e.code === "cycle")) return;
 
       addEdge(tentative.edges[tentative.edges.length - 1]);
     },
@@ -162,12 +181,17 @@ export function NodeEditor() {
   const isValidConnection = useCallback(
     (conn: Connection | Edge) => {
       const c = conn as Connection;
-      if (!c.source || !c.target || !c.sourceHandle || !c.targetHandle) return false;
+      if (!c.source || !c.target || !c.sourceHandle || !c.targetHandle)
+        return false;
       const srcNode = graphNodes.find((n) => n.id === c.source);
       const tgtNode = graphNodes.find((n) => n.id === c.target);
       if (!srcNode || !tgtNode) return false;
-      const srcOut = nodeOutputPorts(srcNode).find((p) => p.name === c.sourceHandle);
-      const tgtIn = nodeInputPorts(tgtNode).find((p) => p.name === c.targetHandle);
+      const srcOut = nodeOutputPorts(srcNode).find(
+        (p) => p.name === c.sourceHandle,
+      );
+      const tgtIn = nodeInputPorts(tgtNode).find(
+        (p) => p.name === c.targetHandle,
+      );
       if (!srcOut || !tgtIn) return false;
       return srcOut.type === tgtIn.type;
     },
@@ -175,9 +199,9 @@ export function NodeEditor() {
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer?.types.includes('Files')) {
+    if (e.dataTransfer?.types.includes("Files")) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
+      e.dataTransfer.dropEffect = "copy";
     }
   }, []);
 
@@ -196,7 +220,7 @@ export function NodeEditor() {
     <div className="panel panel--graph" onDragOver={onDragOver} onDrop={onDrop}>
       <div className="panel-header">Node Graph</div>
       <Toolbar />
-      <div className="panel-body" style={{ background: '#1a1a1a' }}>
+      <div className="panel-body" style={{ background: "#1a1a1a" }}>
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
@@ -220,19 +244,24 @@ export function NodeEditor() {
             zoomable
             nodeColor={(n) => {
               switch ((n as Node).type) {
-                case 'mesh':   return '#56d698';
-                case 'image':  return '#d69c56';
-                case 'shader': return '#569cd6';
-                case 'output': return '#d6569c';
-                case 'param':  return '#d6d656';
-                default: return '#888';
+                case "mesh":
+                  return "#56d698";
+                case "image":
+                  return "#d69c56";
+                case "shader":
+                  return "#569cd6";
+                case "output":
+                  return "#d6569c";
+                case "param":
+                  return "#d6d656";
+                default:
+                  return "#888";
               }
             }}
-            style={{ background: '#252526' }}
+            style={{ background: "#252526" }}
           />
         </ReactFlow>
       </div>
     </div>
   );
 }
-

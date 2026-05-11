@@ -1,14 +1,14 @@
-import { useMemo } from 'react';
-import { useDiagnosticsStore } from '../../state/diagnosticsStore';
-import { useRendererStore } from '../../state/rendererStore';
-import { useGraphStore } from '../../state/graphStore';
-import { useSelectionStore } from '../../state/selectionStore';
-import { useEditorStore } from '../../state/editorStore';
-import type { GLSLDiagnostic } from '../../core/graph/diagnostics';
+import { useMemo } from "react";
+import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useEditorStore } from "../../state/editorStore";
+import { useGraphStore } from "../../state/graphStore";
+import { useRendererStore } from "../../state/rendererStore";
+import { useSelectionStore } from "../../state/selectionStore";
 
 interface Entry {
   nodeId: string;
-  stage: 'vertex' | 'fragment' | 'link';
+  stage: "vertex" | "fragment" | "link";
   diag: GLSLDiagnostic;
 }
 
@@ -23,9 +23,11 @@ export function ProblemsPanel() {
   const entries: Entry[] = useMemo(() => {
     const out: Entry[] = [];
     for (const [nodeId, diags] of Object.entries(byNode)) {
-      for (const d of diags.vertex) out.push({ nodeId, stage: 'vertex', diag: d });
-      for (const d of diags.fragment) out.push({ nodeId, stage: 'fragment', diag: d });
-      for (const d of diags.link) out.push({ nodeId, stage: 'link', diag: d });
+      for (const d of diags.vertex)
+        out.push({ nodeId, stage: "vertex", diag: d });
+      for (const d of diags.fragment)
+        out.push({ nodeId, stage: "fragment", diag: d });
+      for (const d of diags.link) out.push({ nodeId, stage: "link", diag: d });
     }
     return out;
   }, [byNode]);
@@ -37,8 +39,8 @@ export function ProblemsPanel() {
 
   const goTo = (entry: Entry) => {
     select(entry.nodeId);
-    const targetStage: 'vertex' | 'fragment' =
-      entry.stage === 'link' ? 'fragment' : entry.stage;
+    const targetStage: "vertex" | "fragment" =
+      entry.stage === "link" ? "fragment" : entry.stage;
     setStage(targetStage);
     requestJump({
       nodeId: entry.nodeId,
@@ -49,25 +51,34 @@ export function ProblemsPanel() {
   };
 
   return (
-    <div className="panel-body" style={{ overflowY: 'auto' }}>
+    <div className="panel-body" style={{ overflowY: "auto" }}>
       {entries.length === 0 && runtimeErrors.length === 0 && (
         <div className="inspector-empty">No problems</div>
       )}
       {runtimeErrors.length > 0 && (
         <div className="inspector-section">
-          <div className="inspector-label">Runtime errors ({runtimeErrors.length})</div>
+          <div className="inspector-label">
+            Runtime errors ({runtimeErrors.length})
+          </div>
           {runtimeErrors.map((e, i) => (
-            <div key={i} className="problem-row" style={{ color: '#ff8484' }}>
-              <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{e}</span>
+            <div key={i} className="problem-row" style={{ color: "#ff8484" }}>
+              <span style={{ fontFamily: "monospace", fontSize: 11 }}>{e}</span>
             </div>
           ))}
         </div>
       )}
       {entries.length > 0 && (
         <div className="inspector-section">
-          <div className="inspector-label">Shader diagnostics ({entries.length})</div>
+          <div className="inspector-label">
+            Shader diagnostics ({entries.length})
+          </div>
           {entries.map((e, i) => {
-            const color = e.diag.severity === 'error' ? '#ff8484' : e.diag.severity === 'warning' ? '#dcc46c' : '#7aa6e8';
+            const color =
+              e.diag.severity === "error"
+                ? "#ff8484"
+                : e.diag.severity === "warning"
+                  ? "#dcc46c"
+                  : "#7aa6e8";
             return (
               <div
                 key={i}
@@ -75,14 +86,30 @@ export function ProblemsPanel() {
                 onClick={() => goTo(e)}
                 title="Jump to source"
               >
-                <span style={{ color, fontFamily: 'monospace', fontSize: 11, marginRight: 6 }}>
+                <span
+                  style={{
+                    color,
+                    fontFamily: "monospace",
+                    fontSize: 11,
+                    marginRight: 6,
+                  }}
+                >
                   ●
                 </span>
-                <span style={{ color: '#bbb', fontSize: 11 }}>
-                  <strong>{nodeLabel(e.nodeId)}</strong> · {e.stage}:{e.diag.line}
-                  {e.diag.column !== undefined ? `:${e.diag.column}` : ''}
+                <span style={{ color: "#bbb", fontSize: 11 }}>
+                  <strong>{nodeLabel(e.nodeId)}</strong> · {e.stage}:
+                  {e.diag.line}
+                  {e.diag.column !== undefined ? `:${e.diag.column}` : ""}
                 </span>
-                <div style={{ color: '#ddd', fontSize: 12, marginTop: 2, paddingLeft: 14, wordBreak: 'break-word' }}>
+                <div
+                  style={{
+                    color: "#ddd",
+                    fontSize: 12,
+                    marginTop: 2,
+                    paddingLeft: 14,
+                    wordBreak: "break-word",
+                  }}
+                >
                   {e.diag.message}
                 </div>
               </div>

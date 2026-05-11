@@ -1,10 +1,10 @@
-import type { GeometryHandle, ImageHandle } from './types';
-import type { MeshData, MeshAttribute } from '../gl/mesh';
+import type { MeshAttribute, MeshData } from "../gl/mesh";
+import type { GeometryHandle, ImageHandle } from "./types";
 
-const DB_NAME = 'shader-playground';
+const DB_NAME = "shader-playground";
 const DB_VERSION = 1;
-const STORE_MESH = 'meshes';
-const STORE_IMAGE = 'images';
+const STORE_MESH = "meshes";
+const STORE_IMAGE = "images";
 
 interface SerializedAttribute {
   name: string;
@@ -32,15 +32,17 @@ let _dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
   if (_dbPromise) return _dbPromise;
-  if (typeof indexedDB === 'undefined') {
-    return Promise.reject(new Error('IndexedDB not available'));
+  if (typeof indexedDB === "undefined") {
+    return Promise.reject(new Error("IndexedDB not available"));
   }
   _dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_MESH)) db.createObjectStore(STORE_MESH, { keyPath: 'id' });
-      if (!db.objectStoreNames.contains(STORE_IMAGE)) db.createObjectStore(STORE_IMAGE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_MESH))
+        db.createObjectStore(STORE_MESH, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(STORE_IMAGE))
+        db.createObjectStore(STORE_IMAGE, { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -66,7 +68,10 @@ function serializeMesh(handle: GeometryHandle): SerializedMesh {
     vertexCount: handle.data.vertexCount,
     attributes: handle.data.attributes.map((a) => ({
       name: a.name,
-      data: a.data.buffer.slice(a.data.byteOffset, a.data.byteOffset + a.data.byteLength),
+      data: a.data.buffer.slice(
+        a.data.byteOffset,
+        a.data.byteOffset + a.data.byteLength,
+      ),
       size: a.size,
     })),
     indices: handle.data.indices
@@ -102,7 +107,9 @@ function deserializeMesh(record: SerializedMesh): GeometryHandle {
 
 export async function cacheMesh(handle: GeometryHandle): Promise<void> {
   const db = await openDb();
-  await awaitRequest(tx(db, STORE_MESH, 'readwrite').put(serializeMesh(handle)));
+  await awaitRequest(
+    tx(db, STORE_MESH, "readwrite").put(serializeMesh(handle)),
+  );
 }
 
 export async function cacheImage(
@@ -117,14 +124,16 @@ export async function cacheImage(
     height: handle.height,
     blob,
   };
-  await awaitRequest(tx(db, STORE_IMAGE, 'readwrite').put(record));
+  await awaitRequest(tx(db, STORE_IMAGE, "readwrite").put(record));
 }
 
-export async function loadCachedMesh(id: string): Promise<GeometryHandle | null> {
+export async function loadCachedMesh(
+  id: string,
+): Promise<GeometryHandle | null> {
   try {
     const db = await openDb();
     const record = await awaitRequest<SerializedMesh | undefined>(
-      tx(db, STORE_MESH, 'readonly').get(id),
+      tx(db, STORE_MESH, "readonly").get(id),
     );
     return record ? deserializeMesh(record) : null;
   } catch {
@@ -139,10 +148,12 @@ export async function loadCachedImage(id: string): Promise<{
   try {
     const db = await openDb();
     const record = await awaitRequest<SerializedImage | undefined>(
-      tx(db, STORE_IMAGE, 'readonly').get(id),
+      tx(db, STORE_IMAGE, "readonly").get(id),
     );
     if (!record) return null;
-    const bitmap = await createImageBitmap(record.blob, { premultiplyAlpha: 'none' });
+    const bitmap = await createImageBitmap(record.blob, {
+      premultiplyAlpha: "none",
+    });
     const handle: ImageHandle = {
       id: record.id,
       name: record.name,
@@ -156,19 +167,22 @@ export async function loadCachedImage(id: string): Promise<{
   }
 }
 
-export async function listCachedIds(): Promise<{ meshes: string[]; images: string[] }> {
+export async function listCachedIds(): Promise<{
+  meshes: string[];
+  images: string[];
+}> {
   const db = await openDb();
   const meshes = (await awaitRequest<IDBValidKey[]>(
-    tx(db, STORE_MESH, 'readonly').getAllKeys(),
+    tx(db, STORE_MESH, "readonly").getAllKeys(),
   )) as string[];
   const images = (await awaitRequest<IDBValidKey[]>(
-    tx(db, STORE_IMAGE, 'readonly').getAllKeys(),
+    tx(db, STORE_IMAGE, "readonly").getAllKeys(),
   )) as string[];
   return { meshes, images };
 }
 
 export async function clearCache(): Promise<void> {
   const db = await openDb();
-  await awaitRequest(tx(db, STORE_MESH, 'readwrite').clear());
-  await awaitRequest(tx(db, STORE_IMAGE, 'readwrite').clear());
+  await awaitRequest(tx(db, STORE_MESH, "readwrite").clear());
+  await awaitRequest(tx(db, STORE_IMAGE, "readwrite").clear());
 }

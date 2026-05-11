@@ -1,5 +1,5 @@
-import type { Framebuffer } from '../gl/framebuffer';
-import { THUMB_SIZE, downsampleToThumb } from './readback';
+import type { Framebuffer } from "../gl/framebuffer";
+import { downsampleToThumb, THUMB_SIZE } from "./readback";
 
 /**
  * Async FBO readback using WebGL2 PBO + fenceSync. Per nodeId, at most one
@@ -42,11 +42,18 @@ export class AsyncThumbnailReadback {
     fb: Framebuffer,
   ): boolean {
     let slot = this.slots.get(nodeId);
-    if (slot && slot.pending) return false;
+    if (slot?.pending) return false;
     if (!slot) {
       const pbo = gl.createBuffer();
       if (!pbo) return false;
-      slot = { pbo, sync: null, width: 0, height: 0, pending: false, requestedAt: 0 };
+      slot = {
+        pbo,
+        sync: null,
+        width: 0,
+        height: 0,
+        pending: false,
+        requestedAt: 0,
+      };
       this.slots.set(nodeId, slot);
     }
     const w = fb.width;
@@ -69,7 +76,8 @@ export class AsyncThumbnailReadback {
     if (slot.sync) gl.deleteSync(slot.sync);
     slot.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     slot.pending = true;
-    slot.requestedAt = typeof performance !== 'undefined' ? performance.now() : 0;
+    slot.requestedAt =
+      typeof performance !== "undefined" ? performance.now() : 0;
     return true;
   }
 

@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { splitLayout } from './execute';
+import { describe, expect, it } from "vitest";
+import { splitLayout } from "./execute";
 
-describe('splitLayout', () => {
-  it('1 → full canvas', () => {
+describe("splitLayout", () => {
+  it("1 → full canvas", () => {
     const cells = splitLayout(1, 800, 600);
     expect(cells).toEqual([{ x: 0, y: 0, w: 800, h: 600 }]);
   });
 
-  it('2 → left/right halves', () => {
+  it("2 → left/right halves", () => {
     const cells = splitLayout(2, 800, 600);
     expect(cells).toHaveLength(2);
     expect(cells[0].x).toBe(0);
@@ -16,7 +16,7 @@ describe('splitLayout', () => {
     expect(cells[0].h).toBe(600);
   });
 
-  it('3 → 2 on top, 1 below', () => {
+  it("3 → 2 on top, 1 below", () => {
     const cells = splitLayout(3, 800, 600);
     expect(cells).toHaveLength(3);
     // Top cells split horizontally
@@ -29,7 +29,7 @@ describe('splitLayout', () => {
     expect(cells[2].y).toBe(0);
   });
 
-  it('4 → 2×2 grid', () => {
+  it("4 → 2×2 grid", () => {
     const cells = splitLayout(4, 800, 600);
     expect(cells).toHaveLength(4);
     // Each cell ~400×300
@@ -39,11 +39,11 @@ describe('splitLayout', () => {
     }
   });
 
-  it('5+ clamps to 4', () => {
+  it("5+ clamps to 4", () => {
     expect(splitLayout(7, 800, 600)).toHaveLength(4);
   });
 
-  it('odd canvas sizes still tile losslessly horizontally', () => {
+  it("odd canvas sizes still tile losslessly horizontally", () => {
     const cells = splitLayout(2, 801, 600);
     expect(cells[0].w + cells[1].w).toBe(801);
   });

@@ -1,11 +1,11 @@
-import { useGraphStore } from './graphStore';
-import { serializeProject, type SerializedProject } from './serialization';
-import { debounce } from '../utils/debounce';
+import { debounce } from "../utils/debounce";
+import { useGraphStore } from "./graphStore";
+import { type SerializedProject, serializeProject } from "./serialization";
 
-const DB_NAME = 'shader-playground-session';
+const DB_NAME = "shader-playground-session";
 const DB_VERSION = 1;
-const STORE = 'session';
-const KEY = 'autosave';
+const STORE = "session";
+const KEY = "autosave";
 
 export const AUTOSAVE_DEBOUNCE_MS = 30_000;
 
@@ -13,8 +13,8 @@ let _dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
   if (_dbPromise) return _dbPromise;
-  if (typeof indexedDB === 'undefined') {
-    return Promise.reject(new Error('IndexedDB not available'));
+  if (typeof indexedDB === "undefined") {
+    return Promise.reject(new Error("IndexedDB not available"));
   }
   _dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -37,14 +37,14 @@ function awaitRequest<T>(req: IDBRequest<T>): Promise<T> {
 
 export async function saveSession(payload: SerializedProject): Promise<void> {
   const db = await openDb();
-  const tx = db.transaction(STORE, 'readwrite').objectStore(STORE);
+  const tx = db.transaction(STORE, "readwrite").objectStore(STORE);
   await awaitRequest(tx.put(payload, KEY));
 }
 
 export async function loadSession(): Promise<SerializedProject | null> {
   try {
     const db = await openDb();
-    const tx = db.transaction(STORE, 'readonly').objectStore(STORE);
+    const tx = db.transaction(STORE, "readonly").objectStore(STORE);
     const v = await awaitRequest<SerializedProject | undefined>(tx.get(KEY));
     return v ?? null;
   } catch {
@@ -55,7 +55,7 @@ export async function loadSession(): Promise<SerializedProject | null> {
 export async function clearSession(): Promise<void> {
   try {
     const db = await openDb();
-    const tx = db.transaction(STORE, 'readwrite').objectStore(STORE);
+    const tx = db.transaction(STORE, "readwrite").objectStore(STORE);
     await awaitRequest(tx.delete(KEY));
   } catch {
     /* swallow — best-effort cleanup */

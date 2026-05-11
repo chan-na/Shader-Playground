@@ -4,7 +4,7 @@ export type UniformValue =
   | [number, number, number]
   | [number, number, number, number]
   | Float32Array
-  | { kind: 'sampler2D'; texture: WebGLTexture; unit: number };
+  | { kind: "sampler2D"; texture: WebGLTexture; unit: number };
 
 export function setUniform(
   gl: WebGL2RenderingContext,
@@ -12,7 +12,7 @@ export function setUniform(
   value: UniformValue,
 ) {
   if (loc === null) return;
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     gl.uniform1f(loc, value);
     return;
   }
@@ -39,7 +39,11 @@ export function setUniform(
     }
     return;
   }
-  if (typeof value === 'object' && 'kind' in value && value.kind === 'sampler2D') {
+  if (
+    typeof value === "object" &&
+    "kind" in value &&
+    value.kind === "sampler2D"
+  ) {
     gl.activeTexture(gl.TEXTURE0 + value.unit);
     gl.bindTexture(gl.TEXTURE_2D, value.texture);
     gl.uniform1i(loc, value.unit);

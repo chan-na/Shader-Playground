@@ -1,19 +1,23 @@
-import { deserializeProject, serializeProject, type SerializedProject } from './serialization';
-import type { Graph } from '../core/graph/types';
-import type { NodePosition } from './graphStore';
+import type { Graph } from "../core/graph/types";
+import type { NodePosition } from "./graphStore";
+import {
+  deserializeProject,
+  type SerializedProject,
+  serializeProject,
+} from "./serialization";
 
 /**
  * URL-safe base64 round-trip helpers (no padding, replacing +/ with -_).
  */
 function bytesToBase64Url(bytes: Uint8Array): string {
-  let s = '';
+  let s = "";
   for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function base64UrlToBytes(b64: string): Uint8Array {
-  const norm = b64.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = norm + '=='.slice(0, (4 - (norm.length % 4)) % 4);
+  const norm = b64.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = norm + "==".slice(0, (4 - (norm.length % 4)) % 4);
   const bin = atob(padded);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
@@ -23,17 +27,17 @@ function base64UrlToBytes(b64: string): Uint8Array {
 async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
   // CompressionStream is supported in all evergreen browsers (Chrome 80+,
   // Firefox 113+, Safari 16.4+). Fall back to passthrough if missing.
-  if (typeof CompressionStream === 'undefined') return bytes;
-  const cs = new CompressionStream('gzip');
-  const stream = new Response(bytes).body!.pipeThrough(cs);
+  if (typeof CompressionStream === "undefined") return bytes;
+  const cs = new CompressionStream("gzip");
+  const stream = new Response(bytes).body?.pipeThrough(cs);
   const buf = await new Response(stream).arrayBuffer();
   return new Uint8Array(buf);
 }
 
 async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
-  if (typeof DecompressionStream === 'undefined') return bytes;
-  const ds = new DecompressionStream('gzip');
-  const stream = new Response(bytes).body!.pipeThrough(ds);
+  if (typeof DecompressionStream === "undefined") return bytes;
+  const ds = new DecompressionStream("gzip");
+  const stream = new Response(bytes).body?.pipeThrough(ds);
   const buf = await new Response(stream).arrayBuffer();
   return new Uint8Array(buf);
 }
@@ -52,7 +56,11 @@ export async function encodeShareUrl(
   const bytes = new TextEncoder().encode(json);
   const compressed = await gzip(bytes);
   const payload = bytesToBase64Url(compressed);
-  const base = origin ?? (typeof location !== 'undefined' ? `${location.origin}${location.pathname}` : '');
+  const base =
+    origin ??
+    (typeof location !== "undefined"
+      ? `${location.origin}${location.pathname}`
+      : "");
   return `${base}#share=${payload}`;
 }
 
@@ -74,7 +82,12 @@ export async function decodeShareHash(hash: string): Promise<{
     const json = new TextDecoder().decode(decompressed);
     const project = JSON.parse(json) as SerializedProject;
     const parsed = deserializeProject(project);
-    return { project, graph: parsed.graph, positions: parsed.positions, warnings: parsed.warnings };
+    return {
+      project,
+      graph: parsed.graph,
+      positions: parsed.positions,
+      warnings: parsed.warnings,
+    };
   } catch {
     return null;
   }

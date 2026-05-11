@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { useRendererStore } from './rendererStore';
+import { beforeEach, describe, expect, it } from "vitest";
+import { useRendererStore } from "./rendererStore";
 
-describe('rendererStore', () => {
+describe("rendererStore", () => {
   beforeEach(() => {
     useRendererStore.setState({
       ready: false,
@@ -9,14 +9,14 @@ describe('rendererStore', () => {
     });
   });
 
-  it('setReady toggles ready flag', () => {
+  it("setReady toggles ready flag", () => {
     useRendererStore.getState().setReady(true);
     expect(useRendererStore.getState().ready).toBe(true);
     useRendererStore.getState().setReady(false);
     expect(useRendererStore.getState().ready).toBe(false);
   });
 
-  it('setStats merges partial stats', () => {
+  it("setStats merges partial stats", () => {
     useRendererStore.getState().setStats({ fps: 60 });
     useRendererStore.getState().setStats({ frame: 1024 });
     const { fps, frame, drawCalls } = useRendererStore.getState().stats;
@@ -25,10 +25,10 @@ describe('rendererStore', () => {
     expect(drawCalls).toBe(0);
   });
 
-  it('pushError appends and clearErrors resets', () => {
-    useRendererStore.getState().pushError('boom');
-    useRendererStore.getState().pushError('bang');
-    expect(useRendererStore.getState().stats.errors).toEqual(['boom', 'bang']);
+  it("pushError appends and clearErrors resets", () => {
+    useRendererStore.getState().pushError("boom");
+    useRendererStore.getState().pushError("bang");
+    expect(useRendererStore.getState().stats.errors).toEqual(["boom", "bang"]);
     useRendererStore.getState().clearErrors();
     expect(useRendererStore.getState().stats.errors).toEqual([]);
   });

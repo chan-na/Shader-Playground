@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createAutoSaveScheduler } from './autoSave';
-import type { SerializedProject } from './serialization';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createAutoSaveScheduler } from "./autoSave";
+import type { SerializedProject } from "./serialization";
 
 function makeFakeStore(initialRev = 0) {
   let rev = initialRev;
@@ -14,7 +14,7 @@ function makeFakeStore(initialRev = 0) {
     for (const cb of listeners) cb();
   };
   const payload = (): SerializedProject => ({
-    format: 'shader-playground',
+    format: "shader-playground",
     version: 1,
     exportedAt: new Date(0).toISOString(),
     graph: { nodes: [], edges: [] },
@@ -27,7 +27,7 @@ function makeFakeStore(initialRev = 0) {
   };
 }
 
-describe('createAutoSaveScheduler', () => {
+describe("createAutoSaveScheduler", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -35,7 +35,7 @@ describe('createAutoSaveScheduler', () => {
     vi.useRealTimers();
   });
 
-  it('does not save before the debounce window elapses', () => {
+  it("does not save before the debounce window elapses", () => {
     const store = makeFakeStore();
     const persist = vi.fn().mockResolvedValue(undefined);
     const handle = createAutoSaveScheduler({
@@ -49,7 +49,7 @@ describe('createAutoSaveScheduler', () => {
     handle.stop();
   });
 
-  it('saves once after the debounce window elapses', async () => {
+  it("saves once after the debounce window elapses", async () => {
     const store = makeFakeStore();
     const persist = vi.fn().mockResolvedValue(undefined);
     const handle = createAutoSaveScheduler({
@@ -64,7 +64,7 @@ describe('createAutoSaveScheduler', () => {
     handle.stop();
   });
 
-  it('coalesces rapid updates within the window into one save', async () => {
+  it("coalesces rapid updates within the window into one save", async () => {
     const store = makeFakeStore();
     const persist = vi.fn().mockResolvedValue(undefined);
     const handle = createAutoSaveScheduler({
@@ -83,7 +83,7 @@ describe('createAutoSaveScheduler', () => {
     handle.stop();
   });
 
-  it('does not save when the rev has not changed (initial bootstrap)', () => {
+  it("does not save when the rev has not changed (initial bootstrap)", () => {
     const store = makeFakeStore(7);
     const persist = vi.fn().mockResolvedValue(undefined);
     const handle = createAutoSaveScheduler({
@@ -97,7 +97,7 @@ describe('createAutoSaveScheduler', () => {
     handle.stop();
   });
 
-  it('flush() forces a pending save to fire immediately', async () => {
+  it("flush() forces a pending save to fire immediately", async () => {
     const store = makeFakeStore();
     const persist = vi.fn().mockResolvedValue(undefined);
     const handle = createAutoSaveScheduler({
@@ -111,7 +111,7 @@ describe('createAutoSaveScheduler', () => {
     handle.stop();
   });
 
-  it('updates lastSavedRev to the rev that was persisted', async () => {
+  it("updates lastSavedRev to the rev that was persisted", async () => {
     const store = makeFakeStore();
     const persist = vi.fn().mockResolvedValue(undefined);
     const handle = createAutoSaveScheduler({
@@ -127,7 +127,7 @@ describe('createAutoSaveScheduler', () => {
     handle.stop();
   });
 
-  it('stop() cancels a pending debounce', () => {
+  it("stop() cancels a pending debounce", () => {
     const store = makeFakeStore();
     const persist = vi.fn().mockResolvedValue(undefined);
     const handle = createAutoSaveScheduler({

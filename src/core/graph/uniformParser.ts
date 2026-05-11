@@ -83,6 +83,12 @@ export interface UniformHints {
   step?: number;
   defaultValue?: number | number[];
   label?: string;
+  /**
+   * Explicit control override. `@color` forces the color picker even when the
+   * uniform name does not match the color-name pattern; `@slider` / `@multi`
+   * forces a numeric layout even when the name would have inferred a color.
+   */
+  control?: 'color' | 'slider' | 'multi';
 }
 
 /**
@@ -98,6 +104,7 @@ export interface UniformHints {
  *   @step S
  *   @default V or @default V1,V2,V3
  *   @label "Human readable"
+ *   @color  | @slider | @multi   (override the name-based control inference)
  */
 export function parseHintComment(text: string): UniformHints {
   const hints: UniformHints = {};
@@ -139,23 +146,80 @@ export function parseHintComment(text: string): UniformHints {
     if (v) hints.label = v;
   }
 
+  // Explicit control override. Last-write-wins so `@slider` after `@color`
+  // (or vice versa) on the same line behaves predictably.
+  const controlOrder: Array<{ re: RegExp; value: UniformHints['control'] }> = [
+    { re: /@color\b/g, value: 'color' },
+    { re: /@slider\b/g, value: 'slider' },
+    { re: /@multi\b/g, value: 'multi' },
+  ];
+  let bestIndex = -1;
+  for (const { re, value } of controlOrder) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > bestIndex) {
+        bestIndex = m.index;
+        hints.control = value;
+      }
+    }
+  }
+
   return hints;
 }
 
 function applyHints(spec: UniformSpec, hints: UniformHints): UniformSpec {
-  const out = { ...spec };
+  let out = { ...spec };
+
+  // Apply control override first so range/default fixups below match the
+  // chosen control. Only valid for non-sampler, non-matrix, non-bool specs.
+  if (
+    hints.control &&
+    spec.control !== 'sampler' &&
+    spec.control !== 'matrix' &&
+    spec.control !== 'bool'
+  ) {
+    if (hints.control === 'color' && (spec.type === 'vec3' || spec.type === 'vec4')) {
+      out.control = 'color';
+      // If the previous inference didn't already treat this as a color, the
+      // default range was the generic [-1,1] with a zero vector; promote it
+      // to the color-friendly [0,1] white default.
+      if (spec.control !== 'color') {
+        out.min = 0;
+        out.max = 1;
+        out.step = 0.001;
+        const len = spec.type === 'vec4' ? 4 : 3;
+        out.defaultValue = new Array(len).fill(1);
+      }
+    } else if (hints.control === 'slider' && spec.type === 'float') {
+      out.control = 'slider';
+    } else if (
+      hints.control === 'multi' &&
+      (spec.type === 'vec2' || spec.type === 'vec3' || spec.type === 'vec4')
+    ) {
+      out.control = 'multi';
+      // Switching color → multi reverts to the generic numeric range.
+      if (spec.control === 'color') {
+        out.min = -1;
+        out.max = 1;
+        out.step = 0.002;
+        const len = VEC_LEN[spec.type] ?? 3;
+        out.defaultValue = new Array(len).fill(0);
+      }
+    }
+  }
+
   if (hints.min !== undefined) out.min = hints.min;
   if (hints.max !== undefined) out.max = hints.max;
   if (hints.step !== undefined) out.step = hints.step;
   if (hints.label !== undefined) out.label = hints.label;
   if (hints.defaultValue !== undefined) {
-    if (Array.isArray(spec.defaultValue) && Array.isArray(hints.defaultValue)) {
-      const target = spec.defaultValue.slice();
+    if (Array.isArray(out.defaultValue) && Array.isArray(hints.defaultValue)) {
+      const target = out.defaultValue.slice();
       for (let i = 0; i < target.length; i++) {
         if (hints.defaultValue[i] !== undefined) target[i] = hints.defaultValue[i];
       }
       out.defaultValue = target;
-    } else if (typeof spec.defaultValue === 'number' && typeof hints.defaultValue === 'number') {
+    } else if (typeof out.defaultValue === 'number' && typeof hints.defaultValue === 'number') {
       out.defaultValue = hints.defaultValue;
     }
   }

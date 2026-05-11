@@ -137,6 +137,9 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 | **ShaderNode** | `mesh: GeometryHandle?`, `samplers: TextureHandle[]`, `uniforms: scalar/vec` (자동 추출, 비-샘플러 uniform 도 입력 포트로 노출) | `texture: TextureHandle` (FBO 컬러 어태치먼트) |
 | **OutputNode** (명시적, 최대 4개 — Phase 10) | `texture: TextureHandle` × 1 | (캔버스 출력) |
 | **ParamNode** (Phase 10) — `float` / `vec3` / `color` / `time` | (없음) | `value: float | vec3` (kind 별 결정) |
+| **MathNode** (Phase 12) — `op: add/sub/mul/div/pow/abs/sin/cos` | `a: float`, `b: float` (단항 op 는 `a` 만 노출) | `value: float` |
+| **SwizzleNode** (Phase 12) — `mask: x/y/z/w 1~4글자` | `in: vec4` (스칼라는 broadcast) | `value: float\|vec2\|vec3\|vec4` (mask 길이) |
+| **CombineNode** (Phase 12) — `arity: 2\|3\|4` | `x`, `y`, (`z`, `w`): float | `value: vec2\|vec3\|vec4` (arity) |
 
 - 쉐이더 노드 출력은 항상 **오프스크린 텍스처**(FBO에 렌더). 이 텍스처를 다음 쉐이더의 sampler 입력으로 그대로 연결.
 - 메시 입력이 없는 쉐이더 노드는 **풀스크린 쿼드**로 자동 폴백(포스트프로세싱 패스).
@@ -145,6 +148,7 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **Output 노드는 자동으로 추론하지 않는다.** 사용자가 명시적으로 배치하고 입력을 연결해야 캔버스에 그려진다. Output 노드가 없거나 입력이 비어 있으면 캔버스는 placeholder(어두운 배경 + "Connect an Output node to render" 안내)를 표시한다.
 - Output 노드는 그래프당 0~4개를 허용한다. 0개면 placeholder, 1개면 전체 캔버스, 2~4개면 분할 뷰포트(1=전체 / 2=좌우 / 3=상단2+하단1 / 4=2×2). 5개 이상이면 컴파일러가 에러를 보고한다. (Phase 10에서 단일 Output 제약을 완화)
 - Output 노드의 단일 입력 포트 타입은 `texture`. 메시·이미지를 직접 꽂을 수 없으며, 반드시 ShaderNode 출력을 거쳐야 한다(이미지를 그대로 보여주려면 패스스루 쉐이더 노드 사용).
+- **유틸 노드(Math/Swizzle/Combine)는 GL 패스를 만들지 않는다.** ShaderNode 의 비-샘플러 uniform 입력 포트에만 연결되며, 프레임마다 CPU 측에서 평가되어 그 결과 값으로 uniform 을 덮어쓴다(ParamNode 와 동일한 paramBinding 경로). 동일 노드는 fan-out 시 프레임당 1회 메모이즈. cycle 은 기존 그래프 validator 가 차단한다.
 
 #### 2.2.1 ShaderNode 내부 구조
 
@@ -398,11 +402,11 @@ ShaderPlayground/
 - 스크린샷 캡처, 에러/통계 표시(StatusBar).
 
 ### Phase 9 — 에디터 경험 강화 (완료)
-- **GLSL 주석 힌트**(`// @range a..b`, `// @min/@max`, `// @step`, `// @default`, `// @label "..."`)로 인스펙터 컨트롤 메타 오버라이드. 동일 라인 트레일링 주석과 바로 위 주석 양쪽 모두 지원.
+- **GLSL 주석 힌트**(`// @range a..b`, `// @min/@max`, `// @step`, `// @default`, `// @label "..."`)로 인스펙터 컨트롤 메타 오버라이드. 동일 라인 트레일링 주석과 바로 위 주석 양쪽 모두 지원. (Phase 12 에서 `// @color` / `// @slider` / `// @multi` 추가로 컨트롤 종류 자체도 오버라이드 가능.)
 - **시간 컨트롤**: `simTime`이 wall-clock과 분리된 별도 store. 재생/정지, 스크럽 슬라이더, 0~4× 배속, Spacebar 토글. `u_time`은 `simTime`을 받음.
 - **카메라 컨트롤 UI**: 인스펙터에 Reset 버튼 + FOV 슬라이더(10°~120°).
 - **배경색 피커**: 출력 없을 때 placeholder 색, Output 합성 시 클리어 색에 사용.
-- **Problems 패널**(Inspector ↔ Assets ↔ Problems 탭 전환): 모든 노드의 GLSL Diagnostic + 런타임 에러를 한 곳에 모음. 클릭 시 해당 노드 선택 + vertex/fragment 탭 자동 전환. 탭 헤더에 에러 카운트 빨간 뱃지.
+- **Problems 패널**(Inspector ↔ Assets ↔ Problems 탭 전환): 모든 노드의 GLSL Diagnostic + 런타임 에러를 한 곳에 모음. 클릭 시 해당 노드 선택 + vertex/fragment 탭 자동 전환. 탭 헤더에 에러 카운트 빨간 뱃지. (Phase 12 에서 **CodeEditor 라인 점프**까지 확장 — 항목 클릭 시 진단 위치로 커서 이동 + 가운데 정렬 스크롤 + 포커스.)
 - **Undo/Redo** (Cmd+Z / Cmd+Shift+Z, Cmd+Y): 최대 100건 히스토리. 데모 부트스트랩과 슬라이더 드래그(uniformRev)는 히스토리에 포함하지 않음.
 - **Command Palette** (Cmd+K): 노드 추가, 프리셋 로드, 그래프 클리어 — 퍼지 매칭.
 - **검증**: GLSL에 `// @range 0..5 @default 2` 추가 → 인스펙터 슬라이더 즉시 반영. Cmd+Z로 노드 추가/삭제 되돌리기. Cmd+K로 프리셋 즉시 로드.
@@ -423,8 +427,19 @@ ShaderPlayground/
 - **정적 HTML export**: 의존성 0인 단일 파일(~26KB) 생성. `src/export/standalonePlayer.js`에 자체 mat4·primitive 생성기·compile·execute 미니 런타임을 인라인(Vite `?raw`). 프로젝트 JSON은 `window.__SP_PROJECT`로 임베드. split-output, 파라미터 노드, FBO 체인까지 그대로 동작. 익스포트된 HTML 내 `</script>` 인젝션 방지 이스케이프.
 - **검증**: Share URL 복사 → 다른 탭에서 열어 동일한 그래프 복원. `Export HTML`로 받은 파일을 `iframe srcdoc`에 마운트 → 메인 뷰포트와 동일한 셰이더 체인 렌더.
 
+### Phase 12 — 회복성·표현력 보강 (완료)
+- **ProblemsPanel → CodeEditor 라인 점프**: Problems 항목 클릭 시 노드 선택 + vertex/fragment 탭 전환 *에 더해* CodeMirror 가 해당 라인으로 스크롤(가운데 정렬) + 커서 이동 + 포커스까지 수행. `editorStore.jumpRequest`에 rev 카운터를 포함해 동일 라인을 두 번 눌러도 두 번째 클릭이 다시 발화한다. 점프는 effectiveId·stage 가 요청과 일치할 때만 일어나 stage 전환 직후의 doc 교체와 경합하지 않는다.
+- **Auto-save + 세션 복구**: 그래프 구조 rev 가 바뀌면 30 초 디바운스로 직렬화된 프로젝트 JSON 을 IndexedDB(`shader-playground-session/session/autosave`) 에 저장. 다음 부트 때 저장본이 있으면 모달 다이얼로그로 "이전 작업을 복구할까요?" 를 표시 — 백업 시각·노드 수 표시, [복구]/[새로 시작] 2 버튼. share 해시(`#share=...`) 가 있으면 백업을 의도적으로 무시 + 삭제(공유 URL 이 복구보다 우선). bootstrap rev 와 lastSavedRev 가 같으면 데모 그래프 자체는 저장되지 않으므로 첫 클린 부팅에서는 다이얼로그가 뜨지 않는다.
+- **GLSL 주석 힌트 확장**: 기존 메타 키(`@range/@min/@max/@step/@default/@label`)에 더해 **컨트롤 종류 오버라이드** 키 도입.
+  - `// @color`: vec3/vec4 에 강제로 컬러 피커. 이름이 `*Color` 가 아니어도 작동. 이전 추론이 다축 슬라이더였다면 범위를 `0..1`, 디폴트를 흰색 벡터로 자동 승격(사용자가 `@default` 를 같이 지정하면 그 값이 우선).
+  - `// @slider`, `// @multi`: 컬러 추론을 되돌리거나, 컬러 → 다축 슬라이더로 강제. sampler/matrix/bool 타입에는 적용되지 않는다.
+  - 동일 토큰이 여러 번 등장하면 마지막이 이김(예: `@color @slider` → slider).
+  - 원칙: **명시적 주석이 이름 패턴 추론보다 항상 우선** (SPEC §2.2.2 의 후행 메모를 본격 채택).
+- **Math/Swizzle/Combine 유틸 노드**: 위 §2.2 표에 추가된 세 종류의 CPU 평가 노드. ShaderNode 비-샘플러 uniform 입력에 연결되어 프레임마다 평가되고, 그 결과로 uniform 을 덮어쓴다. CommandPalette 에 `Add Math: <op>` × 8, `Add Swizzle: .<mask>` × 8 프리셋, `Add Combine: Float×N → vec N` × 3 등록.
+- **썸네일 readback PBO 비동기화**: 기존 `gl.readPixels` 동기 호출을 WebGL2 PBO + `fenceSync` 로 교체. 매 프레임 `clientWaitSync(timeout=0)` 로 완료된 슬롯만 `getBufferSubData`→다운샘플→`scheduler.commit`. 미완료 슬롯은 그대로 유지되므로 메인 스레드 stall 이 사라진다(N 프레임 지연 허용). 노드당 in-flight 1건, 컴파일로 사라진 노드는 PBO 해제. 96×96 해상도, 10 Hz throttle 그대로 유지.
+- **검증**: Vitest 추가 51건(`asyncReadback` 8, `autoSave` 7, `editorStore` 3, `utility` 25, `uniformParser` +8, 합계 182 통과). Chrome 자동화로 (a) Problems 항목 클릭 → 정확한 라인 활성화, (b) 자동저장 → 리로드 → 복구 다이얼로그 양 경로, (c) `@color` 가 컬러 피커로 즉시 전환, (d) Param→Math→Combine→Swizzle 체인이 sphere 색을 변경, (e) Chain 프리셋(3 노드)의 96×96 썸네일 라이브 갱신을 확인.
+
 ### (백로그)
-- 썸네일 readback PBO 비동기 전환(드라이버 stall 회피).
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - 컴퓨트(Transform Feedback) 노드.
 - GLSL LSP 도입(Monaco 전환 검토).
@@ -458,7 +473,7 @@ ShaderPlayground/
 | GLTF 범위 | 지오메트리만 | 머티리얼/애니메이션 무시 |
 | 컴파일 트리거 | 디바운스 자동 재컴파일 | 향후 수동 컴파일 단축키 추가 가능 |
 | 직렬화 | JSON export/import (Phase 8), 에셋은 IndexedDB 캐시 | |
-| 노드 종류 | Mesh / Image / Shader / Output / Parameter (Phase 10에서 Parameter 추가) | Output은 최대 4개(Phase 10 분할 뷰포트) |
+| 노드 종류 | Mesh / Image / Shader / Output / Parameter / Math / Swizzle / Combine | Parameter는 Phase 10, Math·Swizzle·Combine 유틸은 Phase 12. Output 은 최대 4개(Phase 10 분할 뷰포트). |
 | 의존성 무게 | 경량 우선 | three.js·Monaco는 의도적으로 회피 |
 
 이 디폴트 중 바꾸고 싶은 항목이 있으면 알려줘. 아니면 이대로 Phase 1부터 진행.

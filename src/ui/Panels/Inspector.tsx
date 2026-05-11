@@ -4,7 +4,8 @@ import { useSelectionStore } from '../../state/selectionStore';
 import { inspectorUniforms, parseUniforms, samplerUniforms } from '../../core/graph/uniformParser';
 import { UniformControl } from './UniformControl';
 import { ViewportControls } from './ViewportControls';
-import type { ShaderGraphNode } from '../../core/graph/types';
+import { ParamInspector } from './ParamInspector';
+import type { ParamGraphNode, ShaderGraphNode } from '../../core/graph/types';
 
 export interface InspectorProps {
   /** When embedded inside SidePanel, skip the outer panel + header wrapper. */
@@ -52,8 +53,17 @@ export function Inspector({ embedded = false }: InspectorProps) {
                   primitive: {node.primitive}
                 </div>
               )}
+              {node.kind === 'param' && (
+                <div style={{ color: '#888', fontSize: 11, marginTop: 4 }}>
+                  kind: {(node as ParamGraphNode).paramKind}
+                </div>
+              )}
             </div>
           </div>
+
+          {node.kind === 'param' && (
+            <ParamInspector node={node as ParamGraphNode} />
+          )}
 
           {shaderNode && (
             <>

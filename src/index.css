@@ -182,12 +182,19 @@ button, input, select, textarea {
   border-bottom: 2px solid #569cd6;
 }
 .panel-tab-badge {
-  background: #ff6b6b;
-  color: #1e1e1e;
+  background: #3a3a3d;
+  color: #d4d4d4;
   border-radius: 8px;
   padding: 1px 6px;
   font-size: 10px;
   font-weight: 700;
+}
+.panel-tab--active .panel-tab-badge { background: #094771; color: #fff; }
+/* Red badge specifically for the problems tab when it has issues. */
+.panel-tab[data-variant="error"] .panel-tab-badge,
+.panel-tab--active[data-variant="error"] .panel-tab-badge {
+  background: #ff6b6b;
+  color: #1e1e1e;
 }
 
 .problem-row {
@@ -196,6 +203,26 @@ button, input, select, textarea {
   cursor: pointer;
 }
 .problem-row:hover { background: #2a2a2d; }
+
+.asset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+.asset-row:last-child { border-bottom: none; }
+.asset-image-icon, .asset-mesh-icon {
+  width: 32px;
+  height: 32px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.asset-mesh-icon {
+  background: linear-gradient(135deg, #2a2a2d 0%, #1a1a1a 100%);
+  border: 1px solid #3a3a3d;
+}
 
 /* ── Command Palette ────────────────────────────────────────────── */
 .cmdk-overlay {

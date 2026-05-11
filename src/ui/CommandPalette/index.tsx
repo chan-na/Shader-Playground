@@ -8,6 +8,8 @@ import {
   CHAIN_DEMO_LAYOUT,
   createTorusDemoGraph,
   TORUS_DEMO_LAYOUT,
+  createSplitDemoGraph,
+  SPLIT_DEMO_LAYOUT,
 } from '../../state/demoGraph';
 import { nextId } from '../../utils/id';
 import basicVert from '../../shaders/basic.vert?raw';
@@ -16,7 +18,9 @@ import noiseFrag from '../../shaders/templates/noise.frag?raw';
 import blurFrag from '../../shaders/templates/blur.frag?raw';
 import tonemapFrag from '../../shaders/templates/tonemap.frag?raw';
 import uvDebugFrag from '../../shaders/templates/uvDebug.frag?raw';
-import type { GraphNode, MeshGraphNode } from '../../core/graph/types';
+import blendFrag from '../../shaders/templates/blend.frag?raw';
+import type { GraphNode, MeshGraphNode, ParamKind } from '../../core/graph/types';
+import { MAX_OUTPUTS } from '../../core/graph/validate';
 
 interface Command {
   id: string;
@@ -70,6 +74,7 @@ function buildCommands(): Command[] {
     { name: 'Blur', frag: blurFrag },
     { name: 'Tonemap', frag: tonemapFrag },
     { name: 'UV Debug', frag: uvDebugFrag },
+    { name: 'Blend', frag: blendFrag },
   ];
   for (const tpl of shaderTemplates) {
     cmds.push({
@@ -96,15 +101,32 @@ function buildCommands(): Command[] {
     id: 'add-output',
     category: 'Node',
     label: 'Add Output node',
-    keywords: 'add node output canvas display',
+    keywords: 'add node output canvas display split viewport',
     run: () => {
-      const exists = useGraphStore.getState().nodes.some((n) => n.kind === 'output');
-      if (exists) return;
+      const outputs = useGraphStore.getState().nodes.filter((n) => n.kind === 'output').length;
+      if (outputs >= MAX_OUTPUTS) return;
       const id = nextId('output');
       addNode({ id, kind: 'output' }, { x: 400, y: 0 });
       select(id);
     },
   });
+
+  const paramKinds: ParamKind[] = ['float', 'color', 'vec3', 'time'];
+  for (const k of paramKinds) {
+    cmds.push({
+      id: `add-param-${k}`,
+      category: 'Node',
+      label: `Add Parameter: ${k}`,
+      keywords: `add node parameter param ${k}`,
+      run: () => {
+        const id = nextId(`param-${k}`);
+        const value: number | number[] =
+          k === 'float' ? 0.5 : k === 'time' ? [1, 0] : k === 'color' ? [1, 0.5, 0.2] : [0, 0, 0];
+        addNode({ id, kind: 'param', paramKind: k, value }, { x: -240, y: 240 });
+        select(id);
+      },
+    });
+  }
 
   cmds.push(
     {
@@ -127,6 +149,13 @@ function buildCommands(): Command[] {
       label: 'Load preset: Chain (noise → blur → tonemap)',
       keywords: 'preset demo chain noise blur tonemap',
       run: () => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT),
+    },
+    {
+      id: 'preset-split',
+      category: 'Preset',
+      label: 'Load preset: Split viewport (3 outputs)',
+      keywords: 'preset demo split viewport multi output',
+      run: () => setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT),
     },
     {
       id: 'graph-clear',

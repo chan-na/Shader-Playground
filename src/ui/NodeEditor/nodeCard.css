@@ -79,6 +79,8 @@
   text-align: right;
 }
 
+.node-card__header--param  { background: rgba(214, 214, 86, 0.12); }
+
 .react-flow__handle {
   width: 8px;
   height: 8px;
@@ -87,3 +89,23 @@
 }
 .react-flow__handle.handle-mesh    { background: #56d698; }
 .react-flow__handle.handle-texture { background: #d69c56; }
+.react-flow__handle.handle-float   { background: #d6d656; }
+.react-flow__handle.handle-vec2    { background: #d6d656; }
+.react-flow__handle.handle-vec3    { background: #d6d656; }
+.react-flow__handle.handle-vec4    { background: #d6d656; }
+
+.node-card__param-value {
+  font-family: ui-monospace, SF Mono, Menlo, monospace;
+  font-size: 11px;
+  color: #ddd;
+  background: #1a1a1a;
+  padding: 4px 6px;
+  border-radius: 3px;
+  text-align: center;
+}
+.node-card__param-swatch {
+  width: 100%;
+  height: 24px;
+  border-radius: 3px;
+  border: 1px solid #1a1a1a;
+}

@@ -153,6 +153,9 @@ export function Viewport() {
 
       const t = useTimeStore.getState().simTime;
       const bg = useViewportStore.getState().background;
+      // Build a snapshot of param nodes for the frame.
+      const params: Record<string, typeof graph.nodes[number]> = {};
+      for (const n of graph.nodes) if (n.kind === 'param') params[n.id] = n;
       executePlan(
         gl,
         plan,
@@ -162,6 +165,7 @@ export function Viewport() {
           height: plan.height,
           camera: useCameraStore.getState().camera,
           background: bg,
+          params,
         },
         canvas.width,
         canvas.height,

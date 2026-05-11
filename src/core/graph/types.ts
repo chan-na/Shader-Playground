@@ -1,11 +1,13 @@
-export type PortType = 'mesh' | 'texture';
+export type PortType = 'mesh' | 'texture' | 'float' | 'vec2' | 'vec3' | 'vec4';
 
 export interface Port {
   name: string;
   type: PortType;
 }
 
-export type GraphNodeKind = 'mesh' | 'image' | 'shader' | 'output';
+export type GraphNodeKind = 'mesh' | 'image' | 'shader' | 'output' | 'param';
+
+export type ParamKind = 'float' | 'vec3' | 'color' | 'time';
 
 export interface BaseNode {
   id: string;
@@ -37,11 +39,20 @@ export interface OutputGraphNode extends BaseNode {
   kind: 'output';
 }
 
+export interface ParamGraphNode extends BaseNode {
+  kind: 'param';
+  paramKind: ParamKind;
+  /** Current value. For 'time' it's [scale, offset] applied to simTime. */
+  value: number | number[];
+  label?: string;
+}
+
 export type GraphNode =
   | MeshGraphNode
   | ImageGraphNode
   | ShaderGraphNode
-  | OutputGraphNode;
+  | OutputGraphNode
+  | ParamGraphNode;
 
 export interface GraphEdge {
   id: string;

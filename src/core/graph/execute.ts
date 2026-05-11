@@ -3,6 +3,7 @@ import { bindFramebuffer } from '../gl/framebuffer';
 import { drawMesh } from '../gl/mesh';
 import { setUniform } from '../gl/uniforms';
 import type { ExecutionPlan, ShaderPass } from './compile';
+import type { ParamGraphNode, GraphNode } from './types';
 import {
   modelMatrix,
   projMatrix,
@@ -17,6 +18,8 @@ export interface FrameContext {
   camera: OrbitCameraState;
   /** Background color shown by the placeholder/empty pass. */
   background?: [number, number, number];
+  /** Snapshot of parameter-node values keyed by node ID (read each frame). */
+  params?: Record<string, GraphNode>;
 }
 
 const _view = mat4.create();
@@ -41,8 +44,35 @@ function bindSystemUniforms(
   }
 }
 
-function bindUserUniforms(gl: WebGL2RenderingContext, pass: ShaderPass) {
-  for (const [name, value] of Object.entries(pass.uniformValues)) {
+function paramValue(
+  node: ParamGraphNode,
+  time: number,
+): number | number[] {
+  if (node.paramKind === 'time') {
+    const [scale = 1, offset = 0] = Array.isArray(node.value)
+      ? node.value
+      : [node.value as number, 0];
+    return time * scale + offset;
+  }
+  return node.value;
+}
+
+function bindUserUniforms(
+  gl: WebGL2RenderingContext,
+  pass: ShaderPass,
+  ctx: FrameContext,
+) {
+  // Build an effective uniform map: explicit values overridden by param edges.
+  const effective: Record<string, number | number[]> = { ...pass.uniformValues };
+  if (ctx.params) {
+    for (const b of pass.paramBindings) {
+      const src = ctx.params[b.sourceNodeId];
+      if (!src || src.kind !== 'param') continue;
+      effective[b.uniformName] = paramValue(src, ctx.time);
+    }
+  }
+
+  for (const [name, value] of Object.entries(effective)) {
     const loc = pass.program.uniforms[name];
     if (loc === undefined) continue;
     if (typeof value === 'number') {
@@ -81,6 +111,46 @@ function bindSamplers(
   }
 }
 
+/**
+ * Compute sub-viewport rectangles for N outputs. Layouts:
+ *   1 → full canvas
+ *   2 → left/right halves
+ *   3 → top row of 2, bottom centered
+ *   4 → 2×2 grid
+ */
+export function splitLayout(
+  n: number,
+  W: number,
+  H: number,
+): Array<{ x: number; y: number; w: number; h: number }> {
+  if (n <= 1) return [{ x: 0, y: 0, w: W, h: H }];
+  if (n === 2) {
+    const w = Math.floor(W / 2);
+    return [
+      { x: 0, y: 0, w, h: H },
+      { x: w, y: 0, w: W - w, h: H },
+    ];
+  }
+  if (n === 3) {
+    const h = Math.floor(H / 2);
+    const w = Math.floor(W / 2);
+    return [
+      { x: 0, y: h, w, h: H - h }, // top-left
+      { x: w, y: h, w: W - w, h: H - h }, // top-right
+      { x: 0, y: 0, w: W, h }, // bottom full
+    ];
+  }
+  // n >= 4 — 2×2 grid; extras are clipped to the last cell.
+  const w = Math.floor(W / 2);
+  const h = Math.floor(H / 2);
+  return [
+    { x: 0, y: h, w, h: H - h },
+    { x: w, y: h, w: W - w, h: H - h },
+    { x: 0, y: 0, w, h },
+    { x: w, y: 0, w: W - w, h },
+  ].slice(0, Math.min(n, 4));
+}
+
 export function executePlan(
   gl: WebGL2RenderingContext,
   plan: ExecutionPlan,
@@ -105,7 +175,7 @@ export function executePlan(
     }
     gl.useProgram(pass.program.program);
     bindSystemUniforms(gl, pass, ctx);
-    bindUserUniforms(gl, pass);
+    bindUserUniforms(gl, pass, ctx);
     bindSamplers(gl, pass, passByNode, plan);
     drawMesh(gl, pass.mesh);
   }
@@ -114,16 +184,24 @@ export function executePlan(
   bindFramebuffer(gl, null);
   gl.viewport(0, 0, canvasWidth, canvasHeight);
   const bg = ctx.background ?? [0.07, 0.07, 0.09];
-  if (plan.outputSourceNodeId && passByNode.has(plan.outputSourceNodeId)) {
-    // Clear with background first so any transparent shader output composites
-    // over the user's chosen background instead of black.
-    gl.clearColor(bg[0], bg[1], bg[2], 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    const src = passByNode.get(plan.outputSourceNodeId)!;
-    blitToCanvas(gl, src.fbo.color.texture);
-  } else {
+  // Clear with background; outputs blit into their sub-viewports.
+  gl.clearColor(bg[0], bg[1], bg[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  const drawable = plan.outputs.filter((o) => o.sourceNodeId && passByNode.has(o.sourceNodeId));
+  if (drawable.length === 0) {
     drawPlaceholder(gl, bg);
+    return;
   }
+  const cells = splitLayout(drawable.length, canvasWidth, canvasHeight);
+  for (let i = 0; i < drawable.length; i++) {
+    const cell = cells[i];
+    const src = passByNode.get(drawable[i].sourceNodeId!)!;
+    gl.viewport(cell.x, cell.y, Math.max(1, cell.w), Math.max(1, cell.h));
+    blitToCanvas(gl, src.fbo.color.texture);
+  }
+  // Reset viewport for whoever runs after us.
+  gl.viewport(0, 0, canvasWidth, canvasHeight);
 }
 
 let _blitProgram: WebGLProgram | null = null;

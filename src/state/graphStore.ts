@@ -3,6 +3,7 @@ import type {
   Graph,
   GraphEdge,
   GraphNode,
+  ParamGraphNode,
   ShaderGraphNode,
 } from '../core/graph/types';
 import { useHistoryStore } from './historyStore';
@@ -28,6 +29,8 @@ export interface GraphState {
     patch: { vertexSource?: string; fragmentSource?: string },
   ) => void;
   setUniformValue: (id: string, name: string, value: number | number[]) => void;
+  setParamValue: (id: string, value: number | number[]) => void;
+  setParamLabel: (id: string, label: string) => void;
   addEdge: (edge: GraphEdge) => void;
   removeEdge: (id: string) => void;
   reset: () => void;
@@ -117,6 +120,24 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }),
       uniformRev: s.uniformRev + 1,
     })),
+  setParamValue: (id, value) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== 'param') return n;
+        return { ...(n as ParamGraphNode), value } as ParamGraphNode;
+      }),
+      uniformRev: s.uniformRev + 1,
+    })),
+  setParamLabel: (id, label) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== 'param') return n;
+        return { ...(n as ParamGraphNode), label } as ParamGraphNode;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
   addEdge: (edge) => {
     pushHistory(get());
     set((s) => ({ edges: [...s.edges, edge], rev: s.rev + 1 }));

@@ -199,4 +199,78 @@ describe('parseUniforms with hints', () => {
     expect(x.max).toBe(1);
     expect(x.defaultValue).toBe(0.7);
   });
+
+  it('@color forces color control on a non-color-named vec3', () => {
+    const src = `uniform vec3 u_tint; // @color`;
+    const u = parseUniforms(src);
+    const x = u.find((u) => u.name === 'u_tint')!;
+    expect(x.control).toBe('color');
+    expect(x.min).toBe(0);
+    expect(x.max).toBe(1);
+    expect(x.defaultValue).toEqual([1, 1, 1]);
+  });
+
+  it('@color also promotes vec4 to color (RGBA) with white default', () => {
+    const src = `uniform vec4 u_glow; // @color`;
+    const x = parseUniforms(src).find((u) => u.name === 'u_glow')!;
+    expect(x.control).toBe('color');
+    expect(x.defaultValue).toEqual([1, 1, 1, 1]);
+  });
+
+  it('@color is ignored for incompatible types (float)', () => {
+    const src = `uniform float u_brightness; // @color`;
+    const x = parseUniforms(src).find((u) => u.name === 'u_brightness')!;
+    expect(x.control).toBe('slider');
+  });
+
+  it('@slider reverts a color-named vec3 to per-channel sliders', () => {
+    const src = `uniform vec3 u_baseColor; // @multi`;
+    const x = parseUniforms(src).find((u) => u.name === 'u_baseColor')!;
+    expect(x.control).toBe('multi');
+    expect(x.min).toBe(-1);
+    expect(x.max).toBe(1);
+  });
+
+  it('@color + @default keeps the user default and the color control', () => {
+    const src = `uniform vec3 u_tint; // @color @default 0.2,0.5,0.9`;
+    const x = parseUniforms(src).find((u) => u.name === 'u_tint')!;
+    expect(x.control).toBe('color');
+    expect(x.defaultValue).toEqual([0.2, 0.5, 0.9]);
+  });
+
+  it('explicit @label overrides name-pattern inference (precedence)', () => {
+    const src = `
+      // @label "Brightness"
+      uniform float u_intensity;
+    `;
+    const x = parseUniforms(src).find((u) => u.name === 'u_intensity')!;
+    expect(x.label).toBe('Brightness');
+    // name-pattern said intensity → 0..1, hint did not override, so retained:
+    expect(x.min).toBe(0);
+    expect(x.max).toBe(1);
+  });
+
+  it('explicit @range overrides name-pattern range', () => {
+    // u_scale would otherwise pick 0..10 from the name pattern.
+    const src = `uniform float u_scale; // @range -5..5`;
+    const x = parseUniforms(src).find((u) => u.name === 'u_scale')!;
+    expect(x.min).toBe(-5);
+    expect(x.max).toBe(5);
+  });
+});
+
+describe('parseHintComment @color', () => {
+  it('parses @color', () => {
+    const h = parseHintComment('// @color');
+    expect(h.control).toBe('color');
+  });
+  it('parses @slider', () => {
+    expect(parseHintComment('// @slider').control).toBe('slider');
+  });
+  it('parses @multi', () => {
+    expect(parseHintComment('// @multi').control).toBe('multi');
+  });
+  it('last control hint wins when combined', () => {
+    expect(parseHintComment('// @color @slider').control).toBe('slider');
+  });
 });

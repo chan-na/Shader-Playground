@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { EditorView } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, EditorSelection } from '@codemirror/state';
 import { setDiagnostics } from '@codemirror/lint';
 import { useGraphStore } from '../../state/graphStore';
 import { useSelectionStore } from '../../state/selectionStore';
@@ -26,6 +26,8 @@ export function CodeEditor() {
   const selectedId = useSelectionStore((s) => s.selectedNodeId);
   const stage = useEditorStore((s) => s.activeStage);
   const setStage = useEditorStore((s) => s.setStage);
+  const jumpRequest = useEditorStore((s) => s.jumpRequest);
+  const clearJump = useEditorStore((s) => s.clearJump);
   const fps = useRendererStore((s) => s.stats.fps);
 
   const firstShaderId = useGraphStore((s) =>
@@ -107,6 +109,29 @@ export function CodeEditor() {
       changes: { from: 0, to: view.state.doc.length, insert: source },
     });
   }, [effectiveId, stage, source]);
+
+  // Scroll/select to a requested line (from ProblemsPanel) once the editor
+  // doc matches the requested node/stage.
+  useEffect(() => {
+    if (!jumpRequest) return;
+    if (jumpRequest.nodeId !== effectiveId) return;
+    if (jumpRequest.stage !== stage) return;
+    const view = viewRef.current;
+    if (!view) return;
+    const doc = view.state.doc;
+    const lineNo = Math.max(1, Math.min(doc.lines, jumpRequest.line));
+    const line = doc.line(lineNo);
+    const pos = jumpRequest.column
+      ? Math.min(line.to, line.from + Math.max(0, jumpRequest.column - 1))
+      : line.from;
+    view.dispatch({
+      selection: EditorSelection.cursor(pos),
+      effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+      scrollIntoView: true,
+    });
+    view.focus();
+    clearJump();
+  }, [jumpRequest, effectiveId, stage, source]);
 
   // Push diagnostics to CM
   useEffect(() => {

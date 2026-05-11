@@ -5,7 +5,15 @@ export interface Port {
   type: PortType;
 }
 
-export type GraphNodeKind = 'mesh' | 'image' | 'shader' | 'output' | 'param';
+export type GraphNodeKind =
+  | 'mesh'
+  | 'image'
+  | 'shader'
+  | 'output'
+  | 'param'
+  | 'math'
+  | 'swizzle'
+  | 'combine';
 
 export type ParamKind = 'float' | 'vec3' | 'color' | 'time';
 
@@ -47,12 +55,52 @@ export interface ParamGraphNode extends BaseNode {
   label?: string;
 }
 
+export type MathOp =
+  | 'add'
+  | 'subtract'
+  | 'multiply'
+  | 'divide'
+  | 'pow'
+  | 'abs'
+  | 'sin'
+  | 'cos';
+
+export const MATH_UNARY_OPS: ReadonlySet<MathOp> = new Set(['abs', 'sin', 'cos']);
+
+export interface MathGraphNode extends BaseNode {
+  kind: 'math';
+  op: MathOp;
+  /** Fallback values for `a` and `b` when no edge is connected. */
+  a: number;
+  b: number;
+}
+
+export type SwizzleVecKind = 'vec2' | 'vec3' | 'vec4';
+
+export interface SwizzleGraphNode extends BaseNode {
+  kind: 'swizzle';
+  /** Component order, drawn from x/y/z/w. Output arity = mask.length (1..4). */
+  mask: string;
+}
+
+export type CombineArity = 2 | 3 | 4;
+
+export interface CombineGraphNode extends BaseNode {
+  kind: 'combine';
+  arity: CombineArity;
+  /** Fallback values for the four component channels. */
+  values: [number, number, number, number];
+}
+
 export type GraphNode =
   | MeshGraphNode
   | ImageGraphNode
   | ShaderGraphNode
   | OutputGraphNode
-  | ParamGraphNode;
+  | ParamGraphNode
+  | MathGraphNode
+  | SwizzleGraphNode
+  | CombineGraphNode;
 
 export interface GraphEdge {
   id: string;

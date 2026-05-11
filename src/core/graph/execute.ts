@@ -3,13 +3,14 @@ import { bindFramebuffer } from '../gl/framebuffer';
 import { drawMesh } from '../gl/mesh';
 import { setUniform } from '../gl/uniforms';
 import type { ExecutionPlan, ShaderPass } from './compile';
-import type { ParamGraphNode, GraphNode } from './types';
+import type { Graph, GraphNode } from './types';
 import {
   modelMatrix,
   projMatrix,
   viewMatrix,
   type OrbitCameraState,
 } from '../camera/orbitCamera';
+import { resolveValueFor, type Value } from '../nodes/utility';
 
 export interface FrameContext {
   time: number;
@@ -20,6 +21,12 @@ export interface FrameContext {
   background?: [number, number, number];
   /** Snapshot of parameter-node values keyed by node ID (read each frame). */
   params?: Record<string, GraphNode>;
+  /**
+   * Full graph snapshot — required when math/swizzle/combine utility nodes
+   * appear as upstream value sources, since their output depends on inbound
+   * edges (which `params` alone does not capture).
+   */
+  graph?: Graph;
 }
 
 const _view = mat4.create();
@@ -44,31 +51,22 @@ function bindSystemUniforms(
   }
 }
 
-function paramValue(
-  node: ParamGraphNode,
-  time: number,
-): number | number[] {
-  if (node.paramKind === 'time') {
-    const [scale = 1, offset = 0] = Array.isArray(node.value)
-      ? node.value
-      : [node.value as number, 0];
-    return time * scale + offset;
-  }
-  return node.value;
-}
-
 function bindUserUniforms(
   gl: WebGL2RenderingContext,
   pass: ShaderPass,
   ctx: FrameContext,
+  resolveCache: Map<string, Value>,
 ) {
   // Build an effective uniform map: explicit values overridden by param edges.
   const effective: Record<string, number | number[]> = { ...pass.uniformValues };
-  if (ctx.params) {
+  if (ctx.graph && pass.paramBindings.length) {
     for (const b of pass.paramBindings) {
-      const src = ctx.params[b.sourceNodeId];
-      if (!src || src.kind !== 'param') continue;
-      effective[b.uniformName] = paramValue(src, ctx.time);
+      effective[b.uniformName] = resolveValueFor(
+        b.sourceNodeId,
+        ctx.graph,
+        { time: ctx.time },
+        resolveCache,
+      );
     }
   }
 
@@ -161,6 +159,9 @@ export function executePlan(
   const passByNode = new Map<string, ShaderPass>();
   for (const p of plan.passes) passByNode.set(p.nodeId, p);
 
+  // One resolver cache per frame so fan-out utility nodes are evaluated once.
+  const resolveCache = new Map<string, Value>();
+
   // Render each shader node into its FBO
   for (const pass of plan.passes) {
     bindFramebuffer(gl, pass.fbo);
@@ -175,7 +176,7 @@ export function executePlan(
     }
     gl.useProgram(pass.program.program);
     bindSystemUniforms(gl, pass, ctx);
-    bindUserUniforms(gl, pass, ctx);
+    bindUserUniforms(gl, pass, ctx, resolveCache);
     bindSamplers(gl, pass, passByNode, plan);
     drawMesh(gl, pass.mesh);
   }

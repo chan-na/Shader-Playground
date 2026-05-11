@@ -5,6 +5,7 @@ import { SidePanel } from './ui/Panels/SidePanel';
 import { StatusBar } from './ui/Panels/StatusBar';
 import { CommandPalette } from './ui/CommandPalette';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts';
+import { BootstrapGate } from './ui/BootstrapGate';
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
       </div>
       <CommandPalette />
       <KeyboardShortcuts />
+      <BootstrapGate />
     </div>
   );
 }

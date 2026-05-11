@@ -8,13 +8,11 @@ import { createGLContext } from '../../core/gl/context';
 import { compileGraph, emptyPlan, type ExecutionPlan } from '../../core/graph/compile';
 import { executePlan } from '../../core/graph/execute';
 import { createCameraController } from '../../core/camera/input';
-import { createDemoGraph, DEMO_LAYOUT } from '../../state/demoGraph';
 import { parseShaderInfoLog } from '../../core/graph/diagnostics';
 import { thumbnailScheduler } from '../../state/thumbnailScheduler';
-import { readbackThumbnail } from '../../core/thumbnail/readback';
+import { AsyncThumbnailReadback } from '../../core/thumbnail/asyncReadback';
 import { useTimeStore } from '../../state/timeStore';
 import { useViewportStore } from '../../state/viewportStore';
-import { useHistoryStore } from '../../state/historyStore';
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -22,33 +20,6 @@ export function Viewport() {
   const setStats = useRendererStore((s) => s.setStats);
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
-
-  // Bootstrap: prefer a #share=... URL if present; otherwise demo. Clear
-  // history afterwards so the first Cmd+Z doesn't wipe back to a blank graph.
-  useEffect(() => {
-    if (useGraphStore.getState().nodes.length !== 0) return;
-    const hash = typeof location !== 'undefined' ? location.hash : '';
-    if (hash.includes('share=')) {
-      void (async () => {
-        try {
-          const mod = await import('../../state/shareUrl');
-          const decoded = await mod.decodeShareHash(hash);
-          if (decoded) {
-            useGraphStore.getState().setGraph(decoded.graph, decoded.positions);
-            useHistoryStore.getState().clear();
-            return;
-          }
-        } catch {
-          /* fall through to demo */
-        }
-        useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
-        useHistoryStore.getState().clear();
-      })();
-      return;
-    }
-    useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
-    useHistoryStore.getState().clear();
-  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -67,6 +38,8 @@ export function Viewport() {
     cameraCtl.attach(canvas);
 
     let plan: ExecutionPlan = emptyPlan(canvas.width || 1, canvas.height || 1);
+    const asyncReadback = new AsyncThumbnailReadback();
+    let lastPassNodeIds = new Set<string>();
     let lastRev = -1;
     let lastAssetRev = -1;
     let lastUniformRev = -1;
@@ -141,6 +114,13 @@ export function Viewport() {
         lastAssetRev = assetRev;
         recompile();
         thumbnailScheduler.bumpAll();
+        // Drop async readback slots for passes that were removed: PBO bound
+        // to a deleted FBO would copy stale memory next time it fires.
+        const nextIds = new Set(plan.passes.map((p) => p.nodeId));
+        for (const prev of lastPassNodeIds) {
+          if (!nextIds.has(prev)) asyncReadback.release(gl, prev);
+        }
+        lastPassNodeIds = nextIds;
       }
       if (uniformRev !== lastUniformRev) {
         lastUniformRev = uniformRev;
@@ -184,22 +164,33 @@ export function Viewport() {
           camera: useCameraStore.getState().camera,
           background: bg,
           params,
+          graph: { nodes: graph.nodes, edges: graph.edges },
         },
         canvas.width,
         canvas.height,
       );
 
-      // Thumbnail readback (10Hz throttle handled by scheduler)
+      // Thumbnail readback (10Hz throttle handled by scheduler).
+      // Async path: poll signaled fences first so committed images use the
+      // latest available frame, then issue fresh requests for nodes whose
+      // throttle window elapsed. The GPU pipeline is not stalled — the worst
+      // case is a thumbnail trailing the live viewport by a few frames.
+      try {
+        for (const r of asyncReadback.poll(gl)) {
+          thumbnailScheduler.commit(r.nodeId, r.image, now);
+        }
+      } catch {
+        // Poll failure (e.g., context lost) — drop this frame's results.
+      }
       const ready = thumbnailScheduler.pickReady(now);
       if (ready.length) {
         for (const id of ready) {
           const pass = plan.passes.find((p) => p.nodeId === id);
           if (!pass) continue;
           try {
-            const img = readbackThumbnail(gl, pass.fbo);
-            thumbnailScheduler.commit(id, img, now);
+            asyncReadback.request(gl, id, pass.fbo);
           } catch {
-            // Readback can fail right after a resize; just skip this frame.
+            // Request failure — scheduler entry stays "force next" so we retry.
           }
         }
       }
@@ -212,6 +203,7 @@ export function Viewport() {
       alive = false;
       cancelAnimationFrame(rafId);
       cameraCtl.detach();
+      asyncReadback.disposeAll(gl);
       plan.dispose();
       setReady(false);
     };

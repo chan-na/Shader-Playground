@@ -108,6 +108,17 @@ function structuredCloneNode(n: GraphNode): GraphNode {
         value: Array.isArray(n.value) ? [...n.value] : n.value,
         label: n.label,
       };
+    case 'math':
+      return { id: n.id, kind: 'math', op: n.op, a: n.a, b: n.b };
+    case 'swizzle':
+      return { id: n.id, kind: 'swizzle', mask: n.mask };
+    case 'combine':
+      return {
+        id: n.id,
+        kind: 'combine',
+        arity: n.arity,
+        values: [n.values[0], n.values[1], n.values[2], n.values[3]],
+      };
   }
 }
 

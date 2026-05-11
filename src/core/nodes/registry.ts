@@ -1,6 +1,19 @@
-import type { GraphNodeKind, ParamKind, PortType } from '../graph/types';
+import type {
+  CombineArity,
+  CombineGraphNode,
+  GraphNode,
+  GraphNodeKind,
+  MathGraphNode,
+  MathOp,
+  ParamGraphNode,
+  ParamKind,
+  PortType,
+  SwizzleGraphNode,
+} from '../graph/types';
+import { MATH_UNARY_OPS } from '../graph/types';
 import { inspectorUniforms, parseUniforms, samplerUniforms } from '../graph/uniformParser';
 import type { ShaderGraphNode } from '../graph/types';
+import { isValidSwizzleMask } from './utility';
 
 export interface PortSpec {
   name: string;
@@ -87,4 +100,95 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
     // per-instance accuracy should use paramOutputPort(node.paramKind).
     outputs: () => [{ name: 'value', type: 'float' }],
   },
+  math: {
+    kind: 'math',
+    label: 'Math',
+    // Binary ops surface (a,b); unary ops expose just (a). The runtime
+    // evaluator ignores any edge connected to a port that isn't listed here.
+    inputs: () => [
+      { name: 'a', type: 'float' },
+      { name: 'b', type: 'float' },
+    ],
+    outputs: () => [{ name: 'value', type: 'float' }],
+  },
+  swizzle: {
+    kind: 'swizzle',
+    label: 'Swizzle',
+    inputs: () => [{ name: 'in', type: 'vec4' }],
+    outputs: () => [{ name: 'value', type: 'vec4' }],
+  },
+  combine: {
+    kind: 'combine',
+    label: 'Combine',
+    inputs: () => [
+      { name: 'x', type: 'float' },
+      { name: 'y', type: 'float' },
+      { name: 'z', type: 'float' },
+      { name: 'w', type: 'float' },
+    ],
+    outputs: () => [{ name: 'value', type: 'vec4' }],
+  },
 };
+
+/** Math-node port surface depends on the chosen op (unary vs binary). */
+export function mathInputPorts(op: MathOp): PortSpec[] {
+  if (MATH_UNARY_OPS.has(op)) return [{ name: 'a', type: 'float' }];
+  return [
+    { name: 'a', type: 'float' },
+    { name: 'b', type: 'float' },
+  ];
+}
+
+/** Swizzle output port type depends on the mask length. */
+export function swizzleOutputPort(mask: string): PortSpec {
+  if (!isValidSwizzleMask(mask)) return { name: 'value', type: 'float' };
+  if (mask.length === 1) return { name: 'value', type: 'float' };
+  if (mask.length === 2) return { name: 'value', type: 'vec2' };
+  if (mask.length === 3) return { name: 'value', type: 'vec3' };
+  return { name: 'value', type: 'vec4' };
+}
+
+/** Combine input ports surface only as many channels as the arity asks for. */
+export function combineInputPorts(arity: CombineArity): PortSpec[] {
+  const all: PortSpec[] = [
+    { name: 'x', type: 'float' },
+    { name: 'y', type: 'float' },
+    { name: 'z', type: 'float' },
+    { name: 'w', type: 'float' },
+  ];
+  return all.slice(0, arity);
+}
+
+/** Combine output type tracks the arity (vec2/vec3/vec4). */
+export function combineOutputPort(arity: CombineArity): PortSpec {
+  if (arity === 2) return { name: 'value', type: 'vec2' };
+  if (arity === 3) return { name: 'value', type: 'vec3' };
+  return { name: 'value', type: 'vec4' };
+}
+
+/**
+ * Per-instance input port surface. Falls back to the static NODE_META entry
+ * for node kinds whose ports do not depend on configuration.
+ */
+export function nodeInputPorts(node: GraphNode): PortSpec[] {
+  if (node.kind === 'math') return mathInputPorts((node as MathGraphNode).op);
+  if (node.kind === 'combine')
+    return combineInputPorts((node as CombineGraphNode).arity);
+  return NODE_META[node.kind].inputs(
+    node.kind === 'shader' ? (node as ShaderGraphNode) : null,
+  );
+}
+
+/**
+ * Per-instance output port surface. Routes around the dummy "vec4" default of
+ * Swizzle/Combine so connection validation reflects the real output type.
+ */
+export function nodeOutputPorts(node: GraphNode): PortSpec[] {
+  if (node.kind === 'param')
+    return [paramOutputPort((node as ParamGraphNode).paramKind)];
+  if (node.kind === 'swizzle')
+    return [swizzleOutputPort((node as SwizzleGraphNode).mask)];
+  if (node.kind === 'combine')
+    return [combineOutputPort((node as CombineGraphNode).arity)];
+  return NODE_META[node.kind].outputs();
+}

@@ -18,6 +18,7 @@ export function ProblemsPanel() {
   const nodes = useGraphStore((s) => s.nodes);
   const select = useSelectionStore((s) => s.select);
   const setStage = useEditorStore((s) => s.setStage);
+  const requestJump = useEditorStore((s) => s.requestJump);
 
   const entries: Entry[] = useMemo(() => {
     const out: Entry[] = [];
@@ -34,9 +35,17 @@ export function ProblemsPanel() {
     return n ? `${n.kind} · ${id}` : id;
   };
 
-  const goTo = (nodeId: string, stage: 'vertex' | 'fragment' | 'link') => {
-    select(nodeId);
-    if (stage !== 'link') setStage(stage);
+  const goTo = (entry: Entry) => {
+    select(entry.nodeId);
+    const targetStage: 'vertex' | 'fragment' =
+      entry.stage === 'link' ? 'fragment' : entry.stage;
+    setStage(targetStage);
+    requestJump({
+      nodeId: entry.nodeId,
+      stage: targetStage,
+      line: entry.diag.line,
+      column: entry.diag.column,
+    });
   };
 
   return (
@@ -63,7 +72,7 @@ export function ProblemsPanel() {
               <div
                 key={i}
                 className="problem-row"
-                onClick={() => goTo(e.nodeId, e.stage)}
+                onClick={() => goTo(e)}
                 title="Jump to source"
               >
                 <span style={{ color, fontFamily: 'monospace', fontSize: 11, marginRight: 6 }}>

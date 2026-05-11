@@ -1,10 +1,19 @@
 import { createProgram, disposeProgram, type CompiledProgram, type ShaderError } from '../gl/program';
 import { createFramebuffer, disposeFramebuffer, type Framebuffer } from '../gl/framebuffer';
 import { uploadMesh, disposeMesh, type GLMesh, type MeshData } from '../gl/mesh';
-import type { Graph, GraphNode, ShaderGraphNode, MeshGraphNode } from './types';
+import { createImageTexture, disposeTexture, type GLTexture } from '../gl/texture';
+import type { Graph, GraphNode, ShaderGraphNode, MeshGraphNode, ImageGraphNode } from './types';
 import { topologicalOrder, validateGraph, type ValidationError } from './validate';
 import { makePrimitive } from '../assets/primitives';
+import type { GeometryHandle, ImageHandle } from '../assets/types';
 import fullscreenVert from '../../shaders/fullscreen.vert?raw';
+
+export interface AssetCatalog {
+  meshes: Record<string, GeometryHandle>;
+  images: Record<string, ImageHandle>;
+}
+
+const EMPTY_ASSETS: AssetCatalog = { meshes: {}, images: {} };
 
 export interface SamplerBinding {
   uniformName: string;
@@ -24,6 +33,7 @@ export interface ShaderPass {
 
 export interface ExecutionPlan {
   passes: ShaderPass[];
+  imageTextures: Record<string, GLTexture>;
   outputNodeId: string | null;
   outputSourceNodeId: string | null;
   errors: ValidationError[];
@@ -36,11 +46,13 @@ export interface ExecutionPlan {
 export interface CompileOptions {
   width: number;
   height: number;
+  assets?: AssetCatalog;
 }
 
 export function emptyPlan(width: number, height: number): ExecutionPlan {
   return {
     passes: [],
+    imageTextures: {},
     outputNodeId: null,
     outputSourceNodeId: null,
     errors: [],
@@ -59,11 +71,15 @@ function findEdgesToTarget(graph: Graph, target: string) {
   return graph.edges.filter((e) => e.target === target);
 }
 
-function meshDataFor(node: GraphNode): MeshData | null {
-  if (node.kind === 'mesh') {
-    return makePrimitive((node as MeshGraphNode).primitive);
+function meshDataFor(node: GraphNode, assets: AssetCatalog): MeshData | null {
+  if (node.kind !== 'mesh') return null;
+  const mn = node as MeshGraphNode;
+  if (mn.assetId) {
+    const handle = assets.meshes[mn.assetId];
+    if (handle) return handle.data;
+    // Asset not yet loaded — fall through to primitive fallback.
   }
-  return null;
+  return makePrimitive(mn.primitive);
 }
 
 export function compileGraph(
@@ -71,6 +87,7 @@ export function compileGraph(
   graph: Graph,
   opts: CompileOptions,
 ): ExecutionPlan {
+  const assets = opts.assets ?? EMPTY_ASSETS;
   const errors = validateGraph(graph);
   const shaderErrors: Record<string, ShaderError[]> = {};
   const fatal = errors.some((e) => e.code === 'cycle' || e.code === 'multi_input' || e.code === 'multiple_outputs');
@@ -84,6 +101,24 @@ export function compileGraph(
   const passes: ShaderPass[] = [];
   const disposers: Array<() => void> = [];
 
+  // Upload any image textures referenced by ImageNodes so ShaderNodes can
+  // sample them through the existing sampler-routing path.
+  const imageTextures: Record<string, GLTexture> = {};
+  for (const node of graph.nodes) {
+    if (node.kind !== 'image') continue;
+    const inode = node as ImageGraphNode;
+    if (!inode.assetId) continue;
+    const handle = assets.images[inode.assetId];
+    if (!handle?.bitmap) continue;
+    try {
+      const tex = createImageTexture(gl, handle.bitmap);
+      imageTextures[node.id] = tex;
+      disposers.push(() => disposeTexture(gl, tex));
+    } catch {
+      // Skip silently — the ShaderNode will see no source and stay blank.
+    }
+  }
+
   // Build a pass per shader node in topo order
   const passByNode = new Map<string, ShaderPass>();
   for (const sn of shaderNodes) {
@@ -96,7 +131,7 @@ export function compileGraph(
     if (meshEdge) {
       const meshNode = graph.nodes.find((n) => n.id === meshEdge.source);
       if (meshNode && meshNode.kind === 'mesh') {
-        const md = meshDataFor(meshNode);
+        const md = meshDataFor(meshNode, assets);
         if (md) {
           meshData = md;
           meshIsFullscreen = false;
@@ -150,6 +185,7 @@ export function compileGraph(
 
   return {
     passes,
+    imageTextures,
     outputNodeId: output?.id ?? null,
     outputSourceNodeId,
     errors,

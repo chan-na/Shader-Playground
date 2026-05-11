@@ -57,15 +57,23 @@ function bindSamplers(
   gl: WebGL2RenderingContext,
   pass: ShaderPass,
   passByNode: Map<string, ShaderPass>,
+  plan: ExecutionPlan,
 ) {
   for (const s of pass.samplers) {
+    let texture: WebGLTexture | null = null;
     const src = passByNode.get(s.sourceNodeId);
-    if (!src) continue;
+    if (src) {
+      texture = src.fbo.color.texture;
+    } else {
+      const img = plan.imageTextures[s.sourceNodeId];
+      if (img) texture = img.texture;
+    }
+    if (!texture) continue;
     const loc = pass.program.uniforms[s.uniformName];
     if (loc === undefined) continue;
     setUniform(gl, loc ?? null, {
       kind: 'sampler2D',
-      texture: src.fbo.color.texture,
+      texture,
       unit: s.unit,
     });
   }
@@ -96,7 +104,7 @@ export function executePlan(
     gl.useProgram(pass.program.program);
     bindSystemUniforms(gl, pass, ctx);
     bindUserUniforms(gl, pass);
-    bindSamplers(gl, pass, passByNode);
+    bindSamplers(gl, pass, passByNode, plan);
     drawMesh(gl, pass.mesh);
   }
 

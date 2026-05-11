@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useGraphStore, snapshotGraph } from '../../state/graphStore';
+import { useAssetStore, snapshotAssets } from '../../state/assetStore';
 import { useRendererStore } from '../../state/rendererStore';
 import { useCameraStore } from '../../state/cameraStore';
 import { useDiagnosticsStore, emptyDiagnostics } from '../../state/diagnosticsStore';
@@ -7,7 +8,7 @@ import { createGLContext } from '../../core/gl/context';
 import { compileGraph, emptyPlan, type ExecutionPlan } from '../../core/graph/compile';
 import { executePlan } from '../../core/graph/execute';
 import { createCameraController } from '../../core/camera/input';
-import { createDemoGraph } from '../../state/demoGraph';
+import { createDemoGraph, DEMO_LAYOUT } from '../../state/demoGraph';
 import { parseShaderInfoLog } from '../../core/graph/diagnostics';
 import { thumbnailScheduler } from '../../state/thumbnailScheduler';
 import { readbackThumbnail } from '../../core/thumbnail/readback';
@@ -22,11 +23,7 @@ export function Viewport() {
   // Bootstrap demo graph on first mount if empty
   useEffect(() => {
     if (useGraphStore.getState().nodes.length === 0) {
-      useGraphStore.getState().setGraph(createDemoGraph(), {
-        mesh1: { x: -240, y: 0 },
-        shader1: { x: 80, y: 0 },
-        output1: { x: 400, y: 0 },
-      });
+      useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
     }
   }, []);
 
@@ -48,6 +45,7 @@ export function Viewport() {
 
     let plan: ExecutionPlan = emptyPlan(canvas.width || 1, canvas.height || 1);
     let lastRev = -1;
+    let lastAssetRev = -1;
     let lastUniformRev = -1;
     let alive = true;
     let rafId = 0;
@@ -61,8 +59,9 @@ export function Viewport() {
       const h = Math.max(1, canvas.height);
       plan.dispose();
       const g = snapshotGraph();
+      const assets = snapshotAssets();
       try {
-        plan = compileGraph(gl, g, { width: w, height: h });
+        plan = compileGraph(gl, g, { width: w, height: h, assets });
         clearErrors();
         if (plan.errors.length) {
           pushError(plan.errors.map((e) => e.message).join(' | '));
@@ -106,9 +105,17 @@ export function Viewport() {
       if (!alive) return;
       const resized = resize();
       const rev = useGraphStore.getState().rev;
+      const assetRev = useAssetStore.getState().rev;
       const uniformRev = useGraphStore.getState().uniformRev;
-      if (rev !== lastRev || resized || plan.width !== canvas.width || plan.height !== canvas.height) {
+      if (
+        rev !== lastRev ||
+        assetRev !== lastAssetRev ||
+        resized ||
+        plan.width !== canvas.width ||
+        plan.height !== canvas.height
+      ) {
         lastRev = rev;
+        lastAssetRev = assetRev;
         recompile();
         thumbnailScheduler.bumpAll();
       }

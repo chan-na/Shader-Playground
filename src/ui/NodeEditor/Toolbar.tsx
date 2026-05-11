@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useGraphStore } from '../../state/graphStore';
 import {
   createDemoGraph,
@@ -5,6 +6,7 @@ import {
   createChainDemoGraph,
   CHAIN_DEMO_LAYOUT,
 } from '../../state/demoGraph';
+import { importFiles } from '../../state/assetActions';
 import { nextId } from '../../utils/id';
 import basicVert from '../../shaders/basic.vert?raw';
 import unlitFrag from '../../shaders/templates/unlit.frag?raw';
@@ -25,8 +27,19 @@ export function Toolbar() {
   const setGraph = useGraphStore((s) => s.setGraph);
   const reset = useGraphStore((s) => s.reset);
   const nodes = useGraphStore((s) => s.nodes);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasOutput = nodes.some((n) => n.kind === 'output');
+
+  const onPickFiles = () => fileInputRef.current?.click();
+  const onFilesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length) {
+      void importFiles(files);
+    }
+    // Reset so the same file can be re-imported.
+    e.target.value = '';
+  };
 
   const addMesh = () => {
     const id = nextId('mesh');
@@ -71,6 +84,15 @@ export function Toolbar() {
       <button style={btn} onClick={addImage}>+ Image</button>
       <button style={btn} onClick={addShader}>+ Shader</button>
       <button style={btn} onClick={addOutput} disabled={hasOutput}>+ Output</button>
+      <button style={btn} onClick={onPickFiles} title="Import OBJ/GLTF/PNG/JPG">↑ Load…</button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".obj,.gltf,.glb,image/*"
+        multiple
+        style={{ display: 'none' }}
+        onChange={onFilesChosen}
+      />
       <div style={{ flex: 1 }} />
       <button style={btn} onClick={() => setGraph(createDemoGraph(), DEMO_LAYOUT)}>Demo</button>
       <button style={btn} onClick={() => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT)}>Chain Demo</button>

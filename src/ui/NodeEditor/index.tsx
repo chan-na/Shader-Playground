@@ -17,6 +17,7 @@ import './nodeCard.css';
 
 import { useGraphStore } from '../../state/graphStore';
 import { useSelectionStore } from '../../state/selectionStore';
+import { importFiles } from '../../state/assetActions';
 import { Toolbar } from './Toolbar';
 import { MeshNodeView } from './nodes/MeshNodeView';
 import { ImageNodeView } from './nodes/ImageNodeView';
@@ -172,8 +173,26 @@ export function NodeEditor() {
     [graphNodes],
   );
 
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer?.types.includes('Files')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    const inst = flowRef.current;
+    let pos: { x: number; y: number } | undefined;
+    if (inst) {
+      pos = inst.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    }
+    void importFiles(e.dataTransfer.files, pos);
+  }, []);
+
   return (
-    <div className="panel panel--graph">
+    <div className="panel panel--graph" onDragOver={onDragOver} onDrop={onDrop}>
       <div className="panel-header">Node Graph</div>
       <Toolbar />
       <div className="panel-body" style={{ background: '#1a1a1a' }}>

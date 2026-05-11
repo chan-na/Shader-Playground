@@ -14,7 +14,11 @@ export interface BaseNode {
 
 export interface MeshGraphNode extends BaseNode {
   kind: 'mesh';
+  // Either a built-in primitive name OR an assetId referencing a loaded
+  // custom mesh in the asset store. `primitive` and `assetId` are mutually
+  // exclusive; when `assetId` is set, `primitive` is ignored.
   primitive: 'cube' | 'sphere' | 'plane' | 'torus' | 'quad';
+  assetId?: string | null;
 }
 
 export interface ImageGraphNode extends BaseNode {

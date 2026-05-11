@@ -1,0 +1,96 @@
+import { useMemo } from 'react';
+import { useDiagnosticsStore } from '../../state/diagnosticsStore';
+import { useRendererStore } from '../../state/rendererStore';
+import { useGraphStore } from '../../state/graphStore';
+import { useSelectionStore } from '../../state/selectionStore';
+import { useEditorStore } from '../../state/editorStore';
+import type { GLSLDiagnostic } from '../../core/graph/diagnostics';
+
+interface Entry {
+  nodeId: string;
+  stage: 'vertex' | 'fragment' | 'link';
+  diag: GLSLDiagnostic;
+}
+
+export function ProblemsPanel() {
+  const byNode = useDiagnosticsStore((s) => s.byNode);
+  const runtimeErrors = useRendererStore((s) => s.stats.errors);
+  const nodes = useGraphStore((s) => s.nodes);
+  const select = useSelectionStore((s) => s.select);
+  const setStage = useEditorStore((s) => s.setStage);
+
+  const entries: Entry[] = useMemo(() => {
+    const out: Entry[] = [];
+    for (const [nodeId, diags] of Object.entries(byNode)) {
+      for (const d of diags.vertex) out.push({ nodeId, stage: 'vertex', diag: d });
+      for (const d of diags.fragment) out.push({ nodeId, stage: 'fragment', diag: d });
+      for (const d of diags.link) out.push({ nodeId, stage: 'link', diag: d });
+    }
+    return out;
+  }, [byNode]);
+
+  const nodeLabel = (id: string) => {
+    const n = nodes.find((nn) => nn.id === id);
+    return n ? `${n.kind} · ${id}` : id;
+  };
+
+  const goTo = (nodeId: string, stage: 'vertex' | 'fragment' | 'link') => {
+    select(nodeId);
+    if (stage !== 'link') setStage(stage);
+  };
+
+  return (
+    <div className="panel-body" style={{ overflowY: 'auto' }}>
+      {entries.length === 0 && runtimeErrors.length === 0 && (
+        <div className="inspector-empty">No problems</div>
+      )}
+      {runtimeErrors.length > 0 && (
+        <div className="inspector-section">
+          <div className="inspector-label">Runtime errors ({runtimeErrors.length})</div>
+          {runtimeErrors.map((e, i) => (
+            <div key={i} className="problem-row" style={{ color: '#ff8484' }}>
+              <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{e}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {entries.length > 0 && (
+        <div className="inspector-section">
+          <div className="inspector-label">Shader diagnostics ({entries.length})</div>
+          {entries.map((e, i) => {
+            const color = e.diag.severity === 'error' ? '#ff8484' : e.diag.severity === 'warning' ? '#dcc46c' : '#7aa6e8';
+            return (
+              <div
+                key={i}
+                className="problem-row"
+                onClick={() => goTo(e.nodeId, e.stage)}
+                title="Jump to source"
+              >
+                <span style={{ color, fontFamily: 'monospace', fontSize: 11, marginRight: 6 }}>
+                  ●
+                </span>
+                <span style={{ color: '#bbb', fontSize: 11 }}>
+                  <strong>{nodeLabel(e.nodeId)}</strong> · {e.stage}:{e.diag.line}
+                  {e.diag.column !== undefined ? `:${e.diag.column}` : ''}
+                </span>
+                <div style={{ color: '#ddd', fontSize: 12, marginTop: 2, paddingLeft: 14, wordBreak: 'break-word' }}>
+                  {e.diag.message}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function totalProblems(): number {
+  const byNode = useDiagnosticsStore.getState().byNode;
+  let total = 0;
+  for (const d of Object.values(byNode)) {
+    total += d.vertex.length + d.fragment.length + d.link.length;
+  }
+  total += useRendererStore.getState().stats.errors.length;
+  return total;
+}

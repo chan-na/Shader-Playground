@@ -5,6 +5,7 @@ import type {
   GraphNode,
   ShaderGraphNode,
 } from '../core/graph/types';
+import { useHistoryStore } from './historyStore';
 
 export interface NodePosition {
   x: number;
@@ -30,30 +31,52 @@ export interface GraphState {
   addEdge: (edge: GraphEdge) => void;
   removeEdge: (id: string) => void;
   reset: () => void;
+
+  /** Replace state without bumping history (used by undo/redo). */
+  applySnapshot: (snap: {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+    positions: Record<string, NodePosition>;
+  }) => void;
 }
 
-export const useGraphStore = create<GraphState>((set) => ({
+function pushHistory(s: GraphState) {
+  useHistoryStore.getState().push({
+    nodes: s.nodes.map((n) => ({ ...n })),
+    edges: s.edges.map((e) => ({ ...e })),
+    positions: Object.fromEntries(
+      Object.entries(s.positions).map(([k, v]) => [k, { x: v.x, y: v.y }]),
+    ),
+  });
+}
+
+export const useGraphStore = create<GraphState>((set, get) => ({
   nodes: [],
   edges: [],
   positions: {},
   rev: 0,
   uniformRev: 0,
-  setGraph: (g, positions) =>
+  setGraph: (g, positions) => {
+    pushHistory(get());
     set((s) => ({
       nodes: g.nodes,
       edges: g.edges,
       positions: positions ?? s.positions,
       rev: s.rev + 1,
-    })),
-  addNode: (node, position) =>
+    }));
+  },
+  addNode: (node, position) => {
+    pushHistory(get());
     set((s) => ({
       nodes: [...s.nodes, node],
       positions: position
         ? { ...s.positions, [node.id]: position }
         : s.positions,
       rev: s.rev + 1,
-    })),
-  removeNode: (id) =>
+    }));
+  },
+  removeNode: (id) => {
+    pushHistory(get());
     set((s) => {
       const positions = { ...s.positions };
       delete positions[id];
@@ -63,10 +86,12 @@ export const useGraphStore = create<GraphState>((set) => ({
         positions,
         rev: s.rev + 1,
       };
-    }),
+    });
+  },
   updateNodePosition: (id, position) =>
     set((s) => ({ positions: { ...s.positions, [id]: position } })),
-  updateShaderSource: (id, patch) =>
+  updateShaderSource: (id, patch) => {
+    pushHistory(get());
     set((s) => ({
       nodes: s.nodes.map((n) => {
         if (n.id !== id || n.kind !== 'shader') return n;
@@ -78,7 +103,8 @@ export const useGraphStore = create<GraphState>((set) => ({
         };
       }),
       rev: s.rev + 1,
-    })),
+    }));
+  },
   setUniformValue: (id, name, value) =>
     set((s) => ({
       nodes: s.nodes.map((n) => {
@@ -91,21 +117,52 @@ export const useGraphStore = create<GraphState>((set) => ({
       }),
       uniformRev: s.uniformRev + 1,
     })),
-  addEdge: (edge) =>
-    set((s) => ({ edges: [...s.edges, edge], rev: s.rev + 1 })),
-  removeEdge: (id) =>
-    set((s) => ({ edges: s.edges.filter((e) => e.id !== id), rev: s.rev + 1 })),
-  reset: () =>
+  addEdge: (edge) => {
+    pushHistory(get());
+    set((s) => ({ edges: [...s.edges, edge], rev: s.rev + 1 }));
+  },
+  removeEdge: (id) => {
+    pushHistory(get());
+    set((s) => ({ edges: s.edges.filter((e) => e.id !== id), rev: s.rev + 1 }));
+  },
+  reset: () => {
+    pushHistory(get());
     set((s) => ({
       nodes: [],
       edges: [],
       positions: {},
       rev: s.rev + 1,
       uniformRev: 0,
+    }));
+  },
+  applySnapshot: (snap) =>
+    set((s) => ({
+      nodes: snap.nodes.map((n) => ({ ...n })),
+      edges: snap.edges.map((e) => ({ ...e })),
+      positions: Object.fromEntries(
+        Object.entries(snap.positions).map(([k, v]) => [k, { x: v.x, y: v.y }]),
+      ),
+      rev: s.rev + 1,
     })),
 }));
 
 export function snapshotGraph(): Graph {
   const s = useGraphStore.getState();
   return { nodes: s.nodes, edges: s.edges };
+}
+
+/** Pop the last history entry into the live graph. */
+export function undoGraph(): boolean {
+  const prev = useHistoryStore.getState().undo();
+  if (!prev) return false;
+  useGraphStore.getState().applySnapshot(prev);
+  return true;
+}
+
+/** Re-apply the most recently undone graph. */
+export function redoGraph(): boolean {
+  const next = useHistoryStore.getState().redo();
+  if (!next) return false;
+  useGraphStore.getState().applySnapshot(next);
+  return true;
 }

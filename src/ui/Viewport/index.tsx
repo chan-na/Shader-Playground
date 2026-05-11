@@ -12,6 +12,9 @@ import { createDemoGraph, DEMO_LAYOUT } from '../../state/demoGraph';
 import { parseShaderInfoLog } from '../../core/graph/diagnostics';
 import { thumbnailScheduler } from '../../state/thumbnailScheduler';
 import { readbackThumbnail } from '../../core/thumbnail/readback';
+import { useTimeStore } from '../../state/timeStore';
+import { useViewportStore } from '../../state/viewportStore';
+import { useHistoryStore } from '../../state/historyStore';
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -20,10 +23,12 @@ export function Viewport() {
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
 
-  // Bootstrap demo graph on first mount if empty
+  // Bootstrap demo graph on first mount if empty. Clear history afterwards
+  // so the first Cmd+Z doesn't wipe the demo back to a blank canvas.
   useEffect(() => {
     if (useGraphStore.getState().nodes.length === 0) {
       useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+      useHistoryStore.getState().clear();
     }
   }, []);
 
@@ -49,10 +54,10 @@ export function Viewport() {
     let lastUniformRev = -1;
     let alive = true;
     let rafId = 0;
-    const start = performance.now();
-    let prev = start;
+    let prev = performance.now();
     let frameCount = 0;
     let fpsAccum = 0;
+    const timeStore = useTimeStore;
 
     const recompile = () => {
       const w = Math.max(1, canvas.width);
@@ -135,6 +140,8 @@ export function Viewport() {
       const now = performance.now();
       const dt = now - prev;
       prev = now;
+      // Advance simulated shader time honoring play/pause/speed.
+      timeStore.getState().advance(dt / 1000);
       frameCount++;
       fpsAccum += dt;
       if (fpsAccum >= 500) {
@@ -144,7 +151,8 @@ export function Viewport() {
         fpsAccum = 0;
       }
 
-      const t = (now - start) / 1000;
+      const t = useTimeStore.getState().simTime;
+      const bg = useViewportStore.getState().background;
       executePlan(
         gl,
         plan,
@@ -153,6 +161,7 @@ export function Viewport() {
           width: plan.width,
           height: plan.height,
           camera: useCameraStore.getState().camera,
+          background: bg,
         },
         canvas.width,
         canvas.height,

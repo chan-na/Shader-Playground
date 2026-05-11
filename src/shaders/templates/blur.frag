@@ -3,6 +3,7 @@ precision highp float;
 
 uniform sampler2D u_tex;
 uniform vec2 u_resolution;
+// @range 0..10 @step 0.1 @default 2.5 @label "Blur radius"
 uniform float u_radius;
 
 out vec4 outColor;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseUniforms,
+  parseHintComment,
   inspectorUniforms,
   samplerUniforms,
   SYSTEM_UNIFORMS,
@@ -106,5 +107,96 @@ describe('parseUniforms', () => {
     expect(SYSTEM_UNIFORMS.has('u_time')).toBe(true);
     expect(SYSTEM_UNIFORMS.has('u_resolution')).toBe(true);
     expect(SYSTEM_UNIFORMS.has('u_model')).toBe(true);
+  });
+});
+
+describe('parseHintComment', () => {
+  it('parses @range', () => {
+    const h = parseHintComment('// @range 0..10');
+    expect(h.min).toBe(0);
+    expect(h.max).toBe(10);
+  });
+
+  it('parses @min and @max independently', () => {
+    const h = parseHintComment('// @min -5 @max 5');
+    expect(h.min).toBe(-5);
+    expect(h.max).toBe(5);
+  });
+
+  it('parses @step', () => {
+    const h = parseHintComment('// @step 0.05');
+    expect(h.step).toBe(0.05);
+  });
+
+  it('parses scalar @default', () => {
+    const h = parseHintComment('// @default 0.42');
+    expect(h.defaultValue).toBe(0.42);
+  });
+
+  it('parses vector @default', () => {
+    const h = parseHintComment('// @default 1, 0.5, 0.2');
+    expect(h.defaultValue).toEqual([1, 0.5, 0.2]);
+  });
+
+  it('parses @label with quotes', () => {
+    const h = parseHintComment('// @label "Tint Color"');
+    expect(h.label).toBe('Tint Color');
+  });
+
+  it('parses bare @label', () => {
+    const h = parseHintComment('// @label Brightness');
+    expect(h.label).toBe('Brightness');
+  });
+
+  it('returns an empty object for non-hint text', () => {
+    expect(parseHintComment('// just a normal comment')).toEqual({});
+    expect(parseHintComment('')).toEqual({});
+  });
+});
+
+describe('parseUniforms with hints', () => {
+  it('applies trailing @range hint', () => {
+    const src = `uniform float u_intensity; // @range 0..5 @default 2`;
+    const u = parseUniforms(src);
+    const x = u.find((u) => u.name === 'u_intensity')!;
+    expect(x.min).toBe(0);
+    expect(x.max).toBe(5);
+    expect(x.defaultValue).toBe(2);
+  });
+
+  it('applies hint from preceding comment line', () => {
+    const src = `
+      // @range -3..3 @step 0.1 @label "Frequency"
+      uniform float u_freq;
+    `;
+    const u = parseUniforms(src);
+    const x = u.find((u) => u.name === 'u_freq')!;
+    expect(x.min).toBe(-3);
+    expect(x.max).toBe(3);
+    expect(x.step).toBe(0.1);
+    expect(x.label).toBe('Frequency');
+  });
+
+  it('applies vector default', () => {
+    const src = `
+      // @default 0.2, 0.4, 0.8
+      uniform vec3 u_tint;
+    `;
+    const u = parseUniforms(src);
+    const x = u.find((u) => u.name === 'u_tint')!;
+    expect(x.defaultValue).toEqual([0.2, 0.4, 0.8]);
+  });
+
+  it('combines hints across multiple preceding lines', () => {
+    const src = `
+      // @range 0..1
+      // @default 0.7
+      uniform float u_amount;
+    `;
+    const u = parseUniforms(src);
+    const x = u.find((u) => u.name === 'u_amount')!;
+    expect(x.min).toBe(0);
+    expect(x.max).toBe(1);
+    expect(x.defaultValue).toBe(0.7);
   });
 });

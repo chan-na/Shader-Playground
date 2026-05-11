@@ -15,6 +15,8 @@ export interface FrameContext {
   width: number;
   height: number;
   camera: OrbitCameraState;
+  /** Background color shown by the placeholder/empty pass. */
+  background?: [number, number, number];
 }
 
 const _view = mat4.create();
@@ -111,11 +113,16 @@ export function executePlan(
   // Composite to canvas
   bindFramebuffer(gl, null);
   gl.viewport(0, 0, canvasWidth, canvasHeight);
+  const bg = ctx.background ?? [0.07, 0.07, 0.09];
   if (plan.outputSourceNodeId && passByNode.has(plan.outputSourceNodeId)) {
+    // Clear with background first so any transparent shader output composites
+    // over the user's chosen background instead of black.
+    gl.clearColor(bg[0], bg[1], bg[2], 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     const src = passByNode.get(plan.outputSourceNodeId)!;
     blitToCanvas(gl, src.fbo.color.texture);
   } else {
-    drawPlaceholder(gl);
+    drawPlaceholder(gl, bg);
   }
 }
 
@@ -184,8 +191,8 @@ function blitToCanvas(gl: WebGL2RenderingContext, tex: WebGLTexture) {
   gl.bindVertexArray(null);
 }
 
-function drawPlaceholder(gl: WebGL2RenderingContext) {
+function drawPlaceholder(gl: WebGL2RenderingContext, bg: [number, number, number]) {
   gl.disable(gl.DEPTH_TEST);
-  gl.clearColor(0.07, 0.07, 0.09, 1);
+  gl.clearColor(bg[0], bg[1], bg[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
 }

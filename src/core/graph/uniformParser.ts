@@ -24,7 +24,10 @@ export interface UniformSpec {
   /** Default UI range for sliders */
   min: number;
   max: number;
+  step: number;
   defaultValue: number | number[];
+  /** Optional human-readable label overriding the name */
+  label?: string;
 }
 
 export const SYSTEM_UNIFORMS = new Set([
@@ -49,40 +52,137 @@ function isColorName(name: string): boolean {
   return /color/i.test(name);
 }
 
-function defaultRangeFor(type: UniformType, name: string): { min: number; max: number; defaultValue: number | number[] } {
+function defaultRangeFor(type: UniformType, name: string): { min: number; max: number; step: number; defaultValue: number | number[] } {
   if (type === 'float') {
     if (/intensity|strength|amount|opacity|alpha/i.test(name)) {
-      return { min: 0, max: 1, defaultValue: 0.5 };
+      return { min: 0, max: 1, step: 0.001, defaultValue: 0.5 };
     }
     if (/scale|frequency|radius/i.test(name)) {
-      return { min: 0, max: 10, defaultValue: 1 };
+      return { min: 0, max: 10, step: 0.01, defaultValue: 1 };
     }
-    return { min: -1, max: 1, defaultValue: 0 };
+    return { min: -1, max: 1, step: 0.002, defaultValue: 0 };
   }
   if (type.startsWith('vec')) {
     const len = VEC_LEN[type] ?? 3;
     if (isColorName(name)) {
       const def = len === 4 ? [1, 1, 1, 1] : [1, 1, 1];
-      return { min: 0, max: 1, defaultValue: def };
+      return { min: 0, max: 1, step: 0.001, defaultValue: def };
     }
-    return { min: -1, max: 1, defaultValue: new Array(len).fill(0) };
+    return { min: -1, max: 1, step: 0.002, defaultValue: new Array(len).fill(0) };
   }
-  if (type === 'int') return { min: 0, max: 10, defaultValue: 0 };
-  if (type === 'bool') return { min: 0, max: 1, defaultValue: 0 };
-  return { min: 0, max: 1, defaultValue: 0 };
+  if (type === 'int') return { min: 0, max: 10, step: 1, defaultValue: 0 };
+  if (type === 'bool') return { min: 0, max: 1, step: 1, defaultValue: 0 };
+  return { min: 0, max: 1, step: 0.001, defaultValue: 0 };
 }
 
 const RE_UNIFORM = /^\s*uniform\s+(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+([A-Za-z_][\w]*)\s*(?:\[(\d+)\])?\s*;/;
 
+export interface UniformHints {
+  min?: number;
+  max?: number;
+  step?: number;
+  defaultValue?: number | number[];
+  label?: string;
+}
+
+/**
+ * Parses GLSL annotation comments. Hints may appear on the same line as the
+ * uniform declaration (after `//`) or on the line immediately preceding it.
+ *
+ *   uniform float u_x; // @range 0..10 @step 0.1 @default 3
+ *   // @range -1..1
+ *   uniform float u_y;
+ *
+ * Supported keys:
+ *   @range LO..HI  | @min LO @max HI
+ *   @step S
+ *   @default V or @default V1,V2,V3
+ *   @label "Human readable"
+ */
+export function parseHintComment(text: string): UniformHints {
+  const hints: UniformHints = {};
+  if (!text) return hints;
+
+  const rangeMatch = /@range\s+(-?\d+(?:\.\d+)?)\s*\.\.\s*(-?\d+(?:\.\d+)?)/.exec(text);
+  if (rangeMatch) {
+    hints.min = parseFloat(rangeMatch[1]);
+    hints.max = parseFloat(rangeMatch[2]);
+  }
+  const minMatch = /@min\s+(-?\d+(?:\.\d+)?)/.exec(text);
+  if (minMatch) hints.min = parseFloat(minMatch[1]);
+  const maxMatch = /@max\s+(-?\d+(?:\.\d+)?)/.exec(text);
+  if (maxMatch) hints.max = parseFloat(maxMatch[1]);
+
+  const stepMatch = /@step\s+(-?\d+(?:\.\d+)?)/.exec(text);
+  if (stepMatch) hints.step = parseFloat(stepMatch[1]);
+
+  const defMatch = /@default\s+([^@\n]+)/.exec(text);
+  if (defMatch) {
+    const raw = defMatch[1].trim();
+    if (raw.includes(',')) {
+      const parts = raw
+        .split(/[ ,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => parseFloat(s))
+        .filter((n) => !Number.isNaN(n));
+      if (parts.length) hints.defaultValue = parts;
+    } else {
+      const n = parseFloat(raw);
+      if (!Number.isNaN(n)) hints.defaultValue = n;
+    }
+  }
+
+  const labelMatch = /@label\s+(?:"([^"]+)"|([^\n@]+))/.exec(text);
+  if (labelMatch) {
+    const v = (labelMatch[1] ?? labelMatch[2] ?? '').trim();
+    if (v) hints.label = v;
+  }
+
+  return hints;
+}
+
+function applyHints(spec: UniformSpec, hints: UniformHints): UniformSpec {
+  const out = { ...spec };
+  if (hints.min !== undefined) out.min = hints.min;
+  if (hints.max !== undefined) out.max = hints.max;
+  if (hints.step !== undefined) out.step = hints.step;
+  if (hints.label !== undefined) out.label = hints.label;
+  if (hints.defaultValue !== undefined) {
+    if (Array.isArray(spec.defaultValue) && Array.isArray(hints.defaultValue)) {
+      const target = spec.defaultValue.slice();
+      for (let i = 0; i < target.length; i++) {
+        if (hints.defaultValue[i] !== undefined) target[i] = hints.defaultValue[i];
+      }
+      out.defaultValue = target;
+    } else if (typeof spec.defaultValue === 'number' && typeof hints.defaultValue === 'number') {
+      out.defaultValue = hints.defaultValue;
+    }
+  }
+  return out;
+}
+
 export function parseUniforms(source: string): UniformSpec[] {
   const out: UniformSpec[] = [];
   const seen = new Set<string>();
-  // Strip block + line comments to avoid matching commented-out uniforms.
-  const stripped = source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ');
-  for (const line of stripped.split(/\r?\n/)) {
-    const m = RE_UNIFORM.exec(line);
+  // Walk line by line, BUT preserve trailing line comments and look back at
+  // the previous comment-only line for hint annotations.
+  const rawLines = source.split(/\r?\n/);
+  // Strip block comments globally so they don't break the line walk; convert
+  // them into spaces but preserve newline count.
+  const noBlock = source.replace(/\/\*[\s\S]*?\*\//g, (m) =>
+    m.replace(/[^\n]/g, ' '),
+  );
+  const lines = noBlock.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Drop *inline* comments AFTER we capture them for hint parsing
+    const commentIdx = line.indexOf('//');
+    const code = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
+    const trailingComment = commentIdx >= 0 ? line.slice(commentIdx) : '';
+
+    const m = RE_UNIFORM.exec(code);
     if (!m) continue;
     const type = m[1] as UniformType;
     const name = m[2];
@@ -101,17 +201,36 @@ export function parseUniforms(source: string): UniformSpec[] {
     else if (type === 'float' || type === 'int') control = 'slider';
     else control = 'multi';
 
-    const { min, max, defaultValue } = defaultRangeFor(type, name);
+    const { min, max, step, defaultValue } = defaultRangeFor(type, name);
 
-    out.push({
+    let spec: UniformSpec = {
       name,
       type,
       control,
       system: SYSTEM_UNIFORMS.has(name),
       min,
       max,
+      step,
       defaultValue,
-    });
+    };
+
+    // Pull hints from the trailing inline comment AND from any preceding
+    // comment-only lines (walk back until a non-comment, non-blank line).
+    const hintParts: string[] = [];
+    if (trailingComment) hintParts.push(trailingComment);
+    for (let j = i - 1; j >= 0; j--) {
+      const prev = rawLines[j].trim();
+      if (!prev) continue;
+      if (prev.startsWith('//')) {
+        hintParts.unshift(prev);
+        continue;
+      }
+      break;
+    }
+    const hints = parseHintComment(hintParts.join('\n'));
+    spec = applyHints(spec, hints);
+
+    out.push(spec);
   }
   return out;
 }

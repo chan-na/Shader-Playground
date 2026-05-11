@@ -125,13 +125,15 @@ export async function importFiles(
   const arr = Array.from(files);
   const results: ImportResult[] = [];
   for (let i = 0; i < arr.length; i++) {
+    // biome-ignore lint/style/noNonNullAssertion: loop bound by arr.length
+    const file = arr[i]!;
     const offset = basePosition ?? { x: -240, y: 0 };
     const pos = { x: offset.x, y: offset.y + i * 100 };
     try {
-      const r = await importFile(arr[i], pos);
+      const r = await importFile(file, pos);
       if (r) results.push(r);
     } catch (e) {
-      console.error("Asset import failed:", arr[i].name, e);
+      console.error("Asset import failed:", file.name, e);
     }
   }
   return results;

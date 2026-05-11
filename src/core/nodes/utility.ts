@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + arity-bounded channel/value access
 import type {
   CombineGraphNode,
   Graph,
@@ -49,7 +50,7 @@ export function applySwizzle(input: Value, mask: string): Value {
     const idx = MASK_INDEX[c];
     out.push(idx === undefined ? 0 : (src[idx] ?? 0));
   }
-  if (out.length === 1) return out[0];
+  if (out.length === 1) return out[0]!;
   return out;
 }
 
@@ -184,8 +185,8 @@ function evalCombine(
   for (let i = 0; i < node.arity; i++) {
     const v = inputValue(
       node.id,
-      channels[i],
-      node.values[i],
+      channels[i]!,
+      node.values[i]!,
       graph,
       ctx,
       cache,

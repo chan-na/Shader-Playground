@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + bounded pixel sampling loop
 export const THUMB_SIZE = 96;
 
 const _scratch = new Uint8Array(THUMB_SIZE * THUMB_SIZE * 4);
@@ -37,10 +38,10 @@ export function downsampleToThumb(
         const rowStart = flipped * w * 4;
         for (let sx = sx0; sx < sx1; sx += dx) {
           const i = rowStart + sx * 4;
-          r += buf[i];
-          g += buf[i + 1];
-          b += buf[i + 2];
-          a += buf[i + 3];
+          r += buf[i]!;
+          g += buf[i + 1]!;
+          b += buf[i + 2]!;
+          a += buf[i + 3]!;
           n++;
         }
       }

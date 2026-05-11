@@ -22,7 +22,7 @@ describe("historyStore", () => {
     h.push(snap(3));
 
     const undone = useHistoryStore.getState().undo()!;
-    expect(undone.nodes[0].id).toBe("n2");
+    expect(undone.nodes[0]!.id).toBe("n2");
   });
 
   it("redo restores undone snapshot", () => {
@@ -31,7 +31,7 @@ describe("historyStore", () => {
     h.push(snap(2));
     useHistoryStore.getState().undo();
     const redone = useHistoryStore.getState().redo()!;
-    expect(redone.nodes[0].id).toBe("n2");
+    expect(redone.nodes[0]!.id).toBe("n2");
   });
 
   it("undo on empty history returns null", () => {

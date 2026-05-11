@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + bounded byte/regex loops
 import type { Graph } from "../core/graph/types";
 import {
   deserializeProject,
@@ -11,7 +12,7 @@ import type { NodePosition } from "./types";
  */
 function bytesToBase64Url(bytes: Uint8Array): string {
   let s = "";
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!);
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
@@ -77,7 +78,7 @@ export async function decodeShareHash(hash: string): Promise<{
   const m = /[#&]share=([A-Za-z0-9_-]+)/.exec(hash);
   if (!m) return null;
   try {
-    const bytes = base64UrlToBytes(m[1]);
+    const bytes = base64UrlToBytes(m[1]!);
     const decompressed = await gunzip(bytes);
     const json = new TextDecoder().decode(decompressed);
     const project = JSON.parse(json) as SerializedProject;

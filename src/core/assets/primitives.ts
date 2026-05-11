@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + bounded geometry generation loops
 import type { MeshData } from "../gl/mesh";
 
 export function makeQuad(): MeshData {
@@ -184,9 +185,11 @@ export function makeCube(size = 1): MeshData {
   const uvs: number[] = [];
   for (const f of faces) {
     for (let i = 0; i < 6; i++) {
-      positions.push(f.p[i][0], f.p[i][1], f.p[i][2]);
-      normals.push(f.n[0], f.n[1], f.n[2]);
-      uvs.push(f.u[i][0], f.u[i][1]);
+      const p = f.p[i]!;
+      const u = f.u[i]!;
+      positions.push(p[0]!, p[1]!, p[2]!);
+      normals.push(f.n[0]!, f.n[1]!, f.n[2]!);
+      uvs.push(u[0]!, u[1]!);
     }
   }
   return {

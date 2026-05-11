@@ -174,7 +174,8 @@ export function NodeEditor() {
       };
       if (validateGraph(tentative).some((e) => e.code === "cycle")) return;
 
-      addEdge(tentative.edges[tentative.edges.length - 1]);
+      // biome-ignore lint/style/noNonNullAssertion: we just pushed an edge onto tentative.edges
+      addEdge(tentative.edges[tentative.edges.length - 1]!);
     },
     [graphEdges, graphNodes, addEdge],
   );

@@ -153,9 +153,9 @@ describe("AsyncThumbnailReadback", () => {
     harness.setSignaled(true);
     const results = r.poll(gl);
     expect(results).toHaveLength(1);
-    expect(results[0].nodeId).toBe("n1");
-    expect(results[0].image.width).toBe(96);
-    expect(results[0].image.height).toBe(96);
+    expect(results[0]!.nodeId).toBe("n1");
+    expect(results[0]!.image.width).toBe(96);
+    expect(results[0]!.image.height).toBe(96);
     expect(r.pendingNodeIds()).toEqual([]);
   });
 

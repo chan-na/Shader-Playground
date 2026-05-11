@@ -27,9 +27,9 @@ describe("primitives", () => {
     expect(m.indices).toBeInstanceOf(Uint16Array);
     const normals = m.attributes.find((a) => a.name === "a_normal")!;
     for (let i = 0; i < normals.data.length; i += 3) {
-      const x = normals.data[i];
-      const y = normals.data[i + 1];
-      const z = normals.data[i + 2];
+      const x = normals.data[i]!;
+      const y = normals.data[i + 1]!;
+      const z = normals.data[i + 2]!;
       const len = Math.sqrt(x * x + y * y + z * z);
       expect(Math.abs(len - 1)).toBeLessThan(1e-3);
     }

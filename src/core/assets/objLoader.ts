@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + bounded numeric loops (face vertex/index access)
 import { parse } from "@loaders.gl/core";
 import { OBJLoader } from "@loaders.gl/obj";
 import type { MeshData } from "../gl/mesh";
@@ -124,36 +125,33 @@ function computeFlatNormals(
   };
   const triCount = indices ? indices.length / 3 : positions.length / 9;
   for (let t = 0; t < triCount; t++) {
-    const i0 = indices ? indices[t * 3] : t * 3;
-    const i1 = indices ? indices[t * 3 + 1] : t * 3 + 1;
-    const i2 = indices ? indices[t * 3 + 2] : t * 3 + 2;
-    const [ax, ay, az] = [
-      positions[i0 * 3],
-      positions[i0 * 3 + 1],
-      positions[i0 * 3 + 2],
-    ];
-    const [bx, by, bz] = [
-      positions[i1 * 3],
-      positions[i1 * 3 + 1],
-      positions[i1 * 3 + 2],
-    ];
-    const [cx, cy, cz] = [
-      positions[i2 * 3],
-      positions[i2 * 3 + 1],
-      positions[i2 * 3 + 2],
-    ];
+    const i0 = (indices ? indices[t * 3] : t * 3)!;
+    const i1 = (indices ? indices[t * 3 + 1] : t * 3 + 1)!;
+    const i2 = (indices ? indices[t * 3 + 2] : t * 3 + 2)!;
+    const ax = positions[i0 * 3]!;
+    const ay = positions[i0 * 3 + 1]!;
+    const az = positions[i0 * 3 + 2]!;
+    const bx = positions[i1 * 3]!;
+    const by = positions[i1 * 3 + 1]!;
+    const bz = positions[i1 * 3 + 2]!;
+    const cx = positions[i2 * 3]!;
+    const cy = positions[i2 * 3 + 1]!;
+    const cz = positions[i2 * 3 + 2]!;
     const [nx, ny, nz] = cross(ax, ay, az, bx, by, bz, cx, cy, cz);
     for (const i of [i0, i1, i2]) {
-      out[i * 3] += nx;
-      out[i * 3 + 1] += ny;
-      out[i * 3 + 2] += nz;
+      out[i * 3] = out[i * 3]! + nx;
+      out[i * 3 + 1] = out[i * 3 + 1]! + ny;
+      out[i * 3 + 2] = out[i * 3 + 2]! + nz;
     }
   }
   for (let i = 0; i < out.length; i += 3) {
-    const len = Math.hypot(out[i], out[i + 1], out[i + 2]) || 1;
-    out[i] /= len;
-    out[i + 1] /= len;
-    out[i + 2] /= len;
+    const nx = out[i]!;
+    const ny = out[i + 1]!;
+    const nz = out[i + 2]!;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    out[i] = nx / len;
+    out[i + 1] = ny / len;
+    out[i + 2] = nz / len;
   }
   return out;
 }

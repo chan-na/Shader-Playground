@@ -98,7 +98,8 @@ export function CombineNodeView({ id, data }: NodeProps) {
       <div className="node-card__body">
         <div className="node-card__param-value">
           {inputs
-            .map((p, i) => `${p.name}=${node.values[i].toFixed(2)}`)
+            // biome-ignore lint/style/noNonNullAssertion: inputs length matches node.values length (arity)
+            .map((p, i) => `${p.name}=${node.values[i]!.toFixed(2)}`)
             .join(" ")}
         </div>
         <div className="node-card__meta">{id}</div>

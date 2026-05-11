@@ -2,7 +2,7 @@ import type { ParamGraphNode } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 
 function rgbToHex(rgb: number[]) {
-  const c = (v: number) =>
+  const c = (v: number | undefined) =>
     Math.round(Math.max(0, Math.min(1, v ?? 0)) * 255)
       .toString(16)
       .padStart(2, "0");

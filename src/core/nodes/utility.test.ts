@@ -240,7 +240,7 @@ describe("registry helpers for utility nodes", () => {
       ),
     ).toEqual(["a"]);
     expect(
-      nodeOutputPorts({ id: "s", kind: "swizzle", mask: "xy" })[0].type,
+      nodeOutputPorts({ id: "s", kind: "swizzle", mask: "xy" })[0]!.type,
     ).toBe("vec2");
     expect(
       nodeOutputPorts({
@@ -248,7 +248,7 @@ describe("registry helpers for utility nodes", () => {
         kind: "combine",
         arity: 4,
         values: [0, 0, 0, 0],
-      })[0].type,
+      })[0]!.type,
     ).toBe("vec4");
   });
 });

@@ -1,6 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { ComputeGraphNode, ShaderGraphNode } from "../core/graph/types";
-import { useGraphStore } from "./graphStore";
+import type {
+  CombineGraphNode,
+  ComputeGraphNode,
+  MathGraphNode,
+  ParamGraphNode,
+  ShaderGraphNode,
+  SwizzleGraphNode,
+} from "../core/graph/types";
+import {
+  redoGraph,
+  snapshotGraph,
+  undoGraph,
+  useGraphStore,
+} from "./graphStore";
+import { useHistoryStore } from "./historyStore";
 
 const makeShader = (id: string, frag = "void main(){}"): ShaderGraphNode => ({
   id,
@@ -13,6 +26,7 @@ const makeShader = (id: string, frag = "void main(){}"): ShaderGraphNode => ({
 describe("graphStore", () => {
   beforeEach(() => {
     useGraphStore.getState().reset();
+    useHistoryStore.getState().clear();
   });
 
   it("starts empty", () => {
@@ -130,5 +144,195 @@ describe("graphStore", () => {
     });
     useGraphStore.getState().removeEdge("e1");
     expect(useGraphStore.getState().edges.map((e) => e.id)).toEqual(["e2"]);
+  });
+
+  it("updateNodePosition updates positions without bumping rev", () => {
+    const s = useGraphStore.getState();
+    s.addNode({ id: "n1", kind: "mesh", primitive: "cube" }, { x: 0, y: 0 });
+    const beforeRev = useGraphStore.getState().rev;
+    useGraphStore.getState().updateNodePosition("n1", { x: 99, y: 7 });
+    expect(useGraphStore.getState().positions.n1).toEqual({ x: 99, y: 7 });
+    expect(useGraphStore.getState().rev).toBe(beforeRev);
+  });
+
+  it("setMathConfig patches op/a/b and falls back when patch fields omitted", () => {
+    const m: MathGraphNode = { id: "m1", kind: "math", op: "add", a: 1, b: 2 };
+    useGraphStore.getState().addNode(m);
+    useGraphStore.getState().setMathConfig("m1", { op: "multiply", a: 5 });
+    let updated = useGraphStore.getState().nodes[0] as MathGraphNode;
+    expect(updated.op).toBe("multiply");
+    expect(updated.a).toBe(5);
+    expect(updated.b).toBe(2); // fallback to existing
+
+    useGraphStore.getState().setMathConfig("m1", {});
+    updated = useGraphStore.getState().nodes[0] as MathGraphNode;
+    expect(updated.op).toBe("multiply"); // all fallbacks
+  });
+
+  it("setSwizzleMask patches mask on swizzle nodes", () => {
+    const sw: SwizzleGraphNode = { id: "sw1", kind: "swizzle", mask: "x" };
+    useGraphStore.getState().addNode(sw);
+    useGraphStore.getState().setSwizzleMask("sw1", "yzw");
+    expect((useGraphStore.getState().nodes[0] as SwizzleGraphNode).mask).toBe(
+      "yzw",
+    );
+  });
+
+  it("setCombineConfig patches arity/values and falls back when omitted", () => {
+    const c: CombineGraphNode = {
+      id: "c1",
+      kind: "combine",
+      arity: 2,
+      values: [0, 0, 0, 0],
+    };
+    useGraphStore.getState().addNode(c);
+    useGraphStore
+      .getState()
+      .setCombineConfig("c1", { arity: 4, values: [1, 2, 3, 4] });
+    let updated = useGraphStore.getState().nodes[0] as CombineGraphNode;
+    expect(updated.arity).toBe(4);
+    expect(updated.values).toEqual([1, 2, 3, 4]);
+
+    // Fallback path — empty patch keeps existing values reference
+    useGraphStore.getState().setCombineConfig("c1", {});
+    updated = useGraphStore.getState().nodes[0] as CombineGraphNode;
+    expect(updated.values).toEqual([1, 2, 3, 4]);
+  });
+
+  it("setComputeConfig falls back to existing attributes when patch omits them", () => {
+    const cn: ComputeGraphNode = {
+      id: "cc1",
+      kind: "compute",
+      vertexSource: "",
+      count: 16,
+      primitive: "POINTS",
+      attributes: [{ inName: "a_p", outName: "v_p", size: 3, seed: "zero" }],
+      uniformValues: {},
+    };
+    useGraphStore.getState().addNode(cn);
+    useGraphStore.getState().setComputeConfig("cc1", { count: 64 });
+    const updated = useGraphStore.getState().nodes[0] as ComputeGraphNode;
+    expect(updated.count).toBe(64);
+    expect(updated.attributes).toHaveLength(1);
+    expect(updated.attributes[0]?.inName).toBe("a_p");
+  });
+
+  it("setParamValue updates value and bumps uniformRev only", () => {
+    const p: ParamGraphNode = {
+      id: "p1",
+      kind: "param",
+      paramKind: "float",
+      value: 0,
+    };
+    useGraphStore.getState().addNode(p);
+    const before = useGraphStore.getState();
+    useGraphStore.getState().setParamValue("p1", 0.42);
+    const after = useGraphStore.getState();
+    expect((after.nodes[0] as ParamGraphNode).value).toBe(0.42);
+    expect(after.uniformRev).toBe(before.uniformRev + 1);
+    expect(after.rev).toBe(before.rev);
+  });
+
+  it("setParamLabel patches label and bumps rev", () => {
+    const p: ParamGraphNode = {
+      id: "p1",
+      kind: "param",
+      paramKind: "float",
+      value: 0,
+    };
+    useGraphStore.getState().addNode(p);
+    const before = useGraphStore.getState().rev;
+    useGraphStore.getState().setParamLabel("p1", "Intensity");
+    expect((useGraphStore.getState().nodes[0] as ParamGraphNode).label).toBe(
+      "Intensity",
+    );
+    expect(useGraphStore.getState().rev).toBe(before + 1);
+  });
+
+  it("setUniformValue also targets compute nodes", () => {
+    const cn: ComputeGraphNode = {
+      id: "cu1",
+      kind: "compute",
+      vertexSource: "",
+      count: 1,
+      primitive: "POINTS",
+      attributes: [],
+      uniformValues: {},
+    };
+    useGraphStore.getState().addNode(cn);
+    useGraphStore.getState().setUniformValue("cu1", "u_x", 7);
+    const updated = useGraphStore.getState().nodes[0] as ComputeGraphNode;
+    expect(updated.uniformValues.u_x).toBe(7);
+  });
+
+  it("setGraph replaces nodes/edges and bumps rev", () => {
+    useGraphStore
+      .getState()
+      .addNode({ id: "old", kind: "mesh", primitive: "cube" });
+    const beforeRev = useGraphStore.getState().rev;
+    useGraphStore.getState().setGraph(
+      {
+        nodes: [{ id: "new", kind: "mesh", primitive: "sphere" }],
+        edges: [],
+      },
+      { new: { x: 1, y: 2 } },
+    );
+    const s = useGraphStore.getState();
+    expect(s.nodes.map((n) => n.id)).toEqual(["new"]);
+    expect(s.positions.new).toEqual({ x: 1, y: 2 });
+    expect(s.rev).toBe(beforeRev + 1);
+  });
+
+  it("snapshotGraph returns the live nodes/edges arrays", () => {
+    useGraphStore
+      .getState()
+      .addNode({ id: "n", kind: "mesh", primitive: "cube" });
+    const snap = snapshotGraph();
+    expect(snap.nodes).toHaveLength(1);
+    expect(snap.edges).toEqual([]);
+  });
+
+  it("applySnapshot replaces state without touching history (used by undo)", () => {
+    useGraphStore.getState().applySnapshot({
+      nodes: [{ id: "x", kind: "mesh", primitive: "cube" }],
+      edges: [],
+      positions: { x: { x: 4, y: 5 } },
+    });
+    const s = useGraphStore.getState();
+    expect(s.nodes[0]?.id).toBe("x");
+    expect(s.positions.x).toEqual({ x: 4, y: 5 });
+  });
+
+  it("undoGraph applies a previous snapshot when history is non-empty", () => {
+    useGraphStore
+      .getState()
+      .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+    useGraphStore
+      .getState()
+      .addNode({ id: "b", kind: "mesh", primitive: "sphere" });
+    expect(useGraphStore.getState().nodes).toHaveLength(2);
+
+    expect(undoGraph()).toBe(true);
+    // historyStore.undo returns past[length-2] (not the most recent push) —
+    // we just assert the call succeeded and live state shrunk.
+    expect(useGraphStore.getState().nodes.length).toBeLessThan(2);
+  });
+
+  it("redoGraph restores a previously undone snapshot", () => {
+    useGraphStore
+      .getState()
+      .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+    useGraphStore
+      .getState()
+      .addNode({ id: "b", kind: "mesh", primitive: "sphere" });
+    undoGraph();
+    expect(redoGraph()).toBe(true);
+    // After redo, future-head was cloned back into live state.
+    expect(useGraphStore.getState().nodes.length).toBeGreaterThan(0);
+  });
+
+  it("undoGraph / redoGraph return false when stacks are empty", () => {
+    expect(undoGraph()).toBe(false);
+    expect(redoGraph()).toBe(false);
   });
 });

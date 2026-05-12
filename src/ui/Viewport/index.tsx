@@ -25,6 +25,7 @@ export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const setReady = useRendererStore((s) => s.setReady);
   const setStats = useRendererStore((s) => s.setStats);
+  const bumpRenderTick = useRendererStore((s) => s.bumpRenderTick);
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
 
@@ -50,6 +51,9 @@ export function Viewport() {
     let lastRev = -1;
     let lastAssetRev = -1;
     let lastUniformRev = -1;
+    let lastCameraRev = -1;
+    let lastTimeRev = -1;
+    let lastViewportRev = -1;
     let alive = true;
     let rafId = 0;
     let prev = performance.now();
@@ -109,16 +113,21 @@ export function Viewport() {
     const tick = () => {
       if (!alive) return;
       const resized = resize();
+      const playing = useTimeStore.getState().playing;
       const rev = useGraphStore.getState().rev;
       const assetRev = useAssetStore.getState().rev;
       const uniformRev = useGraphStore.getState().uniformRev;
-      if (
+      const cameraRev = useCameraStore.getState().rev;
+      const timeRev = useTimeStore.getState().rev;
+      const viewportRev = useViewportStore.getState().rev;
+
+      const structuralDirty =
         rev !== lastRev ||
         assetRev !== lastAssetRev ||
         resized ||
         plan.width !== canvas.width ||
-        plan.height !== canvas.height
-      ) {
+        plan.height !== canvas.height;
+      if (structuralDirty) {
         lastRev = rev;
         lastAssetRev = assetRev;
         recompile();
@@ -131,18 +140,28 @@ export function Viewport() {
         }
         lastPassNodeIds = nextIds;
       }
-      if (uniformRev !== lastUniformRev) {
+      const uniformChanged = uniformRev !== lastUniformRev;
+      if (uniformChanged) {
         lastUniformRev = uniformRev;
         thumbnailScheduler.bumpAll();
       }
-      // Pull current uniform values into the plan (cheap)
-      const graph = useGraphStore.getState();
-      for (const pass of plan.passes) {
-        const node = graph.nodes.find((n) => n.id === pass.nodeId);
-        if (node && node.kind === "shader") {
-          pass.uniformValues = node.uniformValues;
-        }
-      }
+      const cameraChanged = cameraRev !== lastCameraRev;
+      const timeChanged = timeRev !== lastTimeRev;
+      const viewportChanged = viewportRev !== lastViewportRev;
+      lastCameraRev = cameraRev;
+      lastTimeRev = timeRev;
+      lastViewportRev = viewportRev;
+
+      // Static graph guard: when paused with no input changes since last frame
+      // there is no reason to re-execute the plan. Camera / param / scrub /
+      // bg / graph mutations bump their store rev, which wakes the next frame.
+      const needsRender =
+        playing ||
+        structuralDirty ||
+        uniformChanged ||
+        cameraChanged ||
+        timeChanged ||
+        viewportChanged;
 
       const now = performance.now();
       const dt = now - prev;
@@ -153,9 +172,36 @@ export function Viewport() {
       fpsAccum += dt;
       if (fpsAccum >= 500) {
         const fps = Math.round((frameCount * 1000) / fpsAccum);
-        setStats({ fps, frame: frameCount, drawCalls: plan.passes.length + 1 });
+        setStats({
+          fps,
+          frame: frameCount,
+          drawCalls: needsRender ? plan.passes.length + 1 : 0,
+        });
         frameCount = 0;
         fpsAccum = 0;
+      }
+
+      if (!needsRender) {
+        // Pump pending readback fences so thumbs issued before the pause
+        // eventually commit.
+        try {
+          for (const r of asyncReadback.poll(gl)) {
+            thumbnailScheduler.commit(r.nodeId, r.image, now);
+          }
+        } catch {
+          // Poll failure (e.g., context lost) — drop this frame's results.
+        }
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Pull current uniform values into the plan (cheap)
+      const graph = useGraphStore.getState();
+      for (const pass of plan.passes) {
+        const node = graph.nodes.find((n) => n.id === pass.nodeId);
+        if (node && node.kind === "shader") {
+          pass.uniformValues = node.uniformValues;
+        }
       }
 
       const t = useTimeStore.getState().simTime;
@@ -178,6 +224,7 @@ export function Viewport() {
         canvas.width,
         canvas.height,
       );
+      bumpRenderTick();
 
       // Thumbnail readback (10Hz throttle handled by scheduler).
       // Async path: poll signaled fences first so committed images use the
@@ -216,7 +263,7 @@ export function Viewport() {
       plan.dispose();
       setReady(false);
     };
-  }, [setReady, setStats, pushError, clearErrors]);
+  }, [setReady, setStats, bumpRenderTick, pushError, clearErrors]);
 
   return (
     <div className="panel panel--viewport">

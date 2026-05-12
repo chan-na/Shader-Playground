@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type {
   ComputeGraphNode,
   ParamGraphNode,
@@ -14,6 +14,7 @@ import { useSelectionStore } from "../../state/selectionStore";
 import { ParamInspector } from "./ParamInspector";
 import { UniformControl } from "./UniformControl";
 import { UtilityInspector } from "./UtilityInspector";
+import { filterUniforms } from "./uniformFilter";
 import { ViewportControls } from "./ViewportControls";
 
 export interface InspectorProps {
@@ -56,6 +57,26 @@ export function Inspector({ embedded = false }: InspectorProps) {
   const visible = inspectorUniforms(specs);
   const samplers = shaderNode ? samplerUniforms(specs) : [];
   const systemUniforms = specs.filter((u) => u.system);
+
+  const [uniformQuery, setUniformQuery] = useState("");
+  const filteredVisible = useMemo(
+    () => filterUniforms(visible, uniformQuery),
+    [visible, uniformQuery],
+  );
+  const filteredSamplers = useMemo(
+    () => filterUniforms(samplers, uniformQuery),
+    [samplers, uniformQuery],
+  );
+  const filteredSystem = useMemo(
+    () => filterUniforms(systemUniforms, uniformQuery),
+    [systemUniforms, uniformQuery],
+  );
+  const totalUniformCount =
+    visible.length + samplers.length + systemUniforms.length;
+  const filteredTotal =
+    filteredVisible.length + filteredSamplers.length + filteredSystem.length;
+  const hasQuery = uniformQuery.trim().length > 0;
+  const noMatches = hasQuery && filteredTotal === 0;
 
   const body = (
     <div className="panel-body" style={{ overflowY: "auto" }}>
@@ -127,9 +148,34 @@ export function Inspector({ embedded = false }: InspectorProps) {
 
           {uniformOwner && (
             <>
+              {totalUniformCount > 0 && (
+                <div className="inspector-section">
+                  <input
+                    type="search"
+                    placeholder="Filter uniforms (name / label / type)"
+                    value={uniformQuery}
+                    onChange={(e) => setUniformQuery(e.target.value)}
+                    data-testid="uniform-search"
+                    style={{
+                      width: "100%",
+                      padding: "4px 8px",
+                      fontSize: 12,
+                      background: "#1a1a1a",
+                      color: "#ddd",
+                      border: "1px solid #333",
+                      borderRadius: 3,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              )}
+
               <div className="inspector-section">
                 <div className="inspector-label">
-                  Uniforms ({visible.length})
+                  Uniforms{" "}
+                  {hasQuery
+                    ? `(${filteredVisible.length}/${visible.length})`
+                    : `(${visible.length})`}
                 </div>
                 {visible.length === 0 && (
                   <div style={{ color: "#777", fontSize: 12 }}>
@@ -138,7 +184,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
                     controls here.
                   </div>
                 )}
-                {visible.map((spec) => (
+                {filteredVisible.map((spec) => (
                   <div
                     key={spec.name}
                     style={{ marginBottom: 10 }}
@@ -169,10 +215,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
                 ))}
               </div>
 
-              {samplers.length > 0 && (
+              {samplers.length > 0 && filteredSamplers.length > 0 && (
                 <div className="inspector-section">
                   <div className="inspector-label">Sampler inputs</div>
-                  {samplers.map((s) => (
+                  {filteredSamplers.map((s) => (
                     <div
                       key={s.name}
                       style={{
@@ -190,10 +236,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
                 </div>
               )}
 
-              {systemUniforms.length > 0 && (
+              {systemUniforms.length > 0 && filteredSystem.length > 0 && (
                 <div className="inspector-section">
                   <div className="inspector-label">System uniforms (auto)</div>
-                  {systemUniforms.map((s) => (
+                  {filteredSystem.map((s) => (
                     <div
                       key={s.name}
                       style={{
@@ -205,6 +251,16 @@ export function Inspector({ embedded = false }: InspectorProps) {
                       {s.name} <span style={{ color: "#555" }}>· {s.type}</span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {noMatches && (
+                <div
+                  className="inspector-section"
+                  data-testid="uniform-search-empty"
+                  style={{ color: "#777", fontSize: 12 }}
+                >
+                  No uniforms match "{uniformQuery.trim()}".
                 </div>
               )}
             </>

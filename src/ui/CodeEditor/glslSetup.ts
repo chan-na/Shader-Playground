@@ -16,6 +16,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { glsl } from "codemirror-lang-glsl";
+import { glslAutocomplete } from "./autocomplete";
 
 const darkTheme = EditorView.theme(
   {
@@ -74,6 +75,7 @@ export function glslExtensions(): Extension[] {
     keymap.of([...defaultKeymap, ...historyKeymap]),
     lintGutter(),
     glsl(),
+    glslAutocomplete(),
     darkTheme,
     EditorView.lineWrapping,
   ];

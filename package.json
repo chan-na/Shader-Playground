@@ -22,6 +22,7 @@
     "check": "npm run typecheck && npm run lint && npm run deadcode && npm run circular && npm run test"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.2",
     "@codemirror/commands": "^6.10.3",
     "@codemirror/language": "^6.12.3",
     "@codemirror/lint": "^6.9.6",

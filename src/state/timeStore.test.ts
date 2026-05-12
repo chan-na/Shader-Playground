@@ -37,4 +37,24 @@ describe("timeStore", () => {
     useTimeStore.getState().setTime(12.5);
     expect(useTimeStore.getState().simTime).toBe(12.5);
   });
+
+  it("user transitions bump rev so the RAF loop wakes from idle", () => {
+    let r = useTimeStore.getState().rev;
+    useTimeStore.getState().setPlaying(false);
+    expect(useTimeStore.getState().rev).toBe(++r);
+    useTimeStore.getState().togglePlaying();
+    expect(useTimeStore.getState().rev).toBe(++r);
+    useTimeStore.getState().setSpeed(2);
+    expect(useTimeStore.getState().rev).toBe(++r);
+    useTimeStore.getState().setTime(1.5);
+    expect(useTimeStore.getState().rev).toBe(++r);
+    useTimeStore.getState().reset();
+    expect(useTimeStore.getState().rev).toBe(++r);
+  });
+
+  it("advance does not bump rev — the per-frame hot path stays quiet", () => {
+    const before = useTimeStore.getState().rev;
+    useTimeStore.getState().advance(0.016);
+    expect(useTimeStore.getState().rev).toBe(before);
+  });
 });

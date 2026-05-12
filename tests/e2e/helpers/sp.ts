@@ -9,6 +9,20 @@ import type {
 
 // Mirror of the contract exposed by main.tsx in dev mode (`window.__sp = {...}`).
 // We don't import the real types — see helpers/types.ts.
+export interface OrbitCameraStateMinimal {
+  target: [number, number, number];
+  distance: number;
+  yaw: number;
+  pitch: number;
+  fov: number;
+  near: number;
+  far: number;
+  minDistance: number;
+  maxDistance: number;
+  minPitch: number;
+  maxPitch: number;
+}
+
 export interface SpStores {
   graph: {
     getState: () => {
@@ -91,6 +105,26 @@ export interface SpStores {
   };
   // biome-ignore lint/suspicious/noExplicitAny: dynamic action registry
   assetActions: Record<string, (...args: any[]) => unknown>;
+  camera: {
+    getState: () => {
+      camera: OrbitCameraStateMinimal;
+      rev: number;
+      setCamera: (c: OrbitCameraStateMinimal) => void;
+      reset: () => void;
+    };
+  };
+  renderer: {
+    getState: () => {
+      ready: boolean;
+      stats: {
+        fps: number;
+        frame: number;
+        drawCalls: number;
+        renderTick: number;
+        errors: string[];
+      };
+    };
+  };
 }
 
 declare global {

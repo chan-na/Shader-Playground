@@ -4,10 +4,12 @@ import { App } from "./App";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
 import { useAssetStore } from "./state/assetStore";
+import { useCameraStore } from "./state/cameraStore";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
 import { useEditorStore } from "./state/editorStore";
 import { useGraphStore } from "./state/graphStore";
 import { useHistoryStore } from "./state/historyStore";
+import { useRendererStore } from "./state/rendererStore";
 import { useSelectionStore } from "./state/selectionStore";
 import { useTimeStore } from "./state/timeStore";
 import { useViewportStore } from "./state/viewportStore";
@@ -24,6 +26,8 @@ if (import.meta.env.DEV) {
     viewport: useViewportStore,
     history: useHistoryStore,
     editor: useEditorStore,
+    camera: useCameraStore,
+    renderer: useRendererStore,
   };
 }
 

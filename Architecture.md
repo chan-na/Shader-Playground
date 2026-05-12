@@ -158,11 +158,12 @@
    - 사라진 패스에 대응하는 `asyncReadback` 슬롯 `release(gl, prevId)` — PBO 가 사라진 FBO 의 stale 메모리를 읽지 않도록.
    - `thumbnailScheduler.bumpAll()` 로 모든 썸네일을 즉시 갱신 큐에 다시 올림.
 3. **유니폼 변경 감지**: `uniformRev` 가 변했으면 `bumpAll()` 만(컴파일은 안 함).
-4. **유니폼 핫패치**: 현재 `graphStore.nodes` 의 `shader` 노드들의 `uniformValues` 를 `pass.uniformValues` 로 그대로 복사. 슬라이더 드래그가 매 프레임 즉시 반영되는 경로.
-5. **시간 진행**: `timeStore.advance(dt/1000)` — `playing=false` 면 noop.
-6. **FPS 통계**: 500ms 누적분으로 `setStats({fps, frame, drawCalls})`.
-7. **실행**: `executePlan(gl, plan, FrameContext, canvasWidth, canvasHeight)`.
-8. **썸네일**: `asyncReadback.poll(gl)` → 완료된 슬롯들을 `scheduler.commit`, `scheduler.pickReady(now)` → 대상 노드에 대해 `asyncReadback.request`.
+4. **dirty 게이트(B2)**: 다음 조건 중 하나라도 참이면 이 프레임을 *렌더링 프레임*으로 마크한다 — `timeStore.playing === true`, 또는 마지막 프레임 대비 `graphStore.rev` / `assetStore.rev` / `graphStore.uniformRev` / `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 중 하나라도 변화. 어떤 조건도 참이 아니면 **이번 프레임은 `executePlan` 을 스킵**하고, async readback 펜스만 펌프한 뒤 다음 RAF 만 등록한다. 정적 그래프 + 정지 시간 = GPU 0 비용. 카메라/슬라이더/스크럽 등 모든 사용자 입력은 자기 스토어의 `rev` 를 올려 다음 프레임을 깨운다.
+5. **유니폼 핫패치**: (렌더 프레임에서만) 현재 `graphStore.nodes` 의 `shader` 노드들의 `uniformValues` 를 `pass.uniformValues` 로 그대로 복사. 슬라이더 드래그가 매 프레임 즉시 반영되는 경로.
+6. **시간 진행**: `timeStore.advance(dt/1000)` — `playing=false` 면 noop. dirty 게이트와 무관하게 매 틱 호출되므로 idle 중 wall-clock 만 지나가도 `simTime` 은 변하지 않는다.
+7. **FPS 통계**: 500ms 누적분으로 `setStats({fps, frame, drawCalls})`. idle 프레임에서는 `drawCalls = 0` 으로 보고된다.
+8. **실행**: `executePlan(gl, plan, FrameContext, canvasWidth, canvasHeight)` + `rendererStore.bumpRenderTick()`. `renderTick` 은 누적 카운터로, idle 게이트가 작동하는지를 E2E 가 확인하는 신호다.
+9. **썸네일**: `asyncReadback.poll(gl)` → 완료된 슬롯들을 `scheduler.commit`, `scheduler.pickReady(now)` → 대상 노드에 대해 `asyncReadback.request`.
 
 ### 4.2 FrameContext
 
@@ -332,9 +333,9 @@ poll(gl):
 | `selectionStore` | `selectedNodeId` | ✗ | ✗ | Inspector·CodeEditor 가 구독 |
 | `editorStore` | activeStage, jumpRequest | ✗ | ✗ | jumpRequest 는 `rev` 카운터 포함 — 동일 행 두 번 클릭도 발화 |
 | `diagnosticsStore` | byNode[id] = {vertex, fragment, link}[] | ✗ | ✗ | recompile 직후 채워짐, CodeEditor 의 CM `setDiagnostics` 와 ProblemsPanel 이 모두 구독 |
-| `cameraStore` | OrbitCameraState | ✗ | ✗ | 입력 → `setCamera`, RAF 가 `getState` |
-| `viewportStore` | background rgb | ✗ | ✗ | placeholder/composite 클리어 색 |
-| `timeStore` | simTime, playing, speed | ✗ | ✗ | `advance(dt)` 는 RAF 가 호출 |
+| `cameraStore` | OrbitCameraState | ✗ | ✗ | 입력 → `setCamera`, RAF 가 `getState`. `rev` 카운터(B2) 가 idle 게이트를 깨움 |
+| `viewportStore` | background rgb | ✗ | ✗ | placeholder/composite 클리어 색. `rev` 카운터(B2) 가 배경 변경 시 idle 게이트를 깨움 |
+| `timeStore` | simTime, playing, speed | ✗ | ✗ | `advance(dt)` 는 RAF 가 호출. `rev` 는 play/pause/scrub/speed 변경에만 올라가고 `advance` 는 올리지 않음 |
 | `rendererStore` | ready, fps/frame/drawCalls/errors | ✗ | ✗ | StatusBar 가 구독 |
 | `historyStore` | past[]/future[], MAX=100 | ✗ | — | `suppressNext` 로 apply 중 재push 방지 |
 | `recorderStore` | MediaRecorder 상태 | ✗ | ✗ | start/stop/elapsedMs |
@@ -349,6 +350,8 @@ poll(gl):
 - **`uniformRev`** — 슬라이더 드래그(`setUniformValue`) 와 param 값 변경(`setParamValue`). 컴파일은 안 하고 다음 RAF 에서 `pass.uniformValues` 만 새로 복사. **history 에는 안 들어감** — Undo 가 60Hz 드래그 이벤트로 가득 차는 것을 막는다.
 
 `setParamLabel`/`setMathConfig`/`setSwizzleMask`/`setCombineConfig` 는 **포트 표면을 바꾸므로** `rev` 를 올리고 history 도 푸시한다.
+
+추가로 B2 가 도입한 `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 는 같은 패턴이다 — 자기 스토어가 사용자 입력으로 변경됐다는 신호만 RAF 의 dirty 게이트에 전달한다. `timeStore.advance()` 만은 매 프레임 호출되는 hot path 라 rev 를 올리지 않는다.
 
 ### 7.2 Undo/Redo
 

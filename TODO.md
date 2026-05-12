@@ -20,7 +20,7 @@ Phase 12 까지의 SPEC.md / Architecture.md 를 기준으로 도출한 다음 �
 
 - [x] **B1. Output 분할 뷰포트 blit 합성 최적화** — M
   - 4-Output 분할 시 `blitToCanvas` 4 패스 → 단일 패스 viewport 변경 또는 `BlitFramebuffer` 경로로 셰이더/바인딩 중복 제거. (Architecture §4.3)
-- [ ] **B2. 정적 그래프 RAF 아이들** — M
+- [x] **B2. 정적 그래프 RAF 아이들** — M
   - 시간 정지 + 입력 정지 + uniform 변화 0 일 때 `executePlan` 스킵, dirty 이벤트로 다음 프레임 재기동. 정적 그래프에서 GPU 0 비용. (Architecture §4.1)
 - [ ] **B3. uniform 핫패치 증분 동기화** — S
   - 매 프레임 모든 ShaderPass uniformValues 전체 복사 → 변경된 패스만 동기화. (Architecture §4.1 step 4)

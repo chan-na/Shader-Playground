@@ -6,6 +6,12 @@ export interface TimeState {
   /** Wall-clock seconds elapsed since last advance (internal). */
   playing: boolean;
   speed: number;
+  /**
+   * Bumped on user-initiated time transitions (play/pause toggle, scrub, speed
+   * change). RAF loop reads this to wake from idle when the user scrubs while
+   * paused. `advance()` does NOT bump rev — that is the hot path.
+   */
+  rev: number;
 
   setPlaying: (p: boolean) => void;
   togglePlaying: () => void;
@@ -20,11 +26,12 @@ export const useTimeStore = create<TimeState>((set, get) => ({
   simTime: 0,
   playing: true,
   speed: 1,
-  setPlaying: (p) => set({ playing: p }),
-  togglePlaying: () => set({ playing: !get().playing }),
-  setSpeed: (s) => set({ speed: s }),
-  setTime: (t) => set({ simTime: Math.max(0, t) }),
-  reset: () => set({ simTime: 0 }),
+  rev: 0,
+  setPlaying: (p) => set((s) => ({ playing: p, rev: s.rev + 1 })),
+  togglePlaying: () => set((s) => ({ playing: !s.playing, rev: s.rev + 1 })),
+  setSpeed: (sp) => set((s) => ({ speed: sp, rev: s.rev + 1 })),
+  setTime: (t) => set((s) => ({ simTime: Math.max(0, t), rev: s.rev + 1 })),
+  reset: () => set((s) => ({ simTime: 0, rev: s.rev + 1 })),
   advance: (dt) => {
     const { playing, speed, simTime } = get();
     if (!playing) return;

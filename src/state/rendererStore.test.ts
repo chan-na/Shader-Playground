@@ -5,7 +5,7 @@ describe("rendererStore", () => {
   beforeEach(() => {
     useRendererStore.setState({
       ready: false,
-      stats: { fps: 0, frame: 0, drawCalls: 0, errors: [] },
+      stats: { fps: 0, frame: 0, drawCalls: 0, renderTick: 0, errors: [] },
     });
   });
 
@@ -23,6 +23,13 @@ describe("rendererStore", () => {
     expect(fps).toBe(60);
     expect(frame).toBe(1024);
     expect(drawCalls).toBe(0);
+  });
+
+  it("bumpRenderTick increments the cumulative renderTick counter", () => {
+    const before = useRendererStore.getState().stats.renderTick;
+    useRendererStore.getState().bumpRenderTick();
+    useRendererStore.getState().bumpRenderTick();
+    expect(useRendererStore.getState().stats.renderTick).toBe(before + 2);
   });
 
   it("pushError appends and clearErrors resets", () => {

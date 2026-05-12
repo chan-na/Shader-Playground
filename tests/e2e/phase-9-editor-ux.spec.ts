@@ -108,4 +108,48 @@ test.describe("Phase 9 — editor UX", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("command-palette")).toBeHidden();
   });
+
+  test("B2 idle: paused static graph stops rendering, camera wakes it", async ({
+    page,
+  }) => {
+    // 1. Pause time. After a short settle window the renderTick counter must
+    //    stop advancing — the RAF tick is alive but `executePlan` is skipped.
+    await withSp(
+      page,
+      (sp) => {
+        sp.time.getState().setPlaying(false);
+      },
+      undefined,
+    );
+    // Give the loop one window to flush the pause-frame and the structural
+    // dirty bits, then sample renderTick and confirm it's frozen.
+    await page.waitForTimeout(400);
+    const idleStart = await readSp(
+      page,
+      (sp) => sp.renderer.getState().stats.renderTick,
+    );
+    await page.waitForTimeout(500);
+    const idleEnd = await readSp(
+      page,
+      (sp) => sp.renderer.getState().stats.renderTick,
+    );
+    expect(idleEnd).toBe(idleStart);
+
+    // 2. Camera mutation must wake the loop. renderTick increases on the next
+    //    frame because cameraStore.rev bumps.
+    await withSp(
+      page,
+      (sp) => {
+        const cam = sp.camera.getState().camera;
+        sp.camera.getState().setCamera({ ...cam, yaw: cam.yaw + 0.1 });
+      },
+      undefined,
+    );
+    await expect
+      .poll(
+        () => readSp(page, (sp) => sp.renderer.getState().stats.renderTick),
+        { timeout: 2_000, intervals: [100, 200] },
+      )
+      .toBeGreaterThan(idleEnd);
+  });
 });

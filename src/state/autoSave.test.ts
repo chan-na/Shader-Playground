@@ -259,6 +259,35 @@ describe("loadSession / clearSession round-trip", () => {
   });
 });
 
+describe("loadSession failure handling", () => {
+  it("returns null when the underlying IDB get rejects", async () => {
+    // Spy on the prototype `get` so loadSession's catch branch fires.
+    const spy = vi
+      .spyOn(IDBObjectStore.prototype, "get")
+      .mockImplementation(() => {
+        throw new Error("get failed");
+      });
+    try {
+      expect(await loadSession()).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("clearSession swallows IDB errors silently", async () => {
+    const spy = vi
+      .spyOn(IDBObjectStore.prototype, "delete")
+      .mockImplementation(() => {
+        throw new Error("delete failed");
+      });
+    try {
+      await expect(clearSession()).resolves.toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe("startAutoSave error surfacing", () => {
   afterEach(() => {
     stopAutoSave();

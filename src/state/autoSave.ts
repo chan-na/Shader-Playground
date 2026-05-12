@@ -1,6 +1,7 @@
 import { debounce } from "../utils/debounce";
 import { useGraphStore } from "./graphStore";
 import { type SerializedProject, serializeProject } from "./serialization";
+import { toast } from "./toastStore";
 
 const DB_NAME = "shader-playground-session";
 const DB_VERSION = 1;
@@ -105,7 +106,11 @@ export function createAutoSaveScheduler(deps: AutoSaveDeps): AutoSaveHandle {
   };
 
   const debounced = debounce(() => {
-    void flushNow();
+    flushNow().catch(() => {
+      // Persist failures are surfaced by the injected `persist` callback
+      // (e.g., toast on IndexedDB quota). Swallow here so the unhandled
+      // rejection doesn't bubble out of fire-and-forget debounced calls.
+    });
   }, delay);
 
   const unsub = deps.subscribe(() => {
@@ -133,6 +138,7 @@ let _activeHandle: AutoSaveHandle | null = null;
 /** Start auto-save against the global graphStore. Idempotent. */
 export function startAutoSave(): AutoSaveHandle {
   if (_activeHandle) return _activeHandle;
+  let lastErrorShown = "";
   _activeHandle = createAutoSaveScheduler({
     getState: () => {
       const s = useGraphStore.getState();
@@ -143,7 +149,21 @@ export function startAutoSave(): AutoSaveHandle {
       };
     },
     subscribe: (cb) => useGraphStore.subscribe(cb),
-    persist: saveSession,
+    persist: async (p) => {
+      try {
+        await saveSession(p);
+        lastErrorShown = "";
+      } catch (err) {
+        const msg = (err as Error).message || String(err);
+        // De-dupe: quota errors repeat every debounce window — surface once
+        // until a save eventually succeeds.
+        if (msg !== lastErrorShown) {
+          lastErrorShown = msg;
+          toast.error(`자동 저장 실패: ${msg}`);
+        }
+        throw err;
+      }
+    },
   });
   return _activeHandle;
 }

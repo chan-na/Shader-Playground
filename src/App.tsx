@@ -5,6 +5,7 @@ import { KeyboardShortcuts } from "./ui/KeyboardShortcuts";
 import { NodeEditor } from "./ui/NodeEditor";
 import { SidePanel } from "./ui/Panels/SidePanel";
 import { StatusBar } from "./ui/Panels/StatusBar";
+import { Toasts } from "./ui/Toasts";
 import { Viewport } from "./ui/Viewport";
 
 export function App() {
@@ -20,6 +21,7 @@ export function App() {
       <CommandPalette />
       <KeyboardShortcuts />
       <BootstrapGate />
+      <Toasts />
     </div>
   );
 }

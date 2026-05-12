@@ -23,6 +23,7 @@ import {
   serializeProject,
 } from "../../state/serialization";
 import { encodeShareUrl } from "../../state/shareUrl";
+import { toast } from "../../state/toastStore";
 import { nextId } from "../../utils/id";
 
 const btn: React.CSSProperties = {
@@ -95,7 +96,7 @@ export function Toolbar() {
         console.warn("Project loaded with warnings:", parsed.warnings);
       }
     } catch (err) {
-      alert(`Failed to load project: ${(err as Error).message}`);
+      toast.error(`프로젝트 로드 실패: ${(err as Error).message}`);
     }
   };
 
@@ -123,7 +124,7 @@ export function Toolbar() {
     );
     try {
       await navigator.clipboard.writeText(url);
-      alert(`Share URL copied to clipboard\n${url.length} chars`);
+      toast.success(`Share URL 복사됨 · ${url.length} chars`);
     } catch {
       window.prompt("Copy this share URL:", url);
     }

@@ -10,7 +10,21 @@
 
 .react-flow__node.selected .node-card {
   border-color: #569cd6;
-  box-shadow: 0 0 0 2px rgba(86, 156, 214, 0.3);
+  box-shadow:
+    0 0 0 2px #569cd6,
+    0 0 12px 2px rgba(86, 156, 214, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Strip the wrapping rectangle that React Flow draws around a multi-node
+ * selection. The individual .selected node halos above already indicate
+ * the active set clearly. The element is kept in the DOM so that group
+ * drag (which dispatches from this rect) still works. */
+.react-flow__nodesselection-rect {
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
 }
 
 .node-card__header {
@@ -142,4 +156,80 @@
   height: 24px;
   border-radius: 3px;
   border: 1px solid #1a1a1a;
+}
+
+/* ── Help modal ─────────────────────────────────────────────────── */
+.help-modal {
+  width: 640px;
+  max-width: 92vw;
+}
+.help-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #2c2c2c;
+  font-size: 13px;
+  color: #f0f0f0;
+  font-weight: 600;
+}
+.help-modal__close {
+  background: transparent;
+  border: none;
+  color: #969696;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.help-modal__close:hover {
+  background: #2d2d30;
+  color: #f0f0f0;
+}
+.help-modal__body {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 8px 14px 14px;
+}
+.help-modal__section {
+  margin-top: 10px;
+}
+.help-modal__section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin: 4px 0 6px;
+  font-weight: 600;
+}
+.help-modal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(160px, max-content) 1fr;
+  row-gap: 4px;
+  column-gap: 14px;
+  align-items: baseline;
+}
+.help-modal__row {
+  display: contents;
+}
+.help-modal__keys {
+  font-family:
+    ui-monospace,
+    SF Mono,
+    Menlo,
+    monospace;
+  font-size: 11px;
+  color: #ddd;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3d;
+  border-radius: 3px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.help-modal__desc {
+  color: #ccc;
+  font-size: 12px;
 }

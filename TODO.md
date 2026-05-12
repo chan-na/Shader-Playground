@@ -27,7 +27,7 @@ Phase 12 까지의 SPEC.md / Architecture.md 를 기준으로 도출한 다음 �
 
 ## C. DX
 
-- [ ] **C1. CodeMirror GLSL 자동완성** — M
+- [x] **C1. CodeMirror GLSL 자동완성** — M
   - `@codemirror/autocomplete` 로 빌트인 함수 / 타입 / 현재 노드의 `parseUniforms` 결과 / `// @` 힌트 키워드 제안. Monaco 전환 없이 가벼운 LSP 전 단계. (SPEC §1.3, §4 백로그)
 - [ ] **C2. Inspector uniform 검색·필터** — S
   - SidePanel Inspector 탭 상단 검색 박스로 name/label/type 매칭. uniform 다수 노드의 UX 개선. (SPEC Phase 4 / Architecture §4.5 후속)

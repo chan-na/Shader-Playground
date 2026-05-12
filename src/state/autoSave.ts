@@ -134,12 +134,13 @@ export function createAutoSaveScheduler(deps: AutoSaveDeps): AutoSaveHandle {
 }
 
 let _activeHandle: AutoSaveHandle | null = null;
+let _detachUnload: (() => void) | null = null;
 
 /** Start auto-save against the global graphStore. Idempotent. */
 export function startAutoSave(): AutoSaveHandle {
   if (_activeHandle) return _activeHandle;
   let lastErrorShown = "";
-  _activeHandle = createAutoSaveScheduler({
+  const handle = createAutoSaveScheduler({
     getState: () => {
       const s = useGraphStore.getState();
       return {
@@ -165,5 +166,42 @@ export function startAutoSave(): AutoSaveHandle {
       }
     },
   });
+  _activeHandle = handle;
+  _detachUnload = attachUnloadFlush(handle);
   return _activeHandle;
+}
+
+/**
+ * Best-effort flush on tab close. `beforeunload` covers desktop refresh/close;
+ * `pagehide` is the iOS Safari path (BFCache also gets a synchronous tick).
+ * Both are fire-and-forget — IndexedDB may not finish if the browser is fast
+ * to kill the page, but it cuts the worst-case 30 s debounce window down to
+ * "whatever IDB can commit in the unload tick" for the common case.
+ */
+function attachUnloadFlush(handle: AutoSaveHandle): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onUnload = () => {
+    handle.flush().catch(() => {
+      // Best-effort during page unload — nothing useful we can do if IDB
+      // rejects, the page is going away. Swallow to avoid unhandled rejection.
+    });
+  };
+  window.addEventListener("beforeunload", onUnload);
+  window.addEventListener("pagehide", onUnload);
+  return () => {
+    window.removeEventListener("beforeunload", onUnload);
+    window.removeEventListener("pagehide", onUnload);
+  };
+}
+
+/** Stop the active scheduler (test seam). Detaches unload listeners too. */
+export function stopAutoSave(): void {
+  if (_detachUnload) {
+    _detachUnload();
+    _detachUnload = null;
+  }
+  if (_activeHandle) {
+    _activeHandle.stop();
+    _activeHandle = null;
+  }
 }

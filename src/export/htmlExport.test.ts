@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Graph } from "../core/graph/types";
-import { buildExportedHtml } from "./htmlExport";
+import { buildExportedHtml, downloadExportedHtml } from "./htmlExport";
 
 const sample: Graph = {
   nodes: [
@@ -66,5 +66,79 @@ describe("buildExportedHtml", () => {
     const html = buildExportedHtml(sample, {});
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain('<canvas id="canvas"');
+  });
+
+  it("respects the title/width/height options", () => {
+    const html = buildExportedHtml(
+      sample,
+      {},
+      {
+        title: "Custom & <Title>",
+        width: 1024,
+        height: 768,
+      },
+    );
+    // Title is HTML-escaped.
+    expect(html).toContain("<title>Custom &amp; &lt;Title&gt;</title>");
+    expect(html).toContain('width="1024"');
+    expect(html).toContain('height="768"');
+  });
+});
+
+describe("downloadExportedHtml", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // jsdom omits URL.createObjectURL / revokeObjectURL — stub them so the
+    // helper can run end-to-end.
+    (
+      URL as unknown as {
+        createObjectURL: (b: Blob) => string;
+        revokeObjectURL: (u: string) => void;
+      }
+    ).createObjectURL = vi.fn(() => "blob:fake-url");
+    (
+      URL as unknown as { revokeObjectURL: (u: string) => void }
+    ).revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("creates an <a> with a blob URL, clicks it, and revokes the URL after a delay", () => {
+    const clickSpy = vi.fn();
+    // Intercept anchors so we can observe what was clicked without actually
+    // navigating.
+    const origCreateElement = document.createElement.bind(document);
+    const createSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tag: string) => {
+        const el = origCreateElement(tag);
+        if (tag === "a") {
+          (el as HTMLAnchorElement).click = clickSpy;
+        }
+        return el;
+      });
+
+    downloadExportedHtml(sample, {}, "my-project");
+
+    expect(
+      (URL as unknown as { createObjectURL: ReturnType<typeof vi.fn> })
+        .createObjectURL,
+    ).toHaveBeenCalledTimes(1);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    // revokeObjectURL fires inside setTimeout(..., 1000).
+    expect(
+      (URL as unknown as { revokeObjectURL: ReturnType<typeof vi.fn> })
+        .revokeObjectURL,
+    ).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(
+      (URL as unknown as { revokeObjectURL: ReturnType<typeof vi.fn> })
+        .revokeObjectURL,
+    ).toHaveBeenCalledWith("blob:fake-url");
+
+    createSpy.mockRestore();
   });
 });

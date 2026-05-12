@@ -3,8 +3,11 @@ import {
   cameraEye,
   clampCamera,
   defaultCameraState,
+  modelMatrix,
   orbit,
   pan,
+  projMatrix,
+  viewMatrix,
   zoom,
 } from "./orbitCamera";
 
@@ -62,5 +65,68 @@ describe("orbitCamera", () => {
     const c = { ...defaultCameraState(), pitch: 999 };
     const clamped = clampCamera(c);
     expect(Math.abs(clamped.pitch)).toBeLessThan(Math.PI / 2);
+  });
+
+  it("clampCamera clamps distance to [minDistance, maxDistance]", () => {
+    const tooClose = clampCamera({
+      ...defaultCameraState(),
+      distance: 0.001,
+    });
+    expect(tooClose.distance).toBe(tooClose.minDistance);
+    const tooFar = clampCamera({ ...defaultCameraState(), distance: 1e6 });
+    expect(tooFar.distance).toBe(tooFar.maxDistance);
+  });
+
+  it("pan with non-zero dy moves the y component of target", () => {
+    const c = { ...defaultCameraState(), pitch: 0, yaw: 0 };
+    const after = pan(c, 0, 100, 0.01);
+    // With pitch=0 the up vector is (0, 1, 0), so dy>0 shifts target[1] up.
+    expect(after.target[1]).toBeGreaterThan(c.target[1]);
+  });
+
+  it("viewMatrix writes a 16-element mat4 (lookAt)", () => {
+    const c = defaultCameraState();
+    const m = viewMatrix(c);
+    expect(m.length).toBe(16);
+    // Identity check would fail for lookAt; just ensure it produced finite numbers.
+    for (const v of m) expect(Number.isFinite(v)).toBe(true);
+  });
+
+  it("viewMatrix reuses the provided out matrix", () => {
+    const c = defaultCameraState();
+    const out = new Float32Array(16);
+    const m = viewMatrix(c, out as unknown as Float32Array);
+    expect(m).toBe(out);
+  });
+
+  it("projMatrix writes a finite perspective mat4", () => {
+    const c = defaultCameraState();
+    const m = projMatrix(c, 16 / 9);
+    expect(m.length).toBe(16);
+    for (const v of m) expect(Number.isFinite(v)).toBe(true);
+  });
+
+  it("projMatrix reuses the provided out matrix", () => {
+    const out = new Float32Array(16);
+    const m = projMatrix(
+      defaultCameraState(),
+      1.5,
+      out as unknown as Float32Array,
+    );
+    expect(m).toBe(out);
+  });
+
+  it("modelMatrix returns identity", () => {
+    const m = modelMatrix();
+    expect(m[0]).toBe(1);
+    expect(m[5]).toBe(1);
+    expect(m[10]).toBe(1);
+    expect(m[15]).toBe(1);
+  });
+
+  it("modelMatrix reuses the provided out matrix", () => {
+    const out = new Float32Array(16);
+    const m = modelMatrix(out as unknown as Float32Array);
+    expect(m).toBe(out);
   });
 });

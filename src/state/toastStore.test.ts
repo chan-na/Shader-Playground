@@ -74,4 +74,45 @@ describe("toastStore", () => {
     vi.advanceTimersByTime(1);
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
+
+  it("toast.info wrapper pushes an info toast and respects explicit duration", () => {
+    toast.info("hello");
+    const after = useToastStore.getState().toasts;
+    expect(after[after.length - 1]?.kind).toBe("info");
+    useToastStore.getState().clear();
+
+    toast.info("brief", 50);
+    vi.advanceTimersByTime(49);
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  it("toast.warning wrapper pushes a warning toast and respects explicit duration", () => {
+    toast.warning("careful");
+    const after = useToastStore.getState().toasts;
+    expect(after[after.length - 1]?.kind).toBe("warning");
+    useToastStore.getState().clear();
+
+    toast.warning("quick", 25);
+    vi.advanceTimersByTime(24);
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  it("toast.success and toast.error accept explicit durations", () => {
+    toast.success("yay", 10);
+    toast.error("oh no", 20);
+    expect(useToastStore.getState().toasts.map((t) => t.kind)).toEqual([
+      "success",
+      "error",
+    ]);
+    vi.advanceTimersByTime(10);
+    expect(useToastStore.getState().toasts.map((t) => t.kind)).toEqual([
+      "error",
+    ]);
+    vi.advanceTimersByTime(10);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
 });

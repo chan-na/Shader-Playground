@@ -75,10 +75,10 @@ Vitest 4.1.6 (`d347386`에서 업그레이드). `vitest.config.ts`에 **커버�
 
 | 지표        | 임계치 |
 | ----------- | ------ |
-| lines       | 30%    |
-| functions   | 22%    |
-| branches    | 22%    |
-| statements  | 30%    |
+| lines       | 50%    |
+| functions   | 47%    |
+| branches    | 42%    |
+| statements  | 50%    |
 
 - 신규 기능 코드는 **해당 임계치를 떨어뜨리지 않도록 단위 테스트를 함께 추가**한다. 임계치 미달 시 `npm run check`가 실패한다.
 - 테스트 파일은 `src/**/*.test.{ts,tsx}` 위치, jsdom 환경.

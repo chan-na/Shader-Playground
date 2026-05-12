@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest";
-import type { ComputeGraphNode, ShaderGraphNode } from "../graph/types";
+import type {
+  CombineGraphNode,
+  ComputeGraphNode,
+  GraphNode,
+  MathGraphNode,
+  ParamGraphNode,
+  ShaderGraphNode,
+  SwizzleGraphNode,
+} from "../graph/types";
 import {
+  combineInputPorts,
+  combineOutputPort,
+  mathInputPorts,
   NODE_META,
   nodeInputPorts,
   nodeOutputPorts,
   paramOutputPort,
+  swizzleOutputPort,
   uniformTypeToPort,
 } from "./registry";
 
@@ -165,5 +177,150 @@ describe("uniformTypeToPort", () => {
     expect(uniformTypeToPort("mat4")).toBeNull();
     expect(uniformTypeToPort("sampler2D")).toBeNull();
     expect(uniformTypeToPort("int")).toBeNull();
+  });
+});
+
+describe("mathInputPorts", () => {
+  it("unary op surfaces only (a)", () => {
+    expect(mathInputPorts("sin")).toEqual([{ name: "a", type: "float" }]);
+  });
+
+  it("binary op surfaces (a, b)", () => {
+    expect(mathInputPorts("add")).toEqual([
+      { name: "a", type: "float" },
+      { name: "b", type: "float" },
+    ]);
+  });
+});
+
+describe("swizzleOutputPort", () => {
+  it("invalid mask falls back to float", () => {
+    expect(swizzleOutputPort("xq")).toEqual({ name: "value", type: "float" });
+  });
+
+  it("size-1 mask → float", () => {
+    expect(swizzleOutputPort("x")).toEqual({ name: "value", type: "float" });
+  });
+
+  it("size-2 mask → vec2", () => {
+    expect(swizzleOutputPort("xy")).toEqual({ name: "value", type: "vec2" });
+  });
+
+  it("size-3 mask → vec3", () => {
+    expect(swizzleOutputPort("xyz")).toEqual({ name: "value", type: "vec3" });
+  });
+
+  it("size-4 mask → vec4", () => {
+    expect(swizzleOutputPort("xyzw")).toEqual({ name: "value", type: "vec4" });
+  });
+});
+
+describe("combineInputPorts / combineOutputPort", () => {
+  it("arity 2 → x/y inputs, vec2 output", () => {
+    expect(combineInputPorts(2).map((p) => p.name)).toEqual(["x", "y"]);
+    expect(combineOutputPort(2).type).toBe("vec2");
+  });
+
+  it("arity 3 → x/y/z inputs, vec3 output", () => {
+    expect(combineInputPorts(3).map((p) => p.name)).toEqual(["x", "y", "z"]);
+    expect(combineOutputPort(3).type).toBe("vec3");
+  });
+
+  it("arity 4 → x/y/z/w inputs, vec4 output", () => {
+    expect(combineInputPorts(4).map((p) => p.name)).toEqual([
+      "x",
+      "y",
+      "z",
+      "w",
+    ]);
+    expect(combineOutputPort(4).type).toBe("vec4");
+  });
+});
+
+describe("nodeInputPorts (per-instance)", () => {
+  it("math node routes through mathInputPorts based on op", () => {
+    const node: MathGraphNode = {
+      id: "m",
+      kind: "math",
+      op: "sin",
+      a: 0,
+      b: 0,
+    };
+    expect(nodeInputPorts(node).map((p) => p.name)).toEqual(["a"]);
+  });
+
+  it("combine node routes through combineInputPorts based on arity", () => {
+    const node: CombineGraphNode = {
+      id: "c",
+      kind: "combine",
+      arity: 3,
+      values: [0, 0, 0, 0],
+    };
+    expect(nodeInputPorts(node).map((p) => p.name)).toEqual(["x", "y", "z"]);
+  });
+
+  it("shader node routes through NODE_META.shader.inputs", () => {
+    const sn: ShaderGraphNode = {
+      id: "s",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "uniform float u_y;",
+      uniformValues: {},
+    };
+    expect(nodeInputPorts(sn).map((p) => p.name)).toEqual(["mesh", "u_y"]);
+  });
+
+  it("kinds without instance-dependent ports fall through to the static meta", () => {
+    const meshNode: GraphNode = {
+      id: "mesh",
+      kind: "mesh",
+      primitive: "cube",
+    };
+    expect(nodeInputPorts(meshNode)).toEqual([]);
+
+    const outputNode: GraphNode = { id: "o", kind: "output" };
+    expect(nodeInputPorts(outputNode)).toEqual([
+      { name: "texture", type: "texture" },
+    ]);
+  });
+});
+
+describe("nodeOutputPorts (per-instance)", () => {
+  it("param node routes through paramOutputPort", () => {
+    const node: ParamGraphNode = {
+      id: "p",
+      kind: "param",
+      paramKind: "color",
+      value: [1, 0, 0],
+    };
+    expect(nodeOutputPorts(node)).toEqual([{ name: "value", type: "vec3" }]);
+  });
+
+  it("swizzle node routes through swizzleOutputPort", () => {
+    const node: SwizzleGraphNode = {
+      id: "z",
+      kind: "swizzle",
+      mask: "xy",
+    };
+    expect(nodeOutputPorts(node)).toEqual([{ name: "value", type: "vec2" }]);
+  });
+
+  it("combine node routes through combineOutputPort", () => {
+    const node: CombineGraphNode = {
+      id: "c",
+      kind: "combine",
+      arity: 4,
+      values: [0, 0, 0, 0],
+    };
+    expect(nodeOutputPorts(node)).toEqual([{ name: "value", type: "vec4" }]);
+  });
+
+  it("kinds without instance-dependent output fall through to static meta", () => {
+    const meshNode: GraphNode = {
+      id: "m",
+      kind: "mesh",
+      primitive: "sphere",
+    };
+    expect(nodeOutputPorts(meshNode)).toEqual([{ name: "mesh", type: "mesh" }]);
   });
 });

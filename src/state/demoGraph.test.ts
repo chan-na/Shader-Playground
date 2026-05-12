@@ -6,7 +6,13 @@ import {
   CHAIN_DEMO_LAYOUT,
   createChainDemoGraph,
   createDemoGraph,
+  createParticleDemoGraph,
+  createSplitDemoGraph,
+  createTorusDemoGraph,
   DEMO_LAYOUT,
+  PARTICLE_DEMO_LAYOUT,
+  SPLIT_DEMO_LAYOUT,
+  TORUS_DEMO_LAYOUT,
 } from "./demoGraph";
 
 describe("createDemoGraph (single shader)", () => {
@@ -61,6 +67,66 @@ describe("createChainDemoGraph (noise → blur → tonemap → output)", () => {
   it("has a layout entry for every node", () => {
     for (const n of graph.nodes) {
       expect(CHAIN_DEMO_LAYOUT[n.id]).toBeDefined();
+    }
+  });
+});
+
+describe("createTorusDemoGraph (uv-debug on torus)", () => {
+  const graph = createTorusDemoGraph();
+
+  it("passes validation", () => {
+    expect(validateGraph(graph)).toEqual([]);
+  });
+
+  it("uses a torus primitive on the mesh node", () => {
+    const meshNode = graph.nodes.find((n) => n.id === "mesh1");
+    expect(meshNode?.kind).toBe("mesh");
+    expect((meshNode as { primitive?: string }).primitive).toBe("torus");
+  });
+
+  it("has a layout entry for every node", () => {
+    for (const n of graph.nodes) {
+      expect(TORUS_DEMO_LAYOUT[n.id]).toBeDefined();
+    }
+  });
+});
+
+describe("createSplitDemoGraph (three outputs)", () => {
+  const graph = createSplitDemoGraph();
+
+  it("passes validation (Output count ≤ MAX_OUTPUTS)", () => {
+    expect(validateGraph(graph)).toEqual([]);
+  });
+
+  it("exposes three Output nodes for the split viewport", () => {
+    const outputs = graph.nodes.filter((n) => n.kind === "output");
+    expect(outputs).toHaveLength(3);
+  });
+
+  it("has a layout entry for every node", () => {
+    for (const n of graph.nodes) {
+      expect(SPLIT_DEMO_LAYOUT[n.id]).toBeDefined();
+    }
+  });
+});
+
+describe("createParticleDemoGraph (compute → render → output)", () => {
+  const graph = createParticleDemoGraph();
+
+  it("passes validation", () => {
+    expect(validateGraph(graph)).toEqual([]);
+  });
+
+  it("has a compute node feeding the shader mesh input", () => {
+    const compute = graph.nodes.find((n) => n.kind === "compute");
+    expect(compute).toBeDefined();
+    const meshEdge = graph.edges.find((e) => e.targetHandle === "mesh");
+    expect(meshEdge?.source).toBe(compute?.id);
+  });
+
+  it("has a layout entry for every node", () => {
+    for (const n of graph.nodes) {
+      expect(PARTICLE_DEMO_LAYOUT[n.id]).toBeDefined();
     }
   });
 });

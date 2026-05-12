@@ -98,6 +98,21 @@ function structuredCloneNode(n: GraphNode): GraphNode {
         fragmentSource: n.fragmentSource,
         uniformValues: deepCloneUniformValues(n.uniformValues),
       };
+    case "compute":
+      return {
+        id: n.id,
+        kind: "compute",
+        vertexSource: n.vertexSource,
+        count: n.count,
+        primitive: n.primitive,
+        attributes: n.attributes.map((a) => ({
+          inName: a.inName,
+          outName: a.outName,
+          size: a.size,
+          seed: a.seed,
+        })),
+        uniformValues: deepCloneUniformValues(n.uniformValues),
+      };
     case "output":
       return { id: n.id, kind: "output" };
     case "param":

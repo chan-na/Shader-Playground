@@ -2,7 +2,7 @@ import { setDiagnostics } from "@codemirror/lint";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { useEffect, useRef } from "react";
-import type { ShaderGraphNode } from "../../core/graph/types";
+import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
@@ -37,15 +37,19 @@ export function CodeEditor() {
 
   const node = useGraphStore(
     (s) =>
-      s.nodes.find((n) => n.id === effectiveId && n.kind === "shader") as
-        | ShaderGraphNode
-        | undefined,
+      s.nodes.find(
+        (n) =>
+          n.id === effectiveId && (n.kind === "shader" || n.kind === "compute"),
+      ) as ShaderGraphNode | ComputeGraphNode | undefined,
   );
+  const isCompute = node?.kind === "compute";
 
   const source = node
-    ? stage === "vertex"
-      ? node.vertexSource
-      : node.fragmentSource
+    ? isCompute
+      ? (node as ComputeGraphNode).vertexSource
+      : stage === "vertex"
+        ? (node as ShaderGraphNode).vertexSource
+        : (node as ShaderGraphNode).fragmentSource
     : "";
 
   const diags = useDiagnosticsStore((s) =>
@@ -63,7 +67,15 @@ export function CodeEditor() {
       const { id, stage: st } = ctxRef.current;
       if (!id) return;
       const cur = useGraphStore.getState().nodes.find((n) => n.id === id);
-      if (!cur || cur.kind !== "shader") return;
+      if (!cur) return;
+      if (cur.kind === "compute") {
+        const cn = cur as ComputeGraphNode;
+        if (cn.vertexSource === value) return;
+        lastCommittedRef.current = value;
+        useGraphStore.getState().updateComputeSource(id, value);
+        return;
+      }
+      if (cur.kind !== "shader") return;
       const sn = cur as ShaderGraphNode;
       if (st === "vertex") {
         if (sn.vertexSource === value) return;

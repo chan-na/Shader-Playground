@@ -2,6 +2,9 @@ import { create } from "zustand";
 import type {
   CombineArity,
   CombineGraphNode,
+  ComputeAttribute,
+  ComputeGraphNode,
+  ComputePrimitive,
   Graph,
   GraphEdge,
   GraphNode,
@@ -40,6 +43,15 @@ export interface GraphState {
   setCombineConfig: (
     id: string,
     patch: { arity?: CombineArity; values?: [number, number, number, number] },
+  ) => void;
+  updateComputeSource: (id: string, vertexSource: string) => void;
+  setComputeConfig: (
+    id: string,
+    patch: {
+      count?: number;
+      primitive?: ComputePrimitive;
+      attributes?: ComputeAttribute[];
+    },
   ) => void;
   addEdge: (edge: GraphEdge) => void;
   removeEdge: (id: string) => void;
@@ -121,12 +133,22 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setUniformValue: (id, name, value) =>
     set((s) => ({
       nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== "shader") return n;
-        const sn = n as ShaderGraphNode;
-        return {
-          ...sn,
-          uniformValues: { ...sn.uniformValues, [name]: value },
-        };
+        if (n.id !== id) return n;
+        if (n.kind === "shader") {
+          const sn = n as ShaderGraphNode;
+          return {
+            ...sn,
+            uniformValues: { ...sn.uniformValues, [name]: value },
+          };
+        }
+        if (n.kind === "compute") {
+          const cn = n as ComputeGraphNode;
+          return {
+            ...cn,
+            uniformValues: { ...cn.uniformValues, [name]: value },
+          };
+        }
+        return n;
       }),
       uniformRev: s.uniformRev + 1,
     })),
@@ -192,6 +214,34 @@ export const useGraphStore = create<GraphState>((set, get) => ({
               ]
             : cn.values,
         } as CombineGraphNode;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
+  updateComputeSource: (id, vertexSource) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== "compute") return n;
+        return { ...(n as ComputeGraphNode), vertexSource } as ComputeGraphNode;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
+  setComputeConfig: (id, patch) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== "compute") return n;
+        const cn = n as ComputeGraphNode;
+        return {
+          ...cn,
+          count: patch.count ?? cn.count,
+          primitive: patch.primitive ?? cn.primitive,
+          attributes: patch.attributes
+            ? patch.attributes.map((a) => ({ ...a }))
+            : cn.attributes,
+        } as ComputeGraphNode;
       }),
       rev: s.rev + 1,
     }));

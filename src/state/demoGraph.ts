@@ -1,7 +1,10 @@
 import type { Graph } from "../core/graph/types";
 import basicVert from "../shaders/basic.vert?raw";
+import particleVert from "../shaders/particles/particle.vert?raw";
+import particleRenderVert from "../shaders/particles/particleRender.vert?raw";
 import blurFrag from "../shaders/templates/blur.frag?raw";
 import noiseFrag from "../shaders/templates/noise.frag?raw";
+import particlePointFrag from "../shaders/templates/particlePoint.frag?raw";
 import tonemapFrag from "../shaders/templates/tonemap.frag?raw";
 import unlitFrag from "../shaders/templates/unlit.frag?raw";
 import uvDebugFrag from "../shaders/templates/uvDebug.frag?raw";
@@ -231,4 +234,67 @@ export const SPLIT_DEMO_LAYOUT: Record<string, NodePosition> = {
   out_noise: { x: -300, y: 160 },
   out_blur: { x: 100, y: 160 },
   out_tone: { x: 300, y: 40 },
+};
+
+/**
+ * Particle demo: 1024 POINTS seeded in a sphere flow through a sin-based
+ * noise field. ComputeNode → ShaderNode (point renderer) → Output.
+ */
+export function createParticleDemoGraph(): Graph {
+  return {
+    nodes: [
+      {
+        id: "compute1",
+        kind: "compute",
+        vertexSource: particleVert,
+        count: 1024,
+        primitive: "POINTS",
+        attributes: [
+          {
+            inName: "a_position",
+            outName: "v_position",
+            size: 3,
+            seed: "sphere",
+          },
+          {
+            inName: "a_velocity",
+            outName: "v_velocity",
+            size: 3,
+            seed: "zero",
+          },
+        ],
+        uniformValues: { u_dt: 0.016, u_strength: 0.6 },
+      },
+      {
+        id: "render1",
+        kind: "shader",
+        vertexSource: particleRenderVert,
+        fragmentSource: particlePointFrag,
+        uniformValues: { u_tint: [0.4, 0.8, 1.0] },
+      },
+      { id: "output1", kind: "output" },
+    ],
+    edges: [
+      {
+        id: "ec",
+        source: "compute1",
+        sourceHandle: "mesh",
+        target: "render1",
+        targetHandle: "mesh",
+      },
+      {
+        id: "er",
+        source: "render1",
+        sourceHandle: "texture",
+        target: "output1",
+        targetHandle: "texture",
+      },
+    ],
+  };
+}
+
+export const PARTICLE_DEMO_LAYOUT: Record<string, NodePosition> = {
+  compute1: { x: -260, y: 0 },
+  render1: { x: 60, y: 0 },
+  output1: { x: 360, y: 0 },
 };

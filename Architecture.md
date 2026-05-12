@@ -51,6 +51,7 @@
 | `mesh` | — | `mesh: mesh` | `primitive` 또는 `assetId` (assetId 가 우선; 미로드 시 primitive fallback) |
 | `image` | — | `texture: texture` | `assetId` 로 비트맵 참조 |
 | `shader` | `mesh: mesh?` + sampler 입력 (`sampler2D` 유니폼) + 비-샘플러 유니폼 입력 (`float/vec2/vec3/vec4`) | `texture: texture` | vertex + fragment 두 GLSL 소스를 함께 보유 |
+| `compute` | 비-샘플러 유니폼 입력만 (`float/vec2/vec3/vec4`) | `mesh: mesh` | vertex GLSL 한 개 + `transformFeedbackVaryings` 로 캡처되는 출력 attribute 페어 목록. fragment 단계는 `RASTERIZER_DISCARD` 로 비활성화. ping-pong 더블 버퍼로 매 프레임 시뮬레이션. primitive 는 POINTS/LINES/TRIANGLES 중 선택. |
 | `output` | `texture: texture` | — | 캔버스에 합성될 패스 마커 |
 | `param` (`float`/`vec3`/`color`/`time`) | — | `value: float` 또는 `value: vec3` | `time` 은 `[scale, offset]` 두 채널을 가지고 매 프레임 `simTime*scale + offset` 으로 재평가 |
 | `math` (8 op) | `a: float`, 이항만 `b: float` | `value: float` | 단항: `abs/sin/cos` (`MATH_UNARY_OPS`) |
@@ -66,6 +67,7 @@
 `src/core/nodes/registry.ts` 가 노드 종류별 PortSpec 의 단일 진실원본이다.
 
 - **ShaderNode 의 입력 포트는 GLSL 소스에서 매번 다시 파싱**된다. `parseUniforms(vertex + '\n' + fragment)` 의 결과에서 sampler 는 `texture` 입력, 비-system·비-sampler·비-matrix 인 `float/vecN` 은 동일 타입 입력으로 노출. 이름이 바뀌면 엣지가 자동으로 끊기지 않으며 — 다음 컴파일에서 unknown uniform 으로 무시될 뿐이다(`bindUserUniforms` 의 `loc === undefined` 분기).
+- **ComputeNode 의 입력 포트도 GLSL 소스 파싱 결과**다. ShaderNode 와 동일한 `parseUniforms` 를 vertex source 단독에 적용해 비-샘플러·비-matrix uniform 만 입력 포트로 노출(sampler 입력은 컴퓨트에 부적절해 의도적으로 제외). 출력은 항상 `mesh: mesh` 하나로 고정.
 - **Math** 의 포트 수는 `op` 에 따라 1 또는 2 (`mathInputPorts`).
 - **Swizzle** 의 출력 타입은 mask 길이에 따라 `float / vec2 / vec3 / vec4` (`swizzleOutputPort`).
 - **Combine** 은 arity 만큼 입력 채널을, arity 에 따른 vec 타입을 출력 (`combineInputPorts` / `combineOutputPort`).
@@ -100,19 +102,23 @@
 │  Graph     │ ────────────▶ │  errors[]    │ ────────▶ │  ordered nodes     │
 └────────────┘               │  (fatal abort)│           └────────────────────┘
                               └──────────────┘                   │
-                                                                 │ filter shader
+                                                                 │ filter shader|compute
                                                                  ▼
               ┌──────────── ImageTexture pool ◀──── ImageNode.assetId ──┐
               │                                                          │
               ▼                                                          │
-       ┌─────────────┐   per ShaderNode   ┌──────────┐                  │
-       │ FBO + Mesh  │ ─────────────────▶ │ ShaderPass│ ◀────────────────┘
-       │ + Program   │                    └──────────┘
-       └─────────────┘                          │
-                                                ▼
+       ┌─────────────┐  per ShaderNode    ┌──────────┐                  │
+       │ FBO + Mesh  │ ─────────────────▶ │ ShaderPass│ ◀────────────────┤
+       │ + Program   │                    └──────────┘                  │
+       └─────────────┘                                                  │
+       ┌─────────────────┐  per ComputeNode  ┌───────────┐              │
+       │ vboA/B + vaoA/B │ ───────────────▶ │ ComputePass│ ◀─────────────┘
+       │ + tfA/B + TF prog│                  └───────────┘
+       └─────────────────┘                          │
+                                                    ▼
                                   ┌─────────────────────────┐
                                   │ ExecutionPlan           │
-                                  │   passes[]              │
+                                  │   passes[] (union)      │
                                   │   imageTextures{}       │
                                   │   outputs[]             │
                                   │   errors[]              │
@@ -125,23 +131,32 @@
 ### 3.1 컴파일 절차
 
 1. `validateGraph` — `cycle`/`multi_input`/`multiple_outputs` 중 하나라도 있으면 **patch 만 채운 emptyPlan** 으로 즉시 종료. `missing_node` 는 fatal 아님(엣지를 건너뛰고 계속).
-2. `topologicalOrder` → shader 노드만 filter.
+2. `topologicalOrder` → shader/compute 노드만 filter (두 종류 모두 패스를 생성).
 3. **ImageTexture 업로드**: 그래프의 모든 ImageNode 를 순회해 `assetStore` 에 비트맵이 있으면 `createImageTexture` 로 GPU 에 올린다. **키는 node.id** (assetId 가 아니다) — 그래야 다음 패스의 sampler 라우팅에서 `edge.source` 만으로 찾을 수 있다.
-4. **ShaderPass 생성** (위상 순서대로):
-   - **메시 결정**: `(target=sn.id, handle='mesh')` 인 엣지가 있으면 메시 노드에서 가져오고 `meshIsFullscreen=false`. 없거나 메시 노드가 비어 있으면 `quad` 프리미티브 + `fullscreen.vert` 가 자동 주입되어 `meshIsFullscreen=true`.
-   - **프로그램 컴파일**: `createProgram(gl, vertexSource, fragmentSource)`. 실패하면 `shaderErrors[node.id]` 에 stage 정보와 함께 누적되고 해당 패스는 건너뛰어진다 — 그래프 나머지는 계속 컴파일됨.
-   - **FBO + VAO** 할당. FBO 는 plan 의 `width × height` 단일 해상도(현재 캔버스의 백버퍼와 동일).
-   - **입력 라우팅**: `sn.id` 로 들어오는 모든 엣지를 순회.
-     - `targetHandle === 'mesh'` 는 위에서 처리했으므로 스킵.
-     - source 가 `param / math / swizzle / combine` → **`paramBinding`** (CPU 평가 경로).
-     - 그 외 (`shader / image / mesh-by-accident`) → **`samplerBinding`** + 텍스처 유닛 증가.
+4. **위상 순서대로 Pass 생성** — 각 노드의 `kind` 에 따라 ShaderPass 또는 ComputePass 가 만들어져 `passes[]` 에 들어간다. union 단일 배열이며 위상 순서가 보존된다.
+   - **ShaderPass (`kind: 'shader'`)**:
+     - **메시 결정**: `(target=sn.id, handle='mesh')` 인 엣지가 있으면 메시 노드에서 가져오고 `meshIsFullscreen=false`. 없거나 메시 노드가 비어 있으면 `quad` 프리미티브 + `fullscreen.vert` 가 자동 주입되어 `meshIsFullscreen=true`.
+     - **컴퓨트 mesh 입력 특수 경로**: 메시 엣지의 source 가 ComputeNode 인 경우, 컴파일 시점에 해당 ComputePass 의 두 vbo 세트(A/B) 각각에 대해 VAO 두 개를 만들어 `pass.meshComputeVaos = [vaoA, vaoB]` 로 보관. `pass.meshComputeNodeId` 로 연결된 ComputePass 를 식별. `pass.mesh.primitive` 는 ComputeNode 의 primitive 를, `vertexCount` 는 ComputeNode 의 `count` 를 그대로 가져온다.
+     - **프로그램 컴파일**: `createProgram(gl, vertexSource, fragmentSource)`. 실패하면 `shaderErrors[node.id]` 에 stage 정보와 함께 누적되고 해당 패스는 건너뛰어진다 — 그래프 나머지는 계속 컴파일됨.
+     - **FBO** 할당 (plan 의 `width × height` 단일 해상도).
+     - **입력 라우팅**: `sn.id` 로 들어오는 모든 엣지를 순회.
+       - `targetHandle === 'mesh'` 는 위에서 처리했으므로 스킵.
+       - source 가 `param / math / swizzle / combine` → **`paramBinding`** (CPU 평가 경로).
+       - 그 외 (`shader / image / mesh-by-accident`) → **`samplerBinding`** + 텍스처 유닛 증가.
+   - **ComputePass (`kind: 'compute'`)**:
+     - **TF 프로그램 컴파일**: vertex shader 만 진짜 로직이고 fragment 는 빌트인 `tfNoop.frag` (의미 없는 dummy 출력 — `RASTERIZER_DISCARD` 로 어차피 폐기). `createComputeProgram` 이 link 전에 `gl.transformFeedbackVaryings(prog, [outNames], INTERLEAVED 또는 SEPARATE)` 를 호출. 현재 구현은 attribute slot 별 분리된 vbo 를 쓰므로 `SEPARATE_ATTRIBS`.
+     - **Ping-pong 버퍼**: attribute slot 마다 두 vbo (A/B) 를 만들고 seed 함수(`sphere`/`cube`/`random`/`zero`) 로 양쪽 모두 초기화. read 측이 다음 프레임 입력, write 측이 다음 프레임 출력. compile 시 `read = 'A'` 로 시작.
+     - **VAO**: vbo 세트마다 VAO 1 개. `vaoA` 는 A 측 vbo 를 attribute pointer 로 묶고, `vaoB` 는 B 측. 매 dispatch 마다 read 에 맞는 VAO 가 bound 되고 다른 측이 TF 캡처 대상.
+     - **TF object**: `tfA` 는 A 측 vbo 들을 `bindBufferBase` 로 묶고, `tfB` 는 B 측. dispatch 시 read 측의 TF 가 캡처 대상.
+     - **입력 라우팅**: ShaderPass 와 동일하게 `paramBindings` 만 추출 (sampler 없음). uniform 값은 노드의 `uniformValues` 를 그대로 베이스로.
+     - **dispose**: program / vbos×N×2 / VAOs / TF objects 모두 정리.
 5. **Output 바인딩**: `kind === 'output'` 노드들을 *문서 순서대로* `outputs[]` 에 매핑(`(target=output.id, handle='texture')` 엣지의 source 를 `sourceNodeId` 로 기록; 없으면 null).
-6. `dispose()` 는 모든 `program / fbo / mesh / imageTexture` 핸들의 deleter 를 한 번에 호출.
+6. `dispose()` 는 모든 `program / fbo / mesh / imageTexture` 핸들 + 컴퓨트 패스의 vbo/TF/VAO 핸들의 deleter 를 한 번에 호출.
 
 ### 3.2 sampler vs param 라우팅 — 한 번 더
 
 - **sampler 경로**: 실행 시 `bindSamplers` 가 `pass.samplers[]` 를 따라가며, `passByNode.get(source).fbo.color.texture` 또는 `plan.imageTextures[source]` 에서 텍스처를 찾아 `gl.uniform1i` + `bindTexture`. 메시 그래프의 텍스처 라우팅 = ShaderNode → ShaderNode 체이닝 = 자동 FBO ping-pong.
-- **param 경로**: 실행 시 `bindUserUniforms` 가 `pass.uniformValues` 를 베이스로 시작해 `paramBindings` 가 가리키는 노드를 `resolveValueFor(sourceId, graph, {time}, cache)` 로 재귀 평가해 덮어쓴다. utility 노드들은 GL 패스를 만들지 않고 CPU 에서만 평가된다.
+- **param 경로**: 실행 시 `bindUserUniforms` 가 `pass.uniformValues` 를 베이스로 시작해 `paramBindings` 가 가리키는 노드를 `resolveValueFor(sourceId, graph, {time}, cache)` 로 재귀 평가해 덮어쓴다. utility 노드들은 GL 패스를 만들지 않고 CPU 에서만 평가된다. ShaderPass 와 ComputePass 가 같은 캐시 + 같은 resolver 를 공유.
 
 ---
 
@@ -158,7 +173,7 @@
    - 사라진 패스에 대응하는 `asyncReadback` 슬롯 `release(gl, prevId)` — PBO 가 사라진 FBO 의 stale 메모리를 읽지 않도록.
    - `thumbnailScheduler.bumpAll()` 로 모든 썸네일을 즉시 갱신 큐에 다시 올림.
 3. **유니폼 변경 감지**: `uniformRev` 가 변했으면 `bumpAll()` 만(컴파일은 안 함).
-4. **dirty 게이트(B2)**: 다음 조건 중 하나라도 참이면 이 프레임을 *렌더링 프레임*으로 마크한다 — `timeStore.playing === true`, 또는 마지막 프레임 대비 `graphStore.rev` / `assetStore.rev` / `graphStore.uniformRev` / `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 중 하나라도 변화. 어떤 조건도 참이 아니면 **이번 프레임은 `executePlan` 을 스킵**하고, async readback 펜스만 펌프한 뒤 다음 RAF 만 등록한다. 정적 그래프 + 정지 시간 = GPU 0 비용. 카메라/슬라이더/스크럽 등 모든 사용자 입력은 자기 스토어의 `rev` 를 올려 다음 프레임을 깨운다.
+4. **dirty 게이트(B2)**: 다음 조건 중 하나라도 참이면 이 프레임을 *렌더링 프레임*으로 마크한다 — `timeStore.playing === true`, 또는 마지막 프레임 대비 `graphStore.rev` / `assetStore.rev` / `graphStore.uniformRev` / `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 중 하나라도 변화. 어떤 조건도 참이 아니면 **이번 프레임은 `executePlan` 을 스킵**하고, async readback 펜스만 펌프한 뒤 다음 RAF 만 등록한다. 정적 그래프 + 정지 시간 = GPU 0 비용. 카메라/슬라이더/스크럽 등 모든 사용자 입력은 자기 스토어의 `rev` 를 올려 다음 프레임을 깨운다. **컴퓨트 패스의 영향(Phase 13)**: 컴퓨트 패스가 한 개 이상이면 `timeStore.playing === true` 일 때 무조건 dirty(애초에 위 첫 조건에 해당). 시간이 정지된 idle 상태에서는 컴퓨트 dispatch 도 건너뛰므로 시뮬레이션이 멈춘 채 GPU 0 비용을 유지한다 — 다음 dispatch 시 read 측의 직전 결과부터 다시 시작.
 5. **유니폼 핫패치**: (렌더 프레임에서만) 현재 `graphStore.nodes` 의 `shader` 노드들의 `uniformValues` 를 `pass.uniformValues` 로 그대로 복사. 슬라이더 드래그가 매 프레임 즉시 반영되는 경로.
 6. **시간 진행**: `timeStore.advance(dt/1000)` — `playing=false` 면 noop. dirty 게이트와 무관하게 매 틱 호출되므로 idle 중 wall-clock 만 지나가도 `simTime` 은 변하지 않는다.
 7. **FPS 통계**: 500ms 누적분으로 `setStats({fps, frame, drawCalls})`. idle 프레임에서는 `drawCalls = 0` 으로 보고된다.
@@ -172,14 +187,29 @@
 ### 4.3 executePlan (`src/core/graph/execute.ts`)
 
 ```
-for each pass in plan.passes:           # 토포 순서가 보존되어 있음
-    bindFramebuffer(pass.fbo); clear()
-    depth on if !fullscreen, off if fullscreen
-    useProgram(pass.program)
-    bindSystemUniforms       # u_time, u_resolution; matrix 는 메시일 때만
-    bindUserUniforms         # uniformValues 위에 paramBindings 덮어쓰기
-    bindSamplers             # FBO color attach 또는 imageTextures 에서
-    drawMesh(pass.mesh)
+for each pass in plan.passes:           # 토포 순서가 보존되어 있음 (Shader | Compute union)
+    if pass.kind == 'compute':
+        useProgram(pass.program)
+        bindUserUniforms     # uniformValues + paramBindings; system u_time 만 자동
+        bindVertexArray(pass.read == 'A' ? vaoA : vaoB)             # 입력 attribute
+        bindTransformFeedback(pass.read == 'A' ? tfB : tfA)         # 캡처 대상
+        enable(RASTERIZER_DISCARD)
+        beginTransformFeedback(prim)
+        drawArrays(prim, 0, count)
+        endTransformFeedback()
+        disable(RASTERIZER_DISCARD)
+        pass.read = pass.read == 'A' ? 'B' : 'A'                    # ping-pong swap
+    else:  # shader
+        bindFramebuffer(pass.fbo); clear()
+        depth on if !fullscreen, off if fullscreen
+        useProgram(pass.program)
+        bindSystemUniforms   # u_time, u_resolution; matrix 는 메시일 때만
+        bindUserUniforms     # uniformValues 위에 paramBindings 덮어쓰기
+        bindSamplers         # FBO color attach 또는 imageTextures 에서
+        if pass.meshComputeNodeId:                                  # 컴퓨트 mesh 입력
+            cp = passByNode.get(pass.meshComputeNodeId)
+            pass.mesh.vao = pass.meshComputeVaos[cp.read == 'A' ? 0 : 1]
+        drawMesh(pass.mesh)
 
 bindFramebuffer(null); viewport(0,0,W,H); clear(bg)
 
@@ -192,6 +222,8 @@ else:
         viewport(cells[i])
         blitToCanvas(pass.fbo.color.texture)   # 내부 1-패스 텍스처드 쿼드
 ```
+
+**컴퓨트 mesh 입력의 read 시점**: 위에서 `cp.read` 는 ComputePass 가 *이미 이번 프레임 dispatch 를 끝낸 뒤의 상태*다(컴퓨트 패스는 위상순서상 ShaderPass 앞). 즉 ShaderPass 가 그릴 때는 방금 캡처된 새 데이터가 read 측에 있어 가장 신선한 vbo 로 attribute 가 묶인다.
 
 `splitLayout`:
 - 1 → 전체
@@ -349,7 +381,7 @@ poll(gl):
 - **`rev`** — 노드/엣지/소스 등 **구조** 변경. 변하면 Viewport 가 `recompile()` 한다 (GL 프로그램 재링크 + FBO 재할당). `pushHistory` 가 같은 path 에서 일어나므로 Undo 단위와 일치한다.
 - **`uniformRev`** — 슬라이더 드래그(`setUniformValue`) 와 param 값 변경(`setParamValue`). 컴파일은 안 하고 다음 RAF 에서 `pass.uniformValues` 만 새로 복사. **history 에는 안 들어감** — Undo 가 60Hz 드래그 이벤트로 가득 차는 것을 막는다.
 
-`setParamLabel`/`setMathConfig`/`setSwizzleMask`/`setCombineConfig` 는 **포트 표면을 바꾸므로** `rev` 를 올리고 history 도 푸시한다.
+`setParamLabel`/`setMathConfig`/`setSwizzleMask`/`setCombineConfig`/`setComputeConfig`/`updateComputeSource` 는 **포트 표면 또는 GPU 자원을 바꾸므로** `rev` 를 올리고 history 도 푸시한다 (recompile 으로 ping-pong 버퍼/TF object/VAO 가 새로 만들어짐).
 
 추가로 B2 가 도입한 `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 는 같은 패턴이다 — 자기 스토어가 사용자 입력으로 변경됐다는 신호만 RAF 의 dirty 게이트에 전달한다. `timeStore.advance()` 만은 매 프레임 호출되는 hot path 라 rev 를 올리지 않는다.
 
@@ -531,12 +563,13 @@ ShaderPlayground/
    │  │  └─ input.ts                 # createCameraController — pointer/wheel 부착
    │  │
    │  ├─ graph/
-   │  │  ├─ types.ts                 # GraphNode/Edge/Port + Param·Math·Swizzle·Combine
-   │  │  ├─ compile.ts               # graph → ExecutionPlan
-   │  │  ├─ execute.ts               # executePlan + splitLayout
+   │  │  ├─ types.ts                 # GraphNode/Edge/Port + Param·Math·Swizzle·Combine·Compute
+   │  │  ├─ compile.ts               # graph → ExecutionPlan (ShaderPass | ComputePass) (+ test)
+   │  │  ├─ execute.ts               # executePlan + splitLayout + TF dispatch
    │  │  ├─ validate.ts              # cycle / multi_input / multiple_outputs (+ test)
    │  │  ├─ diagnostics.ts           # GLSL 로그 파서 (+ test)
    │  │  ├─ uniformParser.ts         # uniform + 주석 힌트 (+ test)
+   │  │  ├─ computeSeed.ts           # sphere/cube/random/zero seed 생성기 (+ test)
    │  │  └─ splitLayout.test.ts      # 분할 뷰포트 단위 테스트
    │  │
    │  ├─ thumbnail/
@@ -590,7 +623,8 @@ ShaderPlayground/
    │  │     ├─ ShaderNodeView.tsx    # FBO 라이브 썸네일 + 핸들/라벨
    │  │     ├─ OutputNodeView.tsx
    │  │     ├─ ParamNodeView.tsx     # Float/Vec3/Color/Time
-   │  │     └─ UtilityNodeViews.tsx  # Math/Swizzle/Combine
+   │  │     ├─ UtilityNodeViews.tsx  # Math/Swizzle/Combine
+   │  │     └─ ComputeNodeView.tsx   # TF 컴퓨트 — count/primitive/attribute 메타 표시
    │  │
    │  ├─ CodeEditor/
    │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync
@@ -623,13 +657,18 @@ ShaderPlayground/
    │  ├─ fullscreen.vert
    │  ├─ basic.vert
    │  ├─ color.frag
+   │  ├─ tfNoop.frag                 # 컴퓨트 패스의 dummy fragment (RASTERIZER_DISCARD 와 짝)
+   │  ├─ particles/
+   │  │  ├─ particle.vert            # 컴퓨트 — sin 기반 noise field 시뮬
+   │  │  └─ particleRender.vert      # 컴퓨트 출력 attribute 를 받는 ShaderNode vertex
    │  └─ templates/
    │     ├─ unlit.frag
    │     ├─ uvDebug.frag
    │     ├─ blur.frag
    │     ├─ noise.frag
    │     ├─ tonemap.frag
-   │     └─ blend.frag               # 두 sampler + u_mix + u_mode(0=mix/1=add/2=mul/3=screen)
+   │     ├─ blend.frag               # 두 sampler + u_mix + u_mode(0=mix/1=add/2=mul/3=screen)
+   │     └─ particlePoint.frag       # 컴퓨트 점 렌더용 fragment
    │
    └─ utils/
       ├─ debounce.ts                 # (+ test)
@@ -645,5 +684,6 @@ ShaderPlayground/
 - **Bootstrap/Hotkey/CommandPalette** — Phase 9 이후 `BootstrapGate`, `KeyboardShortcuts`, `CommandPalette/` 가 App 셸에 상시 마운트.
 - **상태 스토어 확장** — 초안의 4개(`graph/asset/selection/renderer`) 외에 Phase 9~12 의 기능을 받기 위해 10여 개 스토어가 추가.
 - **`src/export/` 신설** — Phase 11 의 정적 HTML export 코드와 미니 런타임.
-- **셰이더 추가** — 초안의 `unlit/uvDebug/blur` 외에 `noise/tonemap/blend.frag` 와 패스스루용 `color.frag`.
+- **셰이더 추가** — 초안의 `unlit/uvDebug/blur` 외에 `noise/tonemap/blend.frag` 와 패스스루용 `color.frag`, 그리고 Phase 13 의 컴퓨트 dummy `tfNoop.frag` + 파티클 데모 vert/frag.
 - **썸네일 readback 이원화** — `readback.ts`(동기 폴백) + `asyncReadback.ts`(PBO + fenceSync, Phase 12 기본 경로) 가 공존하고 `downsampleToThumb` / `THUMB_SIZE` 는 동기 모듈에서 공유.
+- **Pass union (Phase 13)** — 초안의 `ShaderPass[]` 는 `(ShaderPass | ComputePass)[]` 로 일반화. ComputePass 는 FBO 없이 vbo 두 세트 + VAO 두 개 + TF object 두 개로 ping-pong 시뮬레이션을 수행하고, 출력은 ShaderPass.mesh 의 duel VAO 로 흘러간다. dispose 책임은 ShaderPass 가 자기 mesh 의 VAO 두 개를 정리하되 vbo 자체는 ComputePass 소유 — 일반 mesh 경로와 인터페이스는 동일하지만 vbo lifetime 만 외부 소유로 다르다.

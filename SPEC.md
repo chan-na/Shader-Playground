@@ -104,11 +104,12 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 
 핵심 SPEC 차원 결정만 다시 한 번 요약:
 
-- 노드 종류는 8 가지 — `Mesh / Image / Shader / Output / Param / Math / Swizzle / Combine`. Shader 의 입력 포트는 GLSL 의 `uniform` 선언으로부터 매번 다시 파싱되어 자동 생성된다.
+- 노드 종류는 9 가지 — `Mesh / Image / Shader / Compute / Output / Param / Math / Swizzle / Combine`. Shader 와 Compute 의 입력 포트는 GLSL 의 `uniform` 선언으로부터 매번 다시 파싱되어 자동 생성된다.
 - ShaderNode 는 vertex + fragment GLSL 한 쌍을 함께 보유. 메시 입력이 없으면 빌트인 `fullscreen.vert` 가 자동 주입되고 사용자의 vertex 소스는 사용되지 않는다.
+- ComputeNode 는 vertex GLSL 한 개와 `transformFeedbackVaryings` 로 캡처할 출력 attribute 목록을 보유. fragment 단계는 `RASTERIZER_DISCARD` 로 비활성화되고, ping-pong 두 vbo 세트로 매 프레임 시뮬레이션 결과를 갱신한다. 출력은 `mesh` 포트 하나 — 다운스트림 ShaderNode 가 mesh 입력으로 받아 POINTS/LINES/TRIANGLES 중 하나로 그린다.
 - 포트 타입은 6 가지 — `mesh / texture / float / vec2 / vec3 / vec4`. 분기(1:N)는 허용, 합성(N:1)은 금지. Output 노드는 그래프당 0~4 개, 5 개 이상은 검증 단계에서 거부.
-- 유틸 노드(Math/Swizzle/Combine)는 GL 패스를 만들지 않고 ShaderNode 의 비-샘플러 uniform 입력을 CPU 측에서 매 프레임 평가해 덮어쓴다. fan-out 시 프레임당 1 회 메모이즈.
-- 모든 ShaderNode 카드는 자기 FBO 컬러 어태치먼트의 96×96 라이브 썸네일을 표시. 추가 렌더 패스 없이 PBO + `fenceSync` 비동기 readback 으로 가져오며, 10 Hz 스로틀 + IntersectionObserver 가시성 컬링을 적용.
+- 유틸 노드(Math/Swizzle/Combine)는 GL 패스를 만들지 않고 ShaderNode/ComputeNode 의 비-샘플러 uniform 입력을 CPU 측에서 매 프레임 평가해 덮어쓴다. fan-out 시 프레임당 1 회 메모이즈.
+- 모든 ShaderNode 카드는 자기 FBO 컬러 어태치먼트의 96×96 라이브 썸네일을 표시. 추가 렌더 패스 없이 PBO + `fenceSync` 비동기 readback 으로 가져오며, 10 Hz 스로틀 + IntersectionObserver 가시성 컬링을 적용. ComputeNode 는 FBO 가 없어 썸네일이 없고, 대신 카드에 vertex count/primitive 메타정보를 표시한다.
 
 자세한 동작·코드 경로는 [Architecture.md](./Architecture.md) 의 §2~§11 참조.
 
@@ -224,9 +225,20 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **썸네일 readback PBO 비동기화**: 기존 `gl.readPixels` 동기 호출을 WebGL2 PBO + `fenceSync` 로 교체. 매 프레임 `clientWaitSync(timeout=0)` 로 완료된 슬롯만 `getBufferSubData`→다운샘플→`scheduler.commit`. 미완료 슬롯은 그대로 유지되므로 메인 스레드 stall 이 사라진다(N 프레임 지연 허용). 노드당 in-flight 1건, 컴파일로 사라진 노드는 PBO 해제. 96×96 해상도, 10 Hz throttle 그대로 유지.
 - **검증**: Vitest 추가 51건(`asyncReadback` 8, `autoSave` 7, `editorStore` 3, `utility` 25, `uniformParser` +8, 합계 182 통과). Chrome 자동화로 (a) Problems 항목 클릭 → 정확한 라인 활성화, (b) 자동저장 → 리로드 → 복구 다이얼로그 양 경로, (c) `@color` 가 컬러 피커로 즉시 전환, (d) Param→Math→Combine→Swizzle 체인이 sphere 색을 변경, (e) Chain 프리셋(3 노드)의 96×96 썸네일 라이브 갱신을 확인.
 
+### Phase 13 — Transform Feedback 컴퓨트 노드 (완료)
+- **새 노드 종류 `compute`**: WebGL2 `transformFeedbackVaryings` 로 vertex stream 을 캡처해 GPU 측 파티클/시뮬레이션을 지원. 노드 한 개당 vertex shader 한 개, 출력 attribute 페어 목록(`{ inName, outName, size, seed }`), 카운트, 출력 primitive(POINTS/LINES/TRIANGLES) 를 보유. fragment stage 는 `RASTERIZER_DISCARD` 로 비활성화되어 raster 비용 0.
+- **Ping-pong 더블 버퍼**: 한 attribute slot 당 vbo 두 개(A/B) + VAO 두 개 + TF object 두 개. 매 frame dispatch 마다 read 측을 스왑해 다음 프레임 입력이 이번 프레임 출력. seed 함수는 빌트인(`sphere` / `cube` / `random` / `zero`) 으로 attribute 마다 지정. recompile 시 seed 로 재초기화.
+- **포트 표면**: ShaderNode 와 동일하게 vertex source 의 비-샘플러 uniform 선언이 입력 포트로 자동 노출(Param/Math/Swizzle/Combine 연결 가능). sampler/mesh 입력은 금지(컴퓨트는 첫 단계 시뮬레이터로 한정). 출력은 `mesh: mesh` 단일 — 다운스트림 ShaderNode 가 mesh 입력으로 받아 자기 vertex/fragment shader 로 점/선/삼각형을 렌더.
+- **ExecutionPlan 통합**: 기존 `passes: ShaderPass[]` 를 `passes: (ShaderPass | ComputePass)[]` union 으로 확장하고 위상 순서를 그대로 보존. 컴퓨트 → 셰이더 → (다음 프레임) 컴퓨트 의존성도 같은 배열에서 자연 처리.
+- **ShaderPass.mesh 듀얼 VAO**: ShaderNode 가 mesh 입력으로 ComputeNode 를 받으면 ShaderPass 가 두 VAO 를 들고 매 프레임 ComputePass.read 에 맞춰 활성 VAO 를 전환. 일반 mesh 입력 (primitive/asset) 은 기존 path 그대로.
+- **dirty 게이트 영향**: 컴퓨트 패스가 한 개 이상이면 `timeStore.playing === true` 일 때 무조건 dirty(RAF idle 게이트 B2 가 정지된 정적 그래프로 분류하지 않음). 시간이 정지되면 dispatch 가 건너뛰어져 시뮬레이션도 멈추고 idle 가능.
+- **유틸리티 노드 연동**: ComputeNode 의 uniform 입력에 Param/Math/Swizzle/Combine 을 그대로 연결 가능. fan-out 캐시도 ShaderNode 와 공유.
+- **CommandPalette**: `Add Compute: Particle (POINTS)` 프리셋 + `Add Compute (empty)` 1 종 등록.
+- **데모 프리셋**: `createParticleDemoGraph()` — sphere seed 의 1024 POINTS 가 sin 기반 noise field 로 흐르는 파티클 시뮬. Phase 13 의 E2E 가 이 프리셋을 골든 시나리오로 사용.
+- **검증**: Vitest 단위 테스트 — types/registry/validate/serialization/compile 의 compute 경로 신규. Playwright E2E Phase 13 — (a) CommandPalette 로 Particle 프리셋 로드, (b) ComputeNode → ShaderNode → Output 체인 컴파일·렌더 확인, (c) 노드 삭제 시 dispose 안정, (d) Share URL 라운드트립으로 compute 노드 복원, (e) 시간 정지 후 idle 게이트 동작.
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
-- 컴퓨트(Transform Feedback) 노드.
 - GLSL LSP 도입(Monaco 전환 검토).
 - GIF 녹화(gif.js / WASM gifenc).
 
@@ -258,7 +270,7 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 | GLTF 범위 | 지오메트리만 | 머티리얼/애니메이션 무시 |
 | 컴파일 트리거 | 디바운스 자동 재컴파일 | 향후 수동 컴파일 단축키 추가 가능 |
 | 직렬화 | JSON export/import (Phase 8), 에셋은 IndexedDB 캐시 | |
-| 노드 종류 | Mesh / Image / Shader / Output / Parameter / Math / Swizzle / Combine | Parameter는 Phase 10, Math·Swizzle·Combine 유틸은 Phase 12. Output 은 최대 4개(Phase 10 분할 뷰포트). |
+| 노드 종류 | Mesh / Image / Shader / Compute / Output / Parameter / Math / Swizzle / Combine | Parameter는 Phase 10, Math·Swizzle·Combine 유틸은 Phase 12, Compute(Transform Feedback) 은 Phase 13. Output 은 최대 4개(Phase 10 분할 뷰포트). |
 | 의존성 무게 | 경량 우선 | three.js·Monaco는 의도적으로 회피 |
 
 이 디폴트 중 바꾸고 싶은 항목이 있으면 알려줘. 아니면 이대로 Phase 1부터 진행.

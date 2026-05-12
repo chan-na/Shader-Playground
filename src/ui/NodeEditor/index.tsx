@@ -21,6 +21,7 @@ import { importFiles } from "../../state/assetActions";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { nextId } from "../../utils/id";
+import { ComputeNodeView } from "./nodes/ComputeNodeView";
 import { ImageNodeView } from "./nodes/ImageNodeView";
 import { MeshNodeView } from "./nodes/MeshNodeView";
 import { OutputNodeView } from "./nodes/OutputNodeView";
@@ -37,6 +38,7 @@ const nodeTypes = {
   mesh: MeshNodeView,
   image: ImageNodeView,
   shader: ShaderNodeView,
+  compute: ComputeNodeView,
   output: OutputNodeView,
   param: ParamNodeView,
   math: MathNodeView,

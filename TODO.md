@@ -9,7 +9,7 @@ Phase 12 까지의 SPEC.md / Architecture.md 를 기준으로 도출한 다음 �
 
 ## A. 기능 완성도
 
-- [ ] **A1. Transform Feedback 컴퓨트 노드** — L
+- [x] **A1. Transform Feedback 컴퓨트 노드** — L
   - WebGL2 transform feedback 기반 GPU 시뮬레이션/파티클 노드 종류 신설. registry / compile / execute / serialize 전 라인에 영향. (SPEC §4 백로그)
 - [ ] **A2. File System Access API 디스크 백업** — M
   - ShaderNode 의 vertex/fragment 소스를 디스크 파일에 바인딩해 외부 에디터 저장을 핫리로드. capability detect 분기 필요. (SPEC §4 백로그)

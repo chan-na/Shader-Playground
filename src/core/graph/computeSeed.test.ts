@@ -46,4 +46,33 @@ describe("generateSeed", () => {
     const b = generateSeed("random", 32, 3);
     expect(a.length).not.toBe(b.length);
   });
+
+  it("sphere with size 1 uses radial-length shortcut (values in [0, 1))", () => {
+    const buf = generateSeed("sphere", 32, 1);
+    expect(buf.length).toBe(32);
+    for (const v of buf) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(1);
+    }
+  });
+
+  it("sphere with size 4 keeps every point within unit 4-sphere", () => {
+    const buf = generateSeed("sphere", 64, 4);
+    for (let i = 0; i < buf.length; i += 4) {
+      const x = buf[i]!;
+      const y = buf[i + 1]!;
+      const z = buf[i + 2]!;
+      const w = buf[i + 3]!;
+      expect(x * x + y * y + z * z + w * w).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("sphere with size 2 keeps every point within unit disk", () => {
+    const buf = generateSeed("sphere", 64, 2);
+    for (let i = 0; i < buf.length; i += 2) {
+      const x = buf[i]!;
+      const y = buf[i + 1]!;
+      expect(x * x + y * y).toBeLessThanOrEqual(1);
+    }
+  });
 });

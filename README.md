@@ -22,7 +22,7 @@ npm run preview    # 빌드 결과 미리보기
 
 ```
 src/
-  main.ts                 # WebGL2 컨텍스트, 프로그램 링크, 렌더 루프
+  main.tsx                # WebGL2 컨텍스트, 프로그램 링크, 렌더 루프
   vite-env.d.ts           # *.vert / *.frag ?raw 타입 선언
   shaders/
     fullscreen.vert       # 풀스크린 쿼드 정점 셰이더
@@ -32,7 +32,7 @@ vite.config.ts
 tsconfig.json
 ```
 
-셰이더는 `?raw` 임포트로 문자열로 읽어와 컴파일합니다. 새 셰이더 파일을 추가할 때는 `src/shaders/` 아래에 두고 `main.ts`에서 임포트하세요.
+셰이더는 `?raw` 임포트로 문자열로 읽어와 컴파일합니다. 새 셰이더 파일을 추가할 때는 `src/shaders/` 아래에 두고 `main.tsx`에서 임포트하세요.
 
 ## Uniforms
 

@@ -13,6 +13,11 @@ import { setUniform } from "../gl/uniforms";
 import { resolveValueFor, type Value } from "../nodes/utility";
 import type { ComputePass, ExecutionPlan, Pass, ShaderPass } from "./compile";
 import type { Graph, GraphNode } from "./types";
+import {
+  snapshotUniformValue,
+  type UniformValue,
+  uniformValuesEqual,
+} from "./uniformCache";
 
 export interface FrameContext {
   time: number;
@@ -62,6 +67,39 @@ function bindSystemUniforms(
   }
 }
 
+/**
+ * Per-pass cache of the last user-uniform values uploaded to the GPU. Keyed
+ * weakly on the Pass object, so when `compile` rebuilds the plan the previous
+ * Pass + its cache are GC'd together — the new Pass starts with an empty cache
+ * (first frame after recompile re-uploads everything, which is correct).
+ *
+ * Programs are not shared across passes (each ShaderPass calls createProgram),
+ * so a per-pass cache faithfully reflects what is in each program's uniform
+ * state without cross-talk.
+ */
+const userUniformCache = new WeakMap<
+  ShaderPass | ComputePass,
+  Map<string, UniformValue>
+>();
+
+function uploadUniform(
+  gl: WebGL2RenderingContext,
+  loc: WebGLUniformLocation,
+  value: UniformValue,
+) {
+  if (typeof value === "number") {
+    setUniform(gl, loc, value);
+    return;
+  }
+  if (value.length === 2) {
+    setUniform(gl, loc, [value[0]!, value[1]!]);
+  } else if (value.length === 3) {
+    setUniform(gl, loc, [value[0]!, value[1]!, value[2]!]);
+  } else if (value.length === 4) {
+    setUniform(gl, loc, [value[0]!, value[1]!, value[2]!, value[3]!]);
+  }
+}
+
 function bindUserUniforms(
   gl: WebGL2RenderingContext,
   pass: ShaderPass | ComputePass,
@@ -69,7 +107,7 @@ function bindUserUniforms(
   resolveCache: Map<string, Value>,
 ) {
   // Build an effective uniform map: explicit values overridden by param edges.
-  const effective: Record<string, number | number[]> = {
+  const effective: Record<string, UniformValue> = {
     ...pass.uniformValues,
   };
   if (ctx.graph && pass.paramBindings.length) {
@@ -83,24 +121,18 @@ function bindUserUniforms(
     }
   }
 
+  let cache = userUniformCache.get(pass);
+  if (!cache) {
+    cache = new Map();
+    userUniformCache.set(pass, cache);
+  }
+
   for (const [name, value] of Object.entries(effective)) {
     const loc = pass.program.uniforms[name];
-    if (loc === undefined) continue;
-    if (typeof value === "number") {
-      setUniform(gl, loc ?? null, value);
-    } else if (Array.isArray(value)) {
-      if (value.length === 2)
-        setUniform(gl, loc ?? null, [value[0]!, value[1]!]);
-      else if (value.length === 3)
-        setUniform(gl, loc ?? null, [value[0]!, value[1]!, value[2]!]);
-      else if (value.length === 4)
-        setUniform(gl, loc ?? null, [
-          value[0]!,
-          value[1]!,
-          value[2]!,
-          value[3]!,
-        ]);
-    }
+    if (loc === undefined || loc === null) continue;
+    if (uniformValuesEqual(cache.get(name), value)) continue;
+    uploadUniform(gl, loc, value);
+    cache.set(name, snapshotUniformValue(value));
   }
 }
 

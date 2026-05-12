@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "./toastStore";
 
 type RecorderStatus = "idle" | "recording";
 
@@ -53,7 +54,9 @@ export const useRecorderStore = create<RecorderState>((set, get) => ({
     if (_active) return;
     const mime = pickMimeType();
     if (!mime) {
-      set({ error: "MediaRecorder is not supported in this browser" });
+      const msg = "MediaRecorder is not supported in this browser";
+      set({ error: msg });
+      toast.error(`녹화 시작 실패: ${msg}`);
       return;
     }
     // `captureStream` may be missing on some browsers (Safari requires the
@@ -63,7 +66,9 @@ export const useRecorderStore = create<RecorderState>((set, get) => ({
         ? canvas.captureStream(fps)
         : null;
     if (!stream) {
-      set({ error: "canvas.captureStream() is not supported" });
+      const msg = "canvas.captureStream() is not supported";
+      set({ error: msg });
+      toast.error(`녹화 시작 실패: ${msg}`);
       return;
     }
     try {
@@ -86,7 +91,9 @@ export const useRecorderStore = create<RecorderState>((set, get) => ({
         error: null,
       });
     } catch (err) {
-      set({ error: (err as Error).message });
+      const msg = (err as Error).message;
+      set({ error: msg });
+      toast.error(`녹화 시작 실패: ${msg}`);
     }
   },
   stop: async () => {

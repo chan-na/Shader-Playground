@@ -1,6 +1,7 @@
 import { debounce } from "../utils/debounce";
 import { useGraphStore } from "./graphStore";
 import { type SerializedProject, serializeProject } from "./serialization";
+import { toast } from "./toastStore";
 
 const DB_NAME = "shader-playground-session";
 const DB_VERSION = 1;
@@ -105,7 +106,11 @@ export function createAutoSaveScheduler(deps: AutoSaveDeps): AutoSaveHandle {
   };
 
   const debounced = debounce(() => {
-    void flushNow();
+    flushNow().catch(() => {
+      // Persist failures are surfaced by the injected `persist` callback
+      // (e.g., toast on IndexedDB quota). Swallow here so the unhandled
+      // rejection doesn't bubble out of fire-and-forget debounced calls.
+    });
   }, delay);
 
   const unsub = deps.subscribe(() => {
@@ -129,11 +134,13 @@ export function createAutoSaveScheduler(deps: AutoSaveDeps): AutoSaveHandle {
 }
 
 let _activeHandle: AutoSaveHandle | null = null;
+let _detachUnload: (() => void) | null = null;
 
 /** Start auto-save against the global graphStore. Idempotent. */
 export function startAutoSave(): AutoSaveHandle {
   if (_activeHandle) return _activeHandle;
-  _activeHandle = createAutoSaveScheduler({
+  let lastErrorShown = "";
+  const handle = createAutoSaveScheduler({
     getState: () => {
       const s = useGraphStore.getState();
       return {
@@ -143,7 +150,58 @@ export function startAutoSave(): AutoSaveHandle {
       };
     },
     subscribe: (cb) => useGraphStore.subscribe(cb),
-    persist: saveSession,
+    persist: async (p) => {
+      try {
+        await saveSession(p);
+        lastErrorShown = "";
+      } catch (err) {
+        const msg = (err as Error).message || String(err);
+        // De-dupe: quota errors repeat every debounce window — surface once
+        // until a save eventually succeeds.
+        if (msg !== lastErrorShown) {
+          lastErrorShown = msg;
+          toast.error(`자동 저장 실패: ${msg}`);
+        }
+        throw err;
+      }
+    },
   });
+  _activeHandle = handle;
+  _detachUnload = attachUnloadFlush(handle);
   return _activeHandle;
+}
+
+/**
+ * Best-effort flush on tab close. `beforeunload` covers desktop refresh/close;
+ * `pagehide` is the iOS Safari path (BFCache also gets a synchronous tick).
+ * Both are fire-and-forget — IndexedDB may not finish if the browser is fast
+ * to kill the page, but it cuts the worst-case 30 s debounce window down to
+ * "whatever IDB can commit in the unload tick" for the common case.
+ */
+function attachUnloadFlush(handle: AutoSaveHandle): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onUnload = () => {
+    handle.flush().catch(() => {
+      // Best-effort during page unload — nothing useful we can do if IDB
+      // rejects, the page is going away. Swallow to avoid unhandled rejection.
+    });
+  };
+  window.addEventListener("beforeunload", onUnload);
+  window.addEventListener("pagehide", onUnload);
+  return () => {
+    window.removeEventListener("beforeunload", onUnload);
+    window.removeEventListener("pagehide", onUnload);
+  };
+}
+
+/** Stop the active scheduler (test seam). Detaches unload listeners too. */
+export function stopAutoSave(): void {
+  if (_detachUnload) {
+    _detachUnload();
+    _detachUnload = null;
+  }
+  if (_activeHandle) {
+    _activeHandle.stop();
+    _activeHandle = null;
+  }
 }

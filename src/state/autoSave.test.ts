@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAutoSaveScheduler } from "./autoSave";
+import {
+  createAutoSaveScheduler,
+  startAutoSave,
+  stopAutoSave,
+} from "./autoSave";
+import { useGraphStore } from "./graphStore";
 import type { SerializedProject } from "./serialization";
 
 function makeFakeStore(initialRev = 0) {
@@ -139,5 +144,59 @@ describe("createAutoSaveScheduler", () => {
     handle.stop();
     vi.advanceTimersByTime(500);
     expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("persist rejection does not bubble out of the debounced fire-and-forget call", async () => {
+    const store = makeFakeStore();
+    const persist = vi.fn().mockRejectedValue(new Error("quota"));
+    const handle = createAutoSaveScheduler({
+      ...store,
+      persist,
+      delayMs: 100,
+    });
+    const onRejection = vi.fn();
+    process.on("unhandledRejection", onRejection);
+    try {
+      store.bumpRev();
+      vi.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onRejection).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", onRejection);
+      handle.stop();
+    }
+  });
+});
+
+describe("startAutoSave unload listeners", () => {
+  afterEach(() => {
+    stopAutoSave();
+  });
+
+  it("attaches beforeunload and pagehide listeners", () => {
+    const addSpy = vi.spyOn(window, "addEventListener");
+    startAutoSave();
+    const events = addSpy.mock.calls.map((c) => c[0]);
+    expect(events).toContain("beforeunload");
+    expect(events).toContain("pagehide");
+    addSpy.mockRestore();
+  });
+
+  it("stopAutoSave detaches the unload listeners", () => {
+    startAutoSave();
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+    stopAutoSave();
+    const events = removeSpy.mock.calls.map((c) => c[0]);
+    expect(events).toContain("beforeunload");
+    expect(events).toContain("pagehide");
+    removeSpy.mockRestore();
+  });
+
+  it("dispatching beforeunload does not throw", () => {
+    startAutoSave();
+    // Bump rev so flush has something to do.
+    useGraphStore.getState().reset();
+    expect(() => window.dispatchEvent(new Event("beforeunload"))).not.toThrow();
   });
 });

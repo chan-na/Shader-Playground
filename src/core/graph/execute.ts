@@ -197,7 +197,8 @@ export function executePlan(
   bindFramebuffer(gl, null);
   gl.viewport(0, 0, canvasWidth, canvasHeight);
   const bg = ctx.background ?? [0.07, 0.07, 0.09];
-  // Clear with background; outputs blit into their sub-viewports.
+  // Background clear shows through any fragment that the composite shader
+  // discards (only fragments outside every cell — i.e. integer-rounding gaps).
   gl.clearColor(bg[0], bg[1], bg[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -209,36 +210,64 @@ export function executePlan(
     return;
   }
   const cells = splitLayout(drawable.length, canvasWidth, canvasHeight);
+  const textures: WebGLTexture[] = [];
   for (let i = 0; i < drawable.length; i++) {
-    const cell = cells[i]!;
     const src = passByNode.get(drawable[i]!.sourceNodeId!)!;
-    gl.viewport(cell.x, cell.y, Math.max(1, cell.w), Math.max(1, cell.h));
-    blitToCanvas(gl, src.fbo.color.texture);
+    textures.push(src.fbo.color.texture);
   }
-  // Reset viewport for whoever runs after us.
-  gl.viewport(0, 0, canvasWidth, canvasHeight);
+  compositeOutputs(gl, textures, cells, canvasWidth, canvasHeight);
 }
 
-let _blitProgram: WebGLProgram | null = null;
-let _blitVAO: WebGLVertexArrayObject | null = null;
-let _blitTexLoc: WebGLUniformLocation | null = null;
+const MAX_COMPOSITE_OUTPUTS = 4;
 
-function ensureBlit(gl: WebGL2RenderingContext) {
-  if (_blitProgram) return;
+interface CompositeState {
+  program: WebGLProgram;
+  vao: WebGLVertexArrayObject;
+  countLoc: WebGLUniformLocation | null;
+  cellLocs: Array<WebGLUniformLocation | null>;
+}
+
+let _composite: CompositeState | null = null;
+
+function ensureComposite(gl: WebGL2RenderingContext): CompositeState {
+  if (_composite) return _composite;
   const vs = `#version 300 es
 in vec2 a_position;
-out vec2 v_uv;
 void main() {
-  v_uv = a_position * 0.5 + 0.5;
   gl_Position = vec4(a_position, 0.0, 1.0);
 }`;
+  // Pixel-space cell rects (x, y, w, h) — matches splitLayout output directly,
+  // so boundaries are integer-exact and tile losslessly via gl_FragCoord.
   const fs = `#version 300 es
 precision highp float;
-in vec2 v_uv;
-uniform sampler2D u_tex;
+uniform int u_count;
+uniform vec4 u_cells[${MAX_COMPOSITE_OUTPUTS}];
+uniform sampler2D u_tex0;
+uniform sampler2D u_tex1;
+uniform sampler2D u_tex2;
+uniform sampler2D u_tex3;
 out vec4 outColor;
+
+vec4 sampleSlot(int i, vec2 uv) {
+  if (i == 0) return texture(u_tex0, uv);
+  if (i == 1) return texture(u_tex1, uv);
+  if (i == 2) return texture(u_tex2, uv);
+  return texture(u_tex3, uv);
+}
+
 void main() {
-  outColor = texture(u_tex, v_uv);
+  vec2 frag = gl_FragCoord.xy;
+  for (int i = 0; i < ${MAX_COMPOSITE_OUTPUTS}; i++) {
+    if (i >= u_count) break;
+    vec4 c = u_cells[i];
+    if (frag.x >= c.x && frag.x < c.x + c.z &&
+        frag.y >= c.y && frag.y < c.y + c.w) {
+      vec2 local = (frag - c.xy) / c.zw;
+      outColor = sampleSlot(i, local);
+      return;
+    }
+  }
+  discard;
 }`;
   const compile = (type: number, src: string) => {
     const sh = gl.createShader(type)!;
@@ -248,15 +277,27 @@ void main() {
   };
   const v = compile(gl.VERTEX_SHADER, vs);
   const f = compile(gl.FRAGMENT_SHADER, fs);
-  const p = gl.createProgram()!;
-  gl.attachShader(p, v);
-  gl.attachShader(p, f);
-  gl.linkProgram(p);
+  const program = gl.createProgram()!;
+  gl.attachShader(program, v);
+  gl.attachShader(program, f);
+  gl.linkProgram(program);
   gl.deleteShader(v);
   gl.deleteShader(f);
-  _blitProgram = p;
-  _blitTexLoc = gl.getUniformLocation(p, "u_tex");
-  const loc = gl.getAttribLocation(p, "a_position");
+
+  // Sampler unit assignments are constant — set once now.
+  gl.useProgram(program);
+  gl.uniform1i(gl.getUniformLocation(program, "u_tex0"), 0);
+  gl.uniform1i(gl.getUniformLocation(program, "u_tex1"), 1);
+  gl.uniform1i(gl.getUniformLocation(program, "u_tex2"), 2);
+  gl.uniform1i(gl.getUniformLocation(program, "u_tex3"), 3);
+
+  const countLoc = gl.getUniformLocation(program, "u_count");
+  const cellLocs: Array<WebGLUniformLocation | null> = [];
+  for (let i = 0; i < MAX_COMPOSITE_OUTPUTS; i++) {
+    cellLocs.push(gl.getUniformLocation(program, `u_cells[${i}]`));
+  }
+
+  const attrLoc = gl.getAttribLocation(program, "a_position");
   const vao = gl.createVertexArray()!;
   gl.bindVertexArray(vao);
   const vbo = gl.createBuffer()!;
@@ -266,20 +307,49 @@ void main() {
     new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
     gl.STATIC_DRAW,
   );
-  gl.enableVertexAttribArray(loc);
-  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(attrLoc);
+  gl.vertexAttribPointer(attrLoc, 2, gl.FLOAT, false, 0, 0);
   gl.bindVertexArray(null);
-  _blitVAO = vao;
+
+  _composite = { program, vao, countLoc, cellLocs };
+  return _composite;
 }
 
-function blitToCanvas(gl: WebGL2RenderingContext, tex: WebGLTexture) {
-  ensureBlit(gl);
+/**
+ * Composite N (1..4) source textures onto the default framebuffer in a single
+ * draw call. The fragment shader uses `gl_FragCoord` against pixel-exact cell
+ * rects (matching `splitLayout`) to pick which texture to sample. Replaces the
+ * previous N-times `useProgram + bindVAO + drawArrays` loop with one dispatch
+ * and one set of state binds.
+ */
+function compositeOutputs(
+  gl: WebGL2RenderingContext,
+  textures: WebGLTexture[],
+  cells: Array<{ x: number; y: number; w: number; h: number }>,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  const state = ensureComposite(gl);
+  const n = Math.min(textures.length, MAX_COMPOSITE_OUTPUTS);
+
   gl.disable(gl.DEPTH_TEST);
-  gl.useProgram(_blitProgram);
-  gl.bindVertexArray(_blitVAO);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.uniform1i(_blitTexLoc, 0);
+  gl.viewport(0, 0, canvasWidth, canvasHeight);
+  gl.useProgram(state.program);
+  gl.bindVertexArray(state.vao);
+
+  for (let i = 0; i < n; i++) {
+    gl.activeTexture(gl.TEXTURE0 + i);
+    gl.bindTexture(gl.TEXTURE_2D, textures[i]!);
+    const cell = cells[i]!;
+    gl.uniform4f(
+      state.cellLocs[i] ?? null,
+      cell.x,
+      cell.y,
+      Math.max(1, cell.w),
+      Math.max(1, cell.h),
+    );
+  }
+  gl.uniform1i(state.countLoc ?? null, n);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   gl.bindVertexArray(null);
 }

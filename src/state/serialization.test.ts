@@ -101,4 +101,112 @@ describe("serializeProject / deserializeProject", () => {
     const serialized = serializeProject(graph, positions);
     expect(serialized.positions.ghost).toBeUndefined();
   });
+
+  it("rejects null/non-object payloads", () => {
+    expect(() => deserializeProject(null)).toThrow(/not an object/);
+    expect(() => deserializeProject("string")).toThrow();
+  });
+
+  it("rejects payload with non-numeric version", () => {
+    expect(() =>
+      deserializeProject({
+        format: "shader-playground",
+        version: "v1",
+        graph: { nodes: [], edges: [] },
+      }),
+    ).toThrow(/version is missing/);
+  });
+
+  it("rejects payload with malformed graph (missing edges array)", () => {
+    expect(() =>
+      deserializeProject({
+        format: "shader-playground",
+        version: 1,
+        graph: { nodes: [] },
+      }),
+    ).toThrow(/missing or malformed/);
+  });
+
+  it("emits a validation warning for missing_node edges", () => {
+    const restored = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      graph: {
+        nodes: [{ id: "real", kind: "output" }],
+        edges: [
+          {
+            id: "e1",
+            source: "real",
+            sourceHandle: "out",
+            target: "ghost",
+            targetHandle: "in",
+          },
+        ],
+      },
+      positions: {},
+    });
+    expect(restored.warnings.some((w) => w.includes("Validation"))).toBe(true);
+  });
+
+  it("round-trips param / math / swizzle / combine / image / output nodes", () => {
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "img",
+          kind: "image",
+          assetId: "asset-1",
+        },
+        {
+          id: "img-null",
+          kind: "image",
+          assetId: null,
+        },
+        {
+          id: "p1",
+          kind: "param",
+          paramKind: "float",
+          value: 0.5,
+          label: "Intensity",
+        },
+        {
+          id: "p2",
+          kind: "param",
+          paramKind: "vec3",
+          value: [0.1, 0.2, 0.3],
+          // no label — exercises the conditional spread
+        },
+        { id: "m1", kind: "math", op: "add", a: 1, b: 2 },
+        { id: "sw1", kind: "swizzle", mask: "yzx" },
+        {
+          id: "cb1",
+          kind: "combine",
+          arity: 4,
+          values: [0.1, 0.2, 0.3, 0.4],
+        },
+        { id: "out1", kind: "output" },
+      ],
+      edges: [],
+    };
+    const round = deserializeProject(
+      JSON.parse(JSON.stringify(serializeProject(graph, {}))),
+    );
+    expect(round.graph.nodes.map((n) => n.id).sort()).toEqual(
+      graph.nodes.map((n) => n.id).sort(),
+    );
+    const param1 = round.graph.nodes.find((n) => n.id === "p1");
+    expect(param1?.kind).toBe("param");
+    if (param1?.kind === "param") {
+      expect(param1.label).toBe("Intensity");
+      expect(param1.value).toBe(0.5);
+    }
+    const param2 = round.graph.nodes.find((n) => n.id === "p2");
+    if (param2?.kind === "param") {
+      expect(param2.label).toBeUndefined();
+      expect(param2.value).toEqual([0.1, 0.2, 0.3]);
+    }
+    const cb = round.graph.nodes.find((n) => n.id === "cb1");
+    if (cb?.kind === "combine") {
+      expect(cb.values).toEqual([0.1, 0.2, 0.3, 0.4]);
+    }
+  });
 });

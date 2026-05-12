@@ -154,4 +154,68 @@ describe("recorder store", () => {
     // elapsed reflects performance.now() - startedAt — non-negative.
     expect(useRecorderStore.getState().elapsedMs).toBeGreaterThanOrEqual(0);
   });
+
+  it("start() surfaces an error when MediaRecorder construction throws", async () => {
+    class ThrowingMediaRecorder {
+      constructor(_s: MediaStream, _o: { mimeType: string }) {
+        throw new Error("codec init failed");
+      }
+      static isTypeSupported() {
+        return true;
+      }
+    }
+    (
+      globalThis as unknown as { MediaRecorder: typeof ThrowingMediaRecorder }
+    ).MediaRecorder = ThrowingMediaRecorder;
+
+    const canvas = makeFakeCanvas(true);
+    await useRecorderStore.getState().start(canvas, 30);
+    expect(useRecorderStore.getState().status).toBe("idle");
+    expect(useRecorderStore.getState().error).toMatch(/codec init failed/);
+  });
+
+  it("start() returns null when MediaRecorder.isTypeSupported rejects every candidate", async () => {
+    // pickMimeType() returns null before instantiation, so this only needs the
+    // static probe to exist; expose it as a callable shaped like MediaRecorder.
+    const NoTypesMediaRecorder = function NoTypesMediaRecorder() {
+      throw new Error("should not be constructed");
+    };
+    NoTypesMediaRecorder.isTypeSupported = () => false;
+    (globalThis as unknown as { MediaRecorder: unknown }).MediaRecorder =
+      NoTypesMediaRecorder;
+
+    const canvas = makeFakeCanvas(true);
+    await useRecorderStore.getState().start(canvas, 30);
+    expect(useRecorderStore.getState().status).toBe("idle");
+    expect(useRecorderStore.getState().error).toMatch(/MediaRecorder/);
+  });
+
+  it("stop() resolves null when recorder.stop() throws", async () => {
+    class ThrowingStopMediaRecorder {
+      ondataavailable: ((e: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      mimeType: string;
+      constructor(_s: MediaStream, o: { mimeType: string }) {
+        this.mimeType = o.mimeType;
+      }
+      start(_t?: number) {}
+      stop() {
+        throw new Error("hardware busy");
+      }
+      static isTypeSupported() {
+        return true;
+      }
+    }
+    (
+      globalThis as unknown as {
+        MediaRecorder: typeof ThrowingStopMediaRecorder;
+      }
+    ).MediaRecorder = ThrowingStopMediaRecorder;
+
+    const canvas = makeFakeCanvas(true);
+    await useRecorderStore.getState().start(canvas, 30);
+    const result = await useRecorderStore.getState().stop();
+    expect(result).toBeNull();
+    expect(useRecorderStore.getState().status).toBe("idle");
+  });
 });

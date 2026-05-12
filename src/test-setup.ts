@@ -1,3 +1,7 @@
+// fake-indexeddb shim — jsdom omits IndexedDB; auto-import installs an in-memory
+// IDBFactory on globalThis so cache.ts / autoSave.ts IDB paths are testable.
+import "fake-indexeddb/auto";
+
 // Minimal ImageData polyfill for jsdom (which omits the Canvas/ImageData APIs).
 if (typeof globalThis.ImageData === "undefined") {
   class ImageDataPolyfill {

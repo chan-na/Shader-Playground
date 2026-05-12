@@ -91,6 +91,92 @@ test.describe("Phase 3-4 — editor & uniform exposure", () => {
     await expect(row).toHaveAttribute("data-uniform-control", "slider");
   });
 
+  test("Inspector uniform search filters rows by name/type", async ({
+    page,
+  }) => {
+    await page.getByTestId("tab-inspector").click();
+    await withSp(
+      page,
+      (sp) => {
+        sp.selection.getState().select("s1");
+      },
+      undefined,
+    );
+
+    // Inject three custom uniforms so the search has something to filter.
+    const before = await readSp(page, (sp) => sp.graph.getState().rev);
+    const newFrag = trivialShaderSources.fragment.replace(
+      "uniform vec3 u_baseColor;",
+      [
+        "uniform vec3 u_baseColor;",
+        "uniform float u_blurRadius;",
+        "uniform vec3 u_tintColor;",
+        "uniform float u_density;",
+      ].join("\n"),
+    );
+    await withSp(
+      page,
+      (sp, args) => {
+        sp.graph.getState().updateShaderSource(args.id, {
+          fragmentSource: args.src,
+        });
+      },
+      { id: "s1", src: newFrag },
+    );
+    await waitForRev(page, before);
+
+    const search = page.getByTestId("uniform-search");
+    await expect(search).toBeVisible();
+
+    // Initial: all three custom uniforms visible.
+    await expect(
+      page.locator("[data-uniform-name='u_blurRadius']"),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-uniform-name='u_tintColor']"),
+    ).toBeVisible();
+    await expect(page.locator("[data-uniform-name='u_density']")).toBeVisible();
+
+    // Filter by name substring.
+    await search.fill("blur");
+    await expect(
+      page.locator("[data-uniform-name='u_blurRadius']"),
+    ).toBeVisible();
+    await expect(page.locator("[data-uniform-name='u_tintColor']")).toHaveCount(
+      0,
+    );
+    await expect(page.locator("[data-uniform-name='u_density']")).toHaveCount(
+      0,
+    );
+
+    // Filter by type — vec3 keeps tintColor (and baseColor) but not floats.
+    await search.fill("vec3");
+    await expect(
+      page.locator("[data-uniform-name='u_tintColor']"),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-uniform-name='u_blurRadius']"),
+    ).toHaveCount(0);
+    await expect(page.locator("[data-uniform-name='u_density']")).toHaveCount(
+      0,
+    );
+
+    // No-match state.
+    await search.fill("zzz_no_uniform_matches");
+    await expect(page.getByTestId("uniform-search-empty")).toBeVisible();
+    await expect(page.locator("[data-testid='uniform-row']")).toHaveCount(0);
+
+    // Clear → all rows back.
+    await search.fill("");
+    await expect(
+      page.locator("[data-uniform-name='u_blurRadius']"),
+    ).toBeVisible();
+    await expect(
+      page.locator("[data-uniform-name='u_tintColor']"),
+    ).toBeVisible();
+    await expect(page.locator("[data-uniform-name='u_density']")).toBeVisible();
+  });
+
   test("introduce GLSL error → diagnosticsStore populated, stage tab flagged", async ({
     page,
   }) => {

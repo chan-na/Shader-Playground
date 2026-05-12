@@ -29,7 +29,7 @@ Phase 12 까지의 SPEC.md / Architecture.md 를 기준으로 도출한 다음 �
 
 - [x] **C1. CodeMirror GLSL 자동완성** — M
   - `@codemirror/autocomplete` 로 빌트인 함수 / 타입 / 현재 노드의 `parseUniforms` 결과 / `// @` 힌트 키워드 제안. Monaco 전환 없이 가벼운 LSP 전 단계. (SPEC §1.3, §4 백로그)
-- [ ] **C2. Inspector uniform 검색·필터** — S
+- [x] **C2. Inspector uniform 검색·필터** — S
   - SidePanel Inspector 탭 상단 검색 박스로 name/label/type 매칭. uniform 다수 노드의 UX 개선. (SPEC Phase 4 / Architecture §4.5 후속)
 - [ ] **C3. Visual regression (Playwright 스크린샷)** — M
   - SwiftShader 결정론적 출력을 활용한 골든 스크린샷 비교. 픽셀 회귀 가드 추가. (CLAUDE.md §1-6, `1ecf9ea`)
@@ -40,7 +40,7 @@ Phase 12 까지의 SPEC.md / Architecture.md 를 기준으로 도출한 다음 �
   - vite-plugin-pwa 로 정적 빌드 캐싱 + manifest. 에셋·autosave IndexedDB 가 이미 갖춰져 있어 앱 셸만 추가하면 완성. (Architecture §9.2, §9.5)
 - [ ] **D2. Embed 모드 (`?embed`)** — S
   - 쿼리/해시로 NodeEditor·SidePanel·Toolbar 숨기고 Viewport+카메라 컨트롤만 노출. iframe 임베드 친화. (Architecture §10, SPEC Phase 11 후속)
-- [ ] **D3. 번들 사이즈 CI 가드** — S
+- [x] **D3. 번들 사이즈 CI 가드** — S
   - `dist/assets/*.js` gzip 임계치를 `.github/workflows/check.yml` 에 추가. "경량 우선" 디폴트 유지. (SPEC §5.2, `bd85153`)
 - [ ] **D4. 프로젝트 JSON v2 마이그레이션 인프라** — S
   - `serialization.ts` 에 `migrators: Record<number, fn>` 테이블 도입. 현재는 v1 항등 등록만으로도 향후 노드 종류 추가 시 자연 활용. (Architecture §9.1)

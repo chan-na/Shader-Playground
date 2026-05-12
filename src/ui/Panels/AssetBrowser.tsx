@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { GraphNode } from "../../core/graph/types";
 import { importFiles } from "../../state/assetActions";
 import { useAssetStore } from "../../state/assetStore";
@@ -32,8 +32,30 @@ export function AssetBrowser() {
     select(id);
   };
 
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer?.types.includes("Files")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    // No position — AssetBrowser drops don't have a graph coordinate; the
+    // resulting node falls back to the default offset.
+    void importFiles(e.dataTransfer.files);
+  }, []);
+
   return (
-    <div className="panel-body" style={{ overflowY: "auto" }}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the Import button below
+    <div
+      className="panel-body"
+      style={{ overflowY: "auto" }}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      data-testid="asset-browser-drop"
+    >
       <div className="inspector-section">
         <div className="inspector-label">
           <span>Assets</span>
@@ -62,7 +84,7 @@ export function AssetBrowser() {
           }}
         />
         <div style={{ color: "#666", fontSize: 11, marginTop: 6 }}>
-          Drag &amp; drop also works on the graph.
+          Drag &amp; drop files here or onto the graph.
         </div>
       </div>
 

@@ -19,6 +19,7 @@ export interface GraphNodeMinimal {
     | "mesh"
     | "image"
     | "shader"
+    | "compute"
     | "output"
     | "param"
     | "math"

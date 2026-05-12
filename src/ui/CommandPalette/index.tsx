@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   CombineArity,
+  ComputeGraphNode,
   GraphNode,
   MathOp,
   MeshGraphNode,
@@ -8,6 +9,7 @@ import type {
 } from "../../core/graph/types";
 import { MAX_OUTPUTS } from "../../core/graph/validate";
 import basicVert from "../../shaders/basic.vert?raw";
+import particleVert from "../../shaders/particles/particle.vert?raw";
 import blendFrag from "../../shaders/templates/blend.frag?raw";
 import blurFrag from "../../shaders/templates/blur.frag?raw";
 import noiseFrag from "../../shaders/templates/noise.frag?raw";
@@ -18,9 +20,11 @@ import {
   CHAIN_DEMO_LAYOUT,
   createChainDemoGraph,
   createDemoGraph,
+  createParticleDemoGraph,
   createSplitDemoGraph,
   createTorusDemoGraph,
   DEMO_LAYOUT,
+  PARTICLE_DEMO_LAYOUT,
   SPLIT_DEMO_LAYOUT,
   TORUS_DEMO_LAYOUT,
 } from "../../state/demoGraph";
@@ -124,6 +128,70 @@ function buildCommands(): Command[] {
       select(id);
     },
   });
+
+  cmds.push(
+    {
+      id: "add-compute-particle",
+      category: "Node",
+      label: "Add Compute: Particle (POINTS)",
+      keywords:
+        "add node compute transform feedback particle points simulation",
+      run: () => {
+        const id = nextId("compute");
+        const node: ComputeGraphNode = {
+          id,
+          kind: "compute",
+          vertexSource: particleVert,
+          count: 1024,
+          primitive: "POINTS",
+          attributes: [
+            {
+              inName: "a_position",
+              outName: "v_position",
+              size: 3,
+              seed: "sphere",
+            },
+            {
+              inName: "a_velocity",
+              outName: "v_velocity",
+              size: 3,
+              seed: "zero",
+            },
+          ],
+          uniformValues: { u_dt: 0.016, u_strength: 0.6 },
+        };
+        addNode(node, { x: -200, y: 80 });
+        select(id);
+      },
+    },
+    {
+      id: "add-compute-empty",
+      category: "Node",
+      label: "Add Compute (empty)",
+      keywords: "add node compute transform feedback empty blank",
+      run: () => {
+        const id = nextId("compute");
+        const node: ComputeGraphNode = {
+          id,
+          kind: "compute",
+          vertexSource: `#version 300 es\nprecision highp float;\n\nin vec3 a_position;\nout vec3 v_position;\n\nuniform float u_time;\n\nvoid main() {\n  v_position = a_position;\n}\n`,
+          count: 256,
+          primitive: "POINTS",
+          attributes: [
+            {
+              inName: "a_position",
+              outName: "v_position",
+              size: 3,
+              seed: "sphere",
+            },
+          ],
+          uniformValues: {},
+        };
+        addNode(node, { x: -200, y: 80 });
+        select(id);
+      },
+    },
+  );
 
   const paramKinds: ParamKind[] = ["float", "color", "vec3", "time"];
   for (const k of paramKinds) {
@@ -236,6 +304,13 @@ function buildCommands(): Command[] {
       label: "Load preset: Split viewport (3 outputs)",
       keywords: "preset demo split viewport multi output",
       run: () => setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT),
+    },
+    {
+      id: "preset-particle",
+      category: "Preset",
+      label: "Load preset: Particle compute (Transform Feedback)",
+      keywords: "preset demo particle compute transform feedback simulation",
+      run: () => setGraph(createParticleDemoGraph(), PARTICLE_DEMO_LAYOUT),
     },
     {
       id: "graph-clear",

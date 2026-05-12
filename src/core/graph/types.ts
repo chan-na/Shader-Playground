@@ -4,6 +4,7 @@ export type GraphNodeKind =
   | "mesh"
   | "image"
   | "shader"
+  | "compute"
   | "output"
   | "param"
   | "math"
@@ -89,10 +90,45 @@ export interface CombineGraphNode extends BaseNode {
   values: [number, number, number, number];
 }
 
+/** Built-in seed generators for ComputeNode attribute initial data. */
+export type ComputeSeed = "sphere" | "cube" | "random" | "zero";
+
+/** Output primitive when the downstream ShaderNode draws compute results. */
+export type ComputePrimitive = "POINTS" | "LINES" | "TRIANGLES";
+
+export type ComputeAttributeSize = 1 | 2 | 3 | 4;
+
+/**
+ * One ping-pong attribute slot of a ComputeNode. `inName` is the GLSL `in`
+ * attribute the vertex shader reads from; `outName` is the `out` varying
+ * captured into the next-frame buffer for the same slot. They must differ —
+ * WebGL2 forbids identical attribute/varying names in one program.
+ */
+export interface ComputeAttribute {
+  inName: string;
+  outName: string;
+  size: ComputeAttributeSize;
+  seed: ComputeSeed;
+}
+
+export interface ComputeGraphNode extends BaseNode {
+  kind: "compute";
+  /** Vertex shader that runs under transform feedback. */
+  vertexSource: string;
+  /** Number of vertices dispatched per frame. */
+  count: number;
+  /** Output primitive for downstream ShaderNode draw calls. */
+  primitive: ComputePrimitive;
+  /** Ping-pong attribute pairs. Order matters — defines the TF varying list. */
+  attributes: ComputeAttribute[];
+  uniformValues: Record<string, number | number[]>;
+}
+
 export type GraphNode =
   | MeshGraphNode
   | ImageGraphNode
   | ShaderGraphNode
+  | ComputeGraphNode
   | OutputGraphNode
   | ParamGraphNode
   | MathGraphNode

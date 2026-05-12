@@ -1,6 +1,7 @@
 import type {
   CombineArity,
   CombineGraphNode,
+  ComputeGraphNode,
   GraphNode,
   GraphNodeKind,
   MathGraphNode,
@@ -27,7 +28,7 @@ export interface PortSpec {
 export interface NodeKindMeta {
   kind: GraphNodeKind;
   label: string;
-  inputs: (node: ShaderGraphNode | null) => PortSpec[];
+  inputs: (node: ShaderGraphNode | ComputeGraphNode | null) => PortSpec[];
   outputs: () => PortSpec[];
 }
 
@@ -76,7 +77,7 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
     label: "Shader",
     inputs: (sn) => {
       const ports: PortSpec[] = [{ name: "mesh", type: "mesh" }];
-      if (sn) {
+      if (sn && sn.kind === "shader") {
         const specs = parseUniforms(`${sn.vertexSource}\n${sn.fragmentSource}`);
         for (const s of samplerUniforms(specs)) {
           ports.push({ name: s.name, type: "texture" });
@@ -89,6 +90,25 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
       return ports;
     },
     outputs: () => [{ name: "texture", type: "texture" }],
+  },
+  compute: {
+    kind: "compute",
+    label: "Compute",
+    inputs: (cn) => {
+      // ComputeNode exposes only non-sampler uniforms from the vertex source
+      // as input ports. sampler/mesh inputs are intentionally disallowed —
+      // compute is positioned as a first-stage simulator, not a post pass.
+      const ports: PortSpec[] = [];
+      if (cn && cn.kind === "compute") {
+        const specs = parseUniforms(cn.vertexSource);
+        for (const s of inspectorUniforms(specs)) {
+          const t = uniformTypeToPort(s.type);
+          if (t) ports.push({ name: s.name, type: t });
+        }
+      }
+      return ports;
+    },
+    outputs: () => [{ name: "mesh", type: "mesh" }],
   },
   output: {
     kind: "output",
@@ -178,9 +198,11 @@ export function nodeInputPorts(node: GraphNode): PortSpec[] {
   if (node.kind === "math") return mathInputPorts((node as MathGraphNode).op);
   if (node.kind === "combine")
     return combineInputPorts((node as CombineGraphNode).arity);
-  return NODE_META[node.kind].inputs(
-    node.kind === "shader" ? (node as ShaderGraphNode) : null,
-  );
+  if (node.kind === "shader")
+    return NODE_META.shader.inputs(node as ShaderGraphNode);
+  if (node.kind === "compute")
+    return NODE_META.compute.inputs(node as ComputeGraphNode);
+  return NODE_META[node.kind].inputs(null);
 }
 
 /**

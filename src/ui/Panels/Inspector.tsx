@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import type { ParamGraphNode, ShaderGraphNode } from "../../core/graph/types";
+import type {
+  ComputeGraphNode,
+  ParamGraphNode,
+  ShaderGraphNode,
+} from "../../core/graph/types";
 import {
   inspectorUniforms,
   parseUniforms,
@@ -30,16 +34,27 @@ export function Inspector({ embedded = false }: InspectorProps) {
   const setUniformValue = useGraphStore((s) => s.setUniformValue);
 
   const shaderNode = node?.kind === "shader" ? (node as ShaderGraphNode) : null;
+  const computeNode =
+    node?.kind === "compute" ? (node as ComputeGraphNode) : null;
 
   const specs = useMemo(() => {
-    if (!shaderNode) return [];
-    return parseUniforms(
-      `${shaderNode.vertexSource}\n${shaderNode.fragmentSource}`,
-    );
-  }, [shaderNode?.vertexSource, shaderNode?.fragmentSource, shaderNode]);
+    if (shaderNode)
+      return parseUniforms(
+        `${shaderNode.vertexSource}\n${shaderNode.fragmentSource}`,
+      );
+    if (computeNode) return parseUniforms(computeNode.vertexSource);
+    return [];
+  }, [
+    shaderNode?.vertexSource,
+    shaderNode?.fragmentSource,
+    shaderNode,
+    computeNode?.vertexSource,
+    computeNode,
+  ]);
 
+  const uniformOwner = shaderNode ?? computeNode;
   const visible = inspectorUniforms(specs);
-  const samplers = samplerUniforms(specs);
+  const samplers = shaderNode ? samplerUniforms(specs) : [];
   const systemUniforms = specs.filter((u) => u.system);
 
   const body = (
@@ -79,7 +94,38 @@ export function Inspector({ embedded = false }: InspectorProps) {
             node.kind === "swizzle" ||
             node.kind === "combine") && <UtilityInspector node={node} />}
 
-          {shaderNode && (
+          {computeNode && (
+            <div className="inspector-section">
+              <div className="inspector-label">Compute</div>
+              <div style={{ color: "#bbb", fontSize: 11 }}>
+                count: {computeNode.count.toLocaleString()}
+                <br />
+                primitive: {computeNode.primitive}
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div className="inspector-label" style={{ fontSize: 11 }}>
+                  Attributes
+                </div>
+                {computeNode.attributes.map((a) => (
+                  <div
+                    key={a.outName}
+                    style={{
+                      color: "#bbb",
+                      fontFamily: "monospace",
+                      fontSize: 11,
+                    }}
+                  >
+                    {a.inName} → {a.outName}{" "}
+                    <span style={{ color: "#666" }}>
+                      ({a.size}, seed={a.seed})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {uniformOwner && (
             <>
               <div className="inspector-section">
                 <div className="inspector-label">
@@ -114,9 +160,9 @@ export function Inspector({ embedded = false }: InspectorProps) {
                     </div>
                     <UniformControl
                       spec={spec}
-                      value={shaderNode.uniformValues[spec.name]}
+                      value={uniformOwner.uniformValues[spec.name]}
                       onChange={(v) =>
-                        setUniformValue(shaderNode.id, spec.name, v)
+                        setUniformValue(uniformOwner.id, spec.name, v)
                       }
                     />
                   </div>

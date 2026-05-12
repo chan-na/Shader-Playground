@@ -195,11 +195,17 @@ export function Viewport() {
         return;
       }
 
-      // Pull current uniform values into the plan (cheap)
+      // Pull current uniform values into the plan (cheap). Both shader and
+      // compute passes carry slider-driven uniformValues that get hot-patched
+      // every frame without recompile.
       const graph = useGraphStore.getState();
       for (const pass of plan.passes) {
         const node = graph.nodes.find((n) => n.id === pass.nodeId);
-        if (node && node.kind === "shader") {
+        if (!node) continue;
+        if (
+          (pass.kind === "shader" && node.kind === "shader") ||
+          (pass.kind === "compute" && node.kind === "compute")
+        ) {
           pass.uniformValues = node.uniformValues;
         }
       }
@@ -242,7 +248,7 @@ export function Viewport() {
       if (ready.length) {
         for (const id of ready) {
           const pass = plan.passes.find((p) => p.nodeId === id);
-          if (!pass) continue;
+          if (!pass || pass.kind !== "shader") continue;
           try {
             asyncReadback.request(gl, id, pass.fbo);
           } catch {

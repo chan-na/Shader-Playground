@@ -11,7 +11,7 @@ import { bindFramebuffer } from "../gl/framebuffer";
 import { drawMesh } from "../gl/mesh";
 import { setUniform } from "../gl/uniforms";
 import { resolveValueFor, type Value } from "../nodes/utility";
-import type { ExecutionPlan, ShaderPass } from "./compile";
+import type { ComputePass, ExecutionPlan, Pass, ShaderPass } from "./compile";
 import type { Graph, GraphNode } from "./types";
 
 export interface FrameContext {
@@ -35,6 +35,15 @@ const _view = mat4.create();
 const _proj = mat4.create();
 const _model = mat4.create();
 
+function bindComputeSystemUniforms(
+  gl: WebGL2RenderingContext,
+  pass: ComputePass,
+  ctx: FrameContext,
+) {
+  const u = pass.program.uniforms;
+  setUniform(gl, u.u_time ?? null, ctx.time);
+}
+
 function bindSystemUniforms(
   gl: WebGL2RenderingContext,
   pass: ShaderPass,
@@ -55,7 +64,7 @@ function bindSystemUniforms(
 
 function bindUserUniforms(
   gl: WebGL2RenderingContext,
-  pass: ShaderPass,
+  pass: ShaderPass | ComputePass,
   ctx: FrameContext,
   resolveCache: Map<string, Value>,
 ) {
@@ -168,15 +177,28 @@ export function executePlan(
   canvasWidth: number,
   canvasHeight: number,
 ) {
-  const passByNode = new Map<string, ShaderPass>();
+  const passByNode = new Map<string, Pass>();
   for (const p of plan.passes) passByNode.set(p.nodeId, p);
+  const shaderPassByNode = new Map<string, ShaderPass>();
+  for (const p of plan.passes) {
+    if (p.kind === "shader") shaderPassByNode.set(p.nodeId, p);
+  }
 
   // One resolver cache per frame so fan-out utility nodes are evaluated once.
   const resolveCache = new Map<string, Value>();
 
-  // Render each shader node into its FBO
+  // Run each pass in topological order. ComputePass dispatches TF and swaps
+  // its read side; ShaderPass with a compute mesh input picks the VAO matching
+  // the upstream compute pass's (post-swap) read side, so it draws the data
+  // captured this frame.
+  gl.viewport(0, 0, plan.width, plan.height);
   for (const pass of plan.passes) {
+    if (pass.kind === "compute") {
+      executeComputePass(gl, pass, ctx, resolveCache);
+      continue;
+    }
     bindFramebuffer(gl, pass.fbo);
+    gl.viewport(0, 0, plan.width, plan.height);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (pass.meshIsFullscreen) {
@@ -189,7 +211,14 @@ export function executePlan(
     gl.useProgram(pass.program.program);
     bindSystemUniforms(gl, pass, ctx);
     bindUserUniforms(gl, pass, ctx, resolveCache);
-    bindSamplers(gl, pass, passByNode, plan);
+    bindSamplers(gl, pass, shaderPassByNode, plan);
+    if (pass.meshComputeNodeId && pass.meshComputeVaos) {
+      const cp = passByNode.get(pass.meshComputeNodeId);
+      if (cp && cp.kind === "compute") {
+        pass.mesh.vao =
+          cp.read === "A" ? pass.meshComputeVaos[0] : pass.meshComputeVaos[1];
+      }
+    }
     drawMesh(gl, pass.mesh);
   }
 
@@ -203,7 +232,7 @@ export function executePlan(
   gl.clear(gl.COLOR_BUFFER_BIT);
 
   const drawable = plan.outputs.filter(
-    (o) => o.sourceNodeId && passByNode.has(o.sourceNodeId),
+    (o) => o.sourceNodeId && shaderPassByNode.has(o.sourceNodeId),
   );
   if (drawable.length === 0) {
     drawPlaceholder(gl, bg);
@@ -212,10 +241,44 @@ export function executePlan(
   const cells = splitLayout(drawable.length, canvasWidth, canvasHeight);
   const textures: WebGLTexture[] = [];
   for (let i = 0; i < drawable.length; i++) {
-    const src = passByNode.get(drawable[i]!.sourceNodeId!)!;
+    const src = shaderPassByNode.get(drawable[i]!.sourceNodeId!)!;
     textures.push(src.fbo.color.texture);
   }
   compositeOutputs(gl, textures, cells, canvasWidth, canvasHeight);
+}
+
+/**
+ * Run one Transform Feedback dispatch for a ComputePass. Inputs come from the
+ * `read` side's VAO; capture targets are the `!read` side's TF object.
+ * After endTransformFeedback the swap flips `read` so the newly captured side
+ * becomes the next-frame input (and so a downstream ShaderPass reads it).
+ */
+function executeComputePass(
+  gl: WebGL2RenderingContext,
+  pass: ComputePass,
+  ctx: FrameContext,
+  resolveCache: Map<string, Value>,
+) {
+  gl.useProgram(pass.program.program);
+  bindComputeSystemUniforms(gl, pass, ctx);
+  bindUserUniforms(gl, pass, ctx, resolveCache);
+
+  const readingA = pass.read === "A";
+  gl.bindVertexArray(readingA ? pass.vaoA : pass.vaoB);
+  gl.bindTransformFeedback(
+    gl.TRANSFORM_FEEDBACK,
+    readingA ? pass.tfB : pass.tfA,
+  );
+  gl.enable(gl.RASTERIZER_DISCARD);
+  gl.beginTransformFeedback(pass.primitive);
+  gl.drawArrays(pass.primitive, 0, pass.count);
+  gl.endTransformFeedback();
+  gl.disable(gl.RASTERIZER_DISCARD);
+  gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
+  gl.bindVertexArray(null);
+
+  // Swap: the side we just captured into is now the freshest data.
+  pass.read = readingA ? "B" : "A";
 }
 
 const MAX_COMPOSITE_OUTPUTS = 4;

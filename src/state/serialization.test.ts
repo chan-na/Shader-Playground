@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { ComputeGraphNode, Graph } from "../core/graph/types";
 import {
   CHAIN_DEMO_LAYOUT,
   createChainDemoGraph,
   createDemoGraph,
+  createParticleDemoGraph,
   DEMO_LAYOUT,
+  PARTICLE_DEMO_LAYOUT,
 } from "./demoGraph";
 import {
   deserializeProject,
@@ -45,6 +48,25 @@ describe("serializeProject / deserializeProject", () => {
       expect(noise.uniformValues.u_scale).toBe(6);
       expect(noise.uniformValues.u_tint).toEqual([0.4, 0.8, 1.0]);
     }
+  });
+
+  it("round-trips a compute node (Phase 13)", () => {
+    const graph: Graph = createParticleDemoGraph();
+    const serialized = serializeProject(graph, PARTICLE_DEMO_LAYOUT);
+    const restored = deserializeProject(JSON.parse(JSON.stringify(serialized)));
+    const compute = restored.graph.nodes.find((n) => n.kind === "compute") as
+      | ComputeGraphNode
+      | undefined;
+    expect(compute).toBeDefined();
+    if (!compute) return;
+    expect(compute.count).toBe(1024);
+    expect(compute.primitive).toBe("POINTS");
+    expect(compute.attributes.length).toBe(2);
+    expect(compute.attributes[0]?.inName).toBe("a_position");
+    expect(compute.attributes[0]?.outName).toBe("v_position");
+    expect(compute.attributes[0]?.seed).toBe("sphere");
+    expect(compute.uniformValues.u_dt).toBe(0.016);
+    expect(restored.warnings).toEqual([]);
   });
 
   it("rejects payload with wrong format tag", () => {

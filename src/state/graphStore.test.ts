@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { ShaderGraphNode } from "../core/graph/types";
+import type { ComputeGraphNode, ShaderGraphNode } from "../core/graph/types";
 import { useGraphStore } from "./graphStore";
 
 const makeShader = (id: string, frag = "void main(){}"): ShaderGraphNode => ({
@@ -65,6 +65,51 @@ describe("graphStore", () => {
     );
     expect(after.uniformRev).toBe(before.uniformRev + 1);
     expect(after.rev).toBe(before.rev);
+  });
+
+  it("updateComputeSource patches vertexSource and bumps rev (Phase 13)", () => {
+    const cn: ComputeGraphNode = {
+      id: "c1",
+      kind: "compute",
+      vertexSource: "void main(){}",
+      count: 16,
+      primitive: "POINTS",
+      attributes: [
+        { inName: "a_position", outName: "v_position", size: 3, seed: "zero" },
+      ],
+      uniformValues: {},
+    };
+    useGraphStore.getState().addNode(cn);
+    const before = useGraphStore.getState();
+    useGraphStore.getState().updateComputeSource("c1", "// new vertex source");
+    const after = useGraphStore.getState();
+    expect((after.nodes[0] as ComputeGraphNode).vertexSource).toBe(
+      "// new vertex source",
+    );
+    expect(after.rev).toBe(before.rev + 1);
+  });
+
+  it("setComputeConfig patches count/primitive/attributes (Phase 13)", () => {
+    const cn: ComputeGraphNode = {
+      id: "c1",
+      kind: "compute",
+      vertexSource: "",
+      count: 16,
+      primitive: "POINTS",
+      attributes: [
+        { inName: "a_position", outName: "v_position", size: 3, seed: "zero" },
+      ],
+      uniformValues: {},
+    };
+    useGraphStore.getState().addNode(cn);
+    useGraphStore
+      .getState()
+      .setComputeConfig("c1", { count: 512, primitive: "LINES" });
+    const updated = useGraphStore
+      .getState()
+      .nodes.find((n) => n.id === "c1") as ComputeGraphNode;
+    expect(updated.count).toBe(512);
+    expect(updated.primitive).toBe("LINES");
   });
 
   it("removeEdge removes only the named edge", () => {

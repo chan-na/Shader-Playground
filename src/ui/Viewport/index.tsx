@@ -59,6 +59,8 @@ export function Viewport() {
     let prev = performance.now();
     let frameCount = 0;
     let fpsAccum = 0;
+    let contextLost = false;
+    const CONTEXT_LOST_MSG = "GPU 컨텍스트 손실 — 복구 중…";
     const timeStore = useTimeStore;
 
     const recompile = () => {
@@ -110,8 +112,37 @@ export function Viewport() {
 
     setReady(true);
 
+    const onContextLost = (e: Event) => {
+      // Calling preventDefault tells the browser the canvas is willing to be
+      // restored — without it, `webglcontextrestored` never fires.
+      e.preventDefault();
+      contextLost = true;
+      pushError(CONTEXT_LOST_MSG);
+      // Reset bookkeeping so when the context is restored we recompile from
+      // scratch. The underlying GL resources are gone — calling dispose on
+      // the now-invalid plan just frees JS-side handles.
+      lastRev = -1;
+      lastAssetRev = -1;
+      lastUniformRev = -1;
+      lastPassNodeIds = new Set<string>();
+    };
+    const onContextRestored = () => {
+      contextLost = false;
+      // Drop stale references the lost plan was holding; recompile() will
+      // build a new plan against the freshly-restored context on the next tick.
+      plan = emptyPlan(canvas.width || 1, canvas.height || 1);
+      clearErrors();
+    };
+    canvas.addEventListener("webglcontextlost", onContextLost as EventListener);
+    canvas.addEventListener("webglcontextrestored", onContextRestored);
+
     const tick = () => {
       if (!alive) return;
+      if (contextLost) {
+        // Park the loop until the browser fires `webglcontextrestored`.
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
       const resized = resize();
       const playing = useTimeStore.getState().playing;
       const rev = useGraphStore.getState().rev;
@@ -264,6 +295,11 @@ export function Viewport() {
     return () => {
       alive = false;
       cancelAnimationFrame(rafId);
+      canvas.removeEventListener(
+        "webglcontextlost",
+        onContextLost as EventListener,
+      );
+      canvas.removeEventListener("webglcontextrestored", onContextRestored);
       cameraCtl.detach();
       asyncReadback.disposeAll(gl);
       plan.dispose();

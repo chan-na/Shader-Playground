@@ -20,3 +20,6 @@ playwright/.cache/
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code session state
+.claude/worktrees/

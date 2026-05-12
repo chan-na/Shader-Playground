@@ -40,7 +40,7 @@ Phase 12 까지의 SPEC.md / Architecture.md 를 기준으로 도출한 다음 �
   - vite-plugin-pwa 로 정적 빌드 캐싱 + manifest. 에셋·autosave IndexedDB 가 이미 갖춰져 있어 앱 셸만 추가하면 완성. (Architecture §9.2, §9.5)
 - [ ] **D2. Embed 모드 (`?embed`)** — S
   - 쿼리/해시로 NodeEditor·SidePanel·Toolbar 숨기고 Viewport+카메라 컨트롤만 노출. iframe 임베드 친화. (Architecture §10, SPEC Phase 11 후속)
-- [ ] **D3. 번들 사이즈 CI 가드** — S
+- [x] **D3. 번들 사이즈 CI 가드** — S
   - `dist/assets/*.js` gzip 임계치를 `.github/workflows/check.yml` 에 추가. "경량 우선" 디폴트 유지. (SPEC §5.2, `bd85153`)
 - [ ] **D4. 프로젝트 JSON v2 마이그레이션 인프라** — S
   - `serialization.ts` 에 `migrators: Record<number, fn>` 테이블 도입. 현재는 v1 항등 등록만으로도 향후 노드 종류 추가 시 자연 활용. (Architecture §9.1)

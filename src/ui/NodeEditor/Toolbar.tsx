@@ -25,6 +25,7 @@ import {
 import { encodeShareUrl } from "../../state/shareUrl";
 import { toast } from "../../state/toastStore";
 import { nextId } from "../../utils/id";
+import { useHelpModalStore } from "./HelpModal";
 
 const btn: React.CSSProperties = {
   background: "#3a3a3d",
@@ -361,6 +362,15 @@ export function Toolbar() {
       </button>
       <button type="button" style={btn} onClick={() => reset()}>
         Clear
+      </button>
+      <button
+        type="button"
+        style={btn}
+        onClick={() => useHelpModalStore.getState().toggle()}
+        title="단축키 · 제스쳐 도움말"
+        aria-label="Open help"
+      >
+        ? Help
       </button>
     </div>
   );

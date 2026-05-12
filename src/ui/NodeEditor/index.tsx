@@ -21,6 +21,7 @@ import { importFiles } from "../../state/assetActions";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { nextId } from "../../utils/id";
+import { HelpModal } from "./HelpModal";
 import { ComputeNodeView } from "./nodes/ComputeNodeView";
 import { ImageNodeView } from "./nodes/ImageNodeView";
 import { MeshNodeView } from "./nodes/MeshNodeView";
@@ -108,12 +109,14 @@ export function NodeEditor() {
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const updated = applyNodeChanges(changes, rfNodes);
+      const currentSelected = useSelectionStore.getState().selectedNodeId;
       // Persist position drags + removals
       for (const c of changes) {
         if (c.type === "position" && c.position) {
           updateNodePosition(c.id, { x: c.position.x, y: c.position.y });
         } else if (c.type === "remove") {
           removeNode(c.id);
+          if (currentSelected === c.id) select(null);
         } else if (c.type === "select") {
           if (c.selected) select(c.id);
         }
@@ -238,6 +241,7 @@ export function NodeEditor() {
           fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
           proOptions={{ hideAttribution: true }}
           colorMode="dark"
+          deleteKeyCode={["Backspace", "Delete"]}
         >
           <Background color="#333" gap={16} />
           <Controls />
@@ -264,6 +268,7 @@ export function NodeEditor() {
           />
         </ReactFlow>
       </div>
+      <HelpModal />
     </div>
   );
 }

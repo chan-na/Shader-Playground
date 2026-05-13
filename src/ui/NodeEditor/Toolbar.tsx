@@ -260,8 +260,9 @@ export function Toolbar() {
         style={btn}
         onClick={onPickFiles}
         title="Import OBJ/GLTF/PNG/JPG"
+        aria-label="Import OBJ, GLTF, or image files"
       >
-        ↑ Load…
+        <span aria-hidden="true">↑ </span>Load…
       </button>
       <input
         ref={fileInputRef}
@@ -276,16 +277,18 @@ export function Toolbar() {
         style={btn}
         onClick={exportProject}
         title="Save graph as JSON"
+        aria-label="Export project as JSON"
       >
-        ⬇ Export
+        <span aria-hidden="true">⬇ </span>Export
       </button>
       <button
         type="button"
         style={btn}
         onClick={onPickProject}
         title="Load graph from JSON"
+        aria-label="Import project from JSON"
       >
-        ⬆ Import
+        <span aria-hidden="true">⬆ </span>Import
       </button>
       <input
         ref={projectInputRef}
@@ -299,8 +302,9 @@ export function Toolbar() {
         style={btn}
         onClick={screenshot}
         title="Save viewport PNG"
+        aria-label="Save viewport as PNG"
       >
-        📷 Snap
+        <span aria-hidden="true">📷 </span>Snap
       </button>
       <button
         type="button"
@@ -312,24 +316,39 @@ export function Toolbar() {
         }}
         onClick={toggleRecord}
         title="Record viewport to WebM"
+        aria-label={
+          recorderStatus === "recording"
+            ? "Stop recording viewport"
+            : "Start recording viewport to WebM"
+        }
       >
-        {recorderStatus === "recording" ? "■ Stop" : "● Record"}
+        {recorderStatus === "recording" ? (
+          <>
+            <span aria-hidden="true">■ </span>Stop
+          </>
+        ) : (
+          <>
+            <span aria-hidden="true">● </span>Record
+          </>
+        )}
       </button>
       <button
         type="button"
         style={btn}
         onClick={shareUrl}
         title="Copy a shareable URL to clipboard"
+        aria-label="Copy shareable URL to clipboard"
       >
-        🔗 Share
+        <span aria-hidden="true">🔗 </span>Share
       </button>
       <button
         type="button"
         style={btn}
         onClick={exportHtml}
         title="Download a self-contained HTML file"
+        aria-label="Download as self-contained HTML"
       >
-        📄 HTML
+        <span aria-hidden="true">📄 </span>HTML
       </button>
       <div style={{ flex: 1 }} />
       <button
@@ -370,7 +389,7 @@ export function Toolbar() {
         title="단축키 · 제스쳐 도움말"
         aria-label="Open help"
       >
-        ? Help
+        <span aria-hidden="true">? </span>Help
       </button>
     </div>
   );

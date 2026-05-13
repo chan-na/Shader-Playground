@@ -1,6 +1,8 @@
 import {
   cacheImage,
   cacheMesh,
+  deleteCachedImage,
+  deleteCachedMesh,
   loadCachedImage,
   loadCachedMesh,
 } from "../core/assets/cache";
@@ -12,6 +14,7 @@ import { nextId } from "../utils/id";
 import { useAssetStore } from "./assetStore";
 import { useGraphStore } from "./graphStore";
 import { useSelectionStore } from "./selectionStore";
+import { toast } from "./toastStore";
 
 export type AssetKind = "obj" | "gltf" | "image" | "unknown";
 
@@ -118,6 +121,19 @@ export async function hydrateAssetsFor(assetIds: {
   );
 }
 
+// Remove an asset from the in-memory store *and* its IndexedDB record. Without
+// the IDB delete the cache grows unbounded across sessions, eventually
+// consuming the origin's storage quota and breaking autosave.
+export function forgetMesh(id: string): void {
+  useAssetStore.getState().removeMesh(id);
+  void deleteCachedMesh(id);
+}
+
+export function forgetImage(id: string): void {
+  useAssetStore.getState().removeImage(id);
+  void deleteCachedImage(id);
+}
+
 export async function importFiles(
   files: FileList | File[],
   basePosition?: { x: number; y: number },
@@ -131,7 +147,9 @@ export async function importFiles(
       const r = await importFile(file, pos);
       if (r) results.push(r);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.error("Asset import failed:", file.name, e);
+      toast.error(`자산 임포트 실패 (${file.name}): ${msg}`);
     }
   }
   return results;

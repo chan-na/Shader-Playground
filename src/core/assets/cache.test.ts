@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cacheImage,
   cacheMesh,
+  deleteCachedImage,
+  deleteCachedMesh,
   loadCachedImage,
   loadCachedMesh,
 } from "./cache";
@@ -117,5 +119,30 @@ describe("cache (IndexedDB-backed)", () => {
       .mockRejectedValue(new Error("decode failed"));
 
     expect(await loadCachedImage("img-bad-bitmap")).toBeNull();
+  });
+
+  it("deleteCachedMesh removes the record so subsequent loads return null", async () => {
+    const handle = meshHandle("mesh-del");
+    await cacheMesh(handle);
+    expect(await loadCachedMesh("mesh-del")).not.toBeNull();
+
+    await deleteCachedMesh("mesh-del");
+
+    expect(await loadCachedMesh("mesh-del")).toBeNull();
+  });
+
+  it("deleteCachedImage removes the record so subsequent loads return null", async () => {
+    const handle = imageHandle("img-del");
+    await cacheImage(handle, new Blob([new Uint8Array([9])]));
+    expect(await loadCachedImage("img-del")).not.toBeNull();
+
+    await deleteCachedImage("img-del");
+
+    expect(await loadCachedImage("img-del")).toBeNull();
+  });
+
+  it("deleteCachedMesh / deleteCachedImage are no-ops for unknown ids", async () => {
+    await expect(deleteCachedMesh("never-existed")).resolves.toBeUndefined();
+    await expect(deleteCachedImage("never-existed")).resolves.toBeUndefined();
   });
 });

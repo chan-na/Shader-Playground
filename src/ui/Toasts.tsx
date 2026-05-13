@@ -68,7 +68,7 @@ function ToastRow({
         pointerEvents: "auto",
       }}
     >
-      <span style={{ opacity: 0.85, lineHeight: "16px" }}>
+      <span aria-hidden="true" style={{ opacity: 0.85, lineHeight: "16px" }}>
         {ICON_BY_KIND[t.kind]}
       </span>
       <span
@@ -80,6 +80,7 @@ function ToastRow({
         type="button"
         onClick={() => onDismiss(t.id)}
         title="Dismiss"
+        aria-label="Dismiss notification"
         style={{
           background: "transparent",
           color: "#888",
@@ -90,7 +91,7 @@ function ToastRow({
           lineHeight: "16px",
         }}
       >
-        ✕
+        <span aria-hidden="true">✕</span>
       </button>
     </div>
   );

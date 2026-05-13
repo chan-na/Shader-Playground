@@ -8,6 +8,7 @@ import type {
 } from "../../core/graph/types";
 import { isValidSwizzleMask } from "../../core/nodes/utility";
 import { useGraphStore } from "../../state/graphStore";
+import { assertNever } from "../../utils/assertNever";
 
 const MATH_OPS: MathOp[] = [
   "add",
@@ -21,13 +22,25 @@ const MATH_OPS: MathOp[] = [
 ];
 
 export function UtilityInspector({ node }: { node: GraphNode }) {
-  if (node.kind === "math")
-    return <MathInspector node={node as MathGraphNode} />;
-  if (node.kind === "swizzle")
-    return <SwizzleInspector node={node as SwizzleGraphNode} />;
-  if (node.kind === "combine")
-    return <CombineInspector node={node as CombineGraphNode} />;
-  return null;
+  // Exhaustive over GraphNodeKind so that adding a new kind surfaces here as a
+  // compile error via assertNever, instead of silently rendering nothing.
+  switch (node.kind) {
+    case "math":
+      return <MathInspector node={node} />;
+    case "swizzle":
+      return <SwizzleInspector node={node} />;
+    case "combine":
+      return <CombineInspector node={node} />;
+    case "mesh":
+    case "image":
+    case "shader":
+    case "compute":
+    case "output":
+    case "param":
+      return null;
+    default:
+      return assertNever(node);
+  }
 }
 
 function MathInspector({ node }: { node: MathGraphNode }) {

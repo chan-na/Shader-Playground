@@ -1,3 +1,4 @@
+import { assertNever } from "../../utils/assertNever";
 import type {
   CombineArity,
   CombineGraphNode,
@@ -188,6 +189,82 @@ export function combineOutputPort(arity: CombineArity): PortSpec {
   if (arity === 2) return { name: "value", type: "vec2" };
   if (arity === 3) return { name: "value", type: "vec3" };
   return { name: "value", type: "vec4" };
+}
+
+/**
+ * Deep-clone a graph node into a fresh object with a narrow shape (no extra
+ * keys). Centralized here so that adding a new GraphNodeKind surfaces as a
+ * compile error on the exhaustiveness check, instead of silent fallthrough
+ * in callers such as `serializeProject` / `deserializeProject`.
+ */
+export function cloneGraphNode(n: GraphNode): GraphNode {
+  switch (n.kind) {
+    case "mesh":
+      return {
+        id: n.id,
+        kind: "mesh",
+        primitive: n.primitive,
+        assetId: n.assetId ?? null,
+      };
+    case "image":
+      return { id: n.id, kind: "image", assetId: n.assetId ?? null };
+    case "shader":
+      return {
+        id: n.id,
+        kind: "shader",
+        vertexSource: n.vertexSource,
+        fragmentSource: n.fragmentSource,
+        uniformValues: cloneUniformValues(n.uniformValues),
+      };
+    case "compute":
+      return {
+        id: n.id,
+        kind: "compute",
+        vertexSource: n.vertexSource,
+        count: n.count,
+        primitive: n.primitive,
+        attributes: n.attributes.map((a) => ({
+          inName: a.inName,
+          outName: a.outName,
+          size: a.size,
+          seed: a.seed,
+        })),
+        uniformValues: cloneUniformValues(n.uniformValues),
+      };
+    case "output":
+      return { id: n.id, kind: "output" };
+    case "param":
+      return {
+        id: n.id,
+        kind: "param",
+        paramKind: n.paramKind,
+        value: Array.isArray(n.value) ? [...n.value] : n.value,
+        ...(n.label !== undefined && { label: n.label }),
+      };
+    case "math":
+      return { id: n.id, kind: "math", op: n.op, a: n.a, b: n.b };
+    case "swizzle":
+      return { id: n.id, kind: "swizzle", mask: n.mask };
+    case "combine":
+      return {
+        id: n.id,
+        kind: "combine",
+        arity: n.arity,
+        values: [n.values[0], n.values[1], n.values[2], n.values[3]],
+      };
+    default:
+      return assertNever(n);
+  }
+}
+
+function cloneUniformValues(
+  uv: Record<string, number | number[]>,
+): Record<string, number | number[]> {
+  const out: Record<string, number | number[]> = {};
+  for (const [k, v] of Object.entries(uv)) {
+    out[k] = Array.isArray(v) ? [...v] : v;
+  }
+  return out;
 }
 
 /**

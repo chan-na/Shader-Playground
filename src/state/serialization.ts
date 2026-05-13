@@ -1,5 +1,6 @@
-import type { Graph, GraphEdge, GraphNode } from "../core/graph/types";
+import type { Graph, GraphEdge } from "../core/graph/types";
 import { validateGraph } from "../core/graph/validate";
+import { cloneGraphNode } from "../core/nodes/registry";
 import type { NodePosition } from "./types";
 
 export const PROJECT_FORMAT_VERSION = 1;
@@ -27,7 +28,7 @@ export function serializeProject(
     version: PROJECT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
     graph: {
-      nodes: graph.nodes.map((n) => structuredCloneNode(n)),
+      nodes: graph.nodes.map((n) => cloneGraphNode(n)),
       edges: graph.edges.map((e) => structuredCloneEdge(e)),
     },
     positions: trimmedPositions,
@@ -70,71 +71,12 @@ export function deserializeProject(raw: unknown): DeserializedProject {
   }
   return {
     graph: {
-      nodes: graph.nodes.map((n) => structuredCloneNode(n)),
+      nodes: graph.nodes.map((n) => cloneGraphNode(n)),
       edges: graph.edges.map((e) => structuredCloneEdge(e)),
     },
     positions,
     warnings,
   };
-}
-
-function structuredCloneNode(n: GraphNode): GraphNode {
-  // Hand-rolled to keep the shape narrow and avoid leaking unrelated keys.
-  switch (n.kind) {
-    case "mesh":
-      return {
-        id: n.id,
-        kind: "mesh",
-        primitive: n.primitive,
-        assetId: n.assetId ?? null,
-      };
-    case "image":
-      return { id: n.id, kind: "image", assetId: n.assetId ?? null };
-    case "shader":
-      return {
-        id: n.id,
-        kind: "shader",
-        vertexSource: n.vertexSource,
-        fragmentSource: n.fragmentSource,
-        uniformValues: deepCloneUniformValues(n.uniformValues),
-      };
-    case "compute":
-      return {
-        id: n.id,
-        kind: "compute",
-        vertexSource: n.vertexSource,
-        count: n.count,
-        primitive: n.primitive,
-        attributes: n.attributes.map((a) => ({
-          inName: a.inName,
-          outName: a.outName,
-          size: a.size,
-          seed: a.seed,
-        })),
-        uniformValues: deepCloneUniformValues(n.uniformValues),
-      };
-    case "output":
-      return { id: n.id, kind: "output" };
-    case "param":
-      return {
-        id: n.id,
-        kind: "param",
-        paramKind: n.paramKind,
-        value: Array.isArray(n.value) ? [...n.value] : n.value,
-        ...(n.label !== undefined && { label: n.label }),
-      };
-    case "math":
-      return { id: n.id, kind: "math", op: n.op, a: n.a, b: n.b };
-    case "swizzle":
-      return { id: n.id, kind: "swizzle", mask: n.mask };
-    case "combine":
-      return {
-        id: n.id,
-        kind: "combine",
-        arity: n.arity,
-        values: [n.values[0], n.values[1], n.values[2], n.values[3]],
-      };
-  }
 }
 
 function structuredCloneEdge(e: GraphEdge): GraphEdge {
@@ -145,12 +87,4 @@ function structuredCloneEdge(e: GraphEdge): GraphEdge {
     target: e.target,
     targetHandle: e.targetHandle,
   };
-}
-
-function deepCloneUniformValues(uv: Record<string, number | number[]>) {
-  const out: Record<string, number | number[]> = {};
-  for (const [k, v] of Object.entries(uv)) {
-    out[k] = Array.isArray(v) ? [...v] : v;
-  }
-  return out;
 }

@@ -167,3 +167,22 @@ export async function loadCachedImage(id: string): Promise<{
     return null;
   }
 }
+
+export async function deleteCachedMesh(id: string): Promise<void> {
+  try {
+    const db = await openDb();
+    await awaitRequest(tx(db, STORE_MESH, "readwrite").delete(id));
+  } catch {
+    // Swallow — caller already removed the in-memory entry; an orphan IDB
+    // record will be overwritten or eventually cleared by quota pressure.
+  }
+}
+
+export async function deleteCachedImage(id: string): Promise<void> {
+  try {
+    const db = await openDb();
+    await awaitRequest(tx(db, STORE_IMAGE, "readwrite").delete(id));
+  } catch {
+    // See deleteCachedMesh.
+  }
+}

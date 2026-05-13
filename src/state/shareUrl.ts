@@ -7,6 +7,13 @@ import {
 } from "./serialization";
 import type { NodePosition } from "./types";
 
+// Hard caps for defense against malicious / oversized share links. The hash
+// payload is base64url-encoded gzip; 64 KiB compressed expands to roughly
+// 1 MiB of typical JSON (graphs of this app run well under 64 KiB even with
+// many shaders).
+export const MAX_SHARE_HASH_PAYLOAD_BYTES = 64 * 1024;
+const MAX_SHARE_JSON_BYTES = 1024 * 1024;
+
 /**
  * URL-safe base64 round-trip helpers (no padding, replacing +/ with -_).
  */
@@ -77,9 +84,12 @@ export async function decodeShareHash(hash: string): Promise<{
 } | null> {
   const m = /[#&]share=([A-Za-z0-9_-]+)/.exec(hash);
   if (!m) return null;
+  const payload = m[1]!;
+  if (payload.length > MAX_SHARE_HASH_PAYLOAD_BYTES) return null;
   try {
-    const bytes = base64UrlToBytes(m[1]!);
+    const bytes = base64UrlToBytes(payload);
     const decompressed = await gunzip(bytes);
+    if (decompressed.byteLength > MAX_SHARE_JSON_BYTES) return null;
     const json = new TextDecoder().decode(decompressed);
     const project = JSON.parse(json) as SerializedProject;
     const parsed = deserializeProject(project);

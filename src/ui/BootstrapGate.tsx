@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { clearSession, loadSession, startAutoSave } from "../state/autoSave";
 import { createDemoGraph, DEMO_LAYOUT } from "../state/demoGraph";
 import { useGraphStore } from "../state/graphStore";
@@ -10,9 +10,12 @@ import {
 
 type Phase = "init" | "prompt" | "done";
 
+const RECOVERY_TITLE_ID = "recovery-dialog-title";
+
 export function BootstrapGate() {
   const [phase, setPhase] = useState<Phase>("init");
   const [pending, setPending] = useState<SerializedProject | null>(null);
+  const restoreButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (useGraphStore.getState().nodes.length !== 0) {
@@ -62,6 +65,23 @@ export function BootstrapGate() {
     };
   }, []);
 
+  // Auto-focus the primary action when the recovery dialog opens, and swallow
+  // ESC so other handlers (CommandPalette toggle etc.) don't fire over the
+  // modal. ESC intentionally does NOT discard — both options have lasting
+  // consequences, so the user must make an explicit choice.
+  useEffect(() => {
+    if (phase !== "prompt") return;
+    restoreButtonRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [phase]);
+
   if (phase !== "prompt" || !pending) return null;
 
   const restore = () => {
@@ -95,6 +115,7 @@ export function BootstrapGate() {
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby={RECOVERY_TITLE_ID}
       data-testid="recovery-dialog"
       style={{
         position: "fixed",
@@ -118,7 +139,10 @@ export function BootstrapGate() {
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+        <div
+          id={RECOVERY_TITLE_ID}
+          style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}
+        >
           이전 작업을 복구할까요?
         </div>
         <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>
@@ -142,6 +166,7 @@ export function BootstrapGate() {
             새로 시작
           </button>
           <button
+            ref={restoreButtonRef}
             type="button"
             data-testid="recovery-restore"
             onClick={restore}

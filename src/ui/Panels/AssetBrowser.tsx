@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { GraphNode } from "../../core/graph/types";
-import { importFiles } from "../../state/assetActions";
+import { forgetImage, forgetMesh, importFiles } from "../../state/assetActions";
 import { useAssetStore } from "../../state/assetStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
@@ -9,8 +9,6 @@ import { nextId } from "../../utils/id";
 export function AssetBrowser() {
   const meshes = useAssetStore((s) => s.meshes);
   const images = useAssetStore((s) => s.images);
-  const removeMesh = useAssetStore((s) => s.removeMesh);
-  const removeImage = useAssetStore((s) => s.removeImage);
   const addNode = useGraphStore((s) => s.addNode);
   const select = useSelectionStore((s) => s.select);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -68,8 +66,9 @@ export function AssetBrowser() {
           className="btn-small"
           onClick={() => fileRef.current?.click()}
           title="Import OBJ / GLTF / images"
+          aria-label="Import OBJ, GLTF, or image files"
         >
-          ↑ Import file…
+          <span aria-hidden="true">↑ </span>Import file…
         </button>
         <input
           ref={fileRef}
@@ -122,16 +121,18 @@ export function AssetBrowser() {
                 type="button"
                 className="btn-small"
                 onClick={() => addImageNodeFor(img.id)}
+                aria-label={`Add image node for ${img.name}`}
               >
                 + Node
               </button>
               <button
                 type="button"
                 className="btn-small"
-                onClick={() => removeImage(img.id)}
+                onClick={() => forgetImage(img.id)}
                 title="Forget"
+                aria-label={`Forget image ${img.name}`}
               >
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
           ))}
@@ -172,16 +173,18 @@ export function AssetBrowser() {
                 type="button"
                 className="btn-small"
                 onClick={() => addMeshNodeFor(m.id)}
+                aria-label={`Add mesh node for ${m.name}`}
               >
                 + Node
               </button>
               <button
                 type="button"
                 className="btn-small"
-                onClick={() => removeMesh(m.id)}
+                onClick={() => forgetMesh(m.id)}
                 title="Forget"
+                aria-label={`Forget mesh ${m.name}`}
               >
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
           ))}

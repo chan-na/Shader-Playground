@@ -16,6 +16,8 @@ vi.mock("../core/assets/imageLoader", () => ({
 vi.mock("../core/assets/cache", () => ({
   cacheImage: vi.fn().mockResolvedValue(undefined),
   cacheMesh: vi.fn().mockResolvedValue(undefined),
+  deleteCachedImage: vi.fn().mockResolvedValue(undefined),
+  deleteCachedMesh: vi.fn().mockResolvedValue(undefined),
   loadCachedImage: vi.fn(),
   loadCachedMesh: vi.fn(),
 }));
@@ -23,16 +25,25 @@ vi.mock("../core/assets/cache", () => ({
 import {
   cacheImage,
   cacheMesh,
+  deleteCachedImage,
+  deleteCachedMesh,
   loadCachedImage,
   loadCachedMesh,
 } from "../core/assets/cache";
 import { loadGltfFromFile } from "../core/assets/gltfLoader";
 import { loadImageFromFile } from "../core/assets/imageLoader";
 import { loadObjFromFile } from "../core/assets/objLoader";
-import { classifyFile, hydrateAssetsFor, importFiles } from "./assetActions";
+import {
+  classifyFile,
+  forgetImage,
+  forgetMesh,
+  hydrateAssetsFor,
+  importFiles,
+} from "./assetActions";
 import { useAssetStore } from "./assetStore";
 import { useGraphStore } from "./graphStore";
 import { useSelectionStore } from "./selectionStore";
+import { useToastStore } from "./toastStore";
 
 const mockFile = (name: string, type = "") =>
   new File([new Uint8Array()], name, { type });
@@ -156,6 +167,21 @@ describe("importFiles", () => {
     errSpy.mockRestore();
   });
 
+  it("surfaces a toast.error with file name + reason when a loader rejects", async () => {
+    useToastStore.getState().clear();
+    vi.mocked(loadObjFromFile).mockRejectedValueOnce(new Error("parse failed"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await importFiles([mockFile("bad.obj")]);
+
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.kind).toBe("error");
+    expect(toasts[0]?.message).toContain("bad.obj");
+    expect(toasts[0]?.message).toContain("parse failed");
+    errSpy.mockRestore();
+  });
+
   it("offsets node positions per file index when basePosition omitted", async () => {
     vi.mocked(loadObjFromFile)
       .mockResolvedValueOnce(meshHandle("m1"))
@@ -175,6 +201,37 @@ describe("importFiles", () => {
 
     const positions = useGraphStore.getState().positions;
     expect(positions[r!.nodeId]).toEqual({ x: 50, y: -30 });
+  });
+});
+
+describe("forgetMesh / forgetImage", () => {
+  beforeEach(() => {
+    useAssetStore.setState({ meshes: {}, images: {}, rev: 0 });
+    vi.clearAllMocks();
+  });
+
+  it("forgetMesh drops the in-memory entry AND fires an IDB delete", () => {
+    const m = {
+      id: "m1",
+      name: "m1",
+      data: { attributes: [], vertexCount: 0 },
+    };
+    useAssetStore.setState({ meshes: { m1: m }, images: {}, rev: 1 });
+
+    forgetMesh("m1");
+
+    expect(useAssetStore.getState().meshes.m1).toBeUndefined();
+    expect(deleteCachedMesh).toHaveBeenCalledWith("m1");
+  });
+
+  it("forgetImage drops the in-memory entry AND fires an IDB delete", () => {
+    const i = { id: "i1", name: "i1", width: 1, height: 1, bitmap: null };
+    useAssetStore.setState({ meshes: {}, images: { i1: i }, rev: 1 });
+
+    forgetImage("i1");
+
+    expect(useAssetStore.getState().images.i1).toBeUndefined();
+    expect(deleteCachedImage).toHaveBeenCalledWith("i1");
   });
 });
 

@@ -9,6 +9,7 @@ import type {
   SwizzleGraphNode,
 } from "../graph/types";
 import {
+  cloneGraphNode,
   combineInputPorts,
   combineOutputPort,
   mathInputPorts,
@@ -322,5 +323,122 @@ describe("nodeOutputPorts (per-instance)", () => {
       primitive: "sphere",
     };
     expect(nodeOutputPorts(meshNode)).toEqual([{ name: "mesh", type: "mesh" }]);
+  });
+});
+
+describe("cloneGraphNode", () => {
+  it("deep-clones shader uniformValues (no array reference sharing)", () => {
+    const original: ShaderGraphNode = {
+      id: "s1",
+      kind: "shader",
+      vertexSource: "v",
+      fragmentSource: "f",
+      uniformValues: { u_v: [1, 2, 3], u_f: 0.5 },
+    };
+    const cloned = cloneGraphNode(original);
+    expect(cloned).toEqual(original);
+    expect(cloned).not.toBe(original);
+    if (cloned.kind === "shader") {
+      expect(cloned.uniformValues).not.toBe(original.uniformValues);
+      expect(cloned.uniformValues.u_v).not.toBe(original.uniformValues.u_v);
+      expect(cloned.uniformValues.u_v).toEqual([1, 2, 3]);
+    }
+  });
+
+  it("strips unknown keys to keep the shape narrow", () => {
+    const tainted = {
+      id: "m1",
+      kind: "mesh",
+      primitive: "cube",
+      assetId: null,
+      __extra: "should be dropped",
+    } as unknown as GraphNode;
+    const cloned = cloneGraphNode(tainted);
+    expect(Object.keys(cloned).sort()).toEqual([
+      "assetId",
+      "id",
+      "kind",
+      "primitive",
+    ]);
+  });
+
+  it("deep-clones compute attributes (array + element references)", () => {
+    const original: ComputeGraphNode = {
+      id: "c1",
+      kind: "compute",
+      vertexSource: "v",
+      count: 4,
+      primitive: "POINTS",
+      attributes: [{ inName: "a_p", outName: "v_p", size: 3, seed: "zero" }],
+      uniformValues: {},
+    };
+    const cloned = cloneGraphNode(original);
+    if (cloned.kind === "compute") {
+      expect(cloned.attributes).not.toBe(original.attributes);
+      expect(cloned.attributes[0]).not.toBe(original.attributes[0]);
+      expect(cloned.attributes[0]).toEqual(original.attributes[0]);
+    }
+  });
+
+  it("preserves param label only when defined (no explicit undefined leak)", () => {
+    const withLabel: ParamGraphNode = {
+      id: "p1",
+      kind: "param",
+      paramKind: "float",
+      value: 0.25,
+      label: "Intensity",
+    };
+    const cloned = cloneGraphNode(withLabel);
+    expect(cloned).toEqual(withLabel);
+
+    const noLabel: ParamGraphNode = {
+      id: "p2",
+      kind: "param",
+      paramKind: "vec3",
+      value: [0.1, 0.2, 0.3],
+    };
+    const clonedNoLabel = cloneGraphNode(noLabel);
+    expect("label" in clonedNoLabel).toBe(false);
+    if (clonedNoLabel.kind === "param") {
+      expect(clonedNoLabel.value).not.toBe(noLabel.value);
+    }
+  });
+
+  it("round-trips every GraphNodeKind", () => {
+    const samples: GraphNode[] = [
+      { id: "mesh", kind: "mesh", primitive: "cube", assetId: null },
+      { id: "image", kind: "image", assetId: "a1" },
+      {
+        id: "shader",
+        kind: "shader",
+        vertexSource: "v",
+        fragmentSource: "f",
+        uniformValues: { x: 1 },
+      },
+      {
+        id: "compute",
+        kind: "compute",
+        vertexSource: "v",
+        count: 2,
+        primitive: "POINTS",
+        attributes: [{ inName: "a", outName: "b", size: 2, seed: "random" }],
+        uniformValues: {},
+      },
+      { id: "output", kind: "output" },
+      { id: "param", kind: "param", paramKind: "time", value: [1, 0] },
+      { id: "math", kind: "math", op: "add", a: 1, b: 2 },
+      { id: "swizzle", kind: "swizzle", mask: "xy" },
+      {
+        id: "combine",
+        kind: "combine",
+        arity: 2,
+        values: [0.1, 0.2, 0, 0],
+      },
+    ];
+    for (const n of samples) {
+      const cloned = cloneGraphNode(n);
+      expect(cloned).toEqual(n);
+      expect(cloned).not.toBe(n);
+    }
   });
 });

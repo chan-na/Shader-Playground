@@ -22,30 +22,8 @@ import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { nextId } from "../../utils/id";
 import { HelpModal } from "./HelpModal";
-import { ComputeNodeView } from "./nodes/ComputeNodeView";
-import { ImageNodeView } from "./nodes/ImageNodeView";
-import { MeshNodeView } from "./nodes/MeshNodeView";
-import { OutputNodeView } from "./nodes/OutputNodeView";
-import { ParamNodeView } from "./nodes/ParamNodeView";
-import { ShaderNodeView } from "./nodes/ShaderNodeView";
-import {
-  CombineNodeView,
-  MathNodeView,
-  SwizzleNodeView,
-} from "./nodes/UtilityNodeViews";
+import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
 import { Toolbar } from "./Toolbar";
-
-const nodeTypes = {
-  mesh: MeshNodeView,
-  image: ImageNodeView,
-  shader: ShaderNodeView,
-  compute: ComputeNodeView,
-  output: OutputNodeView,
-  param: ParamNodeView,
-  math: MathNodeView,
-  swizzle: SwizzleNodeView,
-  combine: CombineNodeView,
-};
 
 export function NodeEditor() {
   const graphNodes = useGraphStore((s) => s.nodes);
@@ -229,7 +207,7 @@ export function NodeEditor() {
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
-          nodeTypes={nodeTypes}
+          nodeTypes={NODE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -248,22 +226,7 @@ export function NodeEditor() {
           <MiniMap
             pannable
             zoomable
-            nodeColor={(n) => {
-              switch ((n as Node).type) {
-                case "mesh":
-                  return "#56d698";
-                case "image":
-                  return "#d69c56";
-                case "shader":
-                  return "#569cd6";
-                case "output":
-                  return "#d6569c";
-                case "param":
-                  return "#d6d656";
-                default:
-                  return "#888";
-              }
-            }}
+            nodeColor={(n) => minimapColorFor((n as Node).type)}
             style={{ background: "#252526" }}
           />
         </ReactFlow>

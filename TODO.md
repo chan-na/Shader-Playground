@@ -1,7 +1,8 @@
 # ShaderPlayground TODO
 
 작성일: 2026-05-12
-기준: Phase 12 완료 (`c730dcf` / `1ecf9ea` / `bd85153`)
+최종 동기화: 2026-05-16 (E1/E4/E5 완료 반영)
+기준: Phase 13 완료 (`3439d12`) + 코드 리뷰 P1·A·C 묶음 (`2e832c9` HEAD)
 
 Phase 12 까지의 SPEC.md / Architecture.md 를 기준으로 도출한 다음 작업 후보 목록. 각 항목의 근거는 [SPEC.md](./SPEC.md) §4 백로그 또는 [Architecture.md](./Architecture.md) 의 해당 절에 있다. 착수 전 영향 받는 품질 게이트(테스트 파일·E2E Phase)를 한 번 더 식별한 뒤 진행한다.
 
@@ -49,22 +50,22 @@ Phase 12 까지의 SPEC.md / Architecture.md 를 기준으로 도출한 다음 �
 
 SPEC/Architecture 백로그에는 없지만 코드를 읽으며 발견한 빈 자리. 사용자 만나는 에러 경로의 침묵이 공통 테마.
 
-- [ ] **E1. WebGL context-loss / restore 핸들러** — M
-  - 현재 [`Viewport/index.tsx`](src/ui/Viewport/index.tsx) 에 `webglcontextlost`/`webglcontextrestored` 리스너 없음. 주석만 *"Poll failure (e.g., context lost) — drop this frame's results"* (line 192, 245). 노트북 sleep/GPU 스왑 시 캔버스가 조용히 멈추고 errors[] 에도 안 잡힘. 핸들러 부착 + `plan.dispose()` + 다음 RAF 에서 `recompile()` 재호출 + `rendererStore.pushError("GPU 컨텍스트 손실 — 복구 중…")` → 복구 시 clear. (Architecture §8.3 의 "런타임 에러" 가 사실상 GLSL 컴파일 에러로 좁혀져 있는 점도 함께 보완.)
-- [ ] **E2. Toast 알림 + 사일런트 에러 통합 표면화** — S~M
-  - [`Toolbar.tsx`](src/ui/NodeEditor/Toolbar.tsx) 의 native `alert()` 2 곳 (line 98 프로젝트 로드 실패 / line 126 Share URL 복사 성공) 이 앱의 다른 polished `<dialog>` UI 톤과 어긋남. 동시에 [`recorder.ts`](src/state/recorder.ts) 의 `error` (line 56, 66 — MediaRecorder/captureStream 미지원) 와 [`autoSave.ts`](src/state/autoSave.ts) 의 IndexedDB 실패 (line 38-42 의 unhandled rejection 가능 경로) 가 UI 어디에도 안 표시됨. 새 `toastStore` + 우상단 stack 컴포넌트로 세 자리를 한 PR 에 묶어 정리. (E3 의 autosave 에러 표면도 여기에 흡수 가능.)
-- [ ] **E3. `beforeunload`/`pagehide` autosave flush + 실패 표면** — S
-  - Architecture §9.2 가 명시적으로 *"unload 리스너는 안 걸려 있지 않지만 API 는 노출"* 이라고 적어둔 빈 자리. [`autoSave.ts:78-128`](src/state/autoSave.ts) 의 `flush()` 가 준비되어 있는데 호출자 없음 → 30 s 디바운스 내 탭 닫으면 최대 30 s 손실. `BootstrapGate` 또는 `main.tsx` 에서 `beforeunload` + `pagehide` (iOS Safari) 양쪽 부착해 fire-and-forget `flush()`. 함께 `saveSession()` 의 IndexedDB quota 실패를 catch 해서 `lastSaveError` 상태 + (E2 가 끝나 있으면) toast.
-- [ ] **E4. AssetBrowser 드롭 영역 일치** — S
-  - [`AssetBrowser.tsx:65`](src/ui/Panels/AssetBrowser.tsx) 가 *"Drag & drop also works on the graph"* 라고 안내하지만, 실제 드롭 핸들러는 [`NodeEditor/index.tsx:209`](src/ui/NodeEditor/index.tsx) 한 곳뿐. AssetBrowser 패널 위에 드롭하면 무반응. 패널 컨테이너에 `onDragOver`/`onDrop` → `importFiles(files)` 부착해 UI 카피와 동작 일치. 단순 패치라 게이트 영향 좁음.
-- [ ] **E5. 콜드 존 단위 테스트 보강** — S
-  - 임계치(30/22/22/30) 턱걸이 상태 — 2026-05-12 측정 32.2 / 26.78 / 29.2 / 32.16. 다음 UI 작업 한두 건만 추가돼도 게이트 실패 위험. 순수 로직인데 0~15 % 만 커버된 모듈에 단위 테스트 보강: `recorder.ts` (pickMimeType 분기, start/stop 상태 전이, blob URL 라이프사이클 — 0 %), `diagnosticsStore.ts` (set/clear/reset — 0 %), `assetStore.ts` (add/remove + rev — 12.5 %), `assetActions.ts` 의 `classifyFile` (확장자/MIME 분기 — 15 %). UI 컴포넌트가 아닌 store/순수 함수만 다루므로 jsdom 만으로 충분.
+- [x] **E1. WebGL context-loss / restore 핸들러** — M
+  - 완료 (`071a758`). `Viewport/index.tsx` 에 `webglcontextlost`/`webglcontextrestored` 리스너 부착, `preventDefault()` 로 restore 허용, `contextLost` 플래그로 tick 파킹, restore 시 `emptyPlan` + `clearErrors`. 다음 frame 의 `structuralDirty` 분기가 자동으로 `recompile()` 트리거. lost 진입 시 `pushError("GPU 컨텍스트 손실 — 복구 중…")`.
+- [x] **E2. Toast 알림 + 사일런트 에러 통합 표면화** — S~M
+  - 완료 (`9cd4dc2`). `src/state/toastStore.ts` (info/success/warning/error 4종 + auto-dismiss + 컨비니언스 wrappers), `src/ui/Toasts.tsx` + `ToastRow.tsx` 우상단 stack. Toolbar 의 `alert()` 2건 모두 `toast.error()` / `toast.success()` 로 교체, recorder MediaRecorder/captureStream 미지원·생성 실패도 toast 로 표면화.
+- [x] **E3. `beforeunload`/`pagehide` autosave flush + 실패 표면** — S
+  - 완료 (`6044c64`). `autoSave.ts` 의 `attachUnloadFlush()` 가 `beforeunload` + `pagehide` 양쪽에 fire-and-forget `flush()` 부착, `startAutoSave()` 가 자동 연결. persist 실패는 `lastErrorShown` 디듀프 + `toast.error("자동 저장 실패: …")` 로 표면화.
+- [x] **E4. AssetBrowser 드롭 영역 일치** — S
+  - 완료 (`1f939f6`). `AssetBrowser.tsx` 컨테이너에 `onDragOver`/`onDrop` 부착, 드롭 시 `importFiles(files)` 호출. UI 카피("Drag & drop also works on the graph") 와 동작 일치.
+- [x] **E5. 콜드 존 단위 테스트 보강** — S
+  - 완료 (`8aba599` → `4ef45c5` → `7f36d5f` 3단계). `recorder.ts` (pickMimeType/start/stop/blob URL), `diagnosticsStore.ts`, `assetStore.ts`, `assetActions.ts` (classifyFile), `core/camera/input`, loaders, WebGL2 mock 까지 단위 테스트 보강. 커버리지 임계치(50/47/42/50) 라인업 안정화.
 
 ---
 
 ## 우선순위 후보 (참고)
 
-- **빠른 가치 / 낮은 위험**: B3, C2, D2, D3, D4, **E3, E4, E5** — 모두 S 난이도, 게이트 영향 좁음.
-- **사용자 체감 큰 개선**: C1 (자동완성), B1/B2 (체감 성능), A2 (외부 에디터 워크플로), **E1 (context-loss 회복), E2 (에러 표면 통합)**.
-- **장기 투자**: A1 (컴퓨트 노드) — 노드 종류 신설이라 SPEC/Architecture 도 함께 갱신 필요.
-- **자연스러운 묶음**: E2 + E3 — 새 toast 시스템이 autosave 에러 표면 자리를 흡수해 1 PR 로 cross-cutting fix. E1 은 단독 PR 권장 (영향 범위 다름).
+- **빠른 가치 / 낮은 위험**: D2 (Embed), D4 (마이그레이션 인프라) — 둘 다 S 난이도, 게이트 영향 좁음.
+- **사용자 체감 큰 개선**: A2 (외부 에디터 워크플로), A3 (GIF 녹화).
+- **관측 가드**: C3 (Playwright visual regression).
+- **인프라**: D1 (PWA 오프라인).

@@ -131,6 +131,45 @@ test.describe("Phase 9 — editor UX", () => {
     ).toBeNull();
   });
 
+  test("multi-select via setSelectedIds highlights every node in the set", async ({
+    page,
+  }) => {
+    const m1 = page.locator('[data-id="m1"]');
+    const s1 = page.locator('[data-id="s1"]');
+    const o1 = page.locator('[data-id="o1"]');
+
+    await withSp(
+      page,
+      (sp) => {
+        sp.selection.getState().setSelectedIds(["m1", "s1", "o1"]);
+      },
+      undefined,
+    );
+
+    // All three nodes must carry the `.selected` class — the regression we hit
+    // when selectionStore held only a single id and the last write clobbered
+    // the rest of a shift-box select.
+    await expect(m1).toHaveClass(/\bselected\b/);
+    await expect(s1).toHaveClass(/\bselected\b/);
+    await expect(o1).toHaveClass(/\bselected\b/);
+
+    // Primary follows the last entry of the array.
+    expect(
+      await readSp(page, (sp) => sp.selection.getState().selectedNodeId),
+    ).toBe("o1");
+
+    // Pane click still clears the entire set.
+    await page
+      .locator(".react-flow__pane")
+      .click({ position: { x: 10, y: 10 } });
+    await expect(m1).not.toHaveClass(/\bselected\b/);
+    await expect(s1).not.toHaveClass(/\bselected\b/);
+    await expect(o1).not.toHaveClass(/\bselected\b/);
+    expect(
+      await readSp(page, (sp) => sp.selection.getState().selectedNodeIds),
+    ).toEqual([]);
+  });
+
   test("Cmd+K opens the command palette", async ({ page }) => {
     await page.locator("body").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Meta+k");

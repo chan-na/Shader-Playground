@@ -57,7 +57,9 @@ export interface SpStores {
   selection: {
     getState: () => {
       selectedNodeId: string | null;
+      selectedNodeIds: string[];
       select: (id: string | null) => void;
+      setSelectedIds: (ids: string[]) => void;
     };
   };
   diagnostics: {

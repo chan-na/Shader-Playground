@@ -1,6 +1,6 @@
 # ShaderPlayground 코드 리뷰 — 진행 트래커 / Handover
 
-> **최종 업데이트**: 2026-05-17 · **기준 main**: `e80c4df`
+> **최종 업데이트**: 2026-05-17 · **기준 main**: `724a05b`
 > **원본 리뷰**: [`docs/CODE_REVIEW.md`](./CODE_REVIEW.md) (51건 발견, Critical 0)
 > **목적**: 다음 세션이 컨텍스트 없이도 어디서 이어갈지 즉시 파악.
 
@@ -16,11 +16,12 @@
 | 4 | C3 — BootstrapGate dialog 회귀 가드 | [#23](https://github.com/chan-na/Shader-Playground/pull/23) | ✅ merged `ebc7e00` |
 | 5 | C4 — CommandPalette 헬퍼 추출 + 테스트 | [#24](https://github.com/chan-na/Shader-Playground/pull/24) | ✅ merged `ab82ce8` |
 | 6 | B — deserialize sanitize + CSP meta + Viewport.tick Map화 (P3) | [#26](https://github.com/chan-na/Shader-Playground/pull/26) | ✅ merged `e80c4df` |
-| **다음** | **D·E 중 선택** | — | 🟡 미진행 |
+| 7 | E — Playwright browser 캐시 (P3-5) | [#28](https://github.com/chan-na/Shader-Playground/pull/28) | ✅ merged `724a05b` |
+| **다음** | **D 단독** | — | 🟡 미진행 |
 
 **현재 커버리지** (임계치 50 / 47 / 42 / 50):
 statements **56.78** · branches **49.22** · functions **56.34** · lines **57.45**
-→ 마진 +6.78 ~ +15.45%. #26 의 sanitize / CSP plugin 테스트로 branches 가 가장 많이 올랐다 (+2.57%).
+→ 마진 +6.78 ~ +15.45%. #26 의 sanitize / CSP plugin 테스트로 branches 가 가장 많이 올랐다 (+2.57%). #28 은 CI 워크플로 전용 변경이라 커버리지 무변동.
 
 ---
 
@@ -117,6 +118,22 @@ statements **56.78** · branches **49.22** · functions **56.34** · lines **57.
 - Vite build-only 플러그인은 `apply: "build"` + `transformIndexHtml.order: "post"` 조합. dev 에서 CSP 안 깔리므로 Playwright E2E 가 CSP 위반을 잡지 않음 — 단위 테스트 (`CSP_CONTENT` 직접 assertion) 와 `npm run build` 후 `dist/index.html` 육안 확인이 가드.
 - knip `project` 가 `src/**/*.{ts,tsx}` 라서 vite 플러그인은 `src/build/` 아래 두어야 entry graph 에 포함된다 (초기 `vite/` 디렉터리로 만들었다가 옮김).
 
+### #28 — E 묶음: Playwright browser 캐시 (P3-5, `724a05b`)
+
+리뷰 §6.4 — `e2e` 잡이 매 CI 실행마다 `npx playwright install --with-deps chromium` 으로 chromium 바이너리 (~140MB) 를 재다운로드해 30~60s 소모하던 것을 캐시.
+
+핵심 변경 (`.github/workflows/check.yml` `e2e` 잡):
+
+- `actions/cache@v4` 로 `~/.cache/ms-playwright` 캐시
+- 캐시 키: `playwright-${runner.os}-${@playwright/test 버전}` — `package-lock.json` 의 `packages['node_modules/@playwright/test'].version` 을 `node -e` 로 직접 추출해 `$GITHUB_OUTPUT` 으로 전달. dep 변경엔 영향 없고 Playwright bump 시에만 무효화
+- cache-hit: `install-deps chromium` (OS 의존성만, 브라우저 바이너리 재다운로드 생략)
+- cache-miss: `install --with-deps chromium` 기존 동작 유지
+
+베이스라인 측정 (PR #28 첫 실행, cache miss): `e2e` 3m57s. 머지 커밋이 main 의 첫 실행이라 캐시가 채워졌고, 다음 PR 의 e2e 잡부터 cache hit 효과 측정 가능.
+
+**범위 외 (다음 세션 메모)**:
+- §6.4 의 "dist artifact 재사용" 은 **현 구조상 효과 없음** — `e2e` webServer 가 `npm run dev` 를 사용하고 `check` 잡은 빌드를 안 하므로 `bundle-size` 의 dist 를 받을 잡이 없음. 의미 있게 하려면 `e2e` 를 `npm run preview` 로 전환해 prod build 를 검증하는 동작 변경이 필요 — #26 의 "CSP 가드는 dev 에서 검증 불가" 함정과 직결되니 같이 다룰 때 별 PR 로 진행 권장.
+
 ---
 
 ## 2. 다음 작업 후보 (선택)
@@ -124,11 +141,13 @@ statements **56.78** · branches **49.22** · functions **56.34** · lines **57.
 | # | 묶음 | 항목 | 규모 | 임팩트 |
 |---|---|---|---|---|
 | **D** | CSS 토큰화 (P2-3) | §4.5 — `:root` color tokens 도입, Inspector/UtilityInspector/AssetBrowser inline color 치환. 시각 회귀 가능성 있어 E2E 영향 확인 필요 | 중 | 다크모드 외 미래 테마/대비 준비 |
-| **E** | CI 캐시·아티팩트 (P3-5) | §6.4 — Playwright browser 캐시 + dist artifact 재사용 | 소 | CI 시간 단축 (DX) |
 
-**추천 순서**: E → D. #26 (B) 완료로 P3 보안/성능 가드는 닫혔다. E 는 게이트 영향 가장 좁고 (CI 워크플로만 수정) 한 시간 안에 마무리 가능하니 워밍업으로 먼저, 그 뒤 D 의 시각 회귀 위험을 다루는 게 자연스럽다. D 는 §4.5 inline color 치환 범위가 넓어 E2E 스냅샷이 없는 현 상태에선 육안 확인이 필요 — 우선 토큰 도입 + 변경 파일 1~2 개로 PR 을 작게 쪼개는 것을 권장.
+**추천**: D 만 남았다. §4.5 inline color 치환 범위가 넓어 E2E 스냅샷이 없는 현 상태에선 육안 확인이 필요 — 우선 `:root` 토큰 정의 + 변경 파일 1~2 개 (예: AssetBrowser 단독) 로 minimal PR 을 만들고, 시각 차이 없음을 사용자가 확인한 뒤 Inspector / UtilityInspector 로 확장하는 분할 진행을 권장.
 
-**기능 백로그 (`TODO.md`) 와의 관계**: 코드 리뷰 트랙(D/E)이 끝나면 `TODO.md` 의 미진행 백로그 (A2 FS Access, A3 GIF 녹화, C3-Playwright visual regression, D1 PWA, D2 Embed, D4 v2 마이그레이션)로 자연스럽게 전환 가능. 우선 권장은 D2 (Embed) — S 규모, 게이트 영향 좁음.
+**참고: 범위 외로 남은 후보**:
+- **e2e → preview 전환** (#28 메모 참조): `e2e` webServer 를 `npm run preview` 로 바꿔 prod build 를 검증하면 (1) #26 CSP meta 가 E2E 에서도 가드되고 (2) `bundle-size` dist artifact 재사용도 의미를 가짐. 동작 변경이라 회귀 위험 — 별 PR.
+
+**기능 백로그 (`TODO.md`) 와의 관계**: 코드 리뷰 트랙(D)이 끝나면 `TODO.md` 의 미진행 백로그 (A2 FS Access, A3 GIF 녹화, C3-Playwright visual regression, D1 PWA, D2 Embed, D4 v2 마이그레이션)로 자연스럽게 전환 가능. 우선 권장은 D2 (Embed) — S 규모, 게이트 영향 좁음.
 
 원본 리뷰의 미진행 항목 전체는 [`docs/CODE_REVIEW.md` §7 일람표](./CODE_REVIEW.md#7-발견-항목-일람표-severity별)와 §8 권장 액션 참조.
 
@@ -209,6 +228,10 @@ Vite dev 서버는 inline script / eval 을 쓰므로 strict CSP 와 공존 불�
 ### deserialize sanitize 와 cloneGraphNode 의 역할 분리 (#26)
 
 `cloneGraphNode` (A 묶음에서 통합) 는 **신뢰된** 상태 복제용. `sanitizeGraphNode` (B 묶음 신규) 는 외부 페이로드 **boundary** 전용. 둘을 합치면 sanitize 가 serialize 트랙도 silent-coerce 해서 (예: 사용자가 임의로 NaN 넣은 슬라이더 값을 zero 로 만들어) 동작이 바뀐다. **새 GraphNodeKind 추가 시 두 모듈 모두 갱신** — registry exhaustive switch 가 강제하지만 sanitize 의 switch 는 별도로 잡아야 한다 (assertNever 대신 throw 패턴).
+
+### GitHub Actions 의 Playwright 캐시 키 전략 (#28 에서 학습)
+
+Playwright browser 캐시 키로 `hashFiles('package-lock.json')` 을 쓰면 무관한 dep 가 바뀔 때마다 무효화된다. 더 안정적인 패턴: `package-lock.json` 의 `packages['node_modules/@playwright/test'].version` 을 `node -e` 로 직접 읽어 키에 넣는다 — Playwright bump 시에만 자연스럽게 무효화된다. 다른 도구(Cypress, Puppeteer 등) 캐시에도 동일하게 응용 가능. cache-hit 분기에서는 OS 의존성만 따로 깔아야 하므로 (`install-deps chromium`) cache-miss 의 `install --with-deps chromium` 과 step 을 분리해 `if: steps.<cache-id>.outputs.cache-hit` 로 조건 분기.
 
 ### PR 머지 후 main 동기화
 

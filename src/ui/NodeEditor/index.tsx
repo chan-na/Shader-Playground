@@ -1,5 +1,4 @@
 import {
-  applyNodeChanges,
   Background,
   type Connection,
   Controls,
@@ -35,6 +34,7 @@ export function NodeEditor() {
   const addEdge = useGraphStore((s) => s.addEdge);
   const removeEdge = useGraphStore((s) => s.removeEdge);
   const select = useSelectionStore((s) => s.select);
+  const selectedNodeId = useSelectionStore((s) => s.selectedNodeId);
   const flowRef = useRef<ReactFlowInstance | null>(null);
 
   // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear) so
@@ -66,8 +66,12 @@ export function NodeEditor() {
         type: n.kind,
         position: positions[n.id] ?? { x: 0, y: 0 },
         data: { node: n },
+        // React Flow v12 controlled mode: highlight is driven by this flag,
+        // not by RF's internal state. Sync from selectionStore so clicks,
+        // pane-clears, and programmatic selects all reach the DOM.
+        selected: n.id === selectedNodeId,
       })),
-    [graphNodes, positions],
+    [graphNodes, positions, selectedNodeId],
   );
 
   const rfEdges: Edge[] = useMemo(
@@ -86,9 +90,7 @@ export function NodeEditor() {
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      const updated = applyNodeChanges(changes, rfNodes);
       const currentSelected = useSelectionStore.getState().selectedNodeId;
-      // Persist position drags + removals
       for (const c of changes) {
         if (c.type === "position" && c.position) {
           updateNodePosition(c.id, { x: c.position.x, y: c.position.y });
@@ -97,12 +99,15 @@ export function NodeEditor() {
           if (currentSelected === c.id) select(null);
         } else if (c.type === "select") {
           if (c.selected) select(c.id);
+          else if (useSelectionStore.getState().selectedNodeId === c.id)
+            select(null);
         }
       }
-      void updated;
     },
-    [rfNodes, updateNodePosition, removeNode, select],
+    [updateNodePosition, removeNode, select],
   );
+
+  const onPaneClick = useCallback(() => select(null), [select]);
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
@@ -210,6 +215,7 @@ export function NodeEditor() {
           nodeTypes={NODE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onPaneClick={onPaneClick}
           onConnect={onConnect}
           isValidConnection={isValidConnection}
           onInit={(inst) => {

@@ -101,6 +101,36 @@ test.describe("Phase 9 — editor UX", () => {
       .toBe(startCount);
   });
 
+  test("node click drives both selectionStore and the .selected DOM class", async ({
+    page,
+  }) => {
+    const m1 = page.locator('[data-id="m1"]');
+    const s1 = page.locator('[data-id="s1"]');
+    await expect(m1).toBeVisible();
+    await expect(s1).toBeVisible();
+
+    // beforeEach pre-selected "s1" via the store; the DOM must reflect it.
+    await expect(s1).toHaveClass(/\bselected\b/);
+    await expect(m1).not.toHaveClass(/\bselected\b/);
+
+    // Clicking m1 must move the highlight without leaving s1 stuck.
+    await m1.click();
+    await expect(m1).toHaveClass(/\bselected\b/);
+    await expect(s1).not.toHaveClass(/\bselected\b/);
+    expect(
+      await readSp(page, (sp) => sp.selection.getState().selectedNodeId),
+    ).toBe("m1");
+
+    // Pane click clears the selection in both store and DOM.
+    await page
+      .locator(".react-flow__pane")
+      .click({ position: { x: 10, y: 10 } });
+    await expect(m1).not.toHaveClass(/\bselected\b/);
+    expect(
+      await readSp(page, (sp) => sp.selection.getState().selectedNodeId),
+    ).toBeNull();
+  });
+
   test("Cmd+K opens the command palette", async ({ page }) => {
     await page.locator("body").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Meta+k");

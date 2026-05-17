@@ -230,8 +230,11 @@ export function Viewport() {
       // compute passes carry slider-driven uniformValues that get hot-patched
       // every frame without recompile.
       const graph = useGraphStore.getState();
+      // Build a node lookup once per tick; ids are unique so Map.get matches
+      // the prior `.find()` semantics while avoiding O(passes · nodes) scan.
+      const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
       for (const pass of plan.passes) {
-        const node = graph.nodes.find((n) => n.id === pass.nodeId);
+        const node = nodeById.get(pass.nodeId);
         if (!node) continue;
         if (
           (pass.kind === "shader" && node.kind === "shader") ||

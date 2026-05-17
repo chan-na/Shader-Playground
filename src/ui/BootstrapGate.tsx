@@ -7,10 +7,9 @@ import {
   deserializeProject,
   type SerializedProject,
 } from "../state/serialization";
+import { RecoveryDialog, swallowEscape } from "./RecoveryDialog";
 
 type Phase = "init" | "prompt" | "done";
-
-const RECOVERY_TITLE_ID = "recovery-dialog-title";
 
 export function BootstrapGate() {
   const [phase, setPhase] = useState<Phase>("init");
@@ -65,21 +64,13 @@ export function BootstrapGate() {
     };
   }, []);
 
-  // Auto-focus the primary action when the recovery dialog opens, and swallow
-  // ESC so other handlers (CommandPalette toggle etc.) don't fire over the
-  // modal. ESC intentionally does NOT discard — both options have lasting
-  // consequences, so the user must make an explicit choice.
+  // Auto-focus the primary action when the recovery dialog opens, and capture
+  // ESC so it doesn't reach other global listeners while the modal is up.
   useEffect(() => {
     if (phase !== "prompt") return;
     restoreButtonRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    window.addEventListener("keydown", swallowEscape, true);
+    return () => window.removeEventListener("keydown", swallowEscape, true);
   }, [phase]);
 
   if (phase !== "prompt" || !pending) return null;
@@ -112,78 +103,12 @@ export function BootstrapGate() {
   const nodeCount = pending.graph?.nodes?.length ?? 0;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={RECOVERY_TITLE_ID}
-      data-testid="recovery-dialog"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 9999,
-      }}
-    >
-      <div
-        style={{
-          background: "#1e1e1e",
-          color: "#ddd",
-          border: "1px solid #333",
-          borderRadius: 8,
-          padding: "20px 22px",
-          maxWidth: 380,
-          boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
-        <div
-          id={RECOVERY_TITLE_ID}
-          style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}
-        >
-          이전 작업을 복구할까요?
-        </div>
-        <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>
-          저장된 자동 백업이 있습니다 · 노드 {nodeCount}개 · {savedAt}
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button
-            type="button"
-            data-testid="recovery-discard"
-            onClick={discard}
-            style={{
-              background: "transparent",
-              color: "#bbb",
-              border: "1px solid #444",
-              borderRadius: 4,
-              padding: "6px 12px",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
-          >
-            새로 시작
-          </button>
-          <button
-            ref={restoreButtonRef}
-            type="button"
-            data-testid="recovery-restore"
-            onClick={restore}
-            style={{
-              background: "#0e639c",
-              color: "#fff",
-              border: "1px solid #1177bb",
-              borderRadius: 4,
-              padding: "6px 12px",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
-          >
-            복구
-          </button>
-        </div>
-      </div>
-    </div>
+    <RecoveryDialog
+      savedAt={savedAt}
+      nodeCount={nodeCount}
+      onRestore={restore}
+      onDiscard={discard}
+      restoreButtonRef={restoreButtonRef}
+    />
   );
 }

@@ -1,6 +1,11 @@
-import type { Graph, GraphEdge } from "../core/graph/types";
+import type { Graph, GraphEdge, GraphNode } from "../core/graph/types";
 import { validateGraph } from "../core/graph/validate";
 import { cloneGraphNode } from "../core/nodes/registry";
+import {
+  SANITIZE_LIMITS,
+  sanitizeGraphEdge,
+  sanitizeGraphNode,
+} from "./projectSanitize";
 import type { NodePosition } from "./types";
 
 export const PROJECT_FORMAT_VERSION = 1;
@@ -62,18 +67,43 @@ export function deserializeProject(raw: unknown): DeserializedProject {
   if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
     throw new Error("Project graph is missing or malformed");
   }
+  if (graph.nodes.length > SANITIZE_LIMITS.MAX_NODES) {
+    throw new Error(
+      `Project exceeds node limit (${SANITIZE_LIMITS.MAX_NODES})`,
+    );
+  }
+  if (graph.edges.length > SANITIZE_LIMITS.MAX_EDGES) {
+    throw new Error(
+      `Project exceeds edge limit (${SANITIZE_LIMITS.MAX_EDGES})`,
+    );
+  }
   const positions = (obj.positions ?? {}) as Record<string, NodePosition>;
-  const errors = validateGraph(graph);
+
+  const sanitizedNodes: GraphNode[] = [];
+  for (const raw of graph.nodes) {
+    const res = sanitizeGraphNode(raw);
+    if (res.ok) sanitizedNodes.push(res.node);
+    else warnings.push(`Node dropped: ${res.error}`);
+  }
+  const sanitizedEdges: GraphEdge[] = [];
+  for (const raw of graph.edges) {
+    const e = sanitizeGraphEdge(raw);
+    if (e) sanitizedEdges.push(e);
+    else warnings.push("Edge dropped: malformed shape");
+  }
+  const sanitizedGraph: Graph = {
+    nodes: sanitizedNodes,
+    edges: sanitizedEdges,
+  };
+
+  const errors = validateGraph(sanitizedGraph);
   for (const e of errors) {
     if (e.code === "missing_node" || e.code === "multiple_outputs") {
       warnings.push(`Validation: ${e.message}`);
     }
   }
   return {
-    graph: {
-      nodes: graph.nodes.map((n) => cloneGraphNode(n)),
-      edges: graph.edges.map((e) => structuredCloneEdge(e)),
-    },
+    graph: sanitizedGraph,
     positions,
     warnings,
   };

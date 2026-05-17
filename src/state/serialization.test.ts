@@ -148,6 +148,107 @@ describe("serializeProject / deserializeProject", () => {
     expect(restored.warnings.some((w) => w.includes("Validation"))).toBe(true);
   });
 
+  it("rejects payload exceeding node cap", () => {
+    const nodes = Array.from({ length: 2049 }, (_, i) => ({
+      id: `n${i}`,
+      kind: "output",
+    }));
+    expect(() =>
+      deserializeProject({
+        format: "shader-playground",
+        version: 1,
+        graph: { nodes, edges: [] },
+      }),
+    ).toThrow(/node limit/);
+  });
+
+  it("rejects payload exceeding edge cap", () => {
+    const edges = Array.from({ length: 8193 }, (_, i) => ({
+      id: `e${i}`,
+      source: "a",
+      sourceHandle: "x",
+      target: "b",
+      targetHandle: "y",
+    }));
+    expect(() =>
+      deserializeProject({
+        format: "shader-playground",
+        version: 1,
+        graph: { nodes: [], edges },
+      }),
+    ).toThrow(/edge limit/);
+  });
+
+  it("drops malformed nodes with a warning and surfaces dangling edges", () => {
+    const restored = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      graph: {
+        nodes: [
+          { id: "real", kind: "output" },
+          { id: "bad", kind: "alien" }, // unknown kind → dropped
+          null, // not an object → dropped
+        ],
+        edges: [
+          {
+            id: "e1",
+            source: "real",
+            sourceHandle: "out",
+            target: "bad",
+            targetHandle: "in",
+          },
+        ],
+      },
+      positions: {},
+    });
+    expect(restored.graph.nodes.map((n) => n.id)).toEqual(["real"]);
+    expect(restored.warnings.some((w) => w.includes("Node dropped"))).toBe(
+      true,
+    );
+    expect(restored.warnings.some((w) => w.includes("Validation"))).toBe(true);
+  });
+
+  it("drops malformed edges with a warning", () => {
+    const restored = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      graph: {
+        nodes: [{ id: "real", kind: "output" }],
+        edges: [{ id: "bad" }],
+      },
+    });
+    expect(restored.graph.edges).toEqual([]);
+    expect(restored.warnings.some((w) => w.includes("Edge dropped"))).toBe(
+      true,
+    );
+  });
+
+  it("clamps an oversized compute count from external payload", () => {
+    const restored = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      graph: {
+        nodes: [
+          {
+            id: "c",
+            kind: "compute",
+            vertexSource: "",
+            count: Number.MAX_SAFE_INTEGER,
+            primitive: "POINTS",
+            attributes: [],
+            uniformValues: {},
+          },
+        ],
+        edges: [],
+      },
+    });
+    const c = restored.graph.nodes.find((n) => n.id === "c");
+    expect(c?.kind).toBe("compute");
+    if (c?.kind === "compute") {
+      expect(c.count).toBe(1_000_000);
+    }
+  });
+
   it("round-trips param / math / swizzle / combine / image / output nodes", () => {
     const graph: Graph = {
       nodes: [

@@ -31,6 +31,7 @@ import {
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { nextId } from "../../utils/id";
+import { nextActive, prevActive, rankCommands } from "./helpers";
 
 interface Command {
   id: string;
@@ -324,22 +325,6 @@ function buildCommands(): Command[] {
   return cmds;
 }
 
-function fuzzyMatch(haystack: string, query: string): number {
-  if (!query) return 1;
-  const q = query.toLowerCase();
-  const h = haystack.toLowerCase();
-  if (h.includes(q)) return 100 - h.indexOf(q);
-  let qi = 0;
-  let score = 0;
-  for (let i = 0; i < h.length && qi < q.length; i++) {
-    if (h[i] === q[qi]) {
-      score += 1;
-      qi++;
-    }
-  }
-  return qi === q.length ? score : 0;
-}
-
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -371,14 +356,10 @@ export function CommandPalette() {
   }, [open]);
 
   const commands = useMemo(() => buildCommands(), []);
-  const ranked = useMemo(() => {
-    if (!query) return commands;
-    return commands
-      .map((c) => ({ c, s: fuzzyMatch(`${c.label} ${c.keywords}`, query) }))
-      .filter((x) => x.s > 0)
-      .sort((a, b) => b.s - a.s)
-      .map((x) => x.c);
-  }, [commands, query]);
+  const ranked = useMemo(
+    () => rankCommands(commands, query),
+    [commands, query],
+  );
 
   if (!open) return null;
 
@@ -410,10 +391,10 @@ export function CommandPalette() {
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();
-              setActive((a) => Math.min(a + 1, Math.max(0, ranked.length - 1)));
+              setActive((a) => nextActive(a, ranked.length));
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
-              setActive((a) => Math.max(a - 1, 0));
+              setActive(prevActive);
             } else if (e.key === "Enter") {
               e.preventDefault();
               const cmd = ranked[active];

@@ -34,7 +34,8 @@ export function NodeEditor() {
   const addEdge = useGraphStore((s) => s.addEdge);
   const removeEdge = useGraphStore((s) => s.removeEdge);
   const select = useSelectionStore((s) => s.select);
-  const selectedNodeId = useSelectionStore((s) => s.selectedNodeId);
+  const setSelectedIds = useSelectionStore((s) => s.setSelectedIds);
+  const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds);
   const flowRef = useRef<ReactFlowInstance | null>(null);
 
   // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear) so
@@ -59,20 +60,20 @@ export function NodeEditor() {
     return () => cancelAnimationFrame(id);
   }, [rev, graphNodes.length]);
 
-  const rfNodes: Node[] = useMemo(
-    () =>
-      graphNodes.map((n) => ({
-        id: n.id,
-        type: n.kind,
-        position: positions[n.id] ?? { x: 0, y: 0 },
-        data: { node: n },
-        // React Flow v12 controlled mode: highlight is driven by this flag,
-        // not by RF's internal state. Sync from selectionStore so clicks,
-        // pane-clears, and programmatic selects all reach the DOM.
-        selected: n.id === selectedNodeId,
-      })),
-    [graphNodes, positions, selectedNodeId],
-  );
+  const rfNodes: Node[] = useMemo(() => {
+    const sel = new Set(selectedNodeIds);
+    return graphNodes.map((n) => ({
+      id: n.id,
+      type: n.kind,
+      position: positions[n.id] ?? { x: 0, y: 0 },
+      data: { node: n },
+      // React Flow v12 controlled mode: highlight is driven by this flag,
+      // not by RF's internal state. Sync from selectionStore so clicks,
+      // shift-box selects, pane-clears, and programmatic selects all reach
+      // the DOM.
+      selected: sel.has(n.id),
+    }));
+  }, [graphNodes, positions, selectedNodeIds]);
 
   const rfEdges: Edge[] = useMemo(
     () =>
@@ -90,21 +91,32 @@ export function NodeEditor() {
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      const currentSelected = useSelectionStore.getState().selectedNodeId;
+      // Fold the whole batch into the running selection so shift-box selects
+      // (which emit one select event per node) accumulate instead of the last
+      // one clobbering the rest.
+      let next = useSelectionStore.getState().selectedNodeIds;
+      let touched = false;
       for (const c of changes) {
         if (c.type === "position" && c.position) {
           updateNodePosition(c.id, { x: c.position.x, y: c.position.y });
         } else if (c.type === "remove") {
           removeNode(c.id);
-          if (currentSelected === c.id) select(null);
+          if (next.includes(c.id)) {
+            next = next.filter((id) => id !== c.id);
+            touched = true;
+          }
         } else if (c.type === "select") {
-          if (c.selected) select(c.id);
-          else if (useSelectionStore.getState().selectedNodeId === c.id)
-            select(null);
+          touched = true;
+          if (c.selected) {
+            if (!next.includes(c.id)) next = [...next, c.id];
+          } else {
+            next = next.filter((id) => id !== c.id);
+          }
         }
       }
+      if (touched) setSelectedIds(next);
     },
-    [updateNodePosition, removeNode, select],
+    [updateNodePosition, removeNode, setSelectedIds],
   );
 
   const onPaneClick = useCallback(() => select(null), [select]);

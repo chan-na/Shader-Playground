@@ -5,6 +5,7 @@ import { minimapColorFor, NODE_TYPES, NODE_UI } from "./nodeUiRegistry";
 const ALL_KINDS: GraphNodeKind[] = [
   "mesh",
   "image",
+  "webcam",
   "shader",
   "compute",
   "output",

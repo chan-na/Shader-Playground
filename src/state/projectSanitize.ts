@@ -17,6 +17,7 @@ import type {
   ParamKind,
   ShaderGraphNode,
   SwizzleGraphNode,
+  WebcamGraphNode,
 } from "../core/graph/types";
 
 /**
@@ -38,6 +39,7 @@ export const SANITIZE_LIMITS = {
   MAX_UNIFORM_ARRAY_LEN: 16,
   MAX_PARAM_LABEL_LEN: 256,
   MAX_SWIZZLE_LEN: 4,
+  MAX_DEVICE_ID_LEN: 256,
 } as const;
 
 const MESH_PRIMITIVES: ReadonlySet<MeshGraphNode["primitive"]> = new Set([
@@ -165,6 +167,16 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
     case "image": {
       const assetId = typeof raw.assetId === "string" ? raw.assetId : null;
       const node: ImageGraphNode = { id, kind: "image", assetId };
+      return node;
+    }
+    case "webcam": {
+      const node: WebcamGraphNode = { id, kind: "webcam" };
+      if (
+        typeof raw.deviceId === "string" &&
+        raw.deviceId.length <= SANITIZE_LIMITS.MAX_DEVICE_ID_LEN
+      ) {
+        node.deviceId = raw.deviceId;
+      }
       return node;
     }
     case "shader": {

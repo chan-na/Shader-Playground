@@ -3,6 +3,7 @@ import type {
   ComputeGraphNode,
   ParamGraphNode,
   ShaderGraphNode,
+  WebcamGraphNode,
 } from "../../core/graph/types";
 import {
   inspectorUniforms,
@@ -16,6 +17,7 @@ import { UniformControl } from "./UniformControl";
 import { UtilityInspector } from "./UtilityInspector";
 import { filterUniforms } from "./uniformFilter";
 import { ViewportControls } from "./ViewportControls";
+import { WebcamInspector } from "./WebcamInspector";
 
 export interface InspectorProps {
   /** When embedded inside SidePanel, skip the outer panel + header wrapper. */
@@ -109,6 +111,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
 
           {node.kind === "param" && (
             <ParamInspector node={node as ParamGraphNode} />
+          )}
+
+          {node.kind === "webcam" && (
+            <WebcamInspector node={node as WebcamGraphNode} />
           )}
 
           {(node.kind === "math" ||

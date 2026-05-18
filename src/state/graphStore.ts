@@ -13,6 +13,7 @@ import type {
   ParamGraphNode,
   ShaderGraphNode,
   SwizzleGraphNode,
+  WebcamGraphNode,
 } from "../core/graph/types";
 import { useHistoryStore } from "./historyStore";
 import type { NodePosition } from "./types";
@@ -53,6 +54,7 @@ export interface GraphState {
       attributes?: ComputeAttribute[];
     },
   ) => void;
+  setWebcamConfig: (id: string, patch: { deviceId?: string }) => void;
   addEdge: (edge: GraphEdge) => void;
   removeEdge: (id: string) => void;
   reset: () => void;
@@ -242,6 +244,25 @@ export const useGraphStore = create<GraphState>((set, get) => ({
             ? patch.attributes.map((a) => ({ ...a }))
             : cn.attributes,
         } as ComputeGraphNode;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
+  setWebcamConfig: (id, patch) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== "webcam") return n;
+        const wn = n as WebcamGraphNode;
+        // Empty string from the Inspector dropdown maps to "default device"
+        // (the undefined branch); anything else is a concrete deviceId.
+        const incoming =
+          patch.deviceId !== undefined
+            ? patch.deviceId || undefined
+            : wn.deviceId;
+        const next: WebcamGraphNode = { id: wn.id, kind: "webcam" };
+        if (incoming !== undefined) next.deviceId = incoming;
+        return next;
       }),
       rev: s.rev + 1,
     }));

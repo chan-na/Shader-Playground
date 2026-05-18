@@ -6,6 +6,7 @@ import type {
   ParamGraphNode,
   ShaderGraphNode,
   SwizzleGraphNode,
+  WebcamGraphNode,
 } from "../core/graph/types";
 import {
   redoGraph,
@@ -124,6 +125,29 @@ describe("graphStore", () => {
       .nodes.find((n) => n.id === "c1") as ComputeGraphNode;
     expect(updated.count).toBe(512);
     expect(updated.primitive).toBe("LINES");
+  });
+
+  it("setWebcamConfig assigns deviceId, bumps rev, and pushes history (Phase 14)", () => {
+    useGraphStore
+      .getState()
+      .addNode({ id: "w1", kind: "webcam" } satisfies WebcamGraphNode);
+    const before = useGraphStore.getState().rev;
+    useGraphStore.getState().setWebcamConfig("w1", { deviceId: "cam-xyz" });
+    const after = useGraphStore.getState();
+    const w = after.nodes.find((n) => n.id === "w1") as WebcamGraphNode;
+    expect(w.deviceId).toBe("cam-xyz");
+    expect(after.rev).toBe(before + 1);
+  });
+
+  it("setWebcamConfig with empty string resets to default (no deviceId key)", () => {
+    useGraphStore
+      .getState()
+      .addNode({ id: "w2", kind: "webcam", deviceId: "old" });
+    useGraphStore.getState().setWebcamConfig("w2", { deviceId: "" });
+    const w = useGraphStore
+      .getState()
+      .nodes.find((n) => n.id === "w2") as WebcamGraphNode;
+    expect("deviceId" in w).toBe(false);
   });
 
   it("removeEdge removes only the named edge", () => {

@@ -7,6 +7,7 @@ import {
   projMatrix,
   viewMatrix,
 } from "../camera/orbitCamera";
+import { getExternalTexture } from "../external/registry";
 import { bindFramebuffer } from "../gl/framebuffer";
 import { drawMesh } from "../gl/mesh";
 import { setUniform } from "../gl/uniforms";
@@ -149,7 +150,14 @@ function bindSamplers(
       texture = src.fbo.color.texture;
     } else {
       const img = plan.imageTextures[s.sourceNodeId];
-      if (img) texture = img.texture;
+      if (img) {
+        texture = img.texture;
+      } else {
+        // External live sources (webcam etc.) live outside the plan because
+        // they survive across recompiles. Their texture may also be null on
+        // any given frame while acquisition is pending — skip in that case.
+        texture = getExternalTexture(s.sourceNodeId);
+      }
     }
     if (!texture) continue;
     const loc = pass.program.uniforms[s.uniformName];

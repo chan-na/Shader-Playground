@@ -85,6 +85,18 @@ function buildCommands(): Command[] {
     },
   });
 
+  cmds.push({
+    id: "add-webcam",
+    category: "Node",
+    label: "Add Webcam (live camera)",
+    keywords: "add node webcam camera live video texture media stream",
+    run: () => {
+      const id = nextId("webcam");
+      addNode({ id, kind: "webcam" }, { x: -200, y: 320 });
+      select(id);
+    },
+  });
+
   const shaderTemplates: Array<{ name: string; frag: string }> = [
     { name: "Unlit", frag: unlitFrag },
     { name: "Noise", frag: noiseFrag },

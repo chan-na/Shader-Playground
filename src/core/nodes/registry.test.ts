@@ -7,6 +7,7 @@ import type {
   ParamGraphNode,
   ShaderGraphNode,
   SwizzleGraphNode,
+  WebcamGraphNode,
 } from "../graph/types";
 import {
   cloneGraphNode,
@@ -29,6 +30,13 @@ describe("NODE_META", () => {
 
   it("image has one texture output", () => {
     expect(NODE_META.image.outputs()).toEqual([
+      { name: "texture", type: "texture" },
+    ]);
+  });
+
+  it("webcam has one texture output, no inputs", () => {
+    expect(NODE_META.webcam.inputs(null)).toEqual([]);
+    expect(NODE_META.webcam.outputs()).toEqual([
       { name: "texture", type: "texture" },
     ]);
   });
@@ -378,6 +386,21 @@ describe("cloneGraphNode", () => {
       expect(cloned.attributes[0]).not.toBe(original.attributes[0]);
       expect(cloned.attributes[0]).toEqual(original.attributes[0]);
     }
+  });
+
+  it("webcam round-trips with and without deviceId", () => {
+    const noDevice: WebcamGraphNode = { id: "w1", kind: "webcam" };
+    const clonedNoDevice = cloneGraphNode(noDevice);
+    expect(clonedNoDevice).toEqual(noDevice);
+    expect("deviceId" in clonedNoDevice).toBe(false);
+
+    const withDevice: WebcamGraphNode = {
+      id: "w2",
+      kind: "webcam",
+      deviceId: "cam-abc-123",
+    };
+    const clonedWithDevice = cloneGraphNode(withDevice);
+    expect(clonedWithDevice).toEqual(withDevice);
   });
 
   it("preserves param label only when defined (no explicit undefined leak)", () => {

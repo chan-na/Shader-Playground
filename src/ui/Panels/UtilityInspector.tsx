@@ -35,6 +35,7 @@ export function UtilityInspector({ node }: { node: GraphNode }) {
     case "image":
     case "webcam":
     case "video":
+    case "audio":
     case "shader":
     case "compute":
     case "output":

@@ -678,8 +678,145 @@
       gl.bindTexture(gl.TEXTURE_2D, null);
     });
   }
+  // ── audio sources (AnalyserNode FFT bins → R8 1D texture each frame) ───
+  // Mic mode is fully functional (mirrors webcam pattern). File mode looks
+  // up the asset blob URL on window.__SP_AUDIO_BLOBS the same way video does;
+  // bundling those blobs into the export is a follow-up.
+  var audioSources = {};
+  function initAudios() {
+    if (
+      typeof window === "undefined" ||
+      (!window.AudioContext && !window.webkitAudioContext)
+    ) {
+      return;
+    }
+    var Ctor = window.AudioContext || window.webkitAudioContext;
+    nodes
+      .filter((n) => n.kind === "audio")
+      .forEach((n) => {
+        if (audioSources[n.id]) return;
+        var ctx;
+        try {
+          ctx = new Ctor();
+        } catch (_e) {
+          return;
+        }
+        var analyser = ctx.createAnalyser();
+        analyser.fftSize = n.fftSize || 256;
+        analyser.smoothingTimeConstant =
+          typeof n.smoothing === "number" ? n.smoothing : 0.8;
+        var bins = new Uint8Array(analyser.frequencyBinCount);
+        var entry = {
+          ctx: ctx,
+          analyser: analyser,
+          bins: bins,
+          tex: null,
+          w: 0,
+          ready: false,
+        };
+        audioSources[n.id] = entry;
+        var resume = () => {
+          try {
+            var p = ctx.resume();
+            if (p && typeof p.catch === "function") p.catch(() => {});
+          } catch (_) {}
+        };
+        if (n.sourceKind === "mic") {
+          if (
+            !navigator ||
+            !navigator.mediaDevices ||
+            typeof navigator.mediaDevices.getUserMedia !== "function"
+          ) {
+            return;
+          }
+          navigator.mediaDevices.getUserMedia({ audio: true }).then(
+            (stream) => {
+              resume();
+              var src = ctx.createMediaStreamSource(stream);
+              src.connect(analyser);
+              entry.ready = true;
+            },
+            (err) => {
+              console.warn("Audio permission denied:", err);
+            },
+          );
+        } else {
+          var blobs =
+            typeof window !== "undefined" ? window.__SP_AUDIO_BLOBS : undefined;
+          var url = blobs && n.assetId ? blobs[n.assetId] : null;
+          if (!url) return;
+          fetch(url)
+            .then((r) => r.arrayBuffer())
+            .then((buf) => ctx.decodeAudioData(buf))
+            .then((decoded) => {
+              resume();
+              var src = ctx.createBufferSource();
+              src.buffer = decoded;
+              src.loop = !!n.loop;
+              src.connect(analyser);
+              if (n.playing !== false) {
+                try {
+                  src.start(0);
+                } catch (_) {}
+              }
+              entry.ready = true;
+            })
+            .catch((err) => {
+              console.warn("Audio decode failed:", err);
+            });
+        }
+      });
+  }
+  function updateAudios() {
+    Object.keys(audioSources).forEach((id) => {
+      var e = audioSources[id];
+      if (!e.ready) return;
+      e.analyser.getByteFrequencyData(e.bins);
+      var w = e.bins.length;
+      if (!w) return;
+      if (!e.tex || e.w !== w) {
+        if (e.tex) gl.deleteTexture(e.tex);
+        e.tex = gl.createTexture();
+        e.w = w;
+        gl.bindTexture(gl.TEXTURE_2D, e.tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.R8,
+          w,
+          1,
+          0,
+          gl.RED,
+          gl.UNSIGNED_BYTE,
+          e.bins,
+        );
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        return;
+      }
+      gl.bindTexture(gl.TEXTURE_2D, e.tex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0,
+        0,
+        0,
+        w,
+        1,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        e.bins,
+      );
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    });
+  }
   initWebcams();
   initVideos();
+  initAudios();
 
   function rebuild() {
     // Dispose any previous resources (best-effort).
@@ -807,6 +944,7 @@
     }
     updateWebcams();
     updateVideos();
+    updateAudios();
     var t = (now - start) / 1000;
     // Slow rotation if any non-fullscreen pass exists.
     camera.yaw = Math.PI * 0.25 + t * 0.1;
@@ -870,6 +1008,10 @@
         if (!texture) {
           var vs = videoSources[s.sourceNodeId];
           if (vs && vs.tex) texture = vs.tex;
+        }
+        if (!texture) {
+          var as = audioSources[s.sourceNodeId];
+          if (as && as.tex) texture = as.tex;
         }
         if (!texture) return;
         setUniform(u[s.uniformName], {

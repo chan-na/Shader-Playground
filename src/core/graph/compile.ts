@@ -28,6 +28,7 @@ import {
 } from "../gl/texture";
 import { generateSeed } from "./computeSeed";
 import type {
+  AudioGraphNode,
   ComputeGraphNode,
   Graph,
   GraphNode,
@@ -424,6 +425,18 @@ export function compileGraph(
         loop: v.loop,
         muted: v.muted,
         ...(v.currentTime !== undefined && { currentTime: v.currentTime }),
+      });
+    } else if (node.kind === "audio") {
+      const a = node as AudioGraphNode;
+      externalSpecs.push({
+        nodeId: a.id,
+        kind: "audio",
+        sourceKind: a.sourceKind,
+        assetId: a.assetId,
+        fftSize: a.fftSize,
+        smoothing: a.smoothing,
+        playing: a.playing,
+        loop: a.loop,
       });
     }
   }

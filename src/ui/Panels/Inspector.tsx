@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type {
+  AudioGraphNode,
   ComputeGraphNode,
   ParamGraphNode,
   ShaderGraphNode,
@@ -13,6 +14,7 @@ import {
 } from "../../core/graph/uniformParser";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { AudioInspector } from "./AudioInspector";
 import { ParamInspector } from "./ParamInspector";
 import { UniformControl } from "./UniformControl";
 import { UtilityInspector } from "./UtilityInspector";
@@ -121,6 +123,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
 
           {node.kind === "video" && (
             <VideoInspector node={node as VideoGraphNode} />
+          )}
+
+          {node.kind === "audio" && (
+            <AudioInspector node={node as AudioGraphNode} />
           )}
 
           {(node.kind === "math" ||

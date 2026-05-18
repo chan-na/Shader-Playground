@@ -1,14 +1,19 @@
 import type { MeshAttribute, MeshData } from "../gl/mesh";
-import type { GeometryHandle, ImageHandle, VideoAssetHandle } from "./types";
+import type {
+  AudioAssetHandle,
+  GeometryHandle,
+  ImageHandle,
+  VideoAssetHandle,
+} from "./types";
 
 const DB_NAME = "shader-playground";
-// v2: added the videos store. Existing v1 databases upgrade in-place — the
-// onupgradeneeded callback only creates the new store and leaves meshes /
-// images untouched.
-const DB_VERSION = 2;
+// v3: added the audios store. onupgradeneeded only creates stores it doesn't
+// yet have, so existing v1/v2 databases keep their meshes / images / videos.
+const DB_VERSION = 3;
 const STORE_MESH = "meshes";
 const STORE_IMAGE = "images";
 const STORE_VIDEO = "videos";
+const STORE_AUDIO = "audios";
 
 interface SerializedAttribute {
   name: string;
@@ -42,6 +47,16 @@ interface SerializedVideo {
   blob: Blob;
 }
 
+interface SerializedAudio {
+  id: string;
+  name: string;
+  duration: number;
+  sampleRate: number;
+  channels: number;
+  mimeType: string;
+  blob: Blob;
+}
+
 let _dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
@@ -59,6 +74,8 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(STORE_IMAGE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(STORE_VIDEO))
         db.createObjectStore(STORE_VIDEO, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(STORE_AUDIO))
+        db.createObjectStore(STORE_AUDIO, { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -248,6 +265,56 @@ export async function deleteCachedVideo(id: string): Promise<void> {
   try {
     const db = await openDb();
     await awaitRequest(tx(db, STORE_VIDEO, "readwrite").delete(id));
+  } catch {
+    // See deleteCachedMesh.
+  }
+}
+
+export async function cacheAudio(
+  handle: AudioAssetHandle,
+  blob: Blob,
+): Promise<void> {
+  const db = await openDb();
+  const record: SerializedAudio = {
+    id: handle.id,
+    name: handle.name,
+    duration: handle.duration,
+    sampleRate: handle.sampleRate,
+    channels: handle.channels,
+    mimeType: handle.mimeType,
+    blob,
+  };
+  await awaitRequest(tx(db, STORE_AUDIO, "readwrite").put(record));
+}
+
+export async function loadCachedAudio(id: string): Promise<{
+  handle: AudioAssetHandle;
+  blob: Blob;
+} | null> {
+  try {
+    const db = await openDb();
+    const record = await awaitRequest<SerializedAudio | undefined>(
+      tx(db, STORE_AUDIO, "readonly").get(id),
+    );
+    if (!record) return null;
+    const handle: AudioAssetHandle = {
+      id: record.id,
+      name: record.name,
+      duration: record.duration,
+      sampleRate: record.sampleRate,
+      channels: record.channels,
+      mimeType: record.mimeType,
+    };
+    return { handle, blob: record.blob };
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteCachedAudio(id: string): Promise<void> {
+  try {
+    const db = await openDb();
+    await awaitRequest(tx(db, STORE_AUDIO, "readwrite").delete(id));
   } catch {
     // See deleteCachedMesh.
   }

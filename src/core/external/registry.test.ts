@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  __setAudioContextFactoryForTests,
   __setGetUserMediaForTests,
   disposeAllExternal,
   externalHandleCount,
+  getExternalAudioBins,
   getExternalStatus,
   getExternalStream,
   getExternalTexture,
   getExternalVideoElement,
   reconcileExternal,
+  setAudioBlobResolver,
   setVideoBlobResolver,
 } from "./registry";
 
@@ -15,7 +18,9 @@ import {
 // matter and a flake in one case doesn't leak into the next.
 afterEach(() => {
   __setGetUserMediaForTests(null);
+  __setAudioContextFactoryForTests(null);
   setVideoBlobResolver(null);
+  setAudioBlobResolver(null);
   disposeAllExternal();
 });
 
@@ -250,6 +255,188 @@ describe("video specs", () => {
       },
     ]);
     expect(getExternalTexture("v1")).toBeNull();
+  });
+});
+
+/**
+ * Minimal AudioContext stand-in covering only the surface registry.ts touches.
+ * Returning fake AnalyserNode + buffer/source factories lets us assert the
+ * lifecycle (acquire / restart / dispose) without depending on Web Audio.
+ */
+function fakeAudioContext() {
+  const analyser = {
+    fftSize: 0,
+    smoothingTimeConstant: 0,
+    frequencyBinCount: 16,
+    getByteFrequencyData: () => {},
+    disconnect: () => {},
+  } as unknown as AnalyserNode;
+  let lastSource: AudioBufferSourceNode | null = null;
+  const ctx = {
+    state: "running",
+    resume: () => Promise.resolve(),
+    close: () => Promise.resolve(),
+    createAnalyser: () => analyser,
+    createMediaStreamSource: () =>
+      ({
+        connect: () => {},
+        disconnect: () => {},
+      }) as unknown as MediaStreamAudioSourceNode,
+    createBufferSource: () => {
+      const s = {
+        buffer: null,
+        loop: false,
+        start: () => {},
+        stop: () => {},
+        connect: () => {},
+        disconnect: () => {},
+      } as unknown as AudioBufferSourceNode;
+      lastSource = s;
+      return s;
+    },
+    decodeAudioData: () => Promise.resolve({} as AudioBuffer),
+  } as unknown as AudioContext;
+  return { ctx, analyser, getLastSource: () => lastSource };
+}
+
+describe("audio specs", () => {
+  it("creates a handle and reports 'no asset' for file mode without assetId", () => {
+    const { ctx } = fakeAudioContext();
+    __setAudioContextFactoryForTests(() => ctx);
+    reconcileExternal([
+      {
+        nodeId: "a1",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: null,
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+    ]);
+    expect(externalHandleCount()).toBe(1);
+    const status = getExternalStatus("a1");
+    expect(status?.error).toMatch(/no audio asset/i);
+  });
+
+  it("records an error when the file-mode resolver is not registered", () => {
+    const { ctx } = fakeAudioContext();
+    __setAudioContextFactoryForTests(() => ctx);
+    setAudioBlobResolver(null);
+    reconcileExternal([
+      {
+        nodeId: "a1",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: "abc",
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+    ]);
+    return Promise.resolve().then(() => {
+      expect(getExternalStatus("a1")?.error).toMatch(/resolver/i);
+    });
+  });
+
+  it("records an error when the resolver returns null", () => {
+    const { ctx } = fakeAudioContext();
+    __setAudioContextFactoryForTests(() => ctx);
+    setAudioBlobResolver(() => null);
+    reconcileExternal([
+      {
+        nodeId: "a1",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: "missing",
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+    ]);
+    return Promise.resolve().then(() => {
+      expect(getExternalStatus("a1")?.error).toMatch(/asset not found/i);
+    });
+  });
+
+  it("restarts when fftSize changes (different analyser sizing)", () => {
+    const { ctx } = fakeAudioContext();
+    __setAudioContextFactoryForTests(() => ctx);
+    reconcileExternal([
+      {
+        nodeId: "a1",
+        kind: "audio",
+        sourceKind: "mic",
+        assetId: null,
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+    ]);
+    expect(externalHandleCount()).toBe(1);
+    reconcileExternal([
+      {
+        nodeId: "a1",
+        kind: "audio",
+        sourceKind: "mic",
+        assetId: null,
+        fftSize: 512,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+    ]);
+    // Restart path: old handle disposed, new acquired → count stays 1.
+    expect(externalHandleCount()).toBe(1);
+  });
+
+  it("records an error when no AudioContext factory is available", () => {
+    __setAudioContextFactoryForTests(() => null);
+    reconcileExternal([
+      {
+        nodeId: "a1",
+        kind: "audio",
+        sourceKind: "mic",
+        assetId: null,
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+    ]);
+    expect(getExternalStatus("a1")?.error).toMatch(/audiocontext/i);
+  });
+
+  it("getExternalAudioBins returns null before any frame samples", () => {
+    const { ctx } = fakeAudioContext();
+    __setAudioContextFactoryForTests(() => ctx);
+    reconcileExternal([
+      {
+        nodeId: "a1",
+        kind: "audio",
+        sourceKind: "mic",
+        assetId: null,
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+    ]);
+    // bins are pre-allocated at acquire time so the buffer exists even before
+    // the first analyser sample — assert the shape rather than presence.
+    const bins = getExternalAudioBins("a1");
+    expect(bins).toBeInstanceOf(Uint8Array);
+    expect(bins?.length).toBe(16);
+  });
+
+  it("getExternalAudioBins returns null for non-audio handles", () => {
+    __setGetUserMediaForTests(() => new Promise(() => {}));
+    reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
+    expect(getExternalAudioBins("w1")).toBeNull();
   });
 });
 

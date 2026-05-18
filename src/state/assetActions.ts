@@ -1,10 +1,14 @@
+import { loadAudioFromFile } from "../core/assets/audioLoader";
 import {
+  cacheAudio,
   cacheImage,
   cacheMesh,
   cacheVideo,
+  deleteCachedAudio,
   deleteCachedImage,
   deleteCachedMesh,
   deleteCachedVideo,
+  loadCachedAudio,
   loadCachedImage,
   loadCachedMesh,
   loadCachedVideo,
@@ -20,7 +24,13 @@ import { useGraphStore } from "./graphStore";
 import { useSelectionStore } from "./selectionStore";
 import { toast } from "./toastStore";
 
-export type AssetKind = "obj" | "gltf" | "image" | "video" | "unknown";
+export type AssetKind =
+  | "obj"
+  | "gltf"
+  | "image"
+  | "video"
+  | "audio"
+  | "unknown";
 
 export function classifyFile(file: File): AssetKind {
   const lower = file.name.toLowerCase();
@@ -46,6 +56,17 @@ export function classifyFile(file: File): AssetKind {
     return "video";
   }
   if (file.type.startsWith("video/")) return "video";
+  if (
+    lower.endsWith(".mp3") ||
+    lower.endsWith(".wav") ||
+    lower.endsWith(".ogg") ||
+    lower.endsWith(".m4a") ||
+    lower.endsWith(".aac") ||
+    lower.endsWith(".flac")
+  ) {
+    return "audio";
+  }
+  if (file.type.startsWith("audio/")) return "audio";
   return "unknown";
 }
 
@@ -125,6 +146,26 @@ async function importFile(
     return { kind, nodeId: id, assetId: handle.id };
   }
 
+  if (kind === "audio") {
+    const { handle, blob } = await loadAudioFromFile(file);
+    assetStore.addAudio(handle, blob);
+    void cacheAudio(handle, blob).catch(() => {});
+    const id = nextId("audio");
+    const node: GraphNode = {
+      id,
+      kind: "audio",
+      sourceKind: "file",
+      assetId: handle.id,
+      fftSize: 256,
+      smoothing: 0.8,
+      playing: true,
+      loop: true,
+    };
+    graphStore.addNode(node, position ?? { x: -240, y: 480 });
+    selection.select(id);
+    return { kind, nodeId: id, assetId: handle.id };
+  }
+
   return null;
 }
 
@@ -135,6 +176,7 @@ export async function hydrateAssetsFor(assetIds: {
   meshes: string[];
   images: string[];
   videos?: string[];
+  audios?: string[];
 }) {
   const assetStore = useAssetStore.getState();
   await Promise.all(
@@ -161,6 +203,16 @@ export async function hydrateAssetsFor(assetIds: {
       }),
     );
   }
+  if (assetIds.audios?.length) {
+    await Promise.all(
+      assetIds.audios.map(async (id) => {
+        if (assetStore.audios[id]) return;
+        const cached = await loadCachedAudio(id);
+        if (cached)
+          useAssetStore.getState().addAudio(cached.handle, cached.blob);
+      }),
+    );
+  }
 }
 
 // Remove an asset from the in-memory store *and* its IndexedDB record. Without
@@ -179,6 +231,11 @@ export function forgetImage(id: string): void {
 export function forgetVideo(id: string): void {
   useAssetStore.getState().removeVideo(id);
   void deleteCachedVideo(id);
+}
+
+export function forgetAudio(id: string): void {
+  useAssetStore.getState().removeAudio(id);
+  void deleteCachedAudio(id);
 }
 
 export async function importFiles(

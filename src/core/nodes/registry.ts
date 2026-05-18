@@ -85,6 +85,12 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
     inputs: () => [],
     outputs: () => [{ name: "texture", type: "texture" }],
   },
+  audio: {
+    kind: "audio",
+    label: "Audio",
+    inputs: () => [],
+    outputs: () => [{ name: "texture", type: "texture" }],
+  },
   shader: {
     kind: "shader",
     label: "Shader",
@@ -235,6 +241,17 @@ export function cloneGraphNode(n: GraphNode): GraphNode {
         loop: n.loop,
         muted: n.muted,
         ...(n.currentTime !== undefined && { currentTime: n.currentTime }),
+      };
+    case "audio":
+      return {
+        id: n.id,
+        kind: "audio",
+        sourceKind: n.sourceKind,
+        assetId: n.assetId ?? null,
+        fftSize: n.fftSize,
+        smoothing: n.smoothing,
+        playing: n.playing,
+        loop: n.loop,
       };
     case "shader":
       return {

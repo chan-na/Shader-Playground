@@ -86,6 +86,19 @@ describe("classifyFile", () => {
     expect(classifyFile(mockFile("photo", "image/png"))).toBe("image");
   });
 
+  it("detects audio by extension", () => {
+    expect(classifyFile(mockFile("song.mp3"))).toBe("audio");
+    expect(classifyFile(mockFile("clip.wav"))).toBe("audio");
+    expect(classifyFile(mockFile("voice.ogg"))).toBe("audio");
+    expect(classifyFile(mockFile("track.m4a"))).toBe("audio");
+    expect(classifyFile(mockFile("loop.aac"))).toBe("audio");
+    expect(classifyFile(mockFile("master.flac"))).toBe("audio");
+  });
+
+  it("detects audio by MIME when extension is missing", () => {
+    expect(classifyFile(mockFile("clip", "audio/mpeg"))).toBe("audio");
+  });
+
   it("returns unknown for unsupported types", () => {
     expect(classifyFile(mockFile("readme.txt"))).toBe("unknown");
     expect(classifyFile(mockFile("script.js"))).toBe("unknown");

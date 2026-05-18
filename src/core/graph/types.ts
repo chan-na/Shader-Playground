@@ -5,6 +5,7 @@ export type GraphNodeKind =
   | "image"
   | "webcam"
   | "video"
+  | "audio"
   | "shader"
   | "compute"
   | "output"
@@ -12,6 +13,15 @@ export type GraphNodeKind =
   | "math"
   | "swizzle"
   | "combine";
+
+/** Allowed AnalyserNode FFT sizes — must be a power of two within [32, 32768].
+ *  Restricted to the typical set so the texture width stays in a sensible
+ *  range and serialization can reject arbitrary numbers. */
+export type AudioFftSize = 32 | 64 | 128 | 256 | 512 | 1024 | 2048;
+
+export const AUDIO_FFT_SIZES: readonly AudioFftSize[] = [
+  32, 64, 128, 256, 512, 1024, 2048,
+] as const;
 
 export type ParamKind = "float" | "vec3" | "color" | "time";
 
@@ -54,6 +64,25 @@ export interface VideoGraphNode extends BaseNode {
   /** Last-applied seek target (seconds). Optional so the inspector can leave
    *  the playhead alone unless the user explicitly scrubs. */
   currentTime?: number;
+}
+
+export type AudioSourceKind = "mic" | "file";
+
+export interface AudioGraphNode extends BaseNode {
+  kind: "audio";
+  /** "mic" → getUserMedia({ audio: true }); "file" → decodeAudioData(blob). */
+  sourceKind: AudioSourceKind;
+  /** Asset id (file mode). Ignored when sourceKind === "mic". */
+  assetId: string | null;
+  /** AnalyserNode.fftSize — power of two from AUDIO_FFT_SIZES. */
+  fftSize: AudioFftSize;
+  /** AnalyserNode.smoothingTimeConstant — 0 (no smoothing) to 1 (max). */
+  smoothing: number;
+  /** File mode: whether the AudioBufferSourceNode is currently playing.
+   *  Mic mode: ignored (the live stream is always "playing"). */
+  playing: boolean;
+  /** File mode: loop the AudioBufferSourceNode. Mic mode: ignored. */
+  loop: boolean;
 }
 
 export interface ShaderGraphNode extends BaseNode {
@@ -153,6 +182,7 @@ export type GraphNode =
   | ImageGraphNode
   | WebcamGraphNode
   | VideoGraphNode
+  | AudioGraphNode
   | ShaderGraphNode
   | ComputeGraphNode
   | OutputGraphNode

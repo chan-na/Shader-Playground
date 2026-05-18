@@ -1,4 +1,7 @@
 import type {
+  AudioFftSize,
+  AudioGraphNode,
+  AudioSourceKind,
   CombineArity,
   CombineGraphNode,
   ComputeAttribute,
@@ -20,6 +23,7 @@ import type {
   VideoGraphNode,
   WebcamGraphNode,
 } from "../core/graph/types";
+import { AUDIO_FFT_SIZES } from "../core/graph/types";
 
 /**
  * Hard caps for untrusted project payloads (share URL, imported JSON,
@@ -77,6 +81,11 @@ const MATH_OPS: ReadonlySet<MathOp> = new Set([
   "sin",
   "cos",
 ]);
+const AUDIO_SOURCE_KINDS: ReadonlySet<AudioSourceKind> = new Set([
+  "mic",
+  "file",
+]);
+const AUDIO_FFT_SET: ReadonlySet<number> = new Set(AUDIO_FFT_SIZES);
 
 function asObject(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
@@ -198,6 +207,31 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
         // re-clamped by the <video> element at apply time.
         node.currentTime = Math.max(0, raw.currentTime);
       }
+      return node;
+    }
+    case "audio": {
+      const sourceKind: AudioSourceKind = AUDIO_SOURCE_KINDS.has(
+        raw.sourceKind as AudioSourceKind,
+      )
+        ? (raw.sourceKind as AudioSourceKind)
+        : "mic";
+      const assetId = typeof raw.assetId === "string" ? raw.assetId : null;
+      const fftRaw =
+        typeof raw.fftSize === "number" && AUDIO_FFT_SET.has(raw.fftSize)
+          ? (raw.fftSize as AudioFftSize)
+          : 256;
+      const smoothingRaw = safeFiniteNumber(raw.smoothing, 0.8);
+      const smoothing = Math.max(0, Math.min(1, smoothingRaw));
+      const node: AudioGraphNode = {
+        id,
+        kind: "audio",
+        sourceKind,
+        assetId,
+        fftSize: fftRaw,
+        smoothing,
+        playing: typeof raw.playing === "boolean" ? raw.playing : true,
+        loop: typeof raw.loop === "boolean" ? raw.loop : true,
+      };
       return node;
     }
     case "shader": {

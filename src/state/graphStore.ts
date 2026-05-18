@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import type {
+  AudioFftSize,
+  AudioGraphNode,
+  AudioSourceKind,
   CombineArity,
   CombineGraphNode,
   ComputeAttribute,
@@ -64,6 +67,17 @@ export interface GraphState {
       loop?: boolean;
       muted?: boolean;
       currentTime?: number;
+    },
+  ) => void;
+  setAudioConfig: (
+    id: string,
+    patch: {
+      sourceKind?: AudioSourceKind;
+      assetId?: string | null;
+      fftSize?: AudioFftSize;
+      smoothing?: number;
+      playing?: boolean;
+      loop?: boolean;
     },
   ) => void;
   addEdge: (edge: GraphEdge) => void;
@@ -308,6 +322,27 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         return next;
       }),
       ...(isScrubOnly ? { uniformRev: s.uniformRev + 1 } : { rev: s.rev + 1 }),
+    }));
+  },
+  setAudioConfig: (id, patch) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== "audio") return n;
+        const an = n as AudioGraphNode;
+        const next: AudioGraphNode = {
+          id: an.id,
+          kind: "audio",
+          sourceKind: patch.sourceKind ?? an.sourceKind,
+          assetId: patch.assetId !== undefined ? patch.assetId : an.assetId,
+          fftSize: patch.fftSize ?? an.fftSize,
+          smoothing: patch.smoothing ?? an.smoothing,
+          playing: patch.playing ?? an.playing,
+          loop: patch.loop ?? an.loop,
+        };
+        return next;
+      }),
+      rev: s.rev + 1,
     }));
   },
   addEdge: (edge) => {

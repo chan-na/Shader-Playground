@@ -34,6 +34,7 @@ export function UtilityInspector({ node }: { node: GraphNode }) {
     case "mesh":
     case "image":
     case "webcam":
+    case "video":
     case "shader":
     case "compute":
     case "output":

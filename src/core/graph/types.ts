@@ -4,6 +4,7 @@ export type GraphNodeKind =
   | "mesh"
   | "image"
   | "webcam"
+  | "video"
   | "shader"
   | "compute"
   | "output"
@@ -41,6 +42,18 @@ export interface WebcamGraphNode extends BaseNode {
    * permission on each new origin/session.
    */
   deviceId?: string;
+}
+
+export interface VideoGraphNode extends BaseNode {
+  kind: "video";
+  /** Reference to the imported video asset; null until a file is bound. */
+  assetId: string | null;
+  playing: boolean;
+  loop: boolean;
+  muted: boolean;
+  /** Last-applied seek target (seconds). Optional so the inspector can leave
+   *  the playhead alone unless the user explicitly scrubs. */
+  currentTime?: number;
 }
 
 export interface ShaderGraphNode extends BaseNode {
@@ -139,6 +152,7 @@ export type GraphNode =
   | MeshGraphNode
   | ImageGraphNode
   | WebcamGraphNode
+  | VideoGraphNode
   | ShaderGraphNode
   | ComputeGraphNode
   | OutputGraphNode

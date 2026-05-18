@@ -3,6 +3,7 @@ import type {
   ComputeGraphNode,
   ParamGraphNode,
   ShaderGraphNode,
+  VideoGraphNode,
   WebcamGraphNode,
 } from "../../core/graph/types";
 import {
@@ -16,6 +17,7 @@ import { ParamInspector } from "./ParamInspector";
 import { UniformControl } from "./UniformControl";
 import { UtilityInspector } from "./UtilityInspector";
 import { filterUniforms } from "./uniformFilter";
+import { VideoInspector } from "./VideoInspector";
 import { ViewportControls } from "./ViewportControls";
 import { WebcamInspector } from "./WebcamInspector";
 
@@ -115,6 +117,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
 
           {node.kind === "webcam" && (
             <WebcamInspector node={node as WebcamGraphNode} />
+          )}
+
+          {node.kind === "video" && (
+            <VideoInspector node={node as VideoGraphNode} />
           )}
 
           {(node.kind === "math" ||

@@ -504,6 +504,87 @@
   var passes = [];
   var passById = {};
 
+  // ── video sources (assetId → <video> from embedded blob) ─────────────────
+  // Mirrors the webcam pattern but the source is an opaque blob URL bundled
+  // into the export at build time. Per-asset blobs live on
+  // window.__SP_VIDEO_BLOBS (assetId → object-URL string). When the global is
+  // absent (current default — image-parity behavior) initVideos is a no-op
+  // and video samplers fall back to no texture. Wiring the bundle is a
+  // follow-up (Phase 14c) so this exported HTML degrades gracefully today.
+  var videoSources = {};
+  function initVideos() {
+    var blobs =
+      typeof window !== "undefined" ? window.__SP_VIDEO_BLOBS : undefined;
+    if (!blobs) return;
+    nodes
+      .filter((n) => n.kind === "video")
+      .forEach((n) => {
+        if (videoSources[n.id]) return;
+        var url = n.assetId ? blobs[n.assetId] : null;
+        if (!url) return;
+        var video = document.createElement("video");
+        video.muted = !!n.muted;
+        video.loop = !!n.loop;
+        video.playsInline = true;
+        video.src = url;
+        var entry = {
+          video: video,
+          tex: null,
+          w: 0,
+          h: 0,
+          ready: false,
+        };
+        videoSources[n.id] = entry;
+        video.addEventListener(
+          "loadeddata",
+          () => {
+            entry.ready = true;
+            if (n.playing !== false) video.play().catch(() => {});
+          },
+          { once: true },
+        );
+      });
+  }
+  function updateVideos() {
+    Object.keys(videoSources).forEach((id) => {
+      var e = videoSources[id];
+      if (!e.ready) return;
+      var v = e.video;
+      if (v.readyState < 2) return;
+      var vw = v.videoWidth,
+        vh = v.videoHeight;
+      if (!vw || !vh) return;
+      if (!e.tex || e.w !== vw || e.h !== vh) {
+        if (e.tex) gl.deleteTexture(e.tex);
+        e.tex = gl.createTexture();
+        e.w = vw;
+        e.h = vh;
+        gl.bindTexture(gl.TEXTURE_2D, e.tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          v,
+        );
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        return;
+      }
+      gl.bindTexture(gl.TEXTURE_2D, e.tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, v);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    });
+  }
+
   // ── webcam sources (live MediaStream → texSubImage2D each frame) ───────────
   // Acquired once at startup; rebuild() resets passes/FBOs but never tears
   // these down because that would re-prompt for permission on every resize.
@@ -598,6 +679,7 @@
     });
   }
   initWebcams();
+  initVideos();
 
   function rebuild() {
     // Dispose any previous resources (best-effort).
@@ -724,6 +806,7 @@
       rebuild();
     }
     updateWebcams();
+    updateVideos();
     var t = (now - start) / 1000;
     // Slow rotation if any non-fullscreen pass exists.
     camera.yaw = Math.PI * 0.25 + t * 0.1;
@@ -783,6 +866,10 @@
         if (!texture) {
           var ws = webcamSources[s.sourceNodeId];
           if (ws && ws.tex) texture = ws.tex;
+        }
+        if (!texture) {
+          var vs = videoSources[s.sourceNodeId];
+          if (vs && vs.tex) texture = vs.tex;
         }
         if (!texture) return;
         setUniform(u[s.uniformName], {

@@ -1,16 +1,18 @@
 /**
  * Live external texture sources (webcam / video / audio). Lives as a module
  * singleton because the source's lifetime spans graph recompiles — calling
- * getUserMedia on every recompile would re-prompt for permission and tear
- * down/recreate the MediaStream, which is unacceptable UX.
+ * getUserMedia (or re-opening a decoded video) on every recompile would
+ * re-prompt for permission and tear down/recreate the source, which is
+ * unacceptable UX.
  *
  * Lifecycle:
  *   - `reconcileExternal(specs)` is called after each compile. Handles for
  *     missing node IDs are disposed; new node IDs get a fresh handle and
- *     start their acquisition; existing handles whose spec changed
- *     (e.g. deviceId swap) restart.
+ *     start their acquisition; existing handles whose spec changed in a way
+ *     that requires restart (deviceId swap / video assetId swap) restart,
+ *     while non-restart changes (play/pause/loop/mute/seek) apply in place.
  *   - `updateExternalSources(gl)` is called once per RAF tick to upload
- *     the latest video frame into the handle's GLTexture.
+ *     the latest frame into the handle's GLTexture.
  *   - `getExternalTexture(nodeId)` is what `bindSamplers` looks up.
  *   - `disposeAllExternal(gl)` is called on viewport unmount.
  *
@@ -19,17 +21,31 @@
  * edits a shader.
  */
 
-export interface ExternalSpec {
+interface WebcamExternalSpec {
   nodeId: string;
   kind: "webcam";
   deviceId?: string;
 }
 
+interface VideoExternalSpec {
+  nodeId: string;
+  kind: "video";
+  /** Asset id resolved via the registered video blob resolver. */
+  assetId: string | null;
+  playing: boolean;
+  loop: boolean;
+  muted: boolean;
+  /** Optional seek target (seconds). When this value changes the element
+   *  seeks without restart; absent value leaves the playhead alone. */
+  currentTime?: number;
+}
+
+export type ExternalSpec = WebcamExternalSpec | VideoExternalSpec;
+
 interface WebcamHandle {
   nodeId: string;
   kind: "webcam";
-  /** Last-seen deviceId from the spec — restart when it changes. */
-  deviceId: string | undefined;
+  spec: WebcamExternalSpec;
   stream: MediaStream | null;
   video: HTMLVideoElement;
   glTexture: WebGLTexture | null;
@@ -42,7 +58,22 @@ interface WebcamHandle {
   disposed: boolean;
 }
 
-type ExternalHandle = WebcamHandle;
+interface VideoHandle {
+  nodeId: string;
+  kind: "video";
+  spec: VideoExternalSpec;
+  /** Object URL created from the resolved Blob; revoked on dispose/restart. */
+  objectUrl: string | null;
+  video: HTMLVideoElement;
+  glTexture: WebGLTexture | null;
+  width: number;
+  height: number;
+  ready: boolean;
+  error: string | null;
+  disposed: boolean;
+}
+
+type ExternalHandle = WebcamHandle | VideoHandle;
 
 const handles = new Map<string, ExternalHandle>();
 
@@ -72,6 +103,17 @@ function resolveGetUserMedia(): GetUserMedia | null {
 }
 
 /**
+ * Resolver from assetId → Blob, wired by the asset store layer (or stubbed
+ * in tests). Kept as a registered hook rather than a direct import so the
+ * registry stays free of state-store dependencies.
+ */
+type VideoBlobResolver = (assetId: string) => Blob | null;
+let _videoBlobResolver: VideoBlobResolver | null = null;
+export function setVideoBlobResolver(fn: VideoBlobResolver | null) {
+  _videoBlobResolver = fn;
+}
+
+/**
  * Bring the live registry in sync with the graph's current set of external
  * source nodes. Idempotent: calling with the same specs is a no-op.
  */
@@ -87,13 +129,23 @@ export function reconcileExternal(specs: ExternalSpec[]) {
   for (const spec of specs) {
     const existing = handles.get(spec.nodeId);
     if (existing) {
-      if (existing.kind === "webcam" && existing.deviceId !== spec.deviceId) {
+      if (existing.kind !== spec.kind) {
+        // Kind switch on the same node id — tear down and re-acquire.
         disposeHandle(existing);
-        handles.set(spec.nodeId, acquireWebcam(spec));
+        handles.set(spec.nodeId, acquire(spec));
+        continue;
       }
+      if (needsRestart(existing, spec)) {
+        disposeHandle(existing);
+        handles.set(spec.nodeId, acquire(spec));
+        continue;
+      }
+      // Apply in-place updates (video play/pause/loop/mute/seek). Webcam
+      // currently has no in-place mutations.
+      applyInPlace(existing, spec);
       continue;
     }
-    handles.set(spec.nodeId, acquireWebcam(spec));
+    handles.set(spec.nodeId, acquire(spec));
   }
 }
 
@@ -120,18 +172,32 @@ export function getExternalStatus(nodeId: string): {
 
 /**
  * Returns the underlying MediaStream so the node-card preview can mirror the
- * source into a <video> element of its own. The webcam stream is owned by the
- * registry's video element and is safe to attach as srcObject to additional
- * preview videos.
+ * source into a <video> element of its own. Only webcam handles expose a
+ * stream; video handles return null (preview mirrors via the registry's
+ * <video> element directly through getExternalVideoElement).
  */
 export function getExternalStream(nodeId: string): MediaStream | null {
   const h = handles.get(nodeId);
-  return h?.stream ?? null;
+  if (!h || h.kind !== "webcam") return null;
+  return h.stream;
+}
+
+/**
+ * Returns the registry's underlying <video> element for a video handle so
+ * the node-card preview can mirror frames without re-decoding. Returns null
+ * for webcam handles (those use getExternalStream + srcObject).
+ */
+export function getExternalVideoElement(
+  nodeId: string,
+): HTMLVideoElement | null {
+  const h = handles.get(nodeId);
+  if (!h || h.kind !== "video") return null;
+  return h.video;
 }
 
 export function updateExternalSources(gl: WebGL2RenderingContext) {
   for (const h of handles.values()) {
-    if (h.kind === "webcam") updateWebcam(gl, h);
+    uploadFrame(gl, h);
   }
 }
 
@@ -147,18 +213,65 @@ export function externalHandleCount(): number {
   return handles.size;
 }
 
+function acquire(spec: ExternalSpec): ExternalHandle {
+  if (spec.kind === "webcam") return acquireWebcam(spec);
+  return acquireVideo(spec);
+}
+
+function needsRestart(existing: ExternalHandle, spec: ExternalSpec): boolean {
+  if (existing.kind === "webcam" && spec.kind === "webcam") {
+    return existing.spec.deviceId !== spec.deviceId;
+  }
+  if (existing.kind === "video" && spec.kind === "video") {
+    return existing.spec.assetId !== spec.assetId;
+  }
+  return false;
+}
+
+function applyInPlace(existing: ExternalHandle, spec: ExternalSpec) {
+  if (existing.kind === "video" && spec.kind === "video") {
+    applyVideoSpec(existing, spec);
+  }
+  // Webcam has no in-place mutations today.
+}
+
+function uploadFrame(gl: WebGL2RenderingContext, h: ExternalHandle) {
+  if (h.kind === "webcam") {
+    updateWebcam(gl, h);
+    return;
+  }
+  updateVideo(gl, h);
+}
+
 function disposeHandle(h: ExternalHandle, gl?: WebGL2RenderingContext) {
   if (h.disposed) return;
   h.disposed = true;
-  if (h.stream) {
-    for (const track of h.stream.getTracks()) track.stop();
-    h.stream = null;
-  }
-  // Detach srcObject so the video element releases its reference.
-  try {
-    h.video.srcObject = null;
-  } catch {
-    // ignore — some test environments stub the property
+  if (h.kind === "webcam") {
+    if (h.stream) {
+      for (const track of h.stream.getTracks()) track.stop();
+      h.stream = null;
+    }
+    try {
+      h.video.srcObject = null;
+    } catch {
+      // ignore — some test environments stub the property
+    }
+  } else {
+    try {
+      if (typeof h.video.pause === "function") h.video.pause();
+      h.video.removeAttribute("src");
+      h.video.load?.();
+    } catch {
+      // ignore — jsdom may stub these
+    }
+    if (h.objectUrl && typeof URL !== "undefined" && URL.revokeObjectURL) {
+      try {
+        URL.revokeObjectURL(h.objectUrl);
+      } catch {
+        // ignore
+      }
+    }
+    h.objectUrl = null;
   }
   if (h.glTexture && gl) {
     gl.deleteTexture(h.glTexture);
@@ -167,13 +280,16 @@ function disposeHandle(h: ExternalHandle, gl?: WebGL2RenderingContext) {
   handles.delete(h.nodeId);
 }
 
-function acquireWebcam(spec: ExternalSpec): WebcamHandle {
+function createVideoElement(): HTMLVideoElement {
   // jsdom environments may not implement HTMLVideoElement fully; guard so
   // the registry stays usable in unit tests without a DOM.
-  const video =
-    typeof document !== "undefined"
-      ? document.createElement("video")
-      : ({} as HTMLVideoElement);
+  return typeof document !== "undefined"
+    ? document.createElement("video")
+    : ({} as HTMLVideoElement);
+}
+
+function acquireWebcam(spec: WebcamExternalSpec): WebcamHandle {
+  const video = createVideoElement();
   if ("muted" in video) {
     video.muted = true;
     video.playsInline = true;
@@ -182,7 +298,7 @@ function acquireWebcam(spec: ExternalSpec): WebcamHandle {
   const handle: WebcamHandle = {
     nodeId: spec.nodeId,
     kind: "webcam",
-    deviceId: spec.deviceId,
+    spec,
     stream: null,
     video,
     glTexture: null,
@@ -237,7 +353,145 @@ async function startWebcam(handle: WebcamHandle, deviceId: string | undefined) {
 
 function updateWebcam(gl: WebGL2RenderingContext, h: WebcamHandle) {
   if (h.disposed || !h.ready) return;
-  const v = h.video;
+  uploadVideoFrameToTexture(gl, h, h.video);
+}
+
+function acquireVideo(spec: VideoExternalSpec): VideoHandle {
+  const video = createVideoElement();
+  if ("muted" in video) {
+    video.muted = spec.muted;
+    video.loop = spec.loop;
+    video.playsInline = true;
+    // autoplay only kicks in once src is set; we control play() manually.
+  }
+  const handle: VideoHandle = {
+    nodeId: spec.nodeId,
+    kind: "video",
+    spec,
+    objectUrl: null,
+    video,
+    glTexture: null,
+    width: 0,
+    height: 0,
+    ready: false,
+    error: null,
+    disposed: false,
+  };
+  if (!spec.assetId) {
+    handle.error = "No video asset selected";
+    return handle;
+  }
+  const resolver = _videoBlobResolver;
+  if (!resolver) {
+    handle.error = "Video blob resolver not registered";
+    return handle;
+  }
+  const blob = resolver(spec.assetId);
+  if (!blob) {
+    handle.error = "Video asset not found";
+    return handle;
+  }
+  try {
+    handle.objectUrl = URL.createObjectURL(blob);
+  } catch (e) {
+    handle.error = String(e);
+    return handle;
+  }
+  if ("src" in handle.video) {
+    handle.video.src = handle.objectUrl;
+  }
+  const onReady = () => {
+    if (handle.disposed) return;
+    handle.ready = true;
+    if (typeof spec.currentTime === "number") {
+      try {
+        handle.video.currentTime = spec.currentTime;
+      } catch {
+        // ignore — seek may fail before metadata loads
+      }
+    }
+    if (spec.playing && typeof handle.video.play === "function") {
+      try {
+        const p = handle.video.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      } catch {
+        // ignore — jsdom or autoplay policy
+      }
+    }
+  };
+  if (typeof handle.video.addEventListener === "function") {
+    handle.video.addEventListener("loadeddata", onReady, { once: true });
+    handle.video.addEventListener(
+      "error",
+      () => {
+        if (handle.disposed) return;
+        handle.error = "Video load error";
+      },
+      { once: true },
+    );
+  } else {
+    // jsdom path — mark ready synchronously so unit tests can observe state.
+    onReady();
+  }
+  if (typeof handle.video.load === "function") {
+    try {
+      handle.video.load();
+    } catch {
+      // ignore
+    }
+  }
+  return handle;
+}
+
+function applyVideoSpec(handle: VideoHandle, spec: VideoExternalSpec) {
+  const prev = handle.spec;
+  handle.spec = spec;
+  const v = handle.video;
+  if (prev.loop !== spec.loop && "loop" in v) {
+    v.loop = spec.loop;
+  }
+  if (prev.muted !== spec.muted && "muted" in v) {
+    v.muted = spec.muted;
+  }
+  if (prev.playing !== spec.playing) {
+    if (spec.playing && typeof v.play === "function") {
+      try {
+        const p = v.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      } catch {
+        // ignore
+      }
+    } else if (!spec.playing && typeof v.pause === "function") {
+      try {
+        v.pause();
+      } catch {
+        // ignore
+      }
+    }
+  }
+  if (
+    typeof spec.currentTime === "number" &&
+    spec.currentTime !== prev.currentTime &&
+    "currentTime" in v
+  ) {
+    try {
+      v.currentTime = spec.currentTime;
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function updateVideo(gl: WebGL2RenderingContext, h: VideoHandle) {
+  if (h.disposed || !h.ready) return;
+  uploadVideoFrameToTexture(gl, h, h.video);
+}
+
+function uploadVideoFrameToTexture(
+  gl: WebGL2RenderingContext,
+  h: WebcamHandle | VideoHandle,
+  v: HTMLVideoElement,
+) {
   if (typeof v.readyState !== "number" || v.readyState < 2) return;
   const vw = v.videoWidth;
   const vh = v.videoHeight;

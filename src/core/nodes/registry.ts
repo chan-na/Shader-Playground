@@ -79,6 +79,12 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
     inputs: () => [],
     outputs: () => [{ name: "texture", type: "texture" }],
   },
+  video: {
+    kind: "video",
+    label: "Video",
+    inputs: () => [],
+    outputs: () => [{ name: "texture", type: "texture" }],
+  },
   shader: {
     kind: "shader",
     label: "Shader",
@@ -219,6 +225,16 @@ export function cloneGraphNode(n: GraphNode): GraphNode {
         id: n.id,
         kind: "webcam",
         ...(n.deviceId !== undefined && { deviceId: n.deviceId }),
+      };
+    case "video":
+      return {
+        id: n.id,
+        kind: "video",
+        assetId: n.assetId ?? null,
+        playing: n.playing,
+        loop: n.loop,
+        muted: n.muted,
+        ...(n.currentTime !== undefined && { currentTime: n.currentTime }),
       };
     case "shader":
       return {

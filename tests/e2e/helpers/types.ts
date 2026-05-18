@@ -19,6 +19,7 @@ export interface GraphNodeMinimal {
     | "mesh"
     | "image"
     | "webcam"
+    | "video"
     | "shader"
     | "compute"
     | "output"

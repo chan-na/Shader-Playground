@@ -1,10 +1,14 @@
 import type { MeshAttribute, MeshData } from "../gl/mesh";
-import type { GeometryHandle, ImageHandle } from "./types";
+import type { GeometryHandle, ImageHandle, VideoAssetHandle } from "./types";
 
 const DB_NAME = "shader-playground";
-const DB_VERSION = 1;
+// v2: added the videos store. Existing v1 databases upgrade in-place — the
+// onupgradeneeded callback only creates the new store and leaves meshes /
+// images untouched.
+const DB_VERSION = 2;
 const STORE_MESH = "meshes";
 const STORE_IMAGE = "images";
+const STORE_VIDEO = "videos";
 
 interface SerializedAttribute {
   name: string;
@@ -28,6 +32,16 @@ interface SerializedImage {
   blob: Blob;
 }
 
+interface SerializedVideo {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  duration: number;
+  mimeType: string;
+  blob: Blob;
+}
+
 let _dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
@@ -43,6 +57,8 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(STORE_MESH, { keyPath: "id" });
       if (!db.objectStoreNames.contains(STORE_IMAGE))
         db.createObjectStore(STORE_IMAGE, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(STORE_VIDEO))
+        db.createObjectStore(STORE_VIDEO, { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -182,6 +198,56 @@ export async function deleteCachedImage(id: string): Promise<void> {
   try {
     const db = await openDb();
     await awaitRequest(tx(db, STORE_IMAGE, "readwrite").delete(id));
+  } catch {
+    // See deleteCachedMesh.
+  }
+}
+
+export async function cacheVideo(
+  handle: VideoAssetHandle,
+  blob: Blob,
+): Promise<void> {
+  const db = await openDb();
+  const record: SerializedVideo = {
+    id: handle.id,
+    name: handle.name,
+    width: handle.width,
+    height: handle.height,
+    duration: handle.duration,
+    mimeType: handle.mimeType,
+    blob,
+  };
+  await awaitRequest(tx(db, STORE_VIDEO, "readwrite").put(record));
+}
+
+export async function loadCachedVideo(id: string): Promise<{
+  handle: VideoAssetHandle;
+  blob: Blob;
+} | null> {
+  try {
+    const db = await openDb();
+    const record = await awaitRequest<SerializedVideo | undefined>(
+      tx(db, STORE_VIDEO, "readonly").get(id),
+    );
+    if (!record) return null;
+    const handle: VideoAssetHandle = {
+      id: record.id,
+      name: record.name,
+      width: record.width,
+      height: record.height,
+      duration: record.duration,
+      mimeType: record.mimeType,
+    };
+    return { handle, blob: record.blob };
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteCachedVideo(id: string): Promise<void> {
+  try {
+    const db = await openDb();
+    await awaitRequest(tx(db, STORE_VIDEO, "readwrite").delete(id));
   } catch {
     // See deleteCachedMesh.
   }

@@ -17,6 +17,7 @@ import type {
   ParamKind,
   ShaderGraphNode,
   SwizzleGraphNode,
+  VideoGraphNode,
   WebcamGraphNode,
 } from "../core/graph/types";
 
@@ -176,6 +177,26 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
         raw.deviceId.length <= SANITIZE_LIMITS.MAX_DEVICE_ID_LEN
       ) {
         node.deviceId = raw.deviceId;
+      }
+      return node;
+    }
+    case "video": {
+      const assetId = typeof raw.assetId === "string" ? raw.assetId : null;
+      const node: VideoGraphNode = {
+        id,
+        kind: "video",
+        assetId,
+        playing: typeof raw.playing === "boolean" ? raw.playing : true,
+        loop: typeof raw.loop === "boolean" ? raw.loop : true,
+        muted: typeof raw.muted === "boolean" ? raw.muted : true,
+      };
+      if (
+        typeof raw.currentTime === "number" &&
+        Number.isFinite(raw.currentTime)
+      ) {
+        // Clamp negative scrub values; upper bound depends on the file and is
+        // re-clamped by the <video> element at apply time.
+        node.currentTime = Math.max(0, raw.currentTime);
       }
       return node;
     }

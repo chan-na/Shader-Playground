@@ -97,6 +97,28 @@ function buildCommands(): Command[] {
     },
   });
 
+  cmds.push({
+    id: "add-video",
+    category: "Node",
+    label: "Add Video (mp4/webm asset)",
+    keywords: "add node video mp4 webm asset movie clip file texture",
+    run: () => {
+      const id = nextId("video");
+      addNode(
+        {
+          id,
+          kind: "video",
+          assetId: null,
+          playing: true,
+          loop: true,
+          muted: true,
+        },
+        { x: -200, y: 440 },
+      );
+      select(id);
+    },
+  });
+
   const shaderTemplates: Array<{ name: string; frag: string }> = [
     { name: "Unlit", frag: unlitFrag },
     { name: "Noise", frag: noiseFrag },

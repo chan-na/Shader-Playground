@@ -13,6 +13,7 @@ import type {
   ParamGraphNode,
   ShaderGraphNode,
   SwizzleGraphNode,
+  VideoGraphNode,
   WebcamGraphNode,
 } from "../core/graph/types";
 import { useHistoryStore } from "./historyStore";
@@ -55,6 +56,16 @@ export interface GraphState {
     },
   ) => void;
   setWebcamConfig: (id: string, patch: { deviceId?: string }) => void;
+  setVideoConfig: (
+    id: string,
+    patch: {
+      assetId?: string | null;
+      playing?: boolean;
+      loop?: boolean;
+      muted?: boolean;
+      currentTime?: number;
+    },
+  ) => void;
   addEdge: (edge: GraphEdge) => void;
   removeEdge: (id: string) => void;
   reset: () => void;
@@ -265,6 +276,38 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         return next;
       }),
       rev: s.rev + 1,
+    }));
+  },
+  setVideoConfig: (id, patch) => {
+    // Scrub slider can fire dozens of currentTime updates per second; pushing
+    // history on each one would flood the undo stack and discard meaningful
+    // prior edits. Treat currentTime-only changes as uniform-tier (no history,
+    // no structural rev bump) so the registry's RAF still picks up the seek.
+    const isScrubOnly =
+      patch.assetId === undefined &&
+      patch.playing === undefined &&
+      patch.loop === undefined &&
+      patch.muted === undefined &&
+      patch.currentTime !== undefined;
+    if (!isScrubOnly) pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== "video") return n;
+        const vn = n as VideoGraphNode;
+        const next: VideoGraphNode = {
+          id: vn.id,
+          kind: "video",
+          assetId: patch.assetId !== undefined ? patch.assetId : vn.assetId,
+          playing: patch.playing ?? vn.playing,
+          loop: patch.loop ?? vn.loop,
+          muted: patch.muted ?? vn.muted,
+        };
+        const nextTime =
+          patch.currentTime !== undefined ? patch.currentTime : vn.currentTime;
+        if (nextTime !== undefined) next.currentTime = nextTime;
+        return next;
+      }),
+      ...(isScrubOnly ? { uniformRev: s.uniformRev + 1 } : { rev: s.rev + 1 }),
     }));
   },
   addEdge: (edge) => {

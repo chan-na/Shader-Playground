@@ -86,12 +86,18 @@ export function Toolbar() {
       setGraph(parsed.graph, parsed.positions);
       const meshIds: string[] = [];
       const imageIds: string[] = [];
+      const videoIds: string[] = [];
       for (const n of parsed.graph.nodes) {
         if (n.kind === "mesh" && n.assetId) meshIds.push(n.assetId);
         if (n.kind === "image" && n.assetId) imageIds.push(n.assetId);
+        if (n.kind === "video" && n.assetId) videoIds.push(n.assetId);
       }
-      if (meshIds.length || imageIds.length) {
-        void hydrateAssetsFor({ meshes: meshIds, images: imageIds });
+      if (meshIds.length || imageIds.length || videoIds.length) {
+        void hydrateAssetsFor({
+          meshes: meshIds,
+          images: imageIds,
+          videos: videoIds,
+        });
       }
       if (parsed.warnings.length) {
         console.warn("Project loaded with warnings:", parsed.warnings);
@@ -173,6 +179,20 @@ export function Toolbar() {
     const id = nextId("webcam");
     addNode({ id, kind: "webcam" }, { x: -200, y: 320 });
   };
+  const addVideo = () => {
+    const id = nextId("video");
+    addNode(
+      {
+        id,
+        kind: "video",
+        assetId: null,
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+      { x: -200, y: 440 },
+    );
+  };
   const addShader = () => {
     const id = nextId("shader");
     const node: GraphNode = {
@@ -238,6 +258,14 @@ export function Toolbar() {
       >
         + Webcam
       </button>
+      <button
+        type="button"
+        style={btn}
+        onClick={addVideo}
+        title="Video file as a live texture (import via AssetBrowser)"
+      >
+        + Video
+      </button>
       <button type="button" style={btn} onClick={addShader}>
         + Shader
       </button>
@@ -271,15 +299,15 @@ export function Toolbar() {
         type="button"
         style={btn}
         onClick={onPickFiles}
-        title="Import OBJ/GLTF/PNG/JPG"
-        aria-label="Import OBJ, GLTF, or image files"
+        title="Import OBJ/GLTF/PNG/JPG/MP4/WebM"
+        aria-label="Import OBJ, GLTF, image, or video files"
       >
         <span aria-hidden="true">↑ </span>Load…
       </button>
       <input
         ref={fileInputRef}
         type="file"
-        accept=".obj,.gltf,.glb,image/*"
+        accept=".obj,.gltf,.glb,image/*,video/*,.mp4,.webm,.mov,.ogv"
         multiple
         style={{ display: "none" }}
         onChange={onFilesChosen}

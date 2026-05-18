@@ -97,6 +97,64 @@ describe("sanitizeGraphNode — webcam", () => {
   });
 });
 
+describe("sanitizeGraphNode — video", () => {
+  it("accepts a video node with no assetId and defaults play/loop/mute to true", () => {
+    const r = sanitizeGraphNode({ id: "v1", kind: "video" });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "video") {
+      expect(r.node.assetId).toBeNull();
+      expect(r.node.playing).toBe(true);
+      expect(r.node.loop).toBe(true);
+      expect(r.node.muted).toBe(true);
+      expect("currentTime" in r.node).toBe(false);
+    }
+  });
+
+  it("preserves assetId, playing, loop, muted, and currentTime", () => {
+    const r = sanitizeGraphNode({
+      id: "v2",
+      kind: "video",
+      assetId: "abc",
+      playing: false,
+      loop: false,
+      muted: false,
+      currentTime: 12.5,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "video") {
+      expect(r.node.assetId).toBe("abc");
+      expect(r.node.playing).toBe(false);
+      expect(r.node.loop).toBe(false);
+      expect(r.node.muted).toBe(false);
+      expect(r.node.currentTime).toBe(12.5);
+    }
+  });
+
+  it("clamps a negative currentTime to zero", () => {
+    const r = sanitizeGraphNode({
+      id: "v3",
+      kind: "video",
+      currentTime: -3,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "video") {
+      expect(r.node.currentTime).toBe(0);
+    }
+  });
+
+  it("drops non-numeric / non-finite currentTime", () => {
+    const r = sanitizeGraphNode({
+      id: "v4",
+      kind: "video",
+      currentTime: "later",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "video") {
+      expect("currentTime" in r.node).toBe(false);
+    }
+  });
+});
+
 describe("sanitizeGraphNode — shader", () => {
   it("throws on oversized fragmentSource", () => {
     const big = "x".repeat(SANITIZE_LIMITS.MAX_SHADER_SOURCE_LEN + 1);

@@ -6,13 +6,16 @@ import {
   getExternalStatus,
   getExternalStream,
   getExternalTexture,
+  getExternalVideoElement,
   reconcileExternal,
+  setVideoBlobResolver,
 } from "./registry";
 
 // All tests run against the module singleton — clean it up so order doesn't
 // matter and a flake in one case doesn't leak into the next.
 afterEach(() => {
   __setGetUserMediaForTests(null);
+  setVideoBlobResolver(null);
   disposeAllExternal();
 });
 
@@ -135,6 +138,118 @@ describe("getExternalTexture", () => {
 
   it("returns null for unknown node IDs", () => {
     expect(getExternalTexture("does-not-exist")).toBeNull();
+  });
+});
+
+describe("video specs", () => {
+  it("creates a handle for a video spec and records 'no asset' when assetId is null", () => {
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: null,
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+    ]);
+    expect(externalHandleCount()).toBe(1);
+    const status = getExternalStatus("v1");
+    expect(status?.ready).toBe(false);
+    expect(status?.error).toMatch(/no video asset/i);
+    expect(getExternalVideoElement("v1")).not.toBeNull();
+  });
+
+  it("records an error when no blob resolver is registered", () => {
+    setVideoBlobResolver(null);
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: "abc",
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+    ]);
+    const status = getExternalStatus("v1");
+    expect(status?.error).toMatch(/resolver/i);
+  });
+
+  it("records an error when the resolver returns null for the assetId", () => {
+    setVideoBlobResolver(() => null);
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: "missing",
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+    ]);
+    const status = getExternalStatus("v1");
+    expect(status?.error).toMatch(/asset not found/i);
+  });
+
+  it("creates a fresh handle when the assetId changes (restart path)", () => {
+    setVideoBlobResolver(() => null);
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: "a",
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+    ]);
+    expect(externalHandleCount()).toBe(1);
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: "b",
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+    ]);
+    expect(externalHandleCount()).toBe(1);
+  });
+
+  it("getExternalStream returns null for video handles (webcam-only API)", () => {
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: null,
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+    ]);
+    expect(getExternalStream("v1")).toBeNull();
+  });
+
+  it("getExternalVideoElement returns null for webcam handles (video-only API)", () => {
+    __setGetUserMediaForTests(() => new Promise(() => {}));
+    reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
+    expect(getExternalVideoElement("w1")).toBeNull();
+  });
+
+  it("getExternalTexture returns null before the first frame uploads", () => {
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: null,
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+    ]);
+    expect(getExternalTexture("v1")).toBeNull();
   });
 });
 

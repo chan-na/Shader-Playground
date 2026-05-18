@@ -1,9 +1,10 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { setVideoBlobResolver } from "./core/external/registry";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
-import { useAssetStore } from "./state/assetStore";
+import { getVideoBlob, useAssetStore } from "./state/assetStore";
 import { useCameraStore } from "./state/cameraStore";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
 import { useEditorStore } from "./state/editorStore";
@@ -13,6 +14,11 @@ import { useRendererStore } from "./state/rendererStore";
 import { useSelectionStore } from "./state/selectionStore";
 import { useTimeStore } from "./state/timeStore";
 import { useViewportStore } from "./state/viewportStore";
+
+// Wire the external registry's video blob lookup to the in-memory asset
+// store. Kept here (not in the registry or store) so neither layer needs to
+// import the other; registry stays free of state dependencies.
+setVideoBlobResolver(getVideoBlob);
 
 if (import.meta.env.DEV) {
   // Expose stores for debugging / Playwright-style verification.

@@ -119,6 +119,25 @@ describe("compileGraph external sources (Phase 14)", () => {
     expect(plan2.hasExternal).toBe(false);
     expect(externalHandleCount()).toBe(0);
   });
+
+  it("reconciles a video node into the external registry and sets hasExternal", () => {
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "v1",
+          kind: "video",
+          assetId: null,
+          playing: false,
+          loop: true,
+          muted: true,
+        },
+      ],
+      edges: [],
+    };
+    const plan = compileGraph(fakeGl, graph, { width: 32, height: 32 });
+    expect(plan.hasExternal).toBe(true);
+    expect(externalHandleCount()).toBe(1);
+  });
 });
 
 describe("compileGraph fatal-error early return", () => {

@@ -34,6 +34,7 @@ import type {
   ImageGraphNode,
   MeshGraphNode,
   ShaderGraphNode,
+  VideoGraphNode,
   WebcamGraphNode,
 } from "./types";
 import {
@@ -412,6 +413,17 @@ export function compileGraph(
         nodeId: w.id,
         kind: "webcam",
         ...(w.deviceId !== undefined && { deviceId: w.deviceId }),
+      });
+    } else if (node.kind === "video") {
+      const v = node as VideoGraphNode;
+      externalSpecs.push({
+        nodeId: v.id,
+        kind: "video",
+        assetId: v.assetId,
+        playing: v.playing,
+        loop: v.loop,
+        muted: v.muted,
+        ...(v.currentTime !== undefined && { currentTime: v.currentTime }),
       });
     }
   }

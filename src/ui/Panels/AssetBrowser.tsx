@@ -1,6 +1,11 @@
 import { useCallback, useRef } from "react";
 import type { GraphNode } from "../../core/graph/types";
-import { forgetImage, forgetMesh, importFiles } from "../../state/assetActions";
+import {
+  forgetImage,
+  forgetMesh,
+  forgetVideo,
+  importFiles,
+} from "../../state/assetActions";
 import { useAssetStore } from "../../state/assetStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
@@ -9,12 +14,14 @@ import { nextId } from "../../utils/id";
 export function AssetBrowser() {
   const meshes = useAssetStore((s) => s.meshes);
   const images = useAssetStore((s) => s.images);
+  const videos = useAssetStore((s) => s.videos);
   const addNode = useGraphStore((s) => s.addNode);
   const select = useSelectionStore((s) => s.select);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const meshList = Object.values(meshes);
   const imageList = Object.values(images);
+  const videoList = Object.values(videos);
 
   const addMeshNodeFor = (assetId: string) => {
     const id = nextId("mesh");
@@ -27,6 +34,20 @@ export function AssetBrowser() {
     const id = nextId("image");
     const node: GraphNode = { id, kind: "image", assetId };
     addNode(node, { x: -240, y: 160 });
+    select(id);
+  };
+
+  const addVideoNodeFor = (assetId: string) => {
+    const id = nextId("video");
+    const node: GraphNode = {
+      id,
+      kind: "video",
+      assetId,
+      playing: true,
+      loop: true,
+      muted: true,
+    };
+    addNode(node, { x: -240, y: 320 });
     select(id);
   };
 
@@ -58,15 +79,15 @@ export function AssetBrowser() {
         <div className="inspector-label">
           <span>Assets</span>
           <span style={{ color: "#666" }}>
-            {meshList.length + imageList.length}
+            {meshList.length + imageList.length + videoList.length}
           </span>
         </div>
         <button
           type="button"
           className="btn-small"
           onClick={() => fileRef.current?.click()}
-          title="Import OBJ / GLTF / images"
-          aria-label="Import OBJ, GLTF, or image files"
+          title="Import OBJ / GLTF / images / videos"
+          aria-label="Import OBJ, GLTF, image, or video files"
         >
           <span aria-hidden="true">↑ </span>Import file…
         </button>
@@ -74,7 +95,7 @@ export function AssetBrowser() {
           ref={fileRef}
           type="file"
           multiple
-          accept=".obj,.gltf,.glb,image/*"
+          accept=".obj,.gltf,.glb,image/*,video/*,.mp4,.webm,.mov,.ogv"
           style={{ display: "none" }}
           onChange={(e) => {
             const f = e.target.files;
@@ -191,9 +212,61 @@ export function AssetBrowser() {
         </div>
       )}
 
-      {meshList.length === 0 && imageList.length === 0 && (
-        <div className="inspector-empty">No assets loaded</div>
+      {videoList.length > 0 && (
+        <div className="inspector-section">
+          <div className="inspector-label">Videos ({videoList.length})</div>
+          {videoList.map((v) => (
+            <div key={v.id} className="asset-row">
+              <div className="asset-image-icon" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    color: "#ddd",
+                    fontSize: 12,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {v.name}
+                </div>
+                <div
+                  style={{
+                    color: "#888",
+                    fontSize: 10,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {v.width}×{v.height} · {v.duration.toFixed(1)}s
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-small"
+                onClick={() => addVideoNodeFor(v.id)}
+                aria-label={`Add video node for ${v.name}`}
+              >
+                + Node
+              </button>
+              <button
+                type="button"
+                className="btn-small"
+                onClick={() => forgetVideo(v.id)}
+                title="Forget"
+                aria-label={`Forget video ${v.name}`}
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
+          ))}
+        </div>
       )}
+
+      {meshList.length === 0 &&
+        imageList.length === 0 &&
+        videoList.length === 0 && (
+          <div className="inspector-empty">No assets loaded</div>
+        )}
     </div>
   );
 }

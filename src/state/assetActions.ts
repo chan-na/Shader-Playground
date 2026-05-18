@@ -1,14 +1,18 @@
 import {
   cacheImage,
   cacheMesh,
+  cacheVideo,
   deleteCachedImage,
   deleteCachedMesh,
+  deleteCachedVideo,
   loadCachedImage,
   loadCachedMesh,
+  loadCachedVideo,
 } from "../core/assets/cache";
 import { loadGltfFromFile } from "../core/assets/gltfLoader";
 import { loadImageFromFile } from "../core/assets/imageLoader";
 import { loadObjFromFile } from "../core/assets/objLoader";
+import { loadVideoFromFile } from "../core/assets/videoLoader";
 import type { GraphNode } from "../core/graph/types";
 import { nextId } from "../utils/id";
 import { useAssetStore } from "./assetStore";
@@ -16,7 +20,7 @@ import { useGraphStore } from "./graphStore";
 import { useSelectionStore } from "./selectionStore";
 import { toast } from "./toastStore";
 
-export type AssetKind = "obj" | "gltf" | "image" | "unknown";
+export type AssetKind = "obj" | "gltf" | "image" | "video" | "unknown";
 
 export function classifyFile(file: File): AssetKind {
   const lower = file.name.toLowerCase();
@@ -33,6 +37,15 @@ export function classifyFile(file: File): AssetKind {
     return "image";
   }
   if (file.type.startsWith("image/")) return "image";
+  if (
+    lower.endsWith(".mp4") ||
+    lower.endsWith(".webm") ||
+    lower.endsWith(".mov") ||
+    lower.endsWith(".ogv")
+  ) {
+    return "video";
+  }
+  if (file.type.startsWith("video/")) return "video";
   return "unknown";
 }
 
@@ -94,6 +107,24 @@ async function importFile(
     return { kind, nodeId: id, assetId: handle.id };
   }
 
+  if (kind === "video") {
+    const { handle, blob } = await loadVideoFromFile(file);
+    assetStore.addVideo(handle, blob);
+    void cacheVideo(handle, blob).catch(() => {});
+    const id = nextId("video");
+    const node: GraphNode = {
+      id,
+      kind: "video",
+      assetId: handle.id,
+      playing: true,
+      loop: true,
+      muted: true,
+    };
+    graphStore.addNode(node, position ?? { x: -240, y: 320 });
+    selection.select(id);
+    return { kind, nodeId: id, assetId: handle.id };
+  }
+
   return null;
 }
 
@@ -103,6 +134,7 @@ async function importFile(
 export async function hydrateAssetsFor(assetIds: {
   meshes: string[];
   images: string[];
+  videos?: string[];
 }) {
   const assetStore = useAssetStore.getState();
   await Promise.all(
@@ -119,6 +151,16 @@ export async function hydrateAssetsFor(assetIds: {
       if (cached) useAssetStore.getState().addImage(cached.handle);
     }),
   );
+  if (assetIds.videos?.length) {
+    await Promise.all(
+      assetIds.videos.map(async (id) => {
+        if (assetStore.videos[id]) return;
+        const cached = await loadCachedVideo(id);
+        if (cached)
+          useAssetStore.getState().addVideo(cached.handle, cached.blob);
+      }),
+    );
+  }
 }
 
 // Remove an asset from the in-memory store *and* its IndexedDB record. Without
@@ -132,6 +174,11 @@ export function forgetMesh(id: string): void {
 export function forgetImage(id: string): void {
   useAssetStore.getState().removeImage(id);
   void deleteCachedImage(id);
+}
+
+export function forgetVideo(id: string): void {
+  useAssetStore.getState().removeVideo(id);
+  void deleteCachedVideo(id);
 }
 
 export async function importFiles(

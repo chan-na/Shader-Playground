@@ -12,6 +12,7 @@ import {
   MathNodeView,
   SwizzleNodeView,
 } from "./nodes/UtilityNodeViews";
+import { VideoNodeView } from "./nodes/VideoNodeView";
 import { WebcamNodeView } from "./nodes/WebcamNodeView";
 
 export interface NodeUiSpec {
@@ -29,6 +30,7 @@ export const NODE_UI: Record<GraphNodeKind, NodeUiSpec> = {
   mesh: { view: MeshNodeView, minimapColor: "#56d698" },
   image: { view: ImageNodeView, minimapColor: "#d69c56" },
   webcam: { view: WebcamNodeView, minimapColor: "#d65656" },
+  video: { view: VideoNodeView, minimapColor: "#c156d6" },
   shader: { view: ShaderNodeView, minimapColor: "#569cd6" },
   compute: { view: ComputeNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
   output: { view: OutputNodeView, minimapColor: "#d6569c" },

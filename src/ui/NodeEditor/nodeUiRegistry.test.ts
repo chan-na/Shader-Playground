@@ -6,6 +6,7 @@ const ALL_KINDS: GraphNodeKind[] = [
   "mesh",
   "image",
   "webcam",
+  "video",
   "shader",
   "compute",
   "output",

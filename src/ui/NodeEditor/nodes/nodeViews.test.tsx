@@ -90,6 +90,11 @@ describe("ShaderNodeView", () => {
     expect(html).toContain("Shader");
     expect(html).toContain("handle-mesh");
     expect(html).toContain("handle-texture");
+    // Multi-port views render port labels next to handles.
+    expect(html).toContain("node-card__port-label--in");
+    expect(html).toContain("node-card__port-label--out");
+    expect(html).toContain(">mesh<");
+    expect(html).toContain(">texture<");
   });
 
   it("surfaces float uniforms as input handles", () => {
@@ -102,6 +107,7 @@ describe("ShaderNodeView", () => {
     };
     const html = renderInFlow(<ShaderNodeView {...mockProps("s1", node)} />);
     expect(html).toContain("handle-float");
+    expect(html).toContain(">u_intensity<");
   });
 
   it("surfaces sampler2D uniforms as texture handles", () => {
@@ -137,6 +143,8 @@ describe("ComputeNodeView", () => {
     expect(html).toContain("1,024");
     expect(html).toContain("1 attr");
     expect(html).toContain("handle-mesh");
+    // No uniform inputs → effectively single-port → no port labels.
+    expect(html).not.toContain("node-card__port-label");
   });
 
   it("exposes uniform input ports", () => {
@@ -151,6 +159,8 @@ describe("ComputeNodeView", () => {
     };
     const html = renderInFlow(<ComputeNodeView {...mockProps("c1", node)} />);
     expect(html).toContain("handle-float");
+    expect(html).toContain(">u_dt<");
+    expect(html).toContain("node-card__port-label--out");
   });
 });
 
@@ -219,6 +229,8 @@ describe("MathNodeView", () => {
     expect(html).toContain("a=0.50");
     expect(html).not.toContain("b=");
     expect(html).toContain("handle-float");
+    // Unary keeps bare handles (single input → no labels).
+    expect(html).not.toContain("node-card__port-label");
   });
 
   it("renders binary op with two input handles", () => {
@@ -232,6 +244,10 @@ describe("MathNodeView", () => {
     const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
     expect(html).toContain("a=1.00");
     expect(html).toContain("b=2.00");
+    // Binary surfaces a/b/value labels to disambiguate the two inputs.
+    expect(html).toContain(">a<");
+    expect(html).toContain(">b<");
+    expect(html).toContain(">value<");
   });
 });
 
@@ -267,6 +283,9 @@ describe("CombineNodeView", () => {
     expect(html).toContain("y=0.20");
     expect(html).not.toContain("z=");
     expect(html).toContain("handle-vec2");
+    expect(html).toContain(">x<");
+    expect(html).toContain(">y<");
+    expect(html).toContain(">value<");
   });
 
   it("renders arity 4 with all four channels", () => {

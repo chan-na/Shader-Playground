@@ -1,6 +1,7 @@
 import type { NodeProps } from "@xyflow/react";
 import type { ComponentType } from "react";
 import type { GraphNodeKind } from "../../core/graph/types";
+import { AudioNodeView } from "./nodes/AudioNodeView";
 import { ComputeNodeView } from "./nodes/ComputeNodeView";
 import { ImageNodeView } from "./nodes/ImageNodeView";
 import { MeshNodeView } from "./nodes/MeshNodeView";
@@ -31,6 +32,7 @@ export const NODE_UI: Record<GraphNodeKind, NodeUiSpec> = {
   image: { view: ImageNodeView, minimapColor: "#d69c56" },
   webcam: { view: WebcamNodeView, minimapColor: "#d65656" },
   video: { view: VideoNodeView, minimapColor: "#c156d6" },
+  audio: { view: AudioNodeView, minimapColor: "#56c1d6" },
   shader: { view: ShaderNodeView, minimapColor: "#569cd6" },
   compute: { view: ComputeNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
   output: { view: OutputNodeView, minimapColor: "#d6569c" },

@@ -87,16 +87,24 @@ export function Toolbar() {
       const meshIds: string[] = [];
       const imageIds: string[] = [];
       const videoIds: string[] = [];
+      const audioIds: string[] = [];
       for (const n of parsed.graph.nodes) {
         if (n.kind === "mesh" && n.assetId) meshIds.push(n.assetId);
         if (n.kind === "image" && n.assetId) imageIds.push(n.assetId);
         if (n.kind === "video" && n.assetId) videoIds.push(n.assetId);
+        if (n.kind === "audio" && n.assetId) audioIds.push(n.assetId);
       }
-      if (meshIds.length || imageIds.length || videoIds.length) {
+      if (
+        meshIds.length ||
+        imageIds.length ||
+        videoIds.length ||
+        audioIds.length
+      ) {
         void hydrateAssetsFor({
           meshes: meshIds,
           images: imageIds,
           videos: videoIds,
+          audios: audioIds,
         });
       }
       if (parsed.warnings.length) {
@@ -193,6 +201,22 @@ export function Toolbar() {
       { x: -200, y: 440 },
     );
   };
+  const addAudio = () => {
+    const id = nextId("audio");
+    addNode(
+      {
+        id,
+        kind: "audio",
+        sourceKind: "mic",
+        assetId: null,
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+      { x: -200, y: 560 },
+    );
+  };
   const addShader = () => {
     const id = nextId("shader");
     const node: GraphNode = {
@@ -266,6 +290,14 @@ export function Toolbar() {
       >
         + Video
       </button>
+      <button
+        type="button"
+        style={btn}
+        onClick={addAudio}
+        title="Microphone or audio file → FFT bin texture"
+      >
+        + Audio
+      </button>
       <button type="button" style={btn} onClick={addShader}>
         + Shader
       </button>
@@ -299,15 +331,15 @@ export function Toolbar() {
         type="button"
         style={btn}
         onClick={onPickFiles}
-        title="Import OBJ/GLTF/PNG/JPG/MP4/WebM"
-        aria-label="Import OBJ, GLTF, image, or video files"
+        title="Import OBJ/GLTF/PNG/JPG/MP4/WebM/MP3/WAV"
+        aria-label="Import OBJ, GLTF, image, video, or audio files"
       >
         <span aria-hidden="true">↑ </span>Load…
       </button>
       <input
         ref={fileInputRef}
         type="file"
-        accept=".obj,.gltf,.glb,image/*,video/*,.mp4,.webm,.mov,.ogv"
+        accept=".obj,.gltf,.glb,image/*,video/*,.mp4,.webm,.mov,.ogv,audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"
         multiple
         style={{ display: "none" }}
         onChange={onFilesChosen}

@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import type { GraphNode } from "../../core/graph/types";
 import {
+  forgetAudio,
   forgetImage,
   forgetMesh,
   forgetVideo,
@@ -15,6 +16,7 @@ export function AssetBrowser() {
   const meshes = useAssetStore((s) => s.meshes);
   const images = useAssetStore((s) => s.images);
   const videos = useAssetStore((s) => s.videos);
+  const audios = useAssetStore((s) => s.audios);
   const addNode = useGraphStore((s) => s.addNode);
   const select = useSelectionStore((s) => s.select);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -22,6 +24,7 @@ export function AssetBrowser() {
   const meshList = Object.values(meshes);
   const imageList = Object.values(images);
   const videoList = Object.values(videos);
+  const audioList = Object.values(audios);
 
   const addMeshNodeFor = (assetId: string) => {
     const id = nextId("mesh");
@@ -48,6 +51,22 @@ export function AssetBrowser() {
       muted: true,
     };
     addNode(node, { x: -240, y: 320 });
+    select(id);
+  };
+
+  const addAudioNodeFor = (assetId: string) => {
+    const id = nextId("audio");
+    const node: GraphNode = {
+      id,
+      kind: "audio",
+      sourceKind: "file",
+      assetId,
+      fftSize: 256,
+      smoothing: 0.8,
+      playing: true,
+      loop: true,
+    };
+    addNode(node, { x: -240, y: 480 });
     select(id);
   };
 
@@ -79,15 +98,18 @@ export function AssetBrowser() {
         <div className="inspector-label">
           <span>Assets</span>
           <span style={{ color: "#666" }}>
-            {meshList.length + imageList.length + videoList.length}
+            {meshList.length +
+              imageList.length +
+              videoList.length +
+              audioList.length}
           </span>
         </div>
         <button
           type="button"
           className="btn-small"
           onClick={() => fileRef.current?.click()}
-          title="Import OBJ / GLTF / images / videos"
-          aria-label="Import OBJ, GLTF, image, or video files"
+          title="Import OBJ / GLTF / images / videos / audio"
+          aria-label="Import OBJ, GLTF, image, video, or audio files"
         >
           <span aria-hidden="true">↑ </span>Import file…
         </button>
@@ -95,7 +117,7 @@ export function AssetBrowser() {
           ref={fileRef}
           type="file"
           multiple
-          accept=".obj,.gltf,.glb,image/*,video/*,.mp4,.webm,.mov,.ogv"
+          accept=".obj,.gltf,.glb,image/*,video/*,.mp4,.webm,.mov,.ogv,audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"
           style={{ display: "none" }}
           onChange={(e) => {
             const f = e.target.files;
@@ -262,9 +284,62 @@ export function AssetBrowser() {
         </div>
       )}
 
+      {audioList.length > 0 && (
+        <div className="inspector-section">
+          <div className="inspector-label">Audio ({audioList.length})</div>
+          {audioList.map((a) => (
+            <div key={a.id} className="asset-row">
+              <div className="asset-image-icon" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    color: "#ddd",
+                    fontSize: 12,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {a.name}
+                </div>
+                <div
+                  style={{
+                    color: "#888",
+                    fontSize: 10,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {a.duration > 0 ? `${a.duration.toFixed(1)}s` : "—"}
+                  {a.sampleRate > 0 ? ` · ${a.sampleRate}Hz` : ""}
+                  {a.channels > 0 ? ` · ${a.channels}ch` : ""}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-small"
+                onClick={() => addAudioNodeFor(a.id)}
+                aria-label={`Add audio node for ${a.name}`}
+              >
+                + Node
+              </button>
+              <button
+                type="button"
+                className="btn-small"
+                onClick={() => forgetAudio(a.id)}
+                title="Forget"
+                aria-label={`Forget audio ${a.name}`}
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {meshList.length === 0 &&
         imageList.length === 0 &&
-        videoList.length === 0 && (
+        videoList.length === 0 &&
+        audioList.length === 0 && (
           <div className="inspector-empty">No assets loaded</div>
         )}
     </div>

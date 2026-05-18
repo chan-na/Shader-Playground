@@ -155,6 +155,82 @@ describe("sanitizeGraphNode — video", () => {
   });
 });
 
+describe("sanitizeGraphNode — audio", () => {
+  it("accepts a minimal audio node and applies defaults", () => {
+    const r = sanitizeGraphNode({ id: "a1", kind: "audio" });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "audio") {
+      expect(r.node.sourceKind).toBe("mic");
+      expect(r.node.assetId).toBeNull();
+      expect(r.node.fftSize).toBe(256);
+      expect(r.node.smoothing).toBeCloseTo(0.8);
+      expect(r.node.playing).toBe(true);
+      expect(r.node.loop).toBe(true);
+    }
+  });
+
+  it("preserves valid sourceKind / fftSize / smoothing / playing / loop", () => {
+    const r = sanitizeGraphNode({
+      id: "a2",
+      kind: "audio",
+      sourceKind: "file",
+      assetId: "xyz",
+      fftSize: 1024,
+      smoothing: 0.3,
+      playing: false,
+      loop: false,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "audio") {
+      expect(r.node.sourceKind).toBe("file");
+      expect(r.node.assetId).toBe("xyz");
+      expect(r.node.fftSize).toBe(1024);
+      expect(r.node.smoothing).toBeCloseTo(0.3);
+      expect(r.node.playing).toBe(false);
+      expect(r.node.loop).toBe(false);
+    }
+  });
+
+  it("rejects fftSize outside the whitelist by defaulting to 256", () => {
+    const r = sanitizeGraphNode({
+      id: "a3",
+      kind: "audio",
+      fftSize: 999,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "audio") {
+      expect(r.node.fftSize).toBe(256);
+    }
+  });
+
+  it("clamps smoothing to [0, 1]", () => {
+    const lo = sanitizeGraphNode({
+      id: "a4",
+      kind: "audio",
+      smoothing: -0.5,
+    });
+    const hi = sanitizeGraphNode({
+      id: "a5",
+      kind: "audio",
+      smoothing: 5,
+    });
+    expect(lo.ok && lo.node.kind === "audio" && lo.node.smoothing).toBe(0);
+    expect(hi.ok && hi.node.kind === "audio" && hi.node.smoothing).toBe(1);
+  });
+
+  it("falls back to mic when sourceKind is invalid", () => {
+    const r = sanitizeGraphNode({
+      id: "a6",
+      kind: "audio",
+      sourceKind: "bogus",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "audio") {
+      expect(r.node.sourceKind).toBe("mic");
+    }
+  });
+});
+
 describe("sanitizeGraphNode — shader", () => {
   it("throws on oversized fragmentSource", () => {
     const big = "x".repeat(SANITIZE_LIMITS.MAX_SHADER_SOURCE_LEN + 1);

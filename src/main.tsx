@@ -1,10 +1,13 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import { setVideoBlobResolver } from "./core/external/registry";
+import {
+  setAudioBlobResolver,
+  setVideoBlobResolver,
+} from "./core/external/registry";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
-import { getVideoBlob, useAssetStore } from "./state/assetStore";
+import { getAudioBlob, getVideoBlob, useAssetStore } from "./state/assetStore";
 import { useCameraStore } from "./state/cameraStore";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
 import { useEditorStore } from "./state/editorStore";
@@ -19,6 +22,7 @@ import { useViewportStore } from "./state/viewportStore";
 // store. Kept here (not in the registry or store) so neither layer needs to
 // import the other; registry stays free of state dependencies.
 setVideoBlobResolver(getVideoBlob);
+setAudioBlobResolver(getAudioBlob);
 
 if (import.meta.env.DEV) {
   // Expose stores for debugging / Playwright-style verification.

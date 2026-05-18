@@ -119,6 +119,31 @@ function buildCommands(): Command[] {
     },
   });
 
+  cmds.push({
+    id: "add-audio",
+    category: "Node",
+    label: "Add Audio (mic/file FFT texture)",
+    keywords:
+      "add node audio mic microphone fft frequency spectrum file mp3 wav",
+    run: () => {
+      const id = nextId("audio");
+      addNode(
+        {
+          id,
+          kind: "audio",
+          sourceKind: "mic",
+          assetId: null,
+          fftSize: 256,
+          smoothing: 0.8,
+          playing: true,
+          loop: true,
+        },
+        { x: -200, y: 560 },
+      );
+      select(id);
+    },
+  });
+
   const shaderTemplates: Array<{ name: string; frag: string }> = [
     { name: "Unlit", frag: unlitFrag },
     { name: "Noise", frag: noiseFrag },

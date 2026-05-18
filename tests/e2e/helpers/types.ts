@@ -20,6 +20,7 @@ export interface GraphNodeMinimal {
     | "image"
     | "webcam"
     | "video"
+    | "audio"
     | "shader"
     | "compute"
     | "output"

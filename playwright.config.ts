@@ -22,11 +22,20 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
+        // Auto-grant getUserMedia so Phase 14 webcam specs can request a
+        // stream without prompting. Without this Chromium silently rejects
+        // navigator.mediaDevices.getUserMedia in headed/headless test mode.
+        permissions: ["camera"],
         launchOptions: {
           args: [
             "--use-gl=angle",
             "--use-angle=swiftshader",
             "--enable-unsafe-swiftshader",
+            // Replace real camera devices with a synthetic, deterministic
+            // video source — needed because CI runners have no camera and
+            // we want frame-stable behavior across environments.
+            "--use-fake-ui-for-media-stream",
+            "--use-fake-device-for-media-stream",
           ],
         },
       },

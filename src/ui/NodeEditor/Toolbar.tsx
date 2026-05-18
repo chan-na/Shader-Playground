@@ -169,6 +169,10 @@ export function Toolbar() {
     const id = nextId("image");
     addNode({ id, kind: "image", assetId: null }, { x: -200, y: 200 });
   };
+  const addWebcam = () => {
+    const id = nextId("webcam");
+    addNode({ id, kind: "webcam" }, { x: -200, y: 320 });
+  };
   const addShader = () => {
     const id = nextId("shader");
     const node: GraphNode = {
@@ -225,6 +229,14 @@ export function Toolbar() {
       </button>
       <button type="button" style={btn} onClick={addImage}>
         + Image
+      </button>
+      <button
+        type="button"
+        style={btn}
+        onClick={addWebcam}
+        title="Live camera texture (requires permission)"
+      >
+        + Webcam
       </button>
       <button type="button" style={btn} onClick={addShader}>
         + Shader

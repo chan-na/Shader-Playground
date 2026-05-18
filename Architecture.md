@@ -50,6 +50,7 @@
 |---|---|---|---|
 | `mesh` | — | `mesh: mesh` | `primitive` 또는 `assetId` (assetId 가 우선; 미로드 시 primitive fallback) |
 | `image` | — | `texture: texture` | `assetId` 로 비트맵 참조 |
+| `webcam` | — | `texture: texture` | `navigator.mediaDevices.getUserMedia` 로 받은 live MediaStream 을 매 프레임 `texSubImage2D(HTMLVideoElement)`. 옵셔널 `deviceId`; 핸들 lifecycle 은 plan 외부 (`core/external/registry.ts`) 가 관리. Phase 14a. |
 | `shader` | `mesh: mesh?` + sampler 입력 (`sampler2D` 유니폼) + 비-샘플러 유니폼 입력 (`float/vec2/vec3/vec4`) | `texture: texture` | vertex + fragment 두 GLSL 소스를 함께 보유 |
 | `compute` | 비-샘플러 유니폼 입력만 (`float/vec2/vec3/vec4`) | `mesh: mesh` | vertex GLSL 한 개 + `transformFeedbackVaryings` 로 캡처되는 출력 attribute 페어 목록. fragment 단계는 `RASTERIZER_DISCARD` 로 비활성화. ping-pong 더블 버퍼로 매 프레임 시뮬레이션. primitive 는 POINTS/LINES/TRIANGLES 중 선택. |
 | `output` | `texture: texture` | — | 캔버스에 합성될 패스 마커 |
@@ -130,7 +131,8 @@
 
 ### 3.1 컴파일 절차
 
-1. `validateGraph` — `cycle`/`multi_input`/`multiple_outputs` 중 하나라도 있으면 **patch 만 채운 emptyPlan** 으로 즉시 종료. `missing_node` 는 fatal 아님(엣지를 건너뛰고 계속).
+0. **`reconcileExternal`** — webcam 노드 specs 를 모아 `core/external/registry.ts` 의 싱글톤 풀에 전달. 새 노드 ID 는 acquire 시작(비동기 getUserMedia), 사라진 노드 ID 는 release, deviceId 변경 시 restart. **validate 보다 먼저** 호출되므로 cycle 같은 일시적 fatal 이 카메라를 죽이지 않는다. `hasExternal` 도 이 시점에 결정되어 fatal 분기에서도 보존.
+1. `validateGraph` — `cycle`/`multi_input`/`multiple_outputs` 중 하나라도 있으면 **patch 만 채운 emptyPlan** 으로 즉시 종료 (단 `hasExternal` 은 위에서 결정된 값을 그대로 캐리). `missing_node` 는 fatal 아님(엣지를 건너뛰고 계속).
 2. `topologicalOrder` → shader/compute 노드만 filter (두 종류 모두 패스를 생성).
 3. **ImageTexture 업로드**: 그래프의 모든 ImageNode 를 순회해 `assetStore` 에 비트맵이 있으면 `createImageTexture` 로 GPU 에 올린다. **키는 node.id** (assetId 가 아니다) — 그래야 다음 패스의 sampler 라우팅에서 `edge.source` 만으로 찾을 수 있다.
 4. **위상 순서대로 Pass 생성** — 각 노드의 `kind` 에 따라 ShaderPass 또는 ComputePass 가 만들어져 `passes[]` 에 들어간다. union 단일 배열이며 위상 순서가 보존된다.
@@ -155,7 +157,7 @@
 
 ### 3.2 sampler vs param 라우팅 — 한 번 더
 
-- **sampler 경로**: 실행 시 `bindSamplers` 가 `pass.samplers[]` 를 따라가며, `passByNode.get(source).fbo.color.texture` 또는 `plan.imageTextures[source]` 에서 텍스처를 찾아 `gl.uniform1i` + `bindTexture`. 메시 그래프의 텍스처 라우팅 = ShaderNode → ShaderNode 체이닝 = 자동 FBO ping-pong.
+- **sampler 경로**: 실행 시 `bindSamplers` 가 `pass.samplers[]` 를 따라가며, `passByNode.get(source).fbo.color.texture` → `plan.imageTextures[source]` → `getExternalTexture(source)` (Phase 14a, webcam 같은 live source) 순으로 텍스처를 찾아 `gl.uniform1i` + `bindTexture`. 어디서도 못 찾으면 sampler 스킵(검은 frame fallback) — external 핸들이 acquire 중이라 아직 텍스처가 없는 경우가 정상 케이스. 메시 그래프의 텍스처 라우팅 = ShaderNode → ShaderNode 체이닝 = 자동 FBO ping-pong.
 - **param 경로**: 실행 시 `bindUserUniforms` 가 `pass.uniformValues` 를 베이스로 시작해 `paramBindings` 가 가리키는 노드를 `resolveValueFor(sourceId, graph, {time}, cache)` 로 재귀 평가해 덮어쓴다. utility 노드들은 GL 패스를 만들지 않고 CPU 에서만 평가된다. ShaderPass 와 ComputePass 가 같은 캐시 + 같은 resolver 를 공유.
 
 ---
@@ -173,7 +175,7 @@
    - 사라진 패스에 대응하는 `asyncReadback` 슬롯 `release(gl, prevId)` — PBO 가 사라진 FBO 의 stale 메모리를 읽지 않도록.
    - `thumbnailScheduler.bumpAll()` 로 모든 썸네일을 즉시 갱신 큐에 다시 올림.
 3. **유니폼 변경 감지**: `uniformRev` 가 변했으면 `bumpAll()` 만(컴파일은 안 함).
-4. **dirty 게이트(B2)**: 다음 조건 중 하나라도 참이면 이 프레임을 *렌더링 프레임*으로 마크한다 — `timeStore.playing === true`, 또는 마지막 프레임 대비 `graphStore.rev` / `assetStore.rev` / `graphStore.uniformRev` / `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 중 하나라도 변화. 어떤 조건도 참이 아니면 **이번 프레임은 `executePlan` 을 스킵**하고, async readback 펜스만 펌프한 뒤 다음 RAF 만 등록한다. 정적 그래프 + 정지 시간 = GPU 0 비용. 카메라/슬라이더/스크럽 등 모든 사용자 입력은 자기 스토어의 `rev` 를 올려 다음 프레임을 깨운다. **컴퓨트 패스의 영향(Phase 13)**: 컴퓨트 패스가 한 개 이상이면 `timeStore.playing === true` 일 때 무조건 dirty(애초에 위 첫 조건에 해당). 시간이 정지된 idle 상태에서는 컴퓨트 dispatch 도 건너뛰므로 시뮬레이션이 멈춘 채 GPU 0 비용을 유지한다 — 다음 dispatch 시 read 측의 직전 결과부터 다시 시작.
+4. **dirty 게이트(B2)**: 다음 조건 중 하나라도 참이면 이 프레임을 *렌더링 프레임*으로 마크한다 — `timeStore.playing === true`, **`plan.hasExternal === true`** (Phase 14a; webcam 같은 라이브 소스가 있으면 시간 정지와 무관하게 무조건 dirty), 또는 마지막 프레임 대비 `graphStore.rev` / `assetStore.rev` / `graphStore.uniformRev` / `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 중 하나라도 변화. 어떤 조건도 참이 아니면 **이번 프레임은 `executePlan` 을 스킵**하고, async readback 펜스만 펌프한 뒤 다음 RAF 만 등록한다. 정적 그래프 + 정지 시간 + 외부 소스 없음 = GPU 0 비용. 카메라/슬라이더/스크럽 등 모든 사용자 입력은 자기 스토어의 `rev` 를 올려 다음 프레임을 깨운다. **컴퓨트 패스의 영향(Phase 13)**: 컴퓨트 패스가 한 개 이상이면 `timeStore.playing === true` 일 때 무조건 dirty(애초에 위 첫 조건에 해당). 시간이 정지된 idle 상태에서는 컴퓨트 dispatch 도 건너뛰므로 시뮬레이션이 멈춘 채 GPU 0 비용을 유지한다 — 다음 dispatch 시 read 측의 직전 결과부터 다시 시작. **외부 입력의 영향(Phase 14a)**: webcam 노드가 있으면 `hasExternal` 이 시간 정지를 덮어쓰므로 일시정지 중에도 카메라 프레임이 흐른다 — 매 RAF tick 의 `updateExternalSources(gl)` 가 `texSubImage2D(HTMLVideoElement)` 로 신선한 frame 을 GL 텍스처에 업로드.
 5. **유니폼 핫패치**: (렌더 프레임에서만) 현재 `graphStore.nodes` 의 `shader` 노드들의 `uniformValues` 를 `pass.uniformValues` 로 그대로 복사. 슬라이더 드래그가 매 프레임 즉시 반영되는 경로.
 6. **시간 진행**: `timeStore.advance(dt/1000)` — `playing=false` 면 noop. dirty 게이트와 무관하게 매 틱 호출되므로 idle 중 wall-clock 만 지나가도 `simTime` 은 변하지 않는다.
 7. **FPS 통계**: 500ms 누적분으로 `setStats({fps, frame, drawCalls})`. idle 프레임에서는 `drawCalls = 0` 으로 보고된다.
@@ -528,7 +530,7 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 
 ---
 
-## 12. 디렉토리 트리 (Phase 12 기준)
+## 12. 디렉토리 트리 (Phase 14a 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -577,6 +579,9 @@ ShaderPlayground/
    │  │  ├─ asyncReadback.ts         # PBO + fenceSync 비동기 readback (+ test)
    │  │  └─ scheduler.ts             # 10Hz 스로틀 + 가시성 큐 (+ test)
    │  │
+   │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
+   │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
+   │  │
    │  ├─ nodes/
    │  │  ├─ registry.ts              # 노드별 PortSpec + 동적 포트(Shader/Math/Swizzle/Combine) (+ test)
    │  │  └─ utility.ts               # resolveValueFor + Math/Swizzle/Combine CPU 평가 (+ test)
@@ -620,6 +625,7 @@ ShaderPlayground/
    │  │  └─ nodes/
    │  │     ├─ MeshNodeView.tsx
    │  │     ├─ ImageNodeView.tsx
+   │  │     ├─ WebcamNodeView.tsx    # Phase 14a — live <video> preview + getExternalStream polling
    │  │     ├─ ShaderNodeView.tsx    # FBO 라이브 썸네일 + 핸들/라벨
    │  │     ├─ OutputNodeView.tsx
    │  │     ├─ ParamNodeView.tsx     # Float/Vec3/Color/Time
@@ -640,10 +646,11 @@ ShaderPlayground/
    │  │
    │  └─ Panels/
    │     ├─ SidePanel.tsx            # Inspector ↔ Assets ↔ Problems 탭 컨테이너
-   │     ├─ Inspector.tsx            # 디스패처 (Shader/Param/Utility/Mesh)
+   │     ├─ Inspector.tsx            # 디스패처 (Shader/Param/Utility/Mesh/Webcam)
    │     ├─ UniformControl.tsx       # slider / multi / color
    │     ├─ ParamInspector.tsx
    │     ├─ UtilityInspector.tsx
+   │     ├─ WebcamInspector.tsx      # Phase 14a — device dropdown + live status
    │     ├─ ViewportControls.tsx     # 카메라 Reset/FOV + 배경색 + 시간
    │     ├─ ProblemsPanel.tsx        # 진단 → select + setStage + requestJump
    │     ├─ AssetBrowser.tsx
@@ -687,3 +694,4 @@ ShaderPlayground/
 - **셰이더 추가** — 초안의 `unlit/uvDebug/blur` 외에 `noise/tonemap/blend.frag` 와 패스스루용 `color.frag`, 그리고 Phase 13 의 컴퓨트 dummy `tfNoop.frag` + 파티클 데모 vert/frag.
 - **썸네일 readback 이원화** — `readback.ts`(동기 폴백) + `asyncReadback.ts`(PBO + fenceSync, Phase 12 기본 경로) 가 공존하고 `downsampleToThumb` / `THUMB_SIZE` 는 동기 모듈에서 공유.
 - **Pass union (Phase 13)** — 초안의 `ShaderPass[]` 는 `(ShaderPass | ComputePass)[]` 로 일반화. ComputePass 는 FBO 없이 vbo 두 세트 + VAO 두 개 + TF object 두 개로 ping-pong 시뮬레이션을 수행하고, 출력은 ShaderPass.mesh 의 duel VAO 로 흘러간다. dispose 책임은 ShaderPass 가 자기 mesh 의 VAO 두 개를 정리하되 vbo 자체는 ComputePass 소유 — 일반 mesh 경로와 인터페이스는 동일하지만 vbo lifetime 만 외부 소유로 다르다.
+- **External texture pool (Phase 14a)** — `core/external/registry.ts` 가 *ExecutionPlan 외부에* 사는 싱글톤이다. 다른 모든 리소스(FBO, mesh, TF object…) 가 plan.dispose 와 함께 사라지는 것과 의도적으로 다르며, 그 이유는 recompile 마다 getUserMedia 권한 재요청이 일어나는 것을 막기 위해서다. compile 은 webcam specs 만 추출해 `reconcileExternal` 에 넘기고, 핸들 lifecycle (acquire/restart/release) 은 registry 가 그래프 변화에 따라 자체 관리한다. plan 은 `hasExternal: boolean` flag 만 보유 — bindSamplers 가 매번 `getExternalTexture(nodeId)` 로 lookup 하고, RAF dirty 게이트가 idle 우회 신호로 사용한다.

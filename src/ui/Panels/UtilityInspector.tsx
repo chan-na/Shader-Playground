@@ -33,6 +33,7 @@ export function UtilityInspector({ node }: { node: GraphNode }) {
       return <CombineInspector node={node} />;
     case "mesh":
     case "image":
+    case "webcam":
     case "shader":
     case "compute":
     case "output":

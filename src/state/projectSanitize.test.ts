@@ -50,6 +50,53 @@ describe("sanitizeGraphNode — mesh / image", () => {
   });
 });
 
+describe("sanitizeGraphNode — webcam", () => {
+  it("accepts a webcam node with no deviceId", () => {
+    const r = sanitizeGraphNode({ id: "w1", kind: "webcam" });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "webcam") {
+      expect("deviceId" in r.node).toBe(false);
+    }
+  });
+
+  it("preserves a string deviceId", () => {
+    const r = sanitizeGraphNode({
+      id: "w2",
+      kind: "webcam",
+      deviceId: "cam-xyz",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "webcam") {
+      expect(r.node.deviceId).toBe("cam-xyz");
+    }
+  });
+
+  it("drops oversized deviceId rather than letting it through", () => {
+    const huge = "x".repeat(SANITIZE_LIMITS.MAX_DEVICE_ID_LEN + 1);
+    const r = sanitizeGraphNode({
+      id: "w3",
+      kind: "webcam",
+      deviceId: huge,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "webcam") {
+      expect("deviceId" in r.node).toBe(false);
+    }
+  });
+
+  it("drops non-string deviceId rather than coercing", () => {
+    const r = sanitizeGraphNode({
+      id: "w4",
+      kind: "webcam",
+      deviceId: 42,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "webcam") {
+      expect("deviceId" in r.node).toBe(false);
+    }
+  });
+});
+
 describe("sanitizeGraphNode — shader", () => {
   it("throws on oversized fragmentSource", () => {
     const big = "x".repeat(SANITIZE_LIMITS.MAX_SHADER_SOURCE_LEN + 1);

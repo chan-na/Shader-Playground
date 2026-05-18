@@ -504,6 +504,101 @@
   var passes = [];
   var passById = {};
 
+  // ── webcam sources (live MediaStream → texSubImage2D each frame) ───────────
+  // Acquired once at startup; rebuild() resets passes/FBOs but never tears
+  // these down because that would re-prompt for permission on every resize.
+  var webcamSources = {};
+  function initWebcams() {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== "function"
+    ) {
+      return;
+    }
+    nodes
+      .filter((n) => n.kind === "webcam")
+      .forEach((n) => {
+        if (webcamSources[n.id]) return;
+        var video = document.createElement("video");
+        video.muted = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        var entry = {
+          video: video,
+          stream: null,
+          tex: null,
+          w: 0,
+          h: 0,
+          ready: false,
+        };
+        webcamSources[n.id] = entry;
+        var constraints = {
+          video: n.deviceId ? { deviceId: { exact: n.deviceId } } : true,
+          audio: false,
+        };
+        navigator.mediaDevices.getUserMedia(constraints).then(
+          (stream) => {
+            entry.stream = stream;
+            video.srcObject = stream;
+            video.play().catch(() => {});
+            entry.ready = true;
+          },
+          (err) => {
+            console.warn("Webcam permission denied:", err);
+          },
+        );
+      });
+  }
+  function updateWebcams() {
+    Object.keys(webcamSources).forEach((id) => {
+      var e = webcamSources[id];
+      if (!e.ready) return;
+      var v = e.video;
+      if (v.readyState < 2) return;
+      var vw = v.videoWidth,
+        vh = v.videoHeight;
+      if (!vw || !vh) return;
+      if (!e.tex || e.w !== vw || e.h !== vh) {
+        if (e.tex) gl.deleteTexture(e.tex);
+        e.tex = gl.createTexture();
+        e.w = vw;
+        e.h = vh;
+        gl.bindTexture(gl.TEXTURE_2D, e.tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          v,
+        );
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        return;
+      }
+      gl.bindTexture(gl.TEXTURE_2D, e.tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0,
+        0,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        v,
+      );
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    });
+  }
+  initWebcams();
+
   function rebuild() {
     // Dispose any previous resources (best-effort).
     passes.forEach((p) => {
@@ -628,6 +723,7 @@
       sizeDirty = false;
       rebuild();
     }
+    updateWebcams();
     var t = (now - start) / 1000;
     // Slow rotation if any non-fullscreen pass exists.
     camera.yaw = Math.PI * 0.25 + t * 0.1;
@@ -681,11 +777,17 @@
 
       // Samplers
       pass.samplers.forEach((s) => {
+        if (u[s.uniformName] === undefined) return;
         var srcPass = passById[s.sourceNodeId];
-        if (!srcPass || u[s.uniformName] === undefined) return;
+        var texture = srcPass ? srcPass.fbo.tex : null;
+        if (!texture) {
+          var ws = webcamSources[s.sourceNodeId];
+          if (ws && ws.tex) texture = ws.tex;
+        }
+        if (!texture) return;
         setUniform(u[s.uniformName], {
           kind: "sampler2D",
-          texture: srcPass.fbo.tex,
+          texture: texture,
           unit: s.unit,
         });
       });

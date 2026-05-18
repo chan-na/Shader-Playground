@@ -1,5 +1,9 @@
 import { useEffect, useRef } from "react";
 import { createCameraController } from "../../core/camera/input";
+import {
+  disposeAllExternal,
+  updateExternalSources,
+} from "../../core/external/registry";
 import { createGLContext } from "../../core/gl/context";
 import {
   compileGraph,
@@ -186,8 +190,11 @@ export function Viewport() {
       // Static graph guard: when paused with no input changes since last frame
       // there is no reason to re-execute the plan. Camera / param / scrub /
       // bg / graph mutations bump their store rev, which wakes the next frame.
+      // External sources (webcam etc.) supply fresh frames every tick, so any
+      // graph that contains one stays dirty as long as it exists.
       const needsRender =
         playing ||
+        plan.hasExternal ||
         structuralDirty ||
         uniformChanged ||
         cameraChanged ||
@@ -224,6 +231,14 @@ export function Viewport() {
         }
         rafId = requestAnimationFrame(tick);
         return;
+      }
+
+      // Upload the latest frame from each live external source (webcam etc.)
+      // into its backing GL texture. No-op when no external sources exist.
+      try {
+        updateExternalSources(gl);
+      } catch (e) {
+        pushError(`External source upload: ${String(e)}`);
       }
 
       // Pull current uniform values into the plan (cheap). Both shader and
@@ -305,6 +320,7 @@ export function Viewport() {
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
       cameraCtl.detach();
       asyncReadback.disposeAll(gl);
+      disposeAllExternal(gl);
       plan.dispose();
       setReady(false);
     };

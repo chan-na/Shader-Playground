@@ -2,6 +2,7 @@ import fullscreenVert from "../../shaders/fullscreen.vert?raw";
 import tfNoopFrag from "../../shaders/tfNoop.frag?raw";
 import { makePrimitive } from "../assets/primitives";
 import type { GeometryHandle, ImageHandle } from "../assets/types";
+import { type ExternalSpec, reconcileExternal } from "../external/registry";
 import {
   createFramebuffer,
   disposeFramebuffer,
@@ -33,6 +34,7 @@ import type {
   ImageGraphNode,
   MeshGraphNode,
   ShaderGraphNode,
+  WebcamGraphNode,
 } from "./types";
 import {
   topologicalOrder,
@@ -131,6 +133,12 @@ export interface ExecutionPlan {
   height: number;
   /** True when at least one ComputePass exists — RAF idle gate checks this. */
   hasCompute: boolean;
+  /**
+   * True when at least one external source (webcam/video/audio) is in the
+   * graph. The RAF idle gate uses this to stay dirty so the source can keep
+   * uploading fresh frames into its GL texture even when nothing else changed.
+   */
+  hasExternal: boolean;
   dispose: () => void;
 }
 
@@ -152,6 +160,7 @@ export function emptyPlan(width: number, height: number): ExecutionPlan {
     width,
     height,
     hasCompute: false,
+    hasExternal: false,
     dispose: () => {},
   };
 }
@@ -391,6 +400,24 @@ export function compileGraph(
   opts: CompileOptions,
 ): ExecutionPlan {
   const assets = opts.assets ?? EMPTY_ASSETS;
+
+  // Reconcile the external-source registry first — it must stay in sync with
+  // the graph even when validation rejects the rest of the plan, otherwise a
+  // transient cycle would tear down the user's camera.
+  const externalSpecs: ExternalSpec[] = [];
+  for (const node of graph.nodes) {
+    if (node.kind === "webcam") {
+      const w = node as WebcamGraphNode;
+      externalSpecs.push({
+        nodeId: w.id,
+        kind: "webcam",
+        ...(w.deviceId !== undefined && { deviceId: w.deviceId }),
+      });
+    }
+  }
+  reconcileExternal(externalSpecs);
+  const hasExternal = externalSpecs.length > 0;
+
   const errors = validateGraph(graph);
   const shaderErrors: Record<string, ShaderError[]> = {};
   const fatal = errors.some(
@@ -400,7 +427,7 @@ export function compileGraph(
       e.code === "multiple_outputs",
   );
   if (fatal) {
-    return { ...emptyPlan(opts.width, opts.height), errors };
+    return { ...emptyPlan(opts.width, opts.height), errors, hasExternal };
   }
 
   const ordered = topologicalOrder(graph);
@@ -592,6 +619,7 @@ export function compileGraph(
     width: opts.width,
     height: opts.height,
     hasCompute: passes.some((p) => p.kind === "compute"),
+    hasExternal,
     dispose: () => {
       for (const d of disposers) d();
     },

@@ -104,7 +104,7 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 
 핵심 SPEC 차원 결정만 다시 한 번 요약:
 
-- 노드 종류는 9 가지 — `Mesh / Image / Shader / Compute / Output / Param / Math / Swizzle / Combine`. Shader 와 Compute 의 입력 포트는 GLSL 의 `uniform` 선언으로부터 매번 다시 파싱되어 자동 생성된다.
+- 노드 종류는 10 가지 — `Mesh / Image / Webcam / Shader / Compute / Output / Param / Math / Swizzle / Combine`. Shader 와 Compute 의 입력 포트는 GLSL 의 `uniform` 선언으로부터 매번 다시 파싱되어 자동 생성된다.
 - ShaderNode 는 vertex + fragment GLSL 한 쌍을 함께 보유. 메시 입력이 없으면 빌트인 `fullscreen.vert` 가 자동 주입되고 사용자의 vertex 소스는 사용되지 않는다.
 - ComputeNode 는 vertex GLSL 한 개와 `transformFeedbackVaryings` 로 캡처할 출력 attribute 목록을 보유. fragment 단계는 `RASTERIZER_DISCARD` 로 비활성화되고, ping-pong 두 vbo 세트로 매 프레임 시뮬레이션 결과를 갱신한다. 출력은 `mesh` 포트 하나 — 다운스트림 ShaderNode 가 mesh 입력으로 받아 POINTS/LINES/TRIANGLES 중 하나로 그린다.
 - 포트 타입은 6 가지 — `mesh / texture / float / vec2 / vec3 / vec4`. 분기(1:N)는 허용, 합성(N:1)은 금지. Output 노드는 그래프당 0~4 개, 5 개 이상은 검증 단계에서 거부.
@@ -117,7 +117,7 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 
 ## 3. 디렉토리 구조
 
-전체 트리와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-12-기준) 로 이전되었다. 초안 SPEC 디렉토리와 실제 구현이 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 컴포넌트 분할 폐기, SidePanel 단일화, export 신설 등) 도 같은 문서의 §12.1 참조.
+전체 트리와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-14a-기준) 로 이전되었다. 초안 SPEC 디렉토리와 실제 구현이 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 컴포넌트 분할 폐기, SidePanel 단일화, export 신설 등) 도 같은 문서의 §12.1 참조.
 
 ---
 
@@ -237,6 +237,21 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **데모 프리셋**: `createParticleDemoGraph()` — sphere seed 의 1024 POINTS 가 sin 기반 noise field 로 흐르는 파티클 시뮬. Phase 13 의 E2E 가 이 프리셋을 골든 시나리오로 사용.
 - **검증**: Vitest 단위 테스트 — types/registry/validate/serialization/compile 의 compute 경로 신규. Playwright E2E Phase 13 — (a) CommandPalette 로 Particle 프리셋 로드, (b) ComputeNode → ShaderNode → Output 체인 컴파일·렌더 확인, (c) 노드 삭제 시 dispose 안정, (d) Share URL 라운드트립으로 compute 노드 복원, (e) 시간 정지 후 idle 게이트 동작.
 
+### Phase 14a — 외부 입력 텍스처 · Webcam (완료)
+- **새 노드 종류 `webcam`**: `navigator.mediaDevices.getUserMedia` 로 받은 live MediaStream 을 매 프레임 GL 텍스처로 업로드. 입력 포트 0, 출력 `texture: texture` 단일. 옵셔널 `deviceId` (없으면 브라우저 기본 카메라). 직렬화 시 deviceId 만 보존 (256자 제한), 권한은 share/autosave 복원 시 사용자가 다시 승인.
+- **External singleton registry** (`src/core/external/registry.ts`): 노드 ID → `{ video, stream, glTexture, ready, error }` 핸들 Map. `reconcileExternal(specs)` 가 compile 직후 호출되어 그래프 변화에 맞춰 acquire/release/restart (deviceId 변경 시). **`plan.dispose()` 와 의도적으로 분리** — recompile 마다 권한 재요청 / 스트림 재시작이 일어나지 않도록 lifecycle 을 plan 외부에 둠. acquire 는 Promise; ready 전까지는 `getExternalTexture` 가 null 반환 → sampler 스킵 → 검은 프레임. 첫 frame 도착 시 `texImage2D(HTMLVideoElement)`, 이후 매 RAF `texSubImage2D`.
+- **ExecutionPlan.hasExternal**: webcam 노드 1개 이상이면 true. RAF idle gate (B2) 의 *네 번째* unconditional dirty 신호로 추가 — `playing`/`hasCompute when playing`/store-rev 변화에 이어 external 소스가 있으면 무조건 dirty (스트림이 매 프레임 새 데이터를 줌). compile fatal 분기(cycle 등)에서도 hasExternal 은 그대로 보존 — 일시적 사이클이 카메라를 죽이지 않도록.
+- **bindSamplers fallback**: `passByNode` → `imageTextures` 미스 시 `getExternalTexture(sourceNodeId)` lookup. 기존 sampler 라우팅 한 줄만 확장.
+- **NodeView 라이브 프리뷰**: 카드에 96×64 `<video>` 자체 생성 + registry 의 stream 을 srcObject 로 미러 (200ms polling 으로 attach). status (requesting / live · WxH / error) 카드 메타에 표시. minimap 색상 `#d65656`.
+- **Inspector**: 디바이스 드롭다운 (`enumerateDevices` + `devicechange` 리스너로 라이브 갱신, 빈 문자열 = 기본 디바이스로 reset), live status 줄.
+- **Static HTML export**: `standalonePlayer.js` 가 webcam 풀 자체 구현 — `initWebcams()` 1회 acquire, `updateWebcams()` 매 frame `texSubImage2D`, sampler 라우팅에 fallback. mimeType/리커버리 같은 디테일 없이 권한 거부 시 검은 프레임.
+- **CommandPalette / Toolbar**: `Add Webcam (live camera)` 항목 두 곳.
+- **검증**: Vitest 단위 22건 추가 (`external/registry` 11, `compile` +3 hasExternal/restore, `nodes/registry` +2 webcam port/clone, `projectSanitize` +4 deviceId 보존/oversize 드롭, `graphStore` +2 setWebcamConfig). Playwright E2E `phase-14-webcam.spec.ts` 4건 — (a) Chromium fake stream (`--use-fake-device-for-media-stream`) 이 webcam→shader→output 체인으로 렌더, (b) 노드 제거 시 dispose 안정 + 런타임 에러 0, (c) serialize/deserialize 라운드트립으로 webcam 노드 보존, (d) time pause 후에도 plan.hasExternal 로 인해 `stats.drawCalls > 0` 유지 (idle gate 우회 검증).
+
+### (백로그) — Phase 14b/c 예정
+- **Phase 14b — Video 노드**: AssetBrowser 에서 import 한 mp4/webm 을 texture 로. play/pause/loop/seek, IndexedDB videos store 에 Blob 캐시.
+- **Phase 14c — Audio 노드**: 마이크 또는 파일 → FFT 1D R8/R32F texture. fftSize 32~2048, source kind 직렬화. 출력은 texture 만 (라우드니스는 셰이더에서 평균).
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - GLSL LSP 도입(Monaco 전환 검토).
@@ -270,7 +285,7 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 | GLTF 범위 | 지오메트리만 | 머티리얼/애니메이션 무시 |
 | 컴파일 트리거 | 디바운스 자동 재컴파일 | 향후 수동 컴파일 단축키 추가 가능 |
 | 직렬화 | JSON export/import (Phase 8), 에셋은 IndexedDB 캐시 | |
-| 노드 종류 | Mesh / Image / Shader / Compute / Output / Parameter / Math / Swizzle / Combine | Parameter는 Phase 10, Math·Swizzle·Combine 유틸은 Phase 12, Compute(Transform Feedback) 은 Phase 13. Output 은 최대 4개(Phase 10 분할 뷰포트). |
+| 노드 종류 | Mesh / Image / Webcam / Shader / Compute / Output / Parameter / Math / Swizzle / Combine | Parameter는 Phase 10, Math·Swizzle·Combine 유틸은 Phase 12, Compute(Transform Feedback) 은 Phase 13, Webcam (외부 라이브 텍스처) 은 Phase 14a. Output 은 최대 4개(Phase 10 분할 뷰포트). |
 | 의존성 무게 | 경량 우선 | three.js·Monaco는 의도적으로 회피 |
 
 이 디폴트 중 바꾸고 싶은 항목이 있으면 알려줘. 아니면 이대로 Phase 1부터 진행.

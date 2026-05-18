@@ -3,6 +3,7 @@ export type PortType = "mesh" | "texture" | "float" | "vec2" | "vec3" | "vec4";
 export type GraphNodeKind =
   | "mesh"
   | "image"
+  | "webcam"
   | "shader"
   | "compute"
   | "output"
@@ -30,6 +31,16 @@ export interface MeshGraphNode extends BaseNode {
 export interface ImageGraphNode extends BaseNode {
   kind: "image";
   assetId: string | null;
+}
+
+export interface WebcamGraphNode extends BaseNode {
+  kind: "webcam";
+  /**
+   * MediaDevices device ID. When undefined, the browser default camera is
+   * requested. Persists across share/autosave but the user still has to grant
+   * permission on each new origin/session.
+   */
+  deviceId?: string;
 }
 
 export interface ShaderGraphNode extends BaseNode {
@@ -127,6 +138,7 @@ export interface ComputeGraphNode extends BaseNode {
 export type GraphNode =
   | MeshGraphNode
   | ImageGraphNode
+  | WebcamGraphNode
   | ShaderGraphNode
   | ComputeGraphNode
   | OutputGraphNode

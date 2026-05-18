@@ -12,6 +12,7 @@ import {
   MathNodeView,
   SwizzleNodeView,
 } from "./nodes/UtilityNodeViews";
+import { WebcamNodeView } from "./nodes/WebcamNodeView";
 
 export interface NodeUiSpec {
   view: ComponentType<NodeProps>;
@@ -27,6 +28,7 @@ const FALLBACK_MINIMAP_COLOR = "#888888";
 export const NODE_UI: Record<GraphNodeKind, NodeUiSpec> = {
   mesh: { view: MeshNodeView, minimapColor: "#56d698" },
   image: { view: ImageNodeView, minimapColor: "#d69c56" },
+  webcam: { view: WebcamNodeView, minimapColor: "#d65656" },
   shader: { view: ShaderNodeView, minimapColor: "#569cd6" },
   compute: { view: ComputeNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
   output: { view: OutputNodeView, minimapColor: "#d6569c" },

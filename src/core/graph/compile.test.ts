@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  __setGetUserMediaForTests,
+  disposeAllExternal,
+  externalHandleCount,
+} from "../external/registry";
 import { compileGraph, emptyPlan } from "./compile";
 import type { Graph } from "./types";
 
@@ -24,8 +29,95 @@ describe("emptyPlan", () => {
     expect(plan.shaderErrors).toEqual({});
     expect(plan.imageTextures).toEqual({});
     expect(plan.hasCompute).toBe(false);
+    expect(plan.hasExternal).toBe(false);
     expect(typeof plan.dispose).toBe("function");
     expect(() => plan.dispose()).not.toThrow();
+  });
+});
+
+describe("compileGraph external sources (Phase 14)", () => {
+  afterEach(() => {
+    __setGetUserMediaForTests(null);
+    disposeAllExternal();
+  });
+
+  it("reconciles a webcam node into the external registry and sets hasExternal", () => {
+    // Stub getUserMedia so acquisition does not need a real media device.
+    // We don't await the promise — reconcile only needs the spec to be seen.
+    __setGetUserMediaForTests(
+      () => new Promise(() => {}) as Promise<MediaStream>,
+    );
+    const graph: Graph = {
+      nodes: [{ id: "w1", kind: "webcam" }],
+      edges: [],
+    };
+    const plan = compileGraph(fakeGl, graph, { width: 32, height: 32 });
+    expect(plan.hasExternal).toBe(true);
+    expect(externalHandleCount()).toBe(1);
+  });
+
+  it("preserves hasExternal even when validation fatally fails so the camera survives transient cycles", () => {
+    __setGetUserMediaForTests(
+      () => new Promise(() => {}) as Promise<MediaStream>,
+    );
+    const graph: Graph = {
+      nodes: [
+        { id: "w1", kind: "webcam" },
+        {
+          id: "a",
+          kind: "shader",
+          vertexSource: "",
+          fragmentSource: "",
+          uniformValues: {},
+        },
+        {
+          id: "b",
+          kind: "shader",
+          vertexSource: "",
+          fragmentSource: "",
+          uniformValues: {},
+        },
+      ],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "out",
+          target: "b",
+          targetHandle: "t",
+        },
+        {
+          id: "e2",
+          source: "b",
+          sourceHandle: "out",
+          target: "a",
+          targetHandle: "t",
+        },
+      ],
+    };
+    const plan = compileGraph(fakeGl, graph, { width: 16, height: 16 });
+    expect(plan.errors.some((e) => e.code === "cycle")).toBe(true);
+    expect(plan.hasExternal).toBe(true);
+    expect(externalHandleCount()).toBe(1);
+  });
+
+  it("releases the registry handle when a subsequent compile drops the webcam node", () => {
+    __setGetUserMediaForTests(
+      () => new Promise(() => {}) as Promise<MediaStream>,
+    );
+    compileGraph(
+      fakeGl,
+      { nodes: [{ id: "w1", kind: "webcam" }], edges: [] },
+      { width: 8, height: 8 },
+    );
+    expect(externalHandleCount()).toBe(1);
+    const plan2 = compileGraph(
+      fakeGl,
+      { nodes: [], edges: [] },
+      { width: 8, height: 8 },
+    );
+    expect(plan2.hasExternal).toBe(false);
+    expect(externalHandleCount()).toBe(0);
   });
 });
 

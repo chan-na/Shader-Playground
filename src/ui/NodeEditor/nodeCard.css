@@ -97,6 +97,10 @@
     Menlo,
     monospace;
   pointer-events: none;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .node-card__port-label--in {

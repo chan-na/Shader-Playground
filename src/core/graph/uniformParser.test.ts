@@ -3,6 +3,7 @@ import {
   inspectorUniforms,
   parseHintComment,
   parseUniforms,
+  SYSTEM_UNIFORM_DESCRIPTIONS,
   SYSTEM_UNIFORMS,
   samplerUniforms,
 } from "./uniformParser";
@@ -111,6 +112,14 @@ describe("parseUniforms", () => {
     expect(SYSTEM_UNIFORMS.has("u_time")).toBe(true);
     expect(SYSTEM_UNIFORMS.has("u_resolution")).toBe(true);
     expect(SYSTEM_UNIFORMS.has("u_model")).toBe(true);
+    expect(SYSTEM_UNIFORMS.has("u_camera")).toBe(true);
+  });
+
+  it("SYSTEM_UNIFORM_DESCRIPTIONS covers every SYSTEM_UNIFORMS entry", () => {
+    for (const name of SYSTEM_UNIFORMS) {
+      const desc = SYSTEM_UNIFORM_DESCRIPTIONS[name];
+      expect(desc, `missing description for ${name}`).toBeTruthy();
+    }
   });
 });
 

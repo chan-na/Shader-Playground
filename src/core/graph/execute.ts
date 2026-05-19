@@ -2,6 +2,7 @@
 // biome-ignore-all lint/style/noNonNullAssertion: WebGL setup; null only on context loss, treated as fatal upstream
 import { mat4 } from "gl-matrix";
 import {
+  cameraEye,
   modelMatrix,
   type OrbitCameraState,
   projMatrix,
@@ -65,6 +66,7 @@ function bindSystemUniforms(
     setUniform(gl, u.u_view ?? null, _view as Float32Array);
     setUniform(gl, u.u_proj ?? null, _proj as Float32Array);
     setUniform(gl, u.u_model ?? null, _model as Float32Array);
+    setUniform(gl, u.u_camera ?? null, cameraEye(ctx.camera));
   }
 }
 

@@ -40,6 +40,20 @@ export const SYSTEM_UNIFORMS = new Set([
   "u_camera",
 ]);
 
+/**
+ * Short human-readable descriptions for each system uniform. Surfaced in the
+ * Inspector to explain why these names are auto-injected and don't appear as
+ * graph input ports. Keep keys in sync with SYSTEM_UNIFORMS.
+ */
+export const SYSTEM_UNIFORM_DESCRIPTIONS: Record<string, string> = {
+  u_time: "렌더 시작부터의 경과 시간(초)",
+  u_resolution: "렌더 타깃 픽셀 크기 (width, height)",
+  u_view: "카메라 view 행렬 (fullscreen 패스에서는 미적용)",
+  u_proj: "카메라 projection 행렬",
+  u_model: "오브젝트 model 행렬",
+  u_camera: "카메라 월드 위치 (fullscreen 패스에서는 미적용)",
+};
+
 const VEC_LEN: Record<string, number> = {
   vec2: 2,
   vec3: 3,

@@ -10,6 +10,7 @@ import type {
 import {
   inspectorUniforms,
   parseUniforms,
+  SYSTEM_UNIFORM_DESCRIPTIONS,
   samplerUniforms,
 } from "../../core/graph/uniformParser";
 import { useGraphStore } from "../../state/graphStore";
@@ -257,18 +258,44 @@ export function Inspector({ embedded = false }: InspectorProps) {
               {systemUniforms.length > 0 && filteredSystem.length > 0 && (
                 <div className="inspector-section">
                   <div className="inspector-label">System uniforms (auto)</div>
-                  {filteredSystem.map((s) => (
-                    <div
-                      key={s.name}
-                      style={{
-                        fontSize: 11,
-                        color: "#777",
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {s.name} <span style={{ color: "#555" }}>· {s.type}</span>
-                    </div>
-                  ))}
+                  <div
+                    style={{
+                      color: "#999",
+                      fontSize: 11,
+                      marginTop: 2,
+                      marginBottom: 6,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    렌더러가 자동 주입하므로 그래프 input port에는 노출되지
+                    않습니다.
+                  </div>
+                  {filteredSystem.map((s) => {
+                    const desc = SYSTEM_UNIFORM_DESCRIPTIONS[s.name];
+                    return (
+                      <div
+                        key={s.name}
+                        style={{
+                          fontSize: 11,
+                          color: "#777",
+                          marginBottom: 2,
+                          lineHeight: 1.4,
+                        }}
+                        data-testid="system-uniform-row"
+                        data-uniform-name={s.name}
+                      >
+                        <span style={{ fontFamily: "monospace" }}>
+                          {s.name}{" "}
+                          <span style={{ color: "#555" }}>· {s.type}</span>
+                        </span>
+                        {desc && (
+                          <span style={{ color: "#999", marginLeft: 6 }}>
+                            — {desc}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

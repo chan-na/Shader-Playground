@@ -1,4 +1,4 @@
-import { Handle, type NodeProps, Position } from "@xyflow/react";
+import type { NodeProps } from "@xyflow/react";
 import {
   PRIMITIVE_NAMES,
   type PrimitiveName,
@@ -6,6 +6,7 @@ import {
 import type { MeshGraphNode } from "../../../core/graph/types";
 import { useAssetStore } from "../../../state/assetStore";
 import { useGraphStore } from "../../../state/graphStore";
+import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 export function MeshNodeView({ id, data }: NodeProps) {
   const node = data.node as MeshGraphNode;
@@ -30,28 +31,23 @@ export function MeshNodeView({ id, data }: NodeProps) {
   const label = usingAsset ? asset?.name : node.primitive;
 
   return (
-    <div className="node-card">
+    <div className="node-card" style={{ position: "relative", minWidth: 168 }}>
       <div className="node-card__header node-card__header--mesh">
         Mesh · {label}
       </div>
-      <div className="node-card__body">
+      <div
+        className="node-card__body"
+        style={{ paddingLeft: 14, paddingRight: 22 }}
+      >
         {usingAsset ? (
           <div className="node-card__meta" style={{ fontSize: 10 }}>
             {asset?.data.vertexCount.toLocaleString()} verts
           </div>
         ) : (
           <select
-            className="nodrag"
+            className="node-card__select nodrag"
             value={node.primitive}
             onChange={(e) => setPrimitive(e.target.value as PrimitiveName)}
-            style={{
-              background: "#1e1e1e",
-              border: "1px solid #3a3a3d",
-              color: "#ddd",
-              padding: "3px 4px",
-              borderRadius: 3,
-              fontSize: 10,
-            }}
           >
             {PRIMITIVE_NAMES.map((p) => (
               <option key={p} value={p}>
@@ -61,11 +57,10 @@ export function MeshNodeView({ id, data }: NodeProps) {
           </select>
         )}
       </div>
-      <Handle
-        id="mesh"
-        type="source"
-        position={Position.Right}
-        className="handle-mesh"
+      <PortHandle
+        port={{ name: "mesh", type: "mesh" }}
+        side="out"
+        top={PORT_TOP_PAD}
       />
     </div>
   );

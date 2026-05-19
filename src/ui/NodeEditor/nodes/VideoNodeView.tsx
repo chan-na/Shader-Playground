@@ -1,4 +1,4 @@
-import { Handle, type NodeProps, Position } from "@xyflow/react";
+import type { NodeProps } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import {
   getExternalStatus,
@@ -6,6 +6,7 @@ import {
 } from "../../../core/external/registry";
 import type { VideoGraphNode } from "../../../core/graph/types";
 import { useAssetStore } from "../../../state/assetStore";
+import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 const PREVIEW_W = 96;
 const PREVIEW_H = 64;
@@ -31,9 +32,6 @@ export function VideoNodeView({ id, data }: NodeProps) {
     node.assetId ? (s.videos[node.assetId]?.name ?? null) : null,
   );
 
-  // Mirror the same polling pattern as WebcamNodeView. The preview shares the
-  // registry's blob URL (no extra decode) and plays independently — it is a
-  // visual indicator only; the GL upload reads from the registry's element.
   useEffect(() => {
     let timer: number | null = null;
     let cancelled = false;
@@ -64,9 +62,13 @@ export function VideoNodeView({ id, data }: NodeProps) {
   }, [id, node.playing, node.loop]);
 
   return (
-    <div className="node-card" data-testid="video-node">
-      <div className="node-card__header node-card__header--image">Video</div>
-      <div className="node-card__body">
+    <div
+      className="node-card"
+      data-testid="video-node"
+      style={{ position: "relative" }}
+    >
+      <div className="node-card__header node-card__header--video">Video</div>
+      <div className="node-card__body" style={{ paddingRight: 22 }}>
         {!node.assetId ? (
           <div className="node-card__placeholder">no asset</div>
         ) : status.error ? (
@@ -86,7 +88,7 @@ export function VideoNodeView({ id, data }: NodeProps) {
               display: "block",
               objectFit: "cover",
               background: "#000",
-              borderRadius: 2,
+              borderRadius: 3,
               opacity: status.ready ? 1 : 0.4,
             }}
           />
@@ -99,11 +101,10 @@ export function VideoNodeView({ id, data }: NodeProps) {
               : (assetName ?? "no asset")}
         </div>
       </div>
-      <Handle
-        id="texture"
-        type="source"
-        position={Position.Right}
-        className="handle-texture"
+      <PortHandle
+        port={{ name: "texture", type: "texture" }}
+        side="out"
+        top={PORT_TOP_PAD}
       />
     </div>
   );

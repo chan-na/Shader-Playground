@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import type { ShaderGraphNode } from "../../../core/graph/types";
 import { NODE_META } from "../../../core/nodes/registry";
 import { NodeThumbnail } from "../NodeThumbnail";
-import { PortHandle } from "./PortHandle";
+import { PORT_STRIDE, PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 export function ShaderNodeView({ id, data }: NodeProps) {
   const node = data.node as ShaderGraphNode;
@@ -13,13 +13,8 @@ export function ShaderNodeView({ id, data }: NodeProps) {
     [node.vertexSource, node.fragmentSource, node],
   );
 
-  // Vertical stride per input handle
-  const headerH = 24;
-  const stride = 18;
-  const topPad = headerH + 8;
-
   return (
-    <div className="node-card" style={{ position: "relative", minWidth: 160 }}>
+    <div className="node-card" style={{ position: "relative", minWidth: 180 }}>
       <div className="node-card__header node-card__header--shader">Shader</div>
       <div
         className="node-card__body"
@@ -29,12 +24,17 @@ export function ShaderNodeView({ id, data }: NodeProps) {
         <div className="node-card__meta">{id}</div>
       </div>
       {inputs.map((p, i) => (
-        <PortHandle key={p.name} port={p} side="in" top={topPad + i * stride} />
+        <PortHandle
+          key={p.name}
+          port={p}
+          side="in"
+          top={PORT_TOP_PAD + i * PORT_STRIDE}
+        />
       ))}
       <PortHandle
         port={{ name: "texture", type: "texture" }}
         side="out"
-        top={topPad}
+        top={PORT_TOP_PAD}
       />
     </div>
   );

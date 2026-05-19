@@ -1,4 +1,4 @@
-import { Handle, type NodeProps, Position } from "@xyflow/react";
+import type { NodeProps } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import {
   getExternalAudioBins,
@@ -6,6 +6,7 @@ import {
 } from "../../../core/external/registry";
 import type { AudioGraphNode } from "../../../core/graph/types";
 import { useAssetStore } from "../../../state/assetStore";
+import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 const PREVIEW_W = 96;
 const PREVIEW_H = 48;
@@ -27,8 +28,6 @@ export function AudioNodeView({ id, data }: NodeProps) {
     node.assetId ? (s.audios[node.assetId]?.name ?? null) : null,
   );
 
-  // Mirror the same polling pattern as VideoNodeView. The mini-spectrum
-  // draws the registry's most recent FFT bins; the GL upload is independent.
   useEffect(() => {
     let timer: number | null = null;
     let cancelled = false;
@@ -50,9 +49,13 @@ export function AudioNodeView({ id, data }: NodeProps) {
     node.sourceKind === "mic" ? "microphone" : (assetName ?? "no asset");
 
   return (
-    <div className="node-card" data-testid="audio-node">
-      <div className="node-card__header node-card__header--image">Audio</div>
-      <div className="node-card__body">
+    <div
+      className="node-card"
+      data-testid="audio-node"
+      style={{ position: "relative" }}
+    >
+      <div className="node-card__header node-card__header--audio">Audio</div>
+      <div className="node-card__body" style={{ paddingRight: 22 }}>
         {node.sourceKind === "file" && !node.assetId ? (
           <div className="node-card__placeholder">no asset</div>
         ) : status.error ? (
@@ -69,7 +72,7 @@ export function AudioNodeView({ id, data }: NodeProps) {
               height: PREVIEW_H,
               display: "block",
               background: "#000",
-              borderRadius: 2,
+              borderRadius: 3,
               opacity: status.ready ? 1 : 0.4,
             }}
           />
@@ -82,11 +85,10 @@ export function AudioNodeView({ id, data }: NodeProps) {
               : sourceLabel}
         </div>
       </div>
-      <Handle
-        id="texture"
-        type="source"
-        position={Position.Right}
-        className="handle-texture"
+      <PortHandle
+        port={{ name: "texture", type: "texture" }}
+        side="out"
+        top={PORT_TOP_PAD}
       />
     </div>
   );

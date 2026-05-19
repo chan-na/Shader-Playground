@@ -1,10 +1,11 @@
-import { Handle, type NodeProps, Position } from "@xyflow/react";
+import type { NodeProps } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import {
   getExternalStatus,
   getExternalStream,
 } from "../../../core/external/registry";
 import type { WebcamGraphNode } from "../../../core/graph/types";
+import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 const PREVIEW_W = 96;
 const PREVIEW_H = 64;
@@ -55,9 +56,13 @@ export function WebcamNodeView({ id, data }: NodeProps) {
   }, [id]);
 
   return (
-    <div className="node-card" data-testid="webcam-node">
-      <div className="node-card__header node-card__header--image">Webcam</div>
-      <div className="node-card__body">
+    <div
+      className="node-card"
+      data-testid="webcam-node"
+      style={{ position: "relative" }}
+    >
+      <div className="node-card__header node-card__header--webcam">Webcam</div>
+      <div className="node-card__body" style={{ paddingRight: 22 }}>
         {status.error ? (
           <div className="node-card__placeholder" title={status.error}>
             error
@@ -79,7 +84,7 @@ export function WebcamNodeView({ id, data }: NodeProps) {
               display: "block",
               objectFit: "cover",
               background: "#000",
-              borderRadius: 2,
+              borderRadius: 3,
               opacity: status.ready ? 1 : 0.4,
             }}
           />
@@ -92,11 +97,10 @@ export function WebcamNodeView({ id, data }: NodeProps) {
               : (node.deviceId ?? "default device")}
         </div>
       </div>
-      <Handle
-        id="texture"
-        type="source"
-        position={Position.Right}
-        className="handle-texture"
+      <PortHandle
+        port={{ name: "texture", type: "texture" }}
+        side="out"
+        top={PORT_TOP_PAD}
       />
     </div>
   );

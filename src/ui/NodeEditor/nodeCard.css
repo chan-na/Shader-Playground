@@ -1,25 +1,36 @@
+/* ─── UE Blueprint-style node tokens ──────────────────────────────
+ * Heavy drop shadow + rounded body + gradient header per node kind.
+ * Header gradients are dim enough to keep text legible in the dark
+ * editor, but saturated enough to read as category badges at a glance.
+ * Handle colors track the GraphPort data type (mesh/texture/float/vecN).
+ */
+
 .node-card {
-  background: #2d2d30;
-  border: 1px solid #3a3a3d;
-  border-radius: 6px;
+  position: relative;
+  background: linear-gradient(180deg, #2a2a2e 0%, #1c1c1f 100%);
+  border: 1px solid rgba(0, 0, 0, 0.65);
+  border-radius: 10px;
   font-size: 11px;
-  color: #d4d4d4;
-  min-width: 132px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  color: #e6e6ea;
+  min-width: 148px;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.55),
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .react-flow__node.selected .node-card {
-  border-color: #569cd6;
+  border-color: #ffa64d;
   box-shadow:
-    0 0 0 2px #569cd6,
-    0 0 12px 2px rgba(86, 156, 214, 0.45),
-    0 2px 6px rgba(0, 0, 0, 0.4);
+    0 0 0 2px #ffa64d,
+    0 0 14px 2px rgba(255, 166, 77, 0.45),
+    0 10px 24px rgba(0, 0, 0, 0.55);
 }
 
 /* Strip the wrapping rectangle that React Flow draws around a multi-node
- * selection. The individual .selected node halos above already indicate
- * the active set clearly. The element is kept in the DOM so that group
- * drag (which dispatches from this rect) still works. */
+ * selection. The individual .selected halo above already indicates the
+ * active set clearly; the element is kept in the DOM so that group drag
+ * (which dispatches from this rect) still works. */
 .react-flow__nodesselection-rect {
   background: transparent;
   border: none;
@@ -27,39 +38,72 @@
   box-shadow: none;
 }
 
+/* ─── Header (title bar) ──────────────────────────────────────── */
 .node-card__header {
-  padding: 6px 10px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #ddd;
-  border-bottom: 1px solid #1a1a1a;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.45);
+  border-top-left-radius: 9px;
+  border-top-right-radius: 9px;
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  border-top-left-radius: 6px;
-  border-top-right-radius: 6px;
+  background: linear-gradient(180deg, #4a4a52 0%, #2f2f36 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+/* Source / asset categories */
 .node-card__header--mesh {
-  background: rgba(86, 214, 152, 0.12);
+  background: linear-gradient(180deg, #3f8a64 0%, #265c43 100%);
 }
 .node-card__header--image {
-  background: rgba(214, 156, 86, 0.12);
+  background: linear-gradient(180deg, #b9622c 0%, #7b3e16 100%);
 }
-.node-card__header--shader {
-  background: rgba(86, 156, 214, 0.12);
+.node-card__header--webcam {
+  background: linear-gradient(180deg, #b8413f 0%, #7a2826 100%);
 }
-.node-card__header--output {
-  background: rgba(214, 86, 156, 0.12);
+.node-card__header--video {
+  background: linear-gradient(180deg, #9e3da6 0%, #6a2470 100%);
+}
+.node-card__header--audio {
+  background: linear-gradient(180deg, #2c8aa6 0%, #1b5a6e 100%);
 }
 
+/* Processing categories */
+.node-card__header--shader {
+  background: linear-gradient(180deg, #356ea8 0%, #1f4474 100%);
+}
+.node-card__header--compute {
+  background: linear-gradient(180deg, #2c9882 0%, #1a6253 100%);
+}
+
+/* Terminal / variable / utility */
+.node-card__header--output {
+  background: linear-gradient(180deg, #a4324b 0%, #6d1f32 100%);
+}
+.node-card__header--param {
+  background: linear-gradient(180deg, #b08930 0%, #7a5d1c 100%);
+}
+.node-card__header--math {
+  background: linear-gradient(180deg, #c19a2e 0%, #82691b 100%);
+}
+.node-card__header--swizzle {
+  background: linear-gradient(180deg, #c5874c 0%, #855626 100%);
+}
+.node-card__header--combine {
+  background: linear-gradient(180deg, #948f30 0%, #61601c 100%);
+}
+
+/* ─── Body ─────────────────────────────────────────────────────── */
 .node-card__body {
-  padding: 6px;
+  padding: 8px 10px 9px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .node-card__meta {
@@ -69,8 +113,8 @@
     Menlo,
     monospace;
   font-size: 10px;
-  color: #888;
-  padding: 0 4px;
+  color: #8a8a90;
+  padding: 0 2px;
 }
 
 .node-card__placeholder {
@@ -79,69 +123,86 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a1a1a;
-  border-radius: 3px;
-  color: #555;
+  background: #141416;
+  border-radius: 4px;
+  color: #5a5a60;
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 1px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
 }
 
+/* ─── Port labels (next to handles) ───────────────────────────── */
 .node-card__port-label {
   position: absolute;
-  font-size: 9px;
-  color: #888;
+  font-size: 10px;
+  color: #cfcfd4;
   font-family:
     ui-monospace,
     SF Mono,
     Menlo,
     monospace;
   pointer-events: none;
-  max-width: 64px;
+  max-width: 84px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  letter-spacing: 0.2px;
 }
 
 .node-card__port-label--in {
-  left: 12px;
+  left: 14px;
   transform: translateY(-50%);
 }
 .node-card__port-label--out {
-  right: 12px;
+  right: 14px;
   transform: translateY(-50%);
   text-align: right;
 }
 
-.node-card__header--param {
-  background: rgba(214, 214, 86, 0.12);
+/* ─── Handles (data pins) ─────────────────────────────────────── */
+.react-flow__handle {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #0e0e10;
+  background: #8a8a90;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 2px 3px rgba(0, 0, 0, 0.55);
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
+}
+.react-flow__handle:hover {
+  transform: translate(0, -50%) scale(1.25);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.18),
+    0 0 8px rgba(255, 255, 255, 0.25);
+}
+.react-flow__handle.react-flow__handle-left:hover {
+  transform: translate(-50%, -50%) scale(1.25);
+}
+.react-flow__handle.react-flow__handle-right:hover {
+  transform: translate(50%, -50%) scale(1.25);
 }
 
-.react-flow__handle {
-  width: 8px;
-  height: 8px;
-  border: 2px solid #1e1e1e;
-  background: #888;
-}
 .react-flow__handle.handle-mesh {
-  background: #56d698;
+  background: #58c98c;
 }
 .react-flow__handle.handle-texture {
-  background: #d69c56;
+  background: #d65fa6;
 }
 .react-flow__handle.handle-float {
-  background: #d6d656;
+  background: #b6e36b;
 }
-.react-flow__handle.handle-vec2 {
-  background: #d6d656;
-}
-.react-flow__handle.handle-vec3 {
-  background: #d6d656;
-}
+.react-flow__handle.handle-vec2,
+.react-flow__handle.handle-vec3,
 .react-flow__handle.handle-vec4 {
-  background: #d6d656;
+  background: #ffcc33;
 }
 
+/* ─── Inline editable value displays ──────────────────────────── */
 .node-card__param-value {
   font-family:
     ui-monospace,
@@ -149,17 +210,120 @@
     Menlo,
     monospace;
   font-size: 11px;
-  color: #ddd;
-  background: #1a1a1a;
+  color: #e6e6ea;
+  background: #131316;
   padding: 4px 6px;
-  border-radius: 3px;
+  border-radius: 4px;
   text-align: center;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
 }
+
 .node-card__param-swatch {
   width: 100%;
   height: 24px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+/* Wrapper for a single (label + input) row inside the node body */
+.node-card__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.node-card__field-label {
+  font-family:
+    ui-monospace,
+    SF Mono,
+    Menlo,
+    monospace;
+  font-size: 10px;
+  color: #9a9aa0;
+  min-width: 14px;
+}
+
+/* Compact numeric / color inline input. Sits inside the card body and
+ * does not propagate canvas drag thanks to the `nodrag` className that
+ * the node views attach.
+ */
+.node-card__input {
+  flex: 1;
+  background: #131316;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  color: #e6e6ea;
+  font-family:
+    ui-monospace,
+    SF Mono,
+    Menlo,
+    monospace;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.node-card__input:focus {
+  outline: none;
+  border-color: #4a90d6;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.4),
+    0 0 0 2px rgba(74, 144, 214, 0.35);
+}
+.node-card__input::-webkit-outer-spin-button,
+.node-card__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.node-card__input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.node-card__color-input {
+  width: 28px;
+  height: 22px;
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+}
+.node-card__color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.node-card__color-input::-webkit-color-swatch {
+  border: none;
   border-radius: 3px;
-  border: 1px solid #1a1a1a;
+}
+
+.node-card__select {
+  background: #131316;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  color: #e6e6ea;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  width: 100%;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.node-card__select:focus {
+  outline: none;
+  border-color: #4a90d6;
+}
+
+/* Row of inline inputs (e.g. xyz components of a vec3 param). */
+.node-card__row {
+  display: flex;
+  gap: 4px;
+}
+.node-card__row .node-card__input {
+  text-align: center;
+  padding: 3px 2px;
 }
 
 /* ── Help modal ─────────────────────────────────────────────────── */

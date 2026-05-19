@@ -51,6 +51,9 @@ describe("MeshNodeView", () => {
     expect(html).toContain("Mesh");
     expect(html).toContain("cube");
     expect(html).toContain("handle-mesh");
+    // Every node now surfaces a port label so the data type is readable
+    // without relying solely on the header color.
+    expect(html).toContain(">mesh<");
   });
 
   it("includes all primitive options in the select", () => {
@@ -74,6 +77,7 @@ describe("ImageNodeView", () => {
     expect(html).toContain("Image");
     expect(html).toContain("No image");
     expect(html).toContain("handle-texture");
+    expect(html).toContain(">texture<");
   });
 });
 
@@ -90,7 +94,6 @@ describe("ShaderNodeView", () => {
     expect(html).toContain("Shader");
     expect(html).toContain("handle-mesh");
     expect(html).toContain("handle-texture");
-    // Multi-port views render port labels next to handles.
     expect(html).toContain("node-card__port-label--in");
     expect(html).toContain("node-card__port-label--out");
     expect(html).toContain(">mesh<");
@@ -143,8 +146,8 @@ describe("ComputeNodeView", () => {
     expect(html).toContain("1,024");
     expect(html).toContain("1 attr");
     expect(html).toContain("handle-mesh");
-    // No uniform inputs → effectively single-port → no port labels.
-    expect(html).not.toContain("node-card__port-label");
+    // Output port label is always emitted.
+    expect(html).toContain(">mesh<");
   });
 
   it("exposes uniform input ports", () => {
@@ -170,11 +173,12 @@ describe("OutputNodeView", () => {
     expect(html).toContain("Output");
     expect(html).toContain("→ Canvas");
     expect(html).toContain("handle-texture");
+    expect(html).toContain(">texture<");
   });
 });
 
 describe("ParamNodeView", () => {
-  it("renders a float param value", () => {
+  it("renders an editable float input bound to the param value", () => {
     const node: ParamGraphNode = {
       id: "p1",
       kind: "param",
@@ -184,11 +188,27 @@ describe("ParamNodeView", () => {
     const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
     expect(html).toContain("Param");
     expect(html).toContain("float");
-    expect(html).toContain("0.420");
+    // Inline numeric input must surface the canonical formatted value.
+    expect(html).toContain('value="0.420"');
+    expect(html).toContain('type="number"');
     expect(html).toContain("handle-float");
   });
 
-  it("renders a color swatch for vec3 color params", () => {
+  it("renders three editable inputs for vec3 params", () => {
+    const node: ParamGraphNode = {
+      id: "p1",
+      kind: "param",
+      paramKind: "vec3",
+      value: [0.1, 0.2, 0.3],
+    };
+    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
+    expect(html).toContain('value="0.100"');
+    expect(html).toContain('value="0.200"');
+    expect(html).toContain('value="0.300"');
+    expect(html).toContain("handle-vec3");
+  });
+
+  it("renders a color swatch + color picker for vec3 color params", () => {
     const node: ParamGraphNode = {
       id: "p1",
       kind: "param",
@@ -198,6 +218,7 @@ describe("ParamNodeView", () => {
     const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
     expect(html).toContain("node-card__param-swatch");
     expect(html).toContain("ff0000");
+    expect(html).toContain('type="color"');
     expect(html).toContain("handle-vec3");
   });
 
@@ -215,7 +236,7 @@ describe("ParamNodeView", () => {
 });
 
 describe("MathNodeView", () => {
-  it("renders unary op with single input handle", () => {
+  it("renders unary op with one editable input", () => {
     const node: MathGraphNode = {
       id: "m1",
       kind: "math",
@@ -226,14 +247,16 @@ describe("MathNodeView", () => {
     const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
     expect(html).toContain("Math");
     expect(html).toContain("sin");
-    expect(html).toContain("a=0.50");
-    expect(html).not.toContain("b=");
+    // One editable field with the "a" label, and no "b" field surfaces.
+    expect(html).toContain(">a<");
+    expect(html).not.toContain(">b<");
+    expect(html).toContain('value="0.500"');
     expect(html).toContain("handle-float");
-    // Unary keeps bare handles (single input → no labels).
-    expect(html).not.toContain("node-card__port-label");
+    // Out port label is always emitted.
+    expect(html).toContain(">value<");
   });
 
-  it("renders binary op with two input handles", () => {
+  it("renders binary op with two editable inputs", () => {
     const node: MathGraphNode = {
       id: "m1",
       kind: "math",
@@ -242,11 +265,10 @@ describe("MathNodeView", () => {
       b: 2,
     };
     const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
-    expect(html).toContain("a=1.00");
-    expect(html).toContain("b=2.00");
-    // Binary surfaces a/b/value labels to disambiguate the two inputs.
     expect(html).toContain(">a<");
     expect(html).toContain(">b<");
+    expect(html).toContain('value="1.000"');
+    expect(html).toContain('value="2.000"');
     expect(html).toContain(">value<");
   });
 });
@@ -255,7 +277,7 @@ describe("SwizzleNodeView", () => {
   it("renders a valid mask and shows the resulting type", () => {
     const node: SwizzleGraphNode = { id: "z1", kind: "swizzle", mask: "xyz" };
     const html = renderInFlow(<SwizzleNodeView {...mockProps("z1", node)} />);
-    expect(html).toContain(".xyz");
+    expect(html).toContain('value="xyz"');
     expect(html).toContain("vec3");
     expect(html).toContain("handle-vec4"); // input
     expect(html).toContain("handle-vec3"); // output
@@ -269,7 +291,7 @@ describe("SwizzleNodeView", () => {
 });
 
 describe("CombineNodeView", () => {
-  it("renders arity 2 with x/y values + vec2 output", () => {
+  it("renders arity 2 with x/y editable values + vec2 output", () => {
     const node: CombineGraphNode = {
       id: "cb1",
       kind: "combine",
@@ -279,12 +301,12 @@ describe("CombineNodeView", () => {
     const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
     expect(html).toContain("Combine");
     expect(html).toContain("vec2");
-    expect(html).toContain("x=0.10");
-    expect(html).toContain("y=0.20");
-    expect(html).not.toContain("z=");
-    expect(html).toContain("handle-vec2");
     expect(html).toContain(">x<");
     expect(html).toContain(">y<");
+    expect(html).not.toContain(">z<");
+    expect(html).toContain('value="0.100"');
+    expect(html).toContain('value="0.200"');
+    expect(html).toContain("handle-vec2");
     expect(html).toContain(">value<");
   });
 
@@ -296,7 +318,8 @@ describe("CombineNodeView", () => {
       values: [0.1, 0.2, 0.3, 0.4],
     };
     const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
-    expect(html).toContain("w=0.40");
+    expect(html).toContain(">w<");
+    expect(html).toContain('value="0.400"');
     expect(html).toContain("handle-vec4");
   });
 });

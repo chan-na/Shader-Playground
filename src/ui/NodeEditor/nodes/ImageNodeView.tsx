@@ -1,7 +1,8 @@
-import { Handle, type NodeProps, Position } from "@xyflow/react";
+import type { NodeProps } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import type { ImageGraphNode } from "../../../core/graph/types";
 import { useAssetStore } from "../../../state/assetStore";
+import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 const THUMB_W = 96;
 const THUMB_H = 64;
@@ -25,11 +26,11 @@ export function ImageNodeView({ id, data }: NodeProps) {
   }, [asset?.bitmap]);
 
   return (
-    <div className="node-card">
+    <div className="node-card" style={{ position: "relative" }}>
       <div className="node-card__header node-card__header--image">
         Image{asset ? ` · ${truncate(asset.name, 14)}` : ""}
       </div>
-      <div className="node-card__body">
+      <div className="node-card__body" style={{ paddingRight: 22 }}>
         {asset?.bitmap ? (
           <canvas
             ref={canvasRef}
@@ -40,7 +41,7 @@ export function ImageNodeView({ id, data }: NodeProps) {
               height: THUMB_H,
               display: "block",
               imageRendering: "pixelated",
-              borderRadius: 2,
+              borderRadius: 3,
             }}
           />
         ) : (
@@ -50,11 +51,10 @@ export function ImageNodeView({ id, data }: NodeProps) {
           {asset ? `${asset.width}×${asset.height}` : id}
         </div>
       </div>
-      <Handle
-        id="texture"
-        type="source"
-        position={Position.Right}
-        className="handle-texture"
+      <PortHandle
+        port={{ name: "texture", type: "texture" }}
+        side="out"
+        top={PORT_TOP_PAD}
       />
     </div>
   );

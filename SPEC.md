@@ -285,6 +285,14 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **노출(신규)**: 빌트인 템플릿 `Composite 3`(`composite3.frag` — u_a/u_b/u_c + 가중치)·`Mask`(`mask.frag` — u_base/u_overlay/u_mask)를 CommandPalette 에 추가.
 - **검증**: Vitest `validate.test` — 서로 다른 핸들 N:1 이 `multi_input` 미발생 + fan-in 토포 정렬(3 source → 1 sink, 모두 sink 앞). Playwright E2E `phase-18-fanin-composite.spec.ts` — R/G/B 3 source 를 u_a/u_b/u_c 로 합성 → 세 채널 모두 출력(핸들별 라우팅 판별).
 
+### Phase 19 — `u_mouse` / `u_frame` 시스템 유니폼 (완료)
+Shadertoy 호환 절차적 셰이더 이식성을 위해 포인터 좌표·프레임 카운터를 시스템 유니폼으로 자동 주입.
+- **모델**: `u_mouse`(vec4) / `u_frame`(float) 을 `SYSTEM_UNIFORMS` 에 추가 — Inspector 자동 숨김 + 입력 포트 미노출(`inspectorUniforms`). `u_mouse` 는 Shadertoy iMouse 관례: `xy` = 현재 포인터 위치, `zw` = 마지막 클릭 위치. 픽셀 단위·좌하단 원점이라 `gl_FragCoord`/`u_resolution` 과 동일 좌표계.
+- **포인터 store**: 신규 `state/mouseStore.ts`(x/y/clickX/clickY/down/rev). Viewport 의 canvas pointer 리스너(`pointermove`/`down`/`up`/`cancel`)가 `getBoundingClientRect` 기준으로 클라이언트 좌표를 프레임버퍼 픽셀(+y flip)로 변환해 store 갱신. 카메라 컨트롤러 리스너와 공존. `setPosition`/`setDown`/`setUp` 이 `rev` 를 올려 일시정지 상태의 idle RAF 를 깨운다(dirty 게이트에 `mouseChanged` 추가).
+- **u_frame**: Viewport 의 `renderFrame` 로컬 카운터를 `executePlan` 호출마다 +1 해 `FrameContext.frame` 으로 주입. `bindSystemUniforms`(셰이더) + `bindComputeSystemUniforms`(compute) 양쪽 바인딩. `u_mouse` 는 `FrameContext.mouse` 로 셰이더 패스에 vec4 바인딩.
+- **정적 export**: `standalonePlayer.js` 도 canvas pointer 리스너 + 프레임 카운터로 `u_mouse`/`u_frame` 동형 바인딩.
+- **검증**: Vitest — `uniformParser.test`(u_mouse/u_frame system 인식 + Inspector 숨김), `mouseStore.test`(setPosition/Down/Up/reset 의 rev 증가 + vec4 패킹). Playwright E2E `phase-19-mouse-frame.spec.ts` — 풀스크린 셰이더가 화면을 `u_mouse.xy / u_resolution` 평면색으로 칠하고, 포인터를 좌하단→우상단으로 이동하면 R/G 채널이 함께 상승(포인터→u_mouse 경로 end-to-end 판별).
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - GLSL LSP 도입(Monaco 전환 검토).

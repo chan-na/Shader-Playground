@@ -10,13 +10,13 @@
 
 표현력을 직접 키우고 기존 컴파일/실행 구조에 자연스럽게 얹히는 **1 → 2** 가 최우선. 그다음 워크플로/디버깅(4·5·3) → 성능(7) → 비용 높은 디스크 연동(6) 순.
 
-> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. 다음은 **3번(`u_mouse`/`u_frame` 시스템 유니폼)**.
+> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. ✅ **3번(`u_mouse`/`u_frame` 시스템 유니폼)도 완료** — SPEC.md Phase 19. 다음은 **4번(노드 그래프 키보드 접근성 & 복제)**.
 
 | # | 항목 | 분류 | 난이도 | 추천도 |
 |---|---|---|---|---|
 | ~~1~~ | ~~Pass별 해상도 스케일~~ (완료 → Phase 17) | 표현력 | 중 | ★★★ |
 | ~~2~~ | ~~N:1 합성 일반화~~ (완료 → Phase 18) | 표현력 | 중 | ★★★ |
-| 3 | `u_mouse` / `u_frame` 시스템 유니폼 | 표현력 | 하 | ★★ |
+| ~~3~~ | ~~`u_mouse` / `u_frame` 시스템 유니폼~~ (완료 → Phase 19) | 표현력 | 하 | ★★ |
 | 4 | 노드 그래프 키보드 접근성 & 복제 | 워크플로 | 하 | ★★ |
 | 5 | Inspector 주석 힌트 GUI 생성 | 워크플로 | 중 | ★★ |
 | 6 | 셰이더 핫리로드 디스크 백업 | 워크플로 | 상 | ★ |
@@ -36,18 +36,9 @@
 
 ---
 
-## 3. `u_mouse` / `u_frame` 시스템 유니폼
+## 3. `u_mouse` / `u_frame` 시스템 유니폼 — ✅ 완료 (SPEC.md Phase 19)
 
-**동기.** Shadertoy 호환 셰이더 이식성. 마우스 좌표·프레임 카운터는 절차적 셰이더에서 흔히 쓰인다. 마우스 입력은 이미 `core/camera/input.ts` 가 pointer 이벤트를 받고 있어 좌표 추출이 쉽다.
-
-**접근법.**
-- `parseUniforms` 의 system 이름 집합에 `u_mouse`(vec2 또는 vec4: xy=현재, zw=클릭) / `u_frame`(float, 누적 프레임) 추가(Architecture §4.4). → Inspector·입력 포트 자동 숨김.
-- 마우스 좌표 store(또는 기존 cameraStore 옆 소형 store) + RAF 의 `FrameContext` 에 주입. dirty 게이트: 마우스 이동 시 `rev` 증가.
-- `u_frame` 은 `rendererStore.renderTick` 또는 별도 카운터.
-
-**영향 모듈.** `core/graph/uniformParser.ts`, `core/graph/execute.ts`(bindSystemUniforms), `ui/Viewport/index.tsx`, 신규/기존 store, `standalonePlayer.js`.
-
-**게이트.** uniformParser.test 에 system 인식 케이스. E2E: 마우스 이동이 화면에 반영되는 스펙(좌표 의존 셰이더).
+`u_mouse`(vec4: xy=현재, zw=마지막 클릭, 픽셀·좌하단 원점) / `u_frame`(float, 누적 프레임)을 `SYSTEM_UNIFORMS` 에 추가 → Inspector·입력 포트 자동 숨김. 신규 `state/mouseStore.ts` 가 포인터 좌표를 보관하고 Viewport 의 canvas pointer 리스너가 갱신(+y flip, `rev` 증가로 idle RAF 깨움). `execute.ts` 가 `FrameContext.mouse`/`frame` 을 셰이더(+compute u_frame)에 바인딩, `standalonePlayer.js` 동형. 검증: `uniformParser`/`mouseStore` 단위 + `phase-19-mouse-frame.spec.ts`. 자세한 내용은 SPEC.md Phase 19.
 
 ---
 

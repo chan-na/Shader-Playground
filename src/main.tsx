@@ -14,6 +14,7 @@ import { useEditorStore } from "./state/editorStore";
 import { useGpuTimerStore } from "./state/gpuTimerStore";
 import { useGraphStore } from "./state/graphStore";
 import { useHistoryStore } from "./state/historyStore";
+import { useMouseStore } from "./state/mouseStore";
 import { useRendererStore } from "./state/rendererStore";
 import { useSelectionStore } from "./state/selectionStore";
 import { useTimeStore } from "./state/timeStore";
@@ -52,6 +53,7 @@ if (import.meta.env.DEV) {
     history: useHistoryStore,
     editor: useEditorStore,
     camera: useCameraStore,
+    mouse: useMouseStore,
     renderer: useRendererStore,
     gpuTimer: useGpuTimerStore,
     log,

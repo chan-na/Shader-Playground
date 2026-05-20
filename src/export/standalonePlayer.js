@@ -921,6 +921,31 @@
   var model = new Float32Array(16);
   mat4Identity(model);
 
+  // Pointer state for u_mouse (vec4): xy=current, zw=last click. Framebuffer
+  // pixels, bottom-left origin (matches gl_FragCoord / u_resolution).
+  var mouse = [0, 0, 0, 0];
+  function pointerToCanvas(e) {
+    var rect = canvas.getBoundingClientRect();
+    var sx = canvas.width / Math.max(1, rect.width);
+    var sy = canvas.height / Math.max(1, rect.height);
+    return [
+      (e.clientX - rect.left) * sx,
+      canvas.height - (e.clientY - rect.top) * sy,
+    ];
+  }
+  canvas.addEventListener("pointermove", (e) => {
+    var p = pointerToCanvas(e);
+    mouse[0] = p[0];
+    mouse[1] = p[1];
+  });
+  canvas.addEventListener("pointerdown", (e) => {
+    var p = pointerToCanvas(e);
+    mouse[0] = p[0];
+    mouse[1] = p[1];
+    mouse[2] = p[0];
+    mouse[3] = p[1];
+  });
+
   function paramValue(node, time) {
     if (node.paramKind === "time") {
       var arr = Array.isArray(node.value) ? node.value : [node.value || 1, 0];
@@ -949,6 +974,7 @@
 
   var start = performance.now();
   var sizeDirty = true;
+  var frameNum = 0;
   function frame(now) {
     if (sizeDirty || resize()) {
       sizeDirty = false;
@@ -991,6 +1017,8 @@
       var u = pass.program.uniforms;
       setUniform(u["u_time"], t);
       setUniform(u["u_resolution"], [pass.fbo.w, pass.fbo.h]);
+      setUniform(u["u_mouse"], mouse);
+      setUniform(u["u_frame"], frameNum);
       if (!pass.meshIsFullscreen) {
         setUniform(u["u_view"], view);
         setUniform(u["u_proj"], proj);
@@ -1082,6 +1110,7 @@
       }
     }
 
+    frameNum++;
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

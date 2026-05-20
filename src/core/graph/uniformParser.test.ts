@@ -54,6 +54,18 @@ describe("parseUniforms", () => {
     expect(u.find((x) => x.name === "u_intensity")?.system).toBe(false);
   });
 
+  it("flags u_mouse / u_frame as system uniforms (hidden from Inspector)", () => {
+    const src = `
+      uniform vec4 u_mouse;
+      uniform float u_frame;
+      uniform float u_intensity;
+    `;
+    const u = parseUniforms(src);
+    expect(u.find((x) => x.name === "u_mouse")?.system).toBe(true);
+    expect(u.find((x) => x.name === "u_frame")?.system).toBe(true);
+    expect(inspectorUniforms(u).map((x) => x.name)).toEqual(["u_intensity"]);
+  });
+
   it("handles precision qualifiers", () => {
     const src = `
       uniform highp float u_x;
@@ -113,6 +125,8 @@ describe("parseUniforms", () => {
     expect(SYSTEM_UNIFORMS.has("u_resolution")).toBe(true);
     expect(SYSTEM_UNIFORMS.has("u_model")).toBe(true);
     expect(SYSTEM_UNIFORMS.has("u_camera")).toBe(true);
+    expect(SYSTEM_UNIFORMS.has("u_mouse")).toBe(true);
+    expect(SYSTEM_UNIFORMS.has("u_frame")).toBe(true);
   });
 
   it("SYSTEM_UNIFORM_DESCRIPTIONS covers every SYSTEM_UNIFORMS entry", () => {

@@ -27,6 +27,14 @@ export interface FrameContext {
   width: number;
   height: number;
   camera: OrbitCameraState;
+  /**
+   * Pointer state for `u_mouse` (vec4): xy = current position, zw = last
+   * click position. Framebuffer pixels, bottom-left origin (matches
+   * gl_FragCoord / u_resolution). Defaults to all-zero when omitted.
+   */
+  mouse?: [number, number, number, number];
+  /** Accumulated render-frame counter for `u_frame`. Defaults to 0. */
+  frame?: number;
   /** Background color shown by the placeholder/empty pass. */
   background?: [number, number, number];
   /** Snapshot of parameter-node values keyed by node ID (read each frame). */
@@ -50,6 +58,7 @@ function bindComputeSystemUniforms(
 ) {
   const u = pass.program.uniforms;
   setUniform(gl, u.u_time ?? null, ctx.time);
+  setUniform(gl, u.u_frame ?? null, ctx.frame ?? 0);
 }
 
 function bindSystemUniforms(
@@ -60,6 +69,8 @@ function bindSystemUniforms(
   const u = pass.program.uniforms;
   setUniform(gl, u.u_time ?? null, ctx.time);
   setUniform(gl, u.u_resolution ?? null, [pass.width, pass.height]);
+  setUniform(gl, u.u_mouse ?? null, ctx.mouse ?? [0, 0, 0, 0]);
+  setUniform(gl, u.u_frame ?? null, ctx.frame ?? 0);
   if (!pass.meshIsFullscreen) {
     viewMatrix(ctx.camera, _view);
     projMatrix(ctx.camera, pass.width / Math.max(1, pass.height), _proj);

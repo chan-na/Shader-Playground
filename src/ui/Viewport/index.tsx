@@ -23,6 +23,7 @@ import {
 } from "../../state/diagnosticsStore";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { snapshotGraph, useGraphStore } from "../../state/graphStore";
+import { mouseVec4, useMouseStore } from "../../state/mouseStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { thumbnailScheduler } from "../../state/thumbnailScheduler";
 import { useTimeStore } from "../../state/timeStore";
@@ -71,6 +72,34 @@ export function Viewport() {
     cameraCtl.setOnChange((c) => useCameraStore.getState().setCamera(c));
     cameraCtl.attach(canvas);
 
+    // Feed pointer position to mouseStore for the u_mouse system uniform.
+    // Coordinates are converted to framebuffer pixels with a bottom-left
+    // origin so they match gl_FragCoord / u_resolution. These listeners
+    // coexist with the camera controller's own pointer handlers.
+    const pointerToCanvas = (e: PointerEvent): [number, number] => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / Math.max(1, rect.width);
+      const scaleY = canvas.height / Math.max(1, rect.height);
+      const px = (e.clientX - rect.left) * scaleX;
+      const py = canvas.height - (e.clientY - rect.top) * scaleY;
+      return [px, py];
+    };
+    const onMousePointerMove = (e: PointerEvent) => {
+      const [x, y] = pointerToCanvas(e);
+      useMouseStore.getState().setPosition(x, y);
+    };
+    const onMousePointerDown = (e: PointerEvent) => {
+      const [x, y] = pointerToCanvas(e);
+      useMouseStore.getState().setDown(x, y);
+    };
+    const onMousePointerUp = () => {
+      useMouseStore.getState().setUp();
+    };
+    canvas.addEventListener("pointermove", onMousePointerMove);
+    canvas.addEventListener("pointerdown", onMousePointerDown);
+    canvas.addEventListener("pointerup", onMousePointerUp);
+    canvas.addEventListener("pointercancel", onMousePointerUp);
+
     let plan: ExecutionPlan = emptyPlan(canvas.width || 1, canvas.height || 1);
     const asyncReadback = new AsyncThumbnailReadback();
     // GPU timer is optional — the extension is Chrome-only. When absent the
@@ -84,10 +113,13 @@ export function Viewport() {
     let lastCameraRev = -1;
     let lastTimeRev = -1;
     let lastViewportRev = -1;
+    let lastMouseRev = -1;
     let alive = true;
     let rafId = 0;
     let prev = performance.now();
     let frameCount = 0;
+    // Monotonic count of frames actually rendered, exposed via u_frame.
+    let renderFrame = 0;
     let fpsAccum = 0;
     let contextLost = false;
     let glProbeTick = 0;
@@ -193,6 +225,7 @@ export function Viewport() {
       const cameraRev = useCameraStore.getState().rev;
       const timeRev = useTimeStore.getState().rev;
       const viewportRev = useViewportStore.getState().rev;
+      const mouseRev = useMouseStore.getState().rev;
 
       const structuralDirty =
         rev !== lastRev ||
@@ -225,9 +258,11 @@ export function Viewport() {
       const cameraChanged = cameraRev !== lastCameraRev;
       const timeChanged = timeRev !== lastTimeRev;
       const viewportChanged = viewportRev !== lastViewportRev;
+      const mouseChanged = mouseRev !== lastMouseRev;
       lastCameraRev = cameraRev;
       lastTimeRev = timeRev;
       lastViewportRev = viewportRev;
+      lastMouseRev = mouseRev;
 
       // Static graph guard: when paused with no input changes since last frame
       // there is no reason to re-execute the plan. Camera / param / scrub /
@@ -241,7 +276,8 @@ export function Viewport() {
         uniformChanged ||
         cameraChanged ||
         timeChanged ||
-        viewportChanged;
+        viewportChanged ||
+        mouseChanged;
 
       const now = performance.now();
       const dt = now - prev;
@@ -323,6 +359,8 @@ export function Viewport() {
           background: bg,
           params,
           graph: { nodes: graph.nodes, edges: graph.edges },
+          mouse: mouseVec4(useMouseStore.getState()),
+          frame: renderFrame++,
         },
         canvas.width,
         canvas.height,
@@ -395,6 +433,10 @@ export function Viewport() {
         onContextLost as EventListener,
       );
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
+      canvas.removeEventListener("pointermove", onMousePointerMove);
+      canvas.removeEventListener("pointerdown", onMousePointerDown);
+      canvas.removeEventListener("pointerup", onMousePointerUp);
+      canvas.removeEventListener("pointercancel", onMousePointerUp);
       cameraCtl.detach();
       asyncReadback.disposeAll(gl);
       disposeAllExternal(gl);

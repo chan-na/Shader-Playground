@@ -240,12 +240,14 @@ else:
 `parseUniforms` 가 `system: true` 로 표시하는 이름은:
 
 ```
-u_time  u_resolution  u_view  u_proj  u_model  u_camera
+u_time  u_resolution  u_view  u_proj  u_model  u_camera  u_mouse  u_frame
 ```
 
 - `u_time` ← `simTime` (timeStore)
-- `u_resolution` ← `[plan.width, plan.height]`
-- `u_view` / `u_proj` / `u_model` 은 `meshIsFullscreen === false` 인 패스에만 바인딩. 풀스크린 쿼드에는 의미 없으므로 자동 제외.
+- `u_resolution` ← `[pass.width, pass.height]`
+- `u_view` / `u_proj` / `u_model` / `u_camera` 는 `meshIsFullscreen === false` 인 패스에만 바인딩. 풀스크린 쿼드에는 의미 없으므로 자동 제외.
+- `u_mouse` (vec4) ← `mouseStore`. `xy` = 현재 포인터 위치, `zw` = 마지막 클릭 위치. 픽셀 단위·좌하단 원점이라 `gl_FragCoord` / `u_resolution` 과 동일 좌표계(Shadertoy iMouse 관례). Viewport 의 canvas pointer 리스너가 store 를 갱신하고 `rev` 를 올려 idle RAF 를 깨운다.
+- `u_frame` (float) ← Viewport 의 누적 렌더 프레임 카운터(`executePlan` 호출마다 +1). compute 패스에도 바인딩.
 
 System uniform 은 Inspector 에서 자동 숨김(`inspectorUniforms`), 입력 포트로도 노출되지 않음.
 

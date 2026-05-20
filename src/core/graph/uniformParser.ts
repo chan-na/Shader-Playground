@@ -38,6 +38,8 @@ export const SYSTEM_UNIFORMS = new Set([
   "u_proj",
   "u_model",
   "u_camera",
+  "u_mouse",
+  "u_frame",
 ]);
 
 /**
@@ -52,6 +54,9 @@ export const SYSTEM_UNIFORM_DESCRIPTIONS: Record<string, string> = {
   u_proj: "카메라 projection 행렬",
   u_model: "오브젝트 model 행렬",
   u_camera: "카메라 월드 위치 (fullscreen 패스에서는 미적용)",
+  u_mouse:
+    "마우스 좌표 vec4 (xy=현재 위치, zw=마지막 클릭 위치). 픽셀 단위·좌하단 원점 — gl_FragCoord/u_resolution 과 동일 좌표계",
+  u_frame: "렌더 시작부터 누적된 프레임 카운터 (float)",
 };
 
 const VEC_LEN: Record<string, number> = {

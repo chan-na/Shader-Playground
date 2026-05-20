@@ -306,6 +306,12 @@ Shadertoy 호환 절차적 셰이더 이식성을 위해 포인터 좌표·프�
 - **UI**: `UniformHintEditor.tsx` 인라인 에디터(min/max/step/default/label). 벡터 컨트롤(multi/color)은 콤마 구분 default, 스칼라는 단일 숫자. vec3/vec4 의 명시적 color/multi 컨트롤은 `@color`/`@multi` 로 보존해 재파싱 시 이름 기반 추론이 뒤집지 않게 한다. Inspector 의 각 uniform-row 에 ⚙ 토글.
 - **검증**: Vitest `uniformParser.test`(serialize/write round-trip, 앞줄 stale 제거, 자유 텍스트 보존, 벡터 default, `@color` 보존) + `graphStore.test`(fragment/vertex/compute 라우팅·rev·미지 id no-op). Playwright E2E `phase-21-hint-editor.spec.ts` — GUI 로 범위 변경 → 소스 주석 반영 + 슬라이더 min/max 갱신 + 라벨 표시, 기어 토글 open/close, Cancel 무기록.
 
+### Phase 22 — 썸네일 GPU 다운샘플 (완료)
+노드 카드 라이브 미리보기의 readback 비용 절감. 다운샘플을 CPU 박스필터에서 GPU 1패스로 이전해 PBO 전송량을 원본 해상도와 무관하게 `96×96×4` 로 고정.
+- **다운샘플**: `AsyncThumbnailReadback.request` 가 PBO readback 전에 GPU 로 축소한다. 노드당 96×96 thumb FBO(`createFramebuffer(gl, 96, 96, false)`)에 패스의 color 텍스처를 풀스크린 쿼드 1패스로 그려 넣고(`downsampleInto`), 그 작은 FBO 만 `readPixels(0,0,96,96)` 로 PBO 에 담는다. 프래그먼트가 `texture(u_src, vec2(uv.x, 1.0 - uv.y))` 로 Y-flip 하므로 readback 버퍼가 곧 top-down → `poll` 은 `new ImageData(buf, 96, 96)` 로 바로 감싼다(기존 `downsampleToThumb` CPU 박스필터 미사용).
+- **리소스**: blit program + 쿼드 VAO/VBO 는 인스턴스 lazy 싱글톤(`buildBlit`), PBO·thumb FBO 는 slot 단위. `release` 는 PBO+thumb FBO 동시 해제, `disposeAll` 은 blit 리소스까지 정리. `request` 는 그릴 때 `FRAMEBUFFER_BINDING`/`VIEWPORT` 를 저장·복원해 호출자 상태를 보존한다.
+- **검증**: Vitest `asyncReadback.test` — 원본 1024×768 이어도 `readPixels` 가 96×96(GPU 축소 증명), blit 프로그램 컴파일 실패 시 `request` 가 false, 다중 노드 독립 in-flight·release 정리. Playwright E2E 전 Phase 회귀 없이 통과(썸네일 시각 결과 동일). 동기 CPU 폴백 `downsampleToThumb` 는 자체 단위 테스트와 함께 readback.ts 에 보존(Architecture §6.4).
+
 ### (백로그)
 - 노드 다중 선택 박스/화살표 이동(selectionStore 는 이미 다중 id 보관, Inspector/CodeEditor 단일 선택 가정만 정리하면 됨).
 - 쉐이더 핫리로드 디스크 백업(File System Access API).

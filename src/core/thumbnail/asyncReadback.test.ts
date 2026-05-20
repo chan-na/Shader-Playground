@@ -1,29 +1,31 @@
 import { describe, expect, it } from "vitest";
+import { createFakeGl } from "../gl/fakeGl";
 import { AsyncThumbnailReadback } from "./asyncReadback";
 import { downsampleToThumb } from "./readback";
 
 /**
- * Minimal stub of the WebGL2 surface used by AsyncThumbnailReadback. We
- * record method invocations and let tests step the fence state manually.
+ * WebGL2 stub for AsyncThumbnailReadback. The GPU-downsample path (program +
+ * VAO + thumb FBO) is satisfied by `createFakeGl`; on top of that we model the
+ * PBO data flow and a manually-stepped fence so tests can drain on demand.
  */
-function makeGL() {
+function makeGL(opts: { linkFailure?: boolean } = {}) {
   const calls: string[] = [];
   let signaled = false;
   const pboBytes = new Map<WebGLBuffer, Uint8Array>();
   let lastBoundPbo: WebGLBuffer | null = null;
-  let lastReadBuffer: WebGLBuffer | null = null;
-  const fakeFB = {
-    fbo: {} as WebGLFramebuffer,
-    color: { texture: {} },
-  } as never;
 
-  const gl = {
-    // Enum constants — values irrelevant; identity-compared only.
+  const base = createFakeGl({
+    attributes: ["a_position"],
+    uniforms: ["u_src"],
+    ...(opts.linkFailure ? { linkFailure: true } : {}),
+  }) as unknown as Record<string, unknown>;
+
+  const overrides = {
+    // Enum constants the readback path identity-compares.
     PIXEL_PACK_BUFFER: "PIXEL_PACK_BUFFER",
-    READ_FRAMEBUFFER: "READ_FRAMEBUFFER",
-    READ_FRAMEBUFFER_BINDING: "READ_FRAMEBUFFER_BINDING",
-    RGBA: "RGBA",
-    UNSIGNED_BYTE: "UNSIGNED_BYTE",
+    FRAMEBUFFER_BINDING: "FRAMEBUFFER_BINDING",
+    VIEWPORT: "VIEWPORT",
+    DEPTH_TEST: "DEPTH_TEST",
     STREAM_READ: "STREAM_READ",
     SYNC_GPU_COMMANDS_COMPLETE: "SYNC_GPU_COMMANDS_COMPLETE",
     TIMEOUT_EXPIRED: 0,
@@ -37,18 +39,15 @@ function makeGL() {
       return b;
     },
     bindBuffer: (target: string, b: WebGLBuffer | null) => {
-      calls.push(`bindBuffer ${target}`);
       if (target === "PIXEL_PACK_BUFFER") lastBoundPbo = b;
     },
-    bufferData: (_target: string, sizeOrData: number | ArrayBufferView) => {
+    bufferData: (target: string, sizeOrData: number | ArrayBufferView) => {
+      if (target !== "PIXEL_PACK_BUFFER" || !lastBoundPbo) return;
       const size =
         typeof sizeOrData === "number" ? sizeOrData : sizeOrData.byteLength;
-      if (lastBoundPbo) pboBytes.set(lastBoundPbo, new Uint8Array(size));
+      pboBytes.set(lastBoundPbo, new Uint8Array(size));
     },
     getParameter: () => null,
-    bindFramebuffer: (target: string) => {
-      calls.push(`bindFramebuffer ${target}`);
-    },
     readPixels: (
       _x: number,
       _y: number,
@@ -59,7 +58,6 @@ function makeGL() {
       _offsetOrBuf: number | ArrayBufferView,
     ) => {
       calls.push(`readPixels ${w}x${h}`);
-      lastReadBuffer = lastBoundPbo;
       if (lastBoundPbo) {
         // Fill the bound PBO with a sentinel pattern so tests can recognize it.
         const buf = new Uint8Array(w * h * 4);
@@ -83,9 +81,6 @@ function makeGL() {
     deleteSync: () => {
       calls.push("deleteSync");
     },
-    deleteBuffer: () => {
-      calls.push("deleteBuffer");
-    },
     getBufferSubData: (
       _target: string,
       _offset: number,
@@ -93,19 +88,19 @@ function makeGL() {
     ) => {
       calls.push("getBufferSubData");
       const src = lastBoundPbo ? pboBytes.get(lastBoundPbo) : undefined;
-      if (src && out instanceof Uint8Array) {
+      if (src && out instanceof Uint8ClampedArray) {
         out.set(src.subarray(0, out.length));
       }
     },
   };
+
+  const gl = { ...base, ...overrides } as unknown as WebGL2RenderingContext;
   return {
-    gl: gl as unknown as WebGL2RenderingContext,
-    fb: fakeFB,
+    gl,
     calls,
     setSignaled: (v: boolean) => {
       signaled = v;
     },
-    lastReadBuffer: () => lastReadBuffer,
   };
 }
 
@@ -120,14 +115,23 @@ function fakeFB(width: number, height: number) {
 }
 
 describe("AsyncThumbnailReadback", () => {
-  it("request issues readPixels into a PBO and stamps a fence", () => {
+  it("downsamples on the GPU so readPixels is always THUMB_SIZE², not the source size", () => {
     const { gl, calls } = makeGL();
     const r = new AsyncThumbnailReadback();
-    const ok = r.request(gl, "n1", fakeFB(64, 64));
+    const ok = r.request(gl, "n1", fakeFB(1024, 768));
     expect(ok).toBe(true);
-    expect(calls).toContain("readPixels 64x64");
+    // Source is 1024×768 but the readback target is the 96×96 thumb FBO.
+    expect(calls).toContain("readPixels 96x96");
+    expect(calls).not.toContain("readPixels 1024x768");
     expect(calls).toContain("fenceSync");
     expect(r.pendingNodeIds()).toEqual(["n1"]);
+  });
+
+  it("returns false when the blit program fails to build", () => {
+    const { gl } = makeGL({ linkFailure: true });
+    const r = new AsyncThumbnailReadback();
+    expect(r.request(gl, "n1", fakeFB(64, 64))).toBe(false);
+    expect(r.pendingNodeIds()).toEqual([]);
   });
 
   it("request returns false when a slot is already pending for that node", () => {

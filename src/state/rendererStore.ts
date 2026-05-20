@@ -18,11 +18,19 @@ interface RendererStats {
   errors: string[];
 }
 
+/** One-time GL adapter identity, captured at context creation for bug reports. */
+export interface GlInfo {
+  renderer: string;
+  version: string;
+}
+
 export interface RendererState {
   ready: boolean;
   stats: RendererStats;
+  glInfo: GlInfo | null;
   setReady: (ready: boolean) => void;
   setStats: (stats: Partial<RendererStats>) => void;
+  setGlInfo: (info: GlInfo) => void;
   bumpRenderTick: () => void;
   pushError: (msg: string) => void;
   clearErrors: () => void;
@@ -31,7 +39,9 @@ export interface RendererState {
 export const useRendererStore = create<RendererState>((set) => ({
   ready: false,
   stats: { fps: 0, frame: 0, drawCalls: 0, renderTick: 0, errors: [] },
+  glInfo: null,
   setReady: (ready) => set({ ready }),
+  setGlInfo: (glInfo) => set({ glInfo }),
   setStats: (patch) => set((s) => ({ stats: { ...s.stats, ...patch } })),
   bumpRenderTick: () =>
     set((s) => ({

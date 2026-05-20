@@ -15,8 +15,8 @@
 | P1 | 중앙 로거 `src/utils/log.ts` | ✅ 머지됨 | #41 | `log.ts` + `log.test.ts`. 게이트 초록 |
 | P2 | 전역 안전망 (onerror / unhandledrejection / ErrorBoundary) | ✅ 머지됨 | #41 | main.tsx 핸들러 + `ErrorBoundary.tsx`(메인 작업영역만 감쌈) |
 | P3 | 침묵 catch → 로거 교체 (registry/assets/autosave) | ✅ 머지됨 | #42 | 동작 불변, 흔적만. registry/audio·videoLoader/recorder/autoSave/cache/AssetBrowser/WebcamInspector/BootstrapGate/Viewport + rendererStore.errors 상한 50. test-setup `setMinLevel("error")`로 로그 노이즈 차단 |
-| P4 | GL 에러 표면화 (`gl.getError()` + 컨텍스트 손실 상세) | ✅ 구현완료 (PR 대기) | - | 신규 `core/gl/glError.ts`(DEV 게이트 + 큐 드레인). program 링크·FBO 셋업·드로우 루프(120프레임 스로틀)·context lost/restored 로깅. fakeGl `getError`(one-shot) 보강. glError.test + program/framebuffer.test 보강. 게이트 초록 |
-| P5 | 진단 패널 + "진단 정보 복사" | ⬜ 미착수 | - | E2E 1건 동반 |
+| P4 | GL 에러 표면화 (`gl.getError()` + 컨텍스트 손실 상세) | ✅ 머지됨 | #43 | 신규 `core/gl/glError.ts`(DEV 게이트 + 큐 드레인). program 링크·FBO 셋업·드로우 루프(120프레임 스로틀)·context lost/restored 로깅. fakeGl `getError`(one-shot) 보강. glError.test + program/framebuffer.test 보강 |
+| P5 | 진단 패널 + "진단 정보 복사" | ✅ 구현완료 (PR 대기) | - | 신규 `state/debugUiStore.ts`(open/level·category 필터, leaf store) + `ui/Panels/DiagnosticsPanel.tsx`(subscribeLog 실시간/필터/Clear/Copy) + `diagnosticsReport.ts`(순수 빌더). StatusBar `🛈 Diagnostics` 토글, App 조건부 마운트. `rendererStore.glInfo` 1회 캡처. `__sp.log` DEV 노출. **사용자 합의대로** SPEC.md Phase 16 추가 + E2E `phase-16-diagnostics.spec.ts` 1건. log.ts에 stable `seq` id 추가. 게이트 초록(check + coverage + e2e 53건) |
 
 상태 범례: ⬜ 미착수 / 🟨 진행중 / ✅ 완료
 
@@ -184,12 +184,12 @@ export function setMinLevel(level: LogLevel): void;  // 기본 DEV=debug, PROD=w
 
 **게이트 체크리스트**:
 - [x] `program.test.ts` / `framebuffer.test.ts` 보강 (post-link GL 에러 로깅 / FBO 불완전 warn 검증)
-- [x] `fakeGl.ts`에 `getError` (one-shot 큐) 추가 — 기존 program/framebuffer 테스트 영향 없음
-- [x] 드로우 루프 성능 회귀 없음. getError는 DEV 한정 + 120프레임 스로틀 → 프로덕션 비용 0
+- [x] `fakeGl.ts`에 `getError` (one-shot 큐) 추가 — 기존 program/framebuffer 테스트 영향 없음 (663 unit 초록)
+- [x] 드로우 루프 성능 회귀 없음 (E2E 52건 초록, B2 idle 정지-렌더 스펙 포함). getError는 DEV 한정 + 120프레임 스로틀 → 프로덕션 비용 0
 
-**구현 결정**:
-- **드로우 루프 getError 토글**: 별도 store/UI 토글 대신 **DEV 한정 + 120프레임 스로틀**로 자체 완결. 셋업 시점(program 링크·FBO)은 무조건, 드로우 루프만 스로틀.
-- 신규 `checkGlError(gl, context)`는 DEV 외에서 컨텍스트를 건드리지 않고 0 반환 → 핫패스 안전. getError 큐를 bounded drain 하여 stale 에러 오귀속 방지.
+**구현 결정** (§5 리스크 항목 해소):
+- **드로우 루프 getError 토글**: 별도 store/UI 토글 추가 대신 **DEV 한정 + 120프레임 스로틀**로 자체 완결 (P5 진단 패널에 의존하지 않음). 셋업 시점(program 링크·FBO)은 무조건, 드로우 루프만 스로틀.
+- 신규 `checkGlError(gl, context)`는 DEV 외에서 컨텍스트를 건드리지 않고 0 반환 → 핫패스 안전. getError 큐를 bounded drain하여 stale 에러 오귀속 방지.
 
 ---
 
@@ -211,9 +211,15 @@ export function setMinLevel(level: LogLevel): void;  // 기본 DEV=debug, PROD=w
 **상태 저장**: 패널 열림/필터 상태는 별도 경량 store(`debugUiStore`) 또는 기존 패턴 따라 추가. 순환 의존성 주의.
 
 **게이트 체크리스트**:
-- [ ] `DiagnosticsPanel` 단위 테스트(렌더, 필터링)
-- [ ] E2E 1건: 패널 열기 → 로그 표시 확인 (SPEC.md에 Phase 항목 추가 시 **사용자 합의 필요** — 임의 추가 금지)
-- [ ] "진단 정보 복사"가 clipboard API 없는 환경(jsdom)에서 안전한지
+- [x] `DiagnosticsPanel` 단위 테스트(렌더 chrome / empty-state / 버퍼 seed) + `debugUiStore.test` + `diagnosticsReport.test`
+- [x] E2E 1건: `phase-16-diagnostics.spec.ts` — StatusBar 토글로 패널 열기 → `__sp.log` 마커 표시 → Clear. **SPEC.md Phase 16 추가는 사용자 합의 완료** (StatusBar 토글 / 신규 debugUiStore / SPEC+E2E)
+- [x] "진단 정보 복사"는 `navigator.clipboard?.writeText` 가드 + try/catch 폴백(미지원 시 toast.warning + log.warn) → jsdom/비보안 컨텍스트 안전
+
+**구현 결정** (§5 리스크 항목 해소):
+- **진입점**: StatusBar `🛈 Diagnostics` 토글 단독 (CommandPalette 커맨드는 보류 — 사용자 선택).
+- **상태 저장**: 신규 `debugUiStore` (leaf, log 타입만 import → 순환 없음).
+- **GL 정보**: 패널이 gl 컨텍스트를 직접 잡지 않도록 `rendererStore.glInfo` 에 컨텍스트 생성 시 1회 캡처(WEBGL_debug_renderer_info 우선, 마스킹 폴백).
+- **로그 키 안정성**: 인덱스 키 금지(biome) 회피 위해 `LogEntry.seq` (monotonic id) 추가 — 진단 리스트의 안정적 React key.
 
 ---
 

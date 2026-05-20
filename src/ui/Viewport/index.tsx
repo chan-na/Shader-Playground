@@ -36,6 +36,7 @@ export function Viewport() {
   const bumpRenderTick = useRendererStore((s) => s.bumpRenderTick);
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
+  const setGlInfo = useRendererStore((s) => s.setGlInfo);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,6 +48,23 @@ export function Viewport() {
     } catch (e) {
       pushError(String(e));
       return;
+    }
+
+    // Capture the GL adapter identity once for the diagnostics report. The
+    // unmasked names need WEBGL_debug_renderer_info; fall back to the masked
+    // RENDERER when the extension is gated (privacy mode).
+    try {
+      const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+      setGlInfo({
+        renderer: String(
+          dbg
+            ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
+            : gl.getParameter(gl.RENDERER),
+        ),
+        version: String(gl.getParameter(gl.VERSION)),
+      });
+    } catch (e) {
+      log.debug("gl", "glInfo probe failed", normalizeError(e));
     }
 
     const cameraCtl = createCameraController(useCameraStore.getState().camera);
@@ -387,7 +405,7 @@ export function Viewport() {
       plan.dispose();
       setReady(false);
     };
-  }, [setReady, setStats, bumpRenderTick, pushError, clearErrors]);
+  }, [setReady, setStats, bumpRenderTick, pushError, clearErrors, setGlInfo]);
 
   return (
     <div className="panel panel--viewport">

@@ -54,6 +54,7 @@ if (import.meta.env.DEV) {
     camera: useCameraStore,
     renderer: useRendererStore,
     gpuTimer: useGpuTimerStore,
+    log,
   };
 }
 

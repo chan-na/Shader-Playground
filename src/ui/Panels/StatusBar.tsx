@@ -1,3 +1,4 @@
+import { useDebugUiStore } from "../../state/debugUiStore";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
@@ -10,6 +11,8 @@ export function StatusBar() {
   const gpuSupported = useGpuTimerStore((s) => s.supported);
   const gpuEnabled = useGpuTimerStore((s) => s.enabled);
   const gpuTotalMs = useGpuTimerStore((s) => s.totalMs);
+  const diagOpen = useDebugUiStore((s) => s.open);
+  const toggleDiag = useDebugUiStore((s) => s.toggleOpen);
 
   const errorCount = stats.errors.length;
   const showGpu = gpuSupported && gpuEnabled;
@@ -52,6 +55,24 @@ export function StatusBar() {
       ) : (
         <span style={{ color: "#666" }}>no errors</span>
       )}
+      <button
+        type="button"
+        onClick={toggleDiag}
+        title="Toggle the developer diagnostics panel"
+        data-testid="open-diagnostics"
+        aria-pressed={diagOpen}
+        style={{
+          background: diagOpen ? "#2a2a2a" : "transparent",
+          border: "1px solid #333",
+          borderRadius: 3,
+          color: diagOpen ? "#ddd" : "#888",
+          cursor: "pointer",
+          fontSize: 11,
+          padding: "1px 6px",
+        }}
+      >
+        🛈 Diagnostics
+      </button>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { debounce } from "../utils/debounce";
+import { log, normalizeError } from "../utils/log";
 import { useGraphStore } from "./graphStore";
 import { type SerializedProject, serializeProject } from "./serialization";
 import { toast } from "./toastStore";
@@ -48,7 +49,8 @@ export async function loadSession(): Promise<SerializedProject | null> {
     const tx = db.transaction(STORE, "readonly").objectStore(STORE);
     const v = await awaitRequest<SerializedProject | undefined>(tx.get(KEY));
     return v ?? null;
-  } catch {
+  } catch (e) {
+    log.warn("autosave", "loadSession failed", normalizeError(e));
     return null;
   }
 }
@@ -58,8 +60,12 @@ export async function clearSession(): Promise<void> {
     const db = await openDb();
     const tx = db.transaction(STORE, "readwrite").objectStore(STORE);
     await awaitRequest(tx.delete(KEY));
-  } catch {
-    /* swallow — best-effort cleanup */
+  } catch (e) {
+    log.debug(
+      "autosave",
+      "clearSession failed (best-effort)",
+      normalizeError(e),
+    );
   }
 }
 

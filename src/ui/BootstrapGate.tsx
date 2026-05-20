@@ -7,6 +7,7 @@ import {
   deserializeProject,
   type SerializedProject,
 } from "../state/serialization";
+import { log, normalizeError } from "../utils/log";
 import { RecoveryDialog, swallowEscape } from "./RecoveryDialog";
 
 type Phase = "init" | "prompt" | "done";
@@ -38,8 +39,8 @@ export function BootstrapGate() {
             setPhase("done");
             return;
           }
-        } catch {
-          /* fall through */
+        } catch (e) {
+          log.warn("app", "share hash decode failed", normalizeError(e));
         }
       }
       const saved = await loadSession();
@@ -80,7 +81,12 @@ export function BootstrapGate() {
       const restored = deserializeProject(pending);
       useGraphStore.getState().setGraph(restored.graph, restored.positions);
       useHistoryStore.getState().clear();
-    } catch {
+    } catch (e) {
+      log.warn(
+        "app",
+        "session restore failed, falling back to demo",
+        normalizeError(e),
+      );
       useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
       useHistoryStore.getState().clear();
       void clearSession();

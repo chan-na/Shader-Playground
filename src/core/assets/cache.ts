@@ -1,3 +1,4 @@
+import { log, normalizeError } from "../../utils/log";
 import type { MeshAttribute, MeshData } from "../gl/mesh";
 import type {
   AudioAssetHandle,
@@ -170,7 +171,8 @@ export async function loadCachedMesh(
       tx(db, STORE_MESH, "readonly").get(id),
     );
     return record ? deserializeMesh(record) : null;
-  } catch {
+  } catch (e) {
+    log.warn("autosave", "loadCachedMesh failed", normalizeError(e));
     return null;
   }
 }
@@ -196,7 +198,8 @@ export async function loadCachedImage(id: string): Promise<{
       bitmap,
     };
     return { handle, blob: record.blob };
-  } catch {
+  } catch (e) {
+    log.warn("autosave", "loadCachedImage failed", normalizeError(e));
     return null;
   }
 }
@@ -205,9 +208,14 @@ export async function deleteCachedMesh(id: string): Promise<void> {
   try {
     const db = await openDb();
     await awaitRequest(tx(db, STORE_MESH, "readwrite").delete(id));
-  } catch {
+  } catch (e) {
     // Swallow — caller already removed the in-memory entry; an orphan IDB
     // record will be overwritten or eventually cleared by quota pressure.
+    log.debug(
+      "autosave",
+      "deleteCachedMesh failed (best-effort)",
+      normalizeError(e),
+    );
   }
 }
 
@@ -215,8 +223,13 @@ export async function deleteCachedImage(id: string): Promise<void> {
   try {
     const db = await openDb();
     await awaitRequest(tx(db, STORE_IMAGE, "readwrite").delete(id));
-  } catch {
+  } catch (e) {
     // See deleteCachedMesh.
+    log.debug(
+      "autosave",
+      "deleteCachedImage failed (best-effort)",
+      normalizeError(e),
+    );
   }
 }
 
@@ -256,7 +269,8 @@ export async function loadCachedVideo(id: string): Promise<{
       mimeType: record.mimeType,
     };
     return { handle, blob: record.blob };
-  } catch {
+  } catch (e) {
+    log.warn("autosave", "loadCachedVideo failed", normalizeError(e));
     return null;
   }
 }
@@ -265,8 +279,13 @@ export async function deleteCachedVideo(id: string): Promise<void> {
   try {
     const db = await openDb();
     await awaitRequest(tx(db, STORE_VIDEO, "readwrite").delete(id));
-  } catch {
+  } catch (e) {
     // See deleteCachedMesh.
+    log.debug(
+      "autosave",
+      "deleteCachedVideo failed (best-effort)",
+      normalizeError(e),
+    );
   }
 }
 
@@ -306,7 +325,8 @@ export async function loadCachedAudio(id: string): Promise<{
       mimeType: record.mimeType,
     };
     return { handle, blob: record.blob };
-  } catch {
+  } catch (e) {
+    log.warn("autosave", "loadCachedAudio failed", normalizeError(e));
     return null;
   }
 }
@@ -315,7 +335,12 @@ export async function deleteCachedAudio(id: string): Promise<void> {
   try {
     const db = await openDb();
     await awaitRequest(tx(db, STORE_AUDIO, "readwrite").delete(id));
-  } catch {
+  } catch (e) {
     // See deleteCachedMesh.
+    log.debug(
+      "autosave",
+      "deleteCachedAudio failed (best-effort)",
+      normalizeError(e),
+    );
   }
 }

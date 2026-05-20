@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { log, normalizeError } from "../utils/log";
 import { toast } from "./toastStore";
 
 type RecorderStatus = "idle" | "recording";
@@ -37,8 +38,12 @@ function pickMimeType(): string | null {
   for (const m of candidates) {
     try {
       if (MediaRecorder.isTypeSupported(m)) return m;
-    } catch {
-      /* ignore */
+    } catch (e) {
+      log.warn(
+        "app",
+        `MediaRecorder.isTypeSupported threw for ${m}`,
+        normalizeError(e),
+      );
     }
   }
   return null;

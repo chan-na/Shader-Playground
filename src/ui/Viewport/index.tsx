@@ -26,6 +26,7 @@ import { useRendererStore } from "../../state/rendererStore";
 import { thumbnailScheduler } from "../../state/thumbnailScheduler";
 import { useTimeStore } from "../../state/timeStore";
 import { useViewportStore } from "../../state/viewportStore";
+import { log, normalizeError } from "../../utils/log";
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -240,8 +241,13 @@ export function Viewport() {
           for (const r of asyncReadback.poll(gl)) {
             thumbnailScheduler.commit(r.nodeId, r.image, now);
           }
-        } catch {
+        } catch (e) {
           // Poll failure (e.g., context lost) — drop this frame's results.
+          log.debug(
+            "render",
+            "thumbnail readback poll failed",
+            normalizeError(e),
+          );
         }
         rafId = requestAnimationFrame(tick);
         return;
@@ -307,8 +313,9 @@ export function Viewport() {
             const store = useGpuTimerStore.getState();
             for (const s of samples) store.setSample(s.nodeId, s.ms);
           }
-        } catch {
+        } catch (e) {
           // Poll failure (context lost or driver quirk) — drop this batch.
+          log.debug("render", "GPU timer poll failed", normalizeError(e));
         }
       }
 
@@ -321,8 +328,13 @@ export function Viewport() {
         for (const r of asyncReadback.poll(gl)) {
           thumbnailScheduler.commit(r.nodeId, r.image, now);
         }
-      } catch {
+      } catch (e) {
         // Poll failure (e.g., context lost) — drop this frame's results.
+        log.debug(
+          "render",
+          "thumbnail readback poll failed",
+          normalizeError(e),
+        );
       }
       const ready = thumbnailScheduler.pickReady(now);
       if (ready.length) {

@@ -11,6 +11,7 @@ import { useAssetStore } from "../../state/assetStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { nextId } from "../../utils/id";
+import { log, normalizeError } from "../../utils/log";
 
 export function AssetBrowser() {
   const meshes = useAssetStore((s) => s.meshes);
@@ -368,8 +369,8 @@ function ImageThumbnail({
         ctx.clearRect(0, 0, 32, 32);
         try {
           ctx.drawImage(bitmap as CanvasImageSource, 0, 0, 32, 32);
-        } catch {
-          /* ignore */
+        } catch (e) {
+          log.debug("assets", "thumbnail drawImage failed", normalizeError(e));
         }
       }}
       style={{ width: 32, height: 32, borderRadius: 2, background: "#1a1a1a" }}

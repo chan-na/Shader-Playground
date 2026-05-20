@@ -21,6 +21,8 @@
  * edits a shader.
  */
 
+import { log, normalizeError } from "../../utils/log";
+
 interface WebcamExternalSpec {
   nodeId: string;
   kind: "webcam";
@@ -358,22 +360,22 @@ function disposeHandle(h: ExternalHandle, gl?: WebGL2RenderingContext) {
     }
     try {
       h.video.srcObject = null;
-    } catch {
-      // ignore — some test environments stub the property
+    } catch (e) {
+      log.debug("external", "webcam srcObject reset failed", normalizeError(e));
     }
   } else if (h.kind === "video") {
     try {
       if (typeof h.video.pause === "function") h.video.pause();
       h.video.removeAttribute("src");
       h.video.load?.();
-    } catch {
-      // ignore — jsdom may stub these
+    } catch (e) {
+      log.debug("external", "video element teardown failed", normalizeError(e));
     }
     if (h.objectUrl && typeof URL !== "undefined" && URL.revokeObjectURL) {
       try {
         URL.revokeObjectURL(h.objectUrl);
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug("external", "revokeObjectURL failed", normalizeError(e));
       }
     }
     h.objectUrl = null;
@@ -382,21 +384,33 @@ function disposeHandle(h: ExternalHandle, gl?: WebGL2RenderingContext) {
     if (h.bufferSource) {
       try {
         h.bufferSource.stop();
-      } catch {
-        // ignore — may not have been started, or already stopped
+      } catch (e) {
+        log.debug(
+          "external",
+          "bufferSource.stop on dispose failed",
+          normalizeError(e),
+        );
       }
       try {
         h.bufferSource.disconnect();
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug(
+          "external",
+          "bufferSource.disconnect failed",
+          normalizeError(e),
+        );
       }
       h.bufferSource = null;
     }
     if (h.micSourceNode) {
       try {
         h.micSourceNode.disconnect();
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug(
+          "external",
+          "micSourceNode.disconnect failed",
+          normalizeError(e),
+        );
       }
       h.micSourceNode = null;
     }
@@ -407,8 +421,8 @@ function disposeHandle(h: ExternalHandle, gl?: WebGL2RenderingContext) {
     if (h.analyser) {
       try {
         h.analyser.disconnect();
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug("external", "analyser.disconnect failed", normalizeError(e));
       }
       h.analyser = null;
     }
@@ -416,8 +430,8 @@ function disposeHandle(h: ExternalHandle, gl?: WebGL2RenderingContext) {
       // close() returns a Promise — we don't await on dispose paths.
       try {
         void h.audioContext.close();
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug("external", "audioContext.close failed", normalizeError(e));
       }
       h.audioContext = null;
     }
@@ -492,13 +506,14 @@ async function startWebcam(handle: WebcamHandle, deviceId: string | undefined) {
         if (p && typeof p.catch === "function") {
           p.catch(() => {});
         }
-      } catch {
-        // ignore — play attempt failed
+      } catch (e) {
+        log.debug("external", "webcam play() failed", normalizeError(e));
       }
     }
     handle.ready = true;
   } catch (e) {
     handle.error = String(e);
+    log.warn("external", "webcam acquisition failed", normalizeError(e));
   }
 }
 
@@ -546,6 +561,7 @@ function acquireVideo(spec: VideoExternalSpec): VideoHandle {
     handle.objectUrl = URL.createObjectURL(blob);
   } catch (e) {
     handle.error = String(e);
+    log.warn("external", "video object URL creation failed", normalizeError(e));
     return handle;
   }
   if ("src" in handle.video) {
@@ -557,16 +573,20 @@ function acquireVideo(spec: VideoExternalSpec): VideoHandle {
     if (typeof spec.currentTime === "number") {
       try {
         handle.video.currentTime = spec.currentTime;
-      } catch {
-        // ignore — seek may fail before metadata loads
+      } catch (e) {
+        log.debug(
+          "external",
+          "video seek before metadata failed",
+          normalizeError(e),
+        );
       }
     }
     if (spec.playing && typeof handle.video.play === "function") {
       try {
         const p = handle.video.play();
         if (p && typeof p.catch === "function") p.catch(() => {});
-      } catch {
-        // ignore — jsdom or autoplay policy
+      } catch (e) {
+        log.debug("external", "video play() failed", normalizeError(e));
       }
     }
   };
@@ -587,8 +607,8 @@ function acquireVideo(spec: VideoExternalSpec): VideoHandle {
   if (typeof handle.video.load === "function") {
     try {
       handle.video.load();
-    } catch {
-      // ignore
+    } catch (e) {
+      log.debug("external", "video load() failed", normalizeError(e));
     }
   }
   return handle;
@@ -609,14 +629,14 @@ function applyVideoSpec(handle: VideoHandle, spec: VideoExternalSpec) {
       try {
         const p = v.play();
         if (p && typeof p.catch === "function") p.catch(() => {});
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug("external", "video play() toggle failed", normalizeError(e));
       }
     } else if (!spec.playing && typeof v.pause === "function") {
       try {
         v.pause();
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug("external", "video pause() toggle failed", normalizeError(e));
       }
     }
   }
@@ -627,8 +647,8 @@ function applyVideoSpec(handle: VideoHandle, spec: VideoExternalSpec) {
   ) {
     try {
       v.currentTime = spec.currentTime;
-    } catch {
-      // ignore
+    } catch (e) {
+      log.debug("external", "video currentTime seek failed", normalizeError(e));
     }
   }
 }
@@ -705,8 +725,12 @@ async function startAudioMic(handle: AudioHandle) {
     try {
       const p = ctx.resume();
       if (p && typeof p.catch === "function") p.catch(() => {});
-    } catch {
-      // ignore
+    } catch (e) {
+      log.debug(
+        "external",
+        "audio context resume (mic) failed",
+        normalizeError(e),
+      );
     }
     const src = ctx.createMediaStreamSource(stream);
     src.connect(analyser);
@@ -714,6 +738,7 @@ async function startAudioMic(handle: AudioHandle) {
     handle.ready = true;
   } catch (e) {
     handle.error = String(e);
+    log.warn("external", "audio mic acquisition failed", normalizeError(e));
   }
 }
 
@@ -746,6 +771,7 @@ async function startAudioFile(handle: AudioHandle) {
     if (spec.playing) startAudioBufferSource(handle);
   } catch (e) {
     handle.error = String(e);
+    log.warn("external", "audio file decode failed", normalizeError(e));
   }
 }
 
@@ -759,8 +785,12 @@ function startAudioBufferSource(handle: AudioHandle) {
   try {
     const p = ctx.resume();
     if (p && typeof p.catch === "function") p.catch(() => {});
-  } catch {
-    // ignore
+  } catch (e) {
+    log.debug(
+      "external",
+      "audio context resume (file) failed",
+      normalizeError(e),
+    );
   }
   const source = ctx.createBufferSource();
   source.buffer = buffer;
@@ -780,13 +810,13 @@ function stopAudioBufferSource(handle: AudioHandle) {
   if (!handle.bufferSource) return;
   try {
     handle.bufferSource.stop();
-  } catch {
-    // ignore — may not yet have started
+  } catch (e) {
+    log.debug("external", "bufferSource.stop failed", normalizeError(e));
   }
   try {
     handle.bufferSource.disconnect();
-  } catch {
-    // ignore
+  } catch (e) {
+    log.debug("external", "bufferSource.disconnect failed", normalizeError(e));
   }
   handle.bufferSource = null;
 }

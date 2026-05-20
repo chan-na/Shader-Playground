@@ -1,6 +1,13 @@
 // fake-indexeddb shim — jsdom omits IndexedDB; auto-import installs an in-memory
 // IDBFactory on globalThis so cache.ts / autoSave.ts IDB paths are testable.
 import "fake-indexeddb/auto";
+import { setMinLevel } from "./utils/log";
+
+// Keep the dev logger's console mirroring quiet under tests — the P3 catch-site
+// traces would otherwise flood test output. The buffer still records every
+// entry, so tests asserting log behavior are unaffected (log.test.ts sets its
+// own level).
+setMinLevel("error");
 
 // Minimal ImageData polyfill for jsdom (which omits the Canvas/ImageData APIs).
 if (typeof globalThis.ImageData === "undefined") {

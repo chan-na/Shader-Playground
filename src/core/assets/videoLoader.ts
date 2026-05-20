@@ -1,3 +1,4 @@
+import { log, normalizeError } from "../../utils/log";
 import type { VideoAssetHandle } from "./types";
 
 /**
@@ -57,8 +58,12 @@ function probeMetadata(
       video.removeAttribute("src");
       try {
         video.load();
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug(
+          "assets",
+          "video probe cleanup load() failed",
+          normalizeError(e),
+        );
       }
     };
     video.addEventListener(
@@ -79,6 +84,7 @@ function probeMetadata(
       () => {
         const detail = formatMediaError(video.error);
         cleanup();
+        log.warn("assets", "video metadata probe failed", detail);
         reject(new Error(`failed to decode video metadata (${detail})`));
       },
       { once: true },

@@ -39,4 +39,13 @@ describe("rendererStore", () => {
     useRendererStore.getState().clearErrors();
     expect(useRendererStore.getState().stats.errors).toEqual([]);
   });
+
+  it("pushError caps retained errors at 50 (most recent kept)", () => {
+    const push = useRendererStore.getState().pushError;
+    for (let i = 0; i < 60; i++) push(`e${i}`);
+    const { errors } = useRendererStore.getState().stats;
+    expect(errors.length).toBe(50);
+    expect(errors[0]).toBe("e10");
+    expect(errors[errors.length - 1]).toBe("e59");
+  });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { clearLogBuffer, getLogBuffer } from "../../utils/log";
 import { createFakeGl } from "./fakeGl";
 import {
   createProgram,
@@ -60,6 +61,17 @@ describe("createProgram", () => {
     const gl = createFakeGl();
     const r = createProgram(gl, VS, FS);
     expect(() => disposeProgram(gl, r.program!)).not.toThrow();
+  });
+
+  it("surfaces a post-link GL error via the logger (still returns the program)", () => {
+    clearLogBuffer();
+    const gl = createFakeGl({ glError: 0x0502 });
+    const r = createProgram(gl, VS, FS);
+    expect(r.program).not.toBeNull();
+    const buf = getLogBuffer();
+    const entry = buf[buf.length - 1];
+    expect(entry?.category).toBe("gl");
+    expect(entry?.message).toContain("createProgram");
   });
 });
 

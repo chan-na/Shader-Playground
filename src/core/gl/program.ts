@@ -1,3 +1,5 @@
+import { checkGlError } from "./glError";
+
 export interface ShaderError {
   stage: "vertex" | "fragment" | "link";
   line?: number;
@@ -80,6 +82,7 @@ export function createProgram(
       errors: [...errors, { stage: "link", message: log, raw: log }],
     };
   }
+  checkGlError(gl, "createProgram");
 
   const attributes: Record<string, number> = {};
   const uniforms: Record<string, WebGLUniformLocation | null> = {};
@@ -160,6 +163,7 @@ export function createTransformFeedbackProgram(
       errors: [...errors, { stage: "link", message: log, raw: log }],
     };
   }
+  checkGlError(gl, "createTransformFeedbackProgram");
 
   const attributes: Record<string, number> = {};
   const uniforms: Record<string, WebGLUniformLocation | null> = {};

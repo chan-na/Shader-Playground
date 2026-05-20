@@ -20,6 +20,8 @@ interface FakeGlOptions {
   resourceFailure?: boolean;
   /** Override checkFramebufferStatus return value. */
   framebufferStatus?: number;
+  /** First getError() return value (one-shot; subsequent calls return 0). */
+  glError?: number;
 }
 
 const CONSTANTS = {
@@ -73,8 +75,13 @@ export function createFakeGl(opts: FakeGlOptions = {}): WebGL2RenderingContext {
   const handle = (): unknown =>
     opts.resourceFailure ? null : { __id: ++_counter };
 
+  // getError clears one flag per call — model that with a one-shot queue so the
+  // drain loop in checkGlError terminates instead of spinning on a sticky code.
+  const errorQueue: number[] = opts.glError !== undefined ? [opts.glError] : [];
+
   const gl = {
     ...CONSTANTS,
+    getError: () => errorQueue.shift() ?? 0,
 
     // Shader / program lifecycle
     createShader: handle,

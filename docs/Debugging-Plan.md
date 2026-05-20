@@ -14,8 +14,8 @@
 | ----- | ---- | ---- | -- | ---- |
 | P1 | 중앙 로거 `src/utils/log.ts` | ✅ 머지됨 | #41 | `log.ts` + `log.test.ts`. 게이트 초록 |
 | P2 | 전역 안전망 (onerror / unhandledrejection / ErrorBoundary) | ✅ 머지됨 | #41 | main.tsx 핸들러 + `ErrorBoundary.tsx`(메인 작업영역만 감쌈) |
-| P3 | 침묵 catch → 로거 교체 (registry/assets/autosave) | ✅ 구현완료 (PR 대기) | - | 동작 불변, 흔적만. registry/audio·videoLoader/recorder/autoSave/cache/AssetBrowser/WebcamInspector/BootstrapGate/Viewport + rendererStore.errors 상한 50. test-setup `setMinLevel("error")`로 로그 노이즈 차단. 게이트 초록 |
-| P4 | GL 에러 표면화 (`gl.getError()` + 컨텍스트 손실 상세) | ⬜ 미착수 | - | DEV 플래그 뒤 |
+| P3 | 침묵 catch → 로거 교체 (registry/assets/autosave) | ✅ 머지됨 | #42 | 동작 불변, 흔적만. registry/audio·videoLoader/recorder/autoSave/cache/AssetBrowser/WebcamInspector/BootstrapGate/Viewport + rendererStore.errors 상한 50. test-setup `setMinLevel("error")`로 로그 노이즈 차단 |
+| P4 | GL 에러 표면화 (`gl.getError()` + 컨텍스트 손실 상세) | ✅ 구현완료 (PR 대기) | - | 신규 `core/gl/glError.ts`(DEV 게이트 + 큐 드레인). program 링크·FBO 셋업·드로우 루프(120프레임 스로틀)·context lost/restored 로깅. fakeGl `getError`(one-shot) 보강. glError.test + program/framebuffer.test 보강. 게이트 초록 |
 | P5 | 진단 패널 + "진단 정보 복사" | ⬜ 미착수 | - | E2E 1건 동반 |
 
 상태 범례: ⬜ 미착수 / 🟨 진행중 / ✅ 완료
@@ -183,9 +183,13 @@ export function setMinLevel(level: LogLevel): void;  // 기본 DEV=debug, PROD=w
 - `fakeGl.ts`(테스트 더블)가 `getError`를 지원하는지 확인하고, 없으면 no-op 반환하도록 보강.
 
 **게이트 체크리스트**:
-- [ ] `program.test.ts` / `framebuffer.test.ts` 보강
-- [ ] `fakeGl.ts`에 `getError`/context-lost 시뮬레이션 추가 시 기존 테스트 영향 확인
-- [ ] 드로우 루프 성능 회귀 없는지(E2E의 FPS/renderTick 관련 스펙 확인)
+- [x] `program.test.ts` / `framebuffer.test.ts` 보강 (post-link GL 에러 로깅 / FBO 불완전 warn 검증)
+- [x] `fakeGl.ts`에 `getError` (one-shot 큐) 추가 — 기존 program/framebuffer 테스트 영향 없음
+- [x] 드로우 루프 성능 회귀 없음. getError는 DEV 한정 + 120프레임 스로틀 → 프로덕션 비용 0
+
+**구현 결정**:
+- **드로우 루프 getError 토글**: 별도 store/UI 토글 대신 **DEV 한정 + 120프레임 스로틀**로 자체 완결. 셋업 시점(program 링크·FBO)은 무조건, 드로우 루프만 스로틀.
+- 신규 `checkGlError(gl, context)`는 DEV 외에서 컨텍스트를 건드리지 않고 0 반환 → 핫패스 안전. getError 큐를 bounded drain 하여 stale 에러 오귀속 방지.
 
 ---
 

@@ -300,6 +300,32 @@ describe("sanitizeGraphNode — shader", () => {
       );
     }
   });
+
+  it("preserves a valid resolutionScale and drops invalid ones", () => {
+    const ok = sanitizeGraphNode({
+      id: "s",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "",
+      uniformValues: {},
+      resolutionScale: 0.5,
+    });
+    expect(ok.ok && ok.node.kind === "shader" && ok.node.resolutionScale).toBe(
+      0.5,
+    );
+
+    const bad = sanitizeGraphNode({
+      id: "s",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "",
+      uniformValues: {},
+      resolutionScale: 0.75,
+    });
+    if (bad.ok && bad.node.kind === "shader") {
+      expect(bad.node.resolutionScale).toBeUndefined();
+    }
+  });
 });
 
 describe("sanitizeGraphNode — compute", () => {

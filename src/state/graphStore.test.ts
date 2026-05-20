@@ -82,6 +82,25 @@ describe("graphStore", () => {
     expect(after.rev).toBe(before.rev);
   });
 
+  it("setResolutionScale sets the field and bumps rev (structural)", () => {
+    useGraphStore.getState().addNode(makeShader("s1"));
+    const before = useGraphStore.getState();
+    useGraphStore.getState().setResolutionScale("s1", 0.5);
+    const after = useGraphStore.getState();
+    expect((after.nodes[0] as ShaderGraphNode).resolutionScale).toBe(0.5);
+    expect(after.rev).toBe(before.rev + 1);
+  });
+
+  it("setResolutionScale ignores non-shader nodes", () => {
+    useGraphStore
+      .getState()
+      .addNode({ id: "m1", kind: "mesh", primitive: "cube" });
+    useGraphStore.getState().setResolutionScale("m1", 0.25);
+    const node = useGraphStore.getState().nodes[0];
+    expect(node?.kind).toBe("mesh");
+    expect(node && "resolutionScale" in node).toBe(false);
+  });
+
   it("updateComputeSource patches vertexSource and bumps rev (Phase 13)", () => {
     const cn: ComputeGraphNode = {
       id: "c1",

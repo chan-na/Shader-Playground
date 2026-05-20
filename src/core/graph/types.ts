@@ -85,11 +85,25 @@ export interface AudioGraphNode extends BaseNode {
   loop: boolean;
 }
 
+/**
+ * Per-pass render resolution multiplier. The pass's FBO is allocated at
+ * `round(canvas × scale)`; downstream passes still sample it through
+ * normalized UVs, so a smaller scale produces a downsampled intermediate
+ * (bloom / gaussian-pyramid style chains). Absent ⇒ treated as 1.
+ */
+export type ResolutionScale = 0.25 | 0.5 | 1;
+
+export const RESOLUTION_SCALES: readonly ResolutionScale[] = [
+  0.25, 0.5, 1,
+] as const;
+
 export interface ShaderGraphNode extends BaseNode {
   kind: "shader";
   vertexSource: string;
   fragmentSource: string;
   uniformValues: Record<string, number | number[]>;
+  /** Render-target resolution multiplier (default 1 when omitted). */
+  resolutionScale?: ResolutionScale;
 }
 
 interface OutputGraphNode extends BaseNode {

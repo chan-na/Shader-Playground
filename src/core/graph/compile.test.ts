@@ -4,7 +4,7 @@ import {
   disposeAllExternal,
   externalHandleCount,
 } from "../external/registry";
-import { compileGraph, emptyPlan } from "./compile";
+import { compileGraph, emptyPlan, scaledDimensions } from "./compile";
 import type { Graph } from "./types";
 
 // compileGraph is heavily GL-coupled — most paths require a real
@@ -32,6 +32,32 @@ describe("emptyPlan", () => {
     expect(plan.hasExternal).toBe(false);
     expect(typeof plan.dispose).toBe("function");
     expect(() => plan.dispose()).not.toThrow();
+  });
+});
+
+describe("scaledDimensions", () => {
+  it("returns full canvas dimensions at scale 1", () => {
+    expect(scaledDimensions(800, 600, 1)).toEqual({ width: 800, height: 600 });
+  });
+
+  it("halves and quarters dimensions, rounding to nearest integer", () => {
+    expect(scaledDimensions(800, 600, 0.5)).toEqual({
+      width: 400,
+      height: 300,
+    });
+    expect(scaledDimensions(800, 600, 0.25)).toEqual({
+      width: 200,
+      height: 150,
+    });
+    // 401 * 0.5 = 200.5 → rounds to 201 (nearest), not floored.
+    expect(scaledDimensions(401, 401, 0.5)).toEqual({
+      width: 201,
+      height: 201,
+    });
+  });
+
+  it("clamps to at least 1px so a tiny canvas never collapses to 0", () => {
+    expect(scaledDimensions(2, 2, 0.25)).toEqual({ width: 1, height: 1 });
   });
 });
 

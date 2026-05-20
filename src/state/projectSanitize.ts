@@ -250,6 +250,13 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
         fragmentSource,
         uniformValues: sanitizeUniformValues(raw.uniformValues),
       };
+      if (
+        raw.resolutionScale === 0.25 ||
+        raw.resolutionScale === 0.5 ||
+        raw.resolutionScale === 1
+      ) {
+        node.resolutionScale = raw.resolutionScale;
+      }
       return node;
     }
     case "compute": {

@@ -852,7 +852,19 @@
       var compiled = createProgram(gl, vertSrc, sn.fragmentSource);
       if (!compiled) return;
       var mesh = uploadMesh(gl, meshData, compiled.attributes);
-      var fbo = createFBO(gl, W, H);
+      // Per-pass resolution scale (0.25 | 0.5 | 1; absent ⇒ 1). Viewport and
+      // u_resolution already read pass.fbo.w/h, so scaling the FBO is enough.
+      var scale =
+        sn.resolutionScale === 0.25 ||
+        sn.resolutionScale === 0.5 ||
+        sn.resolutionScale === 1
+          ? sn.resolutionScale
+          : 1;
+      var fbo = createFBO(
+        gl,
+        Math.max(1, Math.round(W * scale)),
+        Math.max(1, Math.round(H * scale)),
+      );
 
       var samplers = [];
       var paramBindings = [];

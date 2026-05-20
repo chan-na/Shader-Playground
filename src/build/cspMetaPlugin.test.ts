@@ -46,6 +46,13 @@ describe("CSP_CONTENT policy", () => {
     expect(CSP_CONTENT).toMatch(/img-src [^;]*blob:/);
   });
 
+  it("allows blob: media sources for imported video / audio assets", () => {
+    const directives = CSP_CONTENT.split(";").map((d) => d.trim());
+    const mediaSrc = directives.find((d) => d.startsWith("media-src "));
+    expect(mediaSrc).toBeDefined();
+    expect(mediaSrc).toMatch(/blob:/);
+  });
+
   it("locks down object-src, base-uri, form-action, frame-ancestors", () => {
     expect(CSP_CONTENT).toContain("object-src 'none'");
     expect(CSP_CONTENT).toContain("base-uri 'self'");

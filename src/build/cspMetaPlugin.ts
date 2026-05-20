@@ -17,6 +17,11 @@ import type { Plugin } from "vite";
  *   styling overhaul (out of scope for this guard).
  * - `img-src` allows `data:` and `blob:` for asset thumbnails and viewport
  *   snapshots.
+ * - `media-src 'self' blob:` — imported video/audio assets are mounted on
+ *   `<video>` / `<audio>` elements via `URL.createObjectURL`. Without this the
+ *   policy falls back to `default-src 'self'` and Chrome rejects the blob URL
+ *   with MEDIA_ERR_SRC_NOT_SUPPORTED ("Media load rejected by URL safety
+ *   check"). Dev is unaffected because the meta is build-only.
  * - `connect-src 'self'` — the app does no external fetch.
  * - `worker-src 'self' blob:` — leaves room for future worker offloading
  *   without re-touching CSP.
@@ -28,6 +33,7 @@ export const CSP_CONTENT = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
+  "media-src 'self' blob:",
   "font-src 'self'",
   "connect-src 'self'",
   "worker-src 'self' blob:",

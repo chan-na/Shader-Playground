@@ -116,6 +116,20 @@ export interface SpStores {
       reset: () => void;
     };
   };
+  mouse: {
+    getState: () => {
+      x: number;
+      y: number;
+      clickX: number;
+      clickY: number;
+      down: boolean;
+      rev: number;
+      setPosition: (x: number, y: number) => void;
+      setDown: (x: number, y: number) => void;
+      setUp: () => void;
+      reset: () => void;
+    };
+  };
   renderer: {
     getState: () => {
       ready: boolean;

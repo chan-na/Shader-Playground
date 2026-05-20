@@ -81,6 +81,9 @@ export interface ShaderPass {
   /** Edges that override a uniform's value with a parameter node. */
   paramBindings: ParamBinding[];
   uniformValues: Record<string, number | number[]>;
+  /** FBO dimensions after applying the node's resolutionScale. */
+  width: number;
+  height: number;
 }
 
 interface ComputeAttributeSlot {
@@ -164,6 +167,21 @@ export function emptyPlan(width: number, height: number): ExecutionPlan {
     hasCompute: false,
     hasExternal: false,
     dispose: () => {},
+  };
+}
+
+/**
+ * Apply a per-pass resolution multiplier to canvas dimensions. Rounds and
+ * clamps to ≥ 1 px so a tiny canvas at 0.25× never collapses to a 0-sized FBO.
+ */
+export function scaledDimensions(
+  width: number,
+  height: number,
+  scale: number,
+): { width: number; height: number } {
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
   };
 }
 
@@ -534,7 +552,12 @@ export function compileGraph(
     if (built.errors.length) shaderErrors[sn.id] = built.errors;
     if (!built.program) continue;
 
-    const fbo = createFramebuffer(gl, opts.width, opts.height);
+    const { width: passWidth, height: passHeight } = scaledDimensions(
+      opts.width,
+      opts.height,
+      sn.resolutionScale ?? 1,
+    );
+    const fbo = createFramebuffer(gl, passWidth, passHeight);
     let mesh: GLMesh;
     let meshComputeVaos:
       | [WebGLVertexArrayObject, WebGLVertexArrayObject]
@@ -611,6 +634,8 @@ export function compileGraph(
       samplers,
       paramBindings,
       uniformValues: { ...sn.uniformValues },
+      width: passWidth,
+      height: passHeight,
     };
     passes.push(pass);
     passByNode.set(sn.id, pass);

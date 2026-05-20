@@ -260,6 +260,9 @@ export function cloneGraphNode(n: GraphNode): GraphNode {
         vertexSource: n.vertexSource,
         fragmentSource: n.fragmentSource,
         uniformValues: cloneUniformValues(n.uniformValues),
+        ...(n.resolutionScale !== undefined && {
+          resolutionScale: n.resolutionScale,
+        }),
       };
     case "compute":
       return {

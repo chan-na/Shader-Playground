@@ -3,10 +3,12 @@ import type {
   AudioGraphNode,
   ComputeGraphNode,
   ParamGraphNode,
+  ResolutionScale,
   ShaderGraphNode,
   VideoGraphNode,
   WebcamGraphNode,
 } from "../../core/graph/types";
+import { RESOLUTION_SCALES } from "../../core/graph/types";
 import {
   inspectorUniforms,
   parseUniforms,
@@ -40,6 +42,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
     (s) => s.nodes.find((n) => n.id === effectiveId) ?? null,
   );
   const setUniformValue = useGraphStore((s) => s.setUniformValue);
+  const setResolutionScale = useGraphStore((s) => s.setResolutionScale);
 
   const shaderNode = node?.kind === "shader" ? (node as ShaderGraphNode) : null;
   const computeNode =
@@ -161,6 +164,41 @@ export function Inspector({ embedded = false }: InspectorProps) {
                     </span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {shaderNode && (
+            <div className="inspector-section">
+              <div className="inspector-label">Render resolution</div>
+              <select
+                value={shaderNode.resolutionScale ?? 1}
+                onChange={(e) =>
+                  setResolutionScale(
+                    shaderNode.id,
+                    Number(e.target.value) as ResolutionScale,
+                  )
+                }
+                data-testid="resolution-scale"
+                style={{
+                  width: "100%",
+                  padding: "4px 8px",
+                  fontSize: 12,
+                  background: "#1a1a1a",
+                  color: "#ddd",
+                  border: "1px solid #333",
+                  borderRadius: 3,
+                  boxSizing: "border-box",
+                }}
+              >
+                {RESOLUTION_SCALES.map((s) => (
+                  <option key={s} value={s}>
+                    {s === 1 ? "1× (full)" : `${s}×`}
+                  </option>
+                ))}
+              </select>
+              <div style={{ color: "#666", fontSize: 11, marginTop: 4 }}>
+                이 패스의 FBO 해상도 배율 (다운샘플 체인용).
               </div>
             </div>
           )}

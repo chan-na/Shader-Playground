@@ -59,10 +59,10 @@ function bindSystemUniforms(
 ) {
   const u = pass.program.uniforms;
   setUniform(gl, u.u_time ?? null, ctx.time);
-  setUniform(gl, u.u_resolution ?? null, [ctx.width, ctx.height]);
+  setUniform(gl, u.u_resolution ?? null, [pass.width, pass.height]);
   if (!pass.meshIsFullscreen) {
     viewMatrix(ctx.camera, _view);
-    projMatrix(ctx.camera, ctx.width / Math.max(1, ctx.height), _proj);
+    projMatrix(ctx.camera, pass.width / Math.max(1, pass.height), _proj);
     modelMatrix(_model);
     setUniform(gl, u.u_view ?? null, _view as Float32Array);
     setUniform(gl, u.u_proj ?? null, _proj as Float32Array);
@@ -244,7 +244,7 @@ export function executePlan(
       continue;
     }
     bindFramebuffer(gl, pass.fbo);
-    gl.viewport(0, 0, plan.width, plan.height);
+    gl.viewport(0, 0, pass.width, pass.height);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (pass.meshIsFullscreen) {

@@ -51,6 +51,7 @@ export interface SpStores {
         name: string,
         value: number | number[],
       ) => void;
+      setResolutionScale: (id: string, scale: 0.25 | 0.5 | 1) => void;
       reset: () => void;
     };
   };

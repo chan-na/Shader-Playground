@@ -14,6 +14,7 @@ import type {
   MathGraphNode,
   MathOp,
   ParamGraphNode,
+  ResolutionScale,
   ShaderGraphNode,
   SwizzleGraphNode,
   VideoGraphNode,
@@ -38,6 +39,7 @@ export interface GraphState {
     patch: { vertexSource?: string; fragmentSource?: string },
   ) => void;
   setUniformValue: (id: string, name: string, value: number | number[]) => void;
+  setResolutionScale: (id: string, scale: ResolutionScale) => void;
   setParamValue: (id: string, value: number | number[]) => void;
   setParamLabel: (id: string, label: string) => void;
   setMathConfig: (
@@ -179,6 +181,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }),
       uniformRev: s.uniformRev + 1,
     })),
+  setResolutionScale: (id, scale) => {
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== "shader") return n;
+        return { ...(n as ShaderGraphNode), resolutionScale: scale };
+      }),
+      rev: s.rev + 1,
+    }));
+  },
   setParamValue: (id, value) =>
     set((s) => ({
       nodes: s.nodes.map((n) => {

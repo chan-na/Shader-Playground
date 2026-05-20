@@ -269,6 +269,15 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **진단 패널 + 진단 정보 복사**: StatusBar `🛈 Diagnostics` 토글이 `debugUiStore.open` 을 켠다. `DiagnosticsPanel` 은 `subscribeLog` 로 실시간 갱신되는 로그 리스트(레벨/카테고리 필터 + Clear), `Copy` 는 `buildDiagnosticsReport`(로그 + GL renderer/version + 렌더 통계 + userAgent/화면/DPR + 그래프 노드·엣지 수)를 클립보드로(미지원 환경은 안전 폴백). GL 어댑터 identity 는 컨텍스트 생성 시 `rendererStore.glInfo` 에 1회 캡처.
 - **검증**: Vitest 단위 — `log.test.ts`, `debugUiStore.test.ts`, `diagnosticsReport.test.ts`, `DiagnosticsPanel.test.tsx`, `glError.test.ts` + program/framebuffer 보강. Playwright E2E `phase-16-diagnostics.spec.ts` — StatusBar 토글로 패널 열기 → 버퍼의 로그 엔트리 표시 → Clear 동작.
 
+### Phase 17 — Pass별 해상도 스케일 (완료)
+다운샘플 기반 효과(블룸·가우시안 피라미드 등)를 위해 단일 `plan.width × plan.height` FBO 가정을 깨고 패스별 렌더 타깃 해상도를 도입.
+- **모델**: `ShaderGraphNode.resolutionScale?: 0.25 | 0.5 | 1`(`RESOLUTION_SCALES`). 생략 시 1 로 간주 — 기존 저장본/공유 URL 무손상. 구조 변경이므로 setter(`graphStore.setResolutionScale`)는 `rev` 증가 + history push → recompile.
+- **컴파일**: `compile.ts` 의 `scaledDimensions(w, h, scale)` 헬퍼가 `round(canvas × scale)` 로 패스별 FBO 크기를 결정(1px 하한). `ShaderPass` 에 `width/height` 저장. sampler 라우팅은 정규화 UV 라 해상도가 달라도 그대로 동작.
+- **실행**: `execute.ts` 가 패스별 `gl.viewport` 와 `u_resolution` 을 `pass.width/height` 로 바인딩(이전엔 전역 `plan.width/height`). 카메라 proj aspect 도 패스 치수 기준(균일 스케일이라 비율 불변).
+- **UI**: Inspector 에 셰이더 노드 전용 `Render resolution` 드롭다운(`data-testid="resolution-scale"`).
+- **정적 export**: `standalonePlayer.js` 는 이미 `pass.fbo.w/h` 단위로 viewport·u_resolution 을 처리하므로 `createFBO` 에 스케일만 반영. `projectSanitize`·`cloneGraphNode` 가 필드 검증/보존.
+- **검증**: Vitest — `scaledDimensions`(compile.test) 라운딩/클램프, `graphStore.setResolutionScale`(rev·비셰이더 무시), `projectSanitize`(유효/무효 스케일). Playwright E2E `phase-17-resolution-scale.spec.ts` — 0.25× 다운샘플 체인이 회귀 없이 렌더 + Inspector 드롭다운 반영.
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - GLSL LSP 도입(Monaco 전환 검토).

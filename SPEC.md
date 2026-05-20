@@ -252,6 +252,14 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **Phase 14b — Video 노드**: AssetBrowser 에서 import 한 mp4/webm 을 texture 로. play/pause/loop/seek, IndexedDB videos store 에 Blob 캐시.
 - **Phase 14c — Audio 노드**: 마이크 또는 파일 → FFT 1D R8/R32F texture. fftSize 32~2048, source kind 직렬화. 출력은 texture 만 (라우드니스는 셰이더에서 평균).
 
+### Phase 15 — GPU Timer Overlay (완료)
+- **`EXT_disjoint_timer_query_webgl2` 통합**: `core/gl/gpuTimer.ts` 의 `GpuTimerPool` 이 `TIME_ELAPSED_EXT` 쿼리로 각 ShaderPass / ComputePass 의 GPU 시간을 비동기로 측정. extension 미노출 환경(Safari 등)에서는 `create()` 가 null → 모든 begin/end 가 옵셔널 체이닝으로 no-op.
+- **lifecycle**: thumbnail PBO 풀과 동형 — `begin/end/poll/release/dispose`. nested begin 은 무시(첫 활성 쿼리 유지). `GPU_DISJOINT_EXT` 발화 시 in-flight 쿼리 전부 폐기 후 다음 프레임 재시작.
+- **`gpuTimerStore` (Zustand)**: 결과는 EMA(α=0.2) 로 평활해 `byNode[id]` 에 저장, `totalMs` 는 매 sample 시 합계 재계산. `supported`/`enabled` 두 flag — 둘 다 true 일 때만 `executePlan` 이 timer 인스턴스를 받음.
+- **UI**: ShaderNodeView / ComputeNodeView 카드 우상단 `0.42ms` 칩(`node-card__gpu-ms`), StatusBar 우측에 합계 `12.3ms GPU`, ViewportControls 에 enable 체크박스 (지원 안 됨이면 `unavailable` 라벨). 칩은 `<0.01ms` 미만일 때 `<0.01ms` 표시.
+- **lifecycle hooks**: Viewport recompile 시 사라진 노드 ID 에 대해 `pool.release` + `store.removeNode`. context lost → restored 경로에서 pool 을 재생성하고 supported flag 를 다시 반영.
+- **검증**: Vitest 단위 18 건 (`gpuTimer.test.ts` 11 — extension probe / nest 방지 / 쿼리 재활용 / disjoint / release / dispose, `gpuTimerStore.test.ts` 7 — EMA / total / removeNode / supported·enabled 전이). Playwright E2E `phase-15-gpu-timer.spec.ts` 5 건 — (a) 스토어 shape 노출, (b) 칩 렌더 + ms 텍스트, (c) StatusBar GPU 컬럼 표시, (d) disable 토글이 UI 양쪽 다 숨김, (e) 노드 제거 시 `byNode` 에서 항목 정리.
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - GLSL LSP 도입(Monaco 전환 검토).

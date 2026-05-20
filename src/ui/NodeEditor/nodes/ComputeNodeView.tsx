@@ -2,9 +2,10 @@ import type { NodeProps } from "@xyflow/react";
 import { useMemo } from "react";
 import type { ComputeGraphNode } from "../../../core/graph/types";
 import { NODE_META } from "../../../core/nodes/registry";
+import { GpuTimerChip } from "./GpuTimerChip";
 import { PORT_STRIDE, PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
-export function ComputeNodeView({ data }: NodeProps) {
+export function ComputeNodeView({ id, data }: NodeProps) {
   const node = data.node as ComputeGraphNode;
 
   const inputs = useMemo(() => NODE_META.compute.inputs(node), [node]);
@@ -14,6 +15,7 @@ export function ComputeNodeView({ data }: NodeProps) {
       <div className="node-card__header node-card__header--compute">
         Compute · {node.primitive}
       </div>
+      <GpuTimerChip nodeId={id} />
       <div
         className="node-card__body"
         style={{ paddingLeft: 22, paddingRight: 22 }}

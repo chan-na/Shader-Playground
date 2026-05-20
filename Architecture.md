@@ -268,6 +268,17 @@ System uniform 은 Inspector 에서 자동 숨김(`inspectorUniforms`), 입력 �
   - `@label "..."` 또는 `@label 텍스트`
   - `@color` / `@slider` / `@multi` — 컨트롤 종류 자체를 오버라이드. 같은 텍스트에 여러 번 나오면 **마지막 위치가 이김** (`@color @slider` → slider). 색이 아니었던 벡터에 `@color` 를 붙이면 범위가 `[0,1]` 흰색으로 자동 승격.
 
+### 4.6 GPU 타이밍 (Phase 15)
+
+`EXT_disjoint_timer_query_webgl2` 기반 per-pass 측정. 인프라는 `core/gl/gpuTimer.ts` 의 `GpuTimerPool`, store 는 `state/gpuTimerStore.ts`.
+
+- **`GpuTimerPool.create(gl)`** — extension 미노출 환경(Safari, 일부 Firefox 기본 설정 등)에서는 `null` 반환. RAF 루프는 `pool?.begin(...)` 처럼 옵셔널 체이닝으로 호출하므로 미지원 분기에서 비용 0.
+- **lifecycle**: `begin(gl, nodeId)` → 다음 draw → `end(gl)` 가 한 패스를 감싼다. `TIME_ELAPSED_EXT` 는 nest 불가하므로 패스는 순차 측정. 노드 release / pool dispose 는 thumbnail PBO 풀과 동일한 형태.
+- **poll**: 매 frame `executePlan` 직후 호출. `GPU_DISJOINT_EXT` 가 true 면 in-flight 쿼리를 전부 버리고 다음 프레임부터 재시작 (extension 스펙 요구).
+- **store**: 결과는 EMA(α=0.2) 로 평활해 `byNode[id]` 에 저장, `totalMs` 는 매 sample 시 재계산. `supported` 는 pool 생성 가능 여부, `enabled` 는 ViewportControls 의 사용자 토글. 두 flag 가 모두 true 일 때만 begin/end 가 실제로 호출된다.
+- **UI**: ShaderNodeView / ComputeNodeView 카드 우상단에 `0.42ms` 칩 (`node-card__gpu-ms`), StatusBar 에 합계 `12.3ms GPU`. 둘 다 `supported && enabled && sample 존재` 일 때만 렌더.
+- **context lost 처리**: 잃은 컨텍스트의 extension 객체는 무효 → restored 시 `GpuTimerPool.create(gl)` 재호출 + `setSupported` 재반영.
+
 ---
 
 ## 5. 카메라
@@ -373,6 +384,7 @@ poll(gl):
 | `rendererStore` | ready, fps/frame/drawCalls/errors | ✗ | ✗ | StatusBar 가 구독 |
 | `historyStore` | past[]/future[], MAX=100 | ✗ | — | `suppressNext` 로 apply 중 재push 방지 |
 | `recorderStore` | MediaRecorder 상태 | ✗ | ✗ | start/stop/elapsedMs |
+| `gpuTimerStore` | byNode EMA + totalMs + supported/enabled | ✗ | ✗ | Phase 15. Viewport 가 매 frame `setSample`, 노드 사라지면 `removeNode` |
 
 추가로 작업/디스패치 모듈(스토어 아님): `assetActions`(파일 import + IndexedDB 캐시), `autoSave`(30s 디바운스 스케줄러), `shareUrl`(`#share=` 인코딩), `serialization`(프로젝트 JSON v1).
 
@@ -558,7 +570,8 @@ ShaderPlayground/
    │  │  ├─ texture.ts               # 텍스처 생성/포맷
    │  │  ├─ framebuffer.ts           # FBO + 컬러/깊이 어태치먼트
    │  │  ├─ mesh.ts                  # VBO/VAO 업로드/draw
-   │  │  └─ uniforms.ts              # 유니폼 setter 디스패처
+   │  │  ├─ uniforms.ts              # 유니폼 setter 디스패처
+   │  │  └─ gpuTimer.ts              # Phase 15 — EXT_disjoint_timer_query_webgl2 풀 (+ test)
    │  │
    │  ├─ camera/
    │  │  ├─ orbitCamera.ts           # OrbitCameraState + view/proj/orbit/pan/zoom (+ test)
@@ -611,7 +624,8 @@ ShaderPlayground/
    │  ├─ shareUrl.ts                 # gzip + base64url + URL hash (+ test)
    │  ├─ autoSave.ts                 # 30s debounce IndexedDB 자동저장 (+ test)
    │  ├─ recorder.ts                 # MediaRecorder → WebM/mp4
-   │  └─ thumbnailScheduler.ts       # core/thumbnail/scheduler 싱글톤
+   │  ├─ thumbnailScheduler.ts       # core/thumbnail/scheduler 싱글톤
+   │  └─ gpuTimerStore.ts            # Phase 15 — byNode EMA ms + totalMs + supported/enabled (+ test)
    │
    ├─ ui/                            # ── React 컴포넌트 ────────────────
    │  ├─ BootstrapGate.tsx           # share / autosave 복구 / 데모 분기 + 다이얼로그
@@ -630,7 +644,8 @@ ShaderPlayground/
    │  │     ├─ OutputNodeView.tsx
    │  │     ├─ ParamNodeView.tsx     # Float/Vec3/Color/Time
    │  │     ├─ UtilityNodeViews.tsx  # Math/Swizzle/Combine
-   │  │     └─ ComputeNodeView.tsx   # TF 컴퓨트 — count/primitive/attribute 메타 표시
+   │  │     ├─ ComputeNodeView.tsx   # TF 컴퓨트 — count/primitive/attribute 메타 표시
+   │  │     └─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
    │  │
    │  ├─ CodeEditor/
    │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync

@@ -127,6 +127,17 @@ export interface SpStores {
       };
     };
   };
+  gpuTimer: {
+    getState: () => {
+      byNode: Record<string, number>;
+      totalMs: number;
+      supported: boolean;
+      enabled: boolean;
+      toggleEnabled: () => void;
+      setSupported: (supported: boolean) => void;
+      setEnabled: (enabled: boolean) => void;
+    };
+  };
 }
 
 declare global {

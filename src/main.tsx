@@ -11,6 +11,7 @@ import { getAudioBlob, getVideoBlob, useAssetStore } from "./state/assetStore";
 import { useCameraStore } from "./state/cameraStore";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
 import { useEditorStore } from "./state/editorStore";
+import { useGpuTimerStore } from "./state/gpuTimerStore";
 import { useGraphStore } from "./state/graphStore";
 import { useHistoryStore } from "./state/historyStore";
 import { useRendererStore } from "./state/rendererStore";
@@ -38,6 +39,7 @@ if (import.meta.env.DEV) {
     editor: useEditorStore,
     camera: useCameraStore,
     renderer: useRendererStore,
+    gpuTimer: useGpuTimerStore,
   };
 }
 

@@ -1,4 +1,5 @@
 import { useCameraStore } from "../../state/cameraStore";
+import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useTimeStore } from "../../state/timeStore";
 import { useViewportStore } from "../../state/viewportStore";
 
@@ -32,6 +33,10 @@ export function ViewportControls() {
 
   const background = useViewportStore((s) => s.background);
   const setBackground = useViewportStore((s) => s.setBackground);
+
+  const gpuSupported = useGpuTimerStore((s) => s.supported);
+  const gpuEnabled = useGpuTimerStore((s) => s.enabled);
+  const toggleGpu = useGpuTimerStore((s) => s.toggleEnabled);
 
   const fovDeg = (camera.fov * 180) / Math.PI;
 
@@ -162,6 +167,37 @@ export function ViewportControls() {
           >
             {background.map((x) => x.toFixed(2)).join(", ")}
           </span>
+        </div>
+        <div className="inspector-row">
+          <span style={{ width: 56, color: "#888", fontSize: 11 }}>
+            GPU timer
+          </span>
+          {gpuSupported ? (
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                color: "#aaa",
+                fontSize: 11,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={gpuEnabled}
+                onChange={toggleGpu}
+                data-testid="gpu-timer-toggle"
+              />
+              {gpuEnabled ? "on" : "off"}
+            </label>
+          ) : (
+            <span
+              style={{ color: "#666", fontSize: 11 }}
+              data-testid="gpu-timer-unsupported"
+            >
+              unavailable
+            </span>
+          )}
         </div>
       </div>
     </>

@@ -1,3 +1,4 @@
+import { log } from "../../utils/log";
 import { createColorTexture, disposeTexture, type GLTexture } from "./texture";
 
 export interface Framebuffer {
@@ -48,7 +49,9 @@ export function createFramebuffer(
 
   const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   if (status !== gl.FRAMEBUFFER_COMPLETE) {
-    throw new Error(`Framebuffer incomplete: 0x${status.toString(16)}`);
+    const hex = `0x${status.toString(16)}`;
+    log.warn("gl", `Framebuffer incomplete: ${hex}`, { status, width, height });
+    throw new Error(`Framebuffer incomplete: ${hex}`);
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   return { fbo, color, depth, width, height };

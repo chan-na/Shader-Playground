@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { clearLogBuffer, getLogBuffer } from "../../utils/log";
 import { createFakeGl } from "./fakeGl";
 import {
   bindFramebuffer,
@@ -32,6 +33,17 @@ describe("createFramebuffer", () => {
     expect(() => createFramebuffer(gl, 32, 32)).toThrow(
       /Framebuffer incomplete/,
     );
+  });
+
+  it("logs a gl warning before throwing on an incomplete framebuffer", () => {
+    clearLogBuffer();
+    const gl = createFakeGl({ framebufferStatus: 0xdead });
+    expect(() => createFramebuffer(gl, 32, 32)).toThrow();
+    const buf = getLogBuffer();
+    const entry = buf[buf.length - 1];
+    expect(entry?.level).toBe("warn");
+    expect(entry?.category).toBe("gl");
+    expect(entry?.message).toContain("Framebuffer incomplete");
   });
 });
 

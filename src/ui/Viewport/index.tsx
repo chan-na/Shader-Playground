@@ -5,6 +5,7 @@ import {
   updateExternalSources,
 } from "../../core/external/registry";
 import { createGLContext } from "../../core/gl/context";
+import { checkGlError } from "../../core/gl/glError";
 import { GpuTimerPool } from "../../core/gl/gpuTimer";
 import {
   compileGraph,
@@ -71,6 +72,7 @@ export function Viewport() {
     let frameCount = 0;
     let fpsAccum = 0;
     let contextLost = false;
+    let glProbeTick = 0;
     const CONTEXT_LOST_MSG = "GPU 컨텍스트 손실 — 복구 중…";
     const timeStore = useTimeStore;
 
@@ -129,6 +131,12 @@ export function Viewport() {
       e.preventDefault();
       contextLost = true;
       pushError(CONTEXT_LOST_MSG);
+      const statusMessage = (e as WebGLContextEvent).statusMessage;
+      log.error(
+        "gl",
+        "WebGL context lost",
+        statusMessage ? { statusMessage } : undefined,
+      );
       // Reset bookkeeping so when the context is restored we recompile from
       // scratch. The underlying GL resources are gone — calling dispose on
       // the now-invalid plan just frees JS-side handles.
@@ -139,6 +147,7 @@ export function Viewport() {
     };
     const onContextRestored = () => {
       contextLost = false;
+      log.info("gl", "WebGL context restored");
       // Drop stale references the lost plan was holding; recompile() will
       // build a new plan against the freshly-restored context on the next tick.
       plan = emptyPlan(canvas.width || 1, canvas.height || 1);
@@ -302,6 +311,13 @@ export function Viewport() {
         timerEnabled ? gpuTimer : null,
       );
       bumpRenderTick();
+
+      // DEV-only GL error probe, throttled — gl.getError() forces a sync GPU
+      // flush, so we sample every Nth frame rather than per-frame. No-op in
+      // production (checkGlError short-circuits before touching the context).
+      if (import.meta.env.DEV && ++glProbeTick % 120 === 0) {
+        checkGlError(gl, "draw loop");
+      }
 
       // Drain any GPU timer queries that completed since the last frame and
       // push the smoothed samples to the store. Disjoint events discard the

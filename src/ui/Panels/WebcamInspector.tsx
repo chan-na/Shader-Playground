@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getExternalStatus } from "../../core/external/registry";
 import type { WebcamGraphNode } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
+import { log, normalizeError } from "../../utils/log";
 
 interface DeviceInfo {
   deviceId: string;
@@ -43,8 +44,8 @@ export function WebcamInspector({ node }: { node: WebcamGraphNode }) {
               label: d.label || `Camera ${i + 1}`,
             })),
         );
-      } catch {
-        // ignore — surface as "no devices" in the dropdown
+      } catch (e) {
+        log.debug("external", "enumerateDevices failed", normalizeError(e));
       }
     };
     void enumerate();

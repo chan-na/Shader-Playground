@@ -12,9 +12,9 @@
 
 | Phase | 내용 | 상태 | PR | 비고 |
 | ----- | ---- | ---- | -- | ---- |
-| P1 | 중앙 로거 `src/utils/log.ts` | ✅ 구현완료 (PR 대기) | - | `log.ts` + `log.test.ts`. 게이트 초록 |
-| P2 | 전역 안전망 (onerror / unhandledrejection / ErrorBoundary) | ✅ 구현완료 (PR 대기) | - | main.tsx 핸들러 + `ErrorBoundary.tsx`(메인 작업영역만 감쌈) |
-| P3 | 침묵 catch → 로거 교체 (registry/assets/autosave) | ⬜ 미착수 | - | 동작 불변, 흔적만 추가 |
+| P1 | 중앙 로거 `src/utils/log.ts` | ✅ 머지됨 | #41 | `log.ts` + `log.test.ts`. 게이트 초록 |
+| P2 | 전역 안전망 (onerror / unhandledrejection / ErrorBoundary) | ✅ 머지됨 | #41 | main.tsx 핸들러 + `ErrorBoundary.tsx`(메인 작업영역만 감쌈) |
+| P3 | 침묵 catch → 로거 교체 (registry/assets/autosave) | ✅ 구현완료 (PR 대기) | - | 동작 불변, 흔적만. registry/audio·videoLoader/recorder/autoSave/cache/AssetBrowser/WebcamInspector/BootstrapGate/Viewport + rendererStore.errors 상한 50. test-setup `setMinLevel("error")`로 로그 노이즈 차단. 게이트 초록 |
 | P4 | GL 에러 표면화 (`gl.getError()` + 컨텍스트 손실 상세) | ⬜ 미착수 | - | DEV 플래그 뒤 |
 | P5 | 진단 패널 + "진단 정보 복사" | ⬜ 미착수 | - | E2E 1건 동반 |
 

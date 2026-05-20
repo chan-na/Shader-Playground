@@ -1,4 +1,8 @@
 import { create } from "zustand";
+import { log } from "../utils/log";
+
+// Cap retained render errors — unbounded accumulation was a memory leak.
+const RENDERER_ERROR_CAP = 50;
 
 interface RendererStats {
   fps: number;
@@ -33,9 +37,14 @@ export const useRendererStore = create<RendererState>((set) => ({
     set((s) => ({
       stats: { ...s.stats, renderTick: s.stats.renderTick + 1 },
     })),
-  pushError: (msg) =>
+  pushError: (msg) => {
+    log.error("render", msg);
     set((s) => ({
-      stats: { ...s.stats, errors: [...s.stats.errors, msg] },
-    })),
+      stats: {
+        ...s.stats,
+        errors: [...s.stats.errors, msg].slice(-RENDERER_ERROR_CAP),
+      },
+    }));
+  },
   clearErrors: () => set((s) => ({ stats: { ...s.stats, errors: [] } })),
 }));

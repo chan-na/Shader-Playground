@@ -1,3 +1,4 @@
+import { log, normalizeError } from "../../utils/log";
 import type { AudioAssetHandle } from "./types";
 
 /**
@@ -42,14 +43,19 @@ async function probeMetadata(
       sampleRate: decoded.sampleRate,
       channels: decoded.numberOfChannels,
     };
-  } catch {
+  } catch (e) {
+    log.warn("assets", "audio metadata decode failed", normalizeError(e));
     return empty;
   } finally {
     if (ctx) {
       try {
         void ctx.close();
-      } catch {
-        // ignore
+      } catch (e) {
+        log.debug(
+          "assets",
+          "audio probe context close failed",
+          normalizeError(e),
+        );
       }
     }
   }

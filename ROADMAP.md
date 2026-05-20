@@ -10,14 +10,14 @@
 
 표현력을 직접 키우고 기존 컴파일/실행 구조에 자연스럽게 얹히는 **1 → 2** 가 최우선. 그다음 워크플로/디버깅(4·5·3) → 성능(7) → 비용 높은 디스크 연동(6) 순.
 
-> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. ✅ **3번(`u_mouse`/`u_frame` 시스템 유니폼)도 완료** — SPEC.md Phase 19. 다음은 **4번(노드 그래프 키보드 접근성 & 복제)**.
+> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. ✅ **3번(`u_mouse`/`u_frame` 시스템 유니폼)도 완료** — SPEC.md Phase 19. ✅ **4번(노드 복제 Cmd+D)도 완료** — SPEC.md Phase 20. 다음은 **5번(Inspector 주석 힌트 GUI 생성)**.
 
 | # | 항목 | 분류 | 난이도 | 추천도 |
 |---|---|---|---|---|
 | ~~1~~ | ~~Pass별 해상도 스케일~~ (완료 → Phase 17) | 표현력 | 중 | ★★★ |
 | ~~2~~ | ~~N:1 합성 일반화~~ (완료 → Phase 18) | 표현력 | 중 | ★★★ |
 | ~~3~~ | ~~`u_mouse` / `u_frame` 시스템 유니폼~~ (완료 → Phase 19) | 표현력 | 하 | ★★ |
-| 4 | 노드 그래프 키보드 접근성 & 복제 | 워크플로 | 하 | ★★ |
+| ~~4~~ | ~~노드 그래프 키보드 접근성 & 복제~~ (복제 완료 → Phase 20) | 워크플로 | 하 | ★★ |
 | 5 | Inspector 주석 힌트 GUI 생성 | 워크플로 | 중 | ★★ |
 | 6 | 셰이더 핫리로드 디스크 백업 | 워크플로 | 상 | ★ |
 | 7 | 썸네일 GPU 다운샘플 | 성능 | 중 | ★★ |
@@ -42,19 +42,11 @@
 
 ---
 
-## 4. 노드 그래프 키보드 접근성 & 복제
+## 4. 노드 그래프 키보드 접근성 & 복제 — ✅ 복제 완료 (SPEC.md Phase 20)
 
-**동기.** 노드 편집 생산성. 복제(Cmd+D), 화살표 이동, 박스 다중 선택은 노드 에디터의 기본 기대치다.
+**복제(Cmd/Ctrl+D)** 를 단독 머지했다. `graphStore.cloneNode(id)` 가 `structuredClone` 으로 노드를 깊은 복사 → `nextId(kind)` 새 id + (+40,+40) 오프셋, **엣지는 복제 안 함**, history push + 구조 rev. `KeyboardShortcuts.tsx` 가 Cmd/Ctrl+D 를 받아 편집 포커스가 아닐 때만 `selectionStore.selectedNodeId` 를 복제하고 선택을 클론으로 이동. 검증: `graphStore.test`(깊은 복사·엣지 미복제·오프셋·null) + `phase-20-node-duplicate.spec.ts`. 자세한 내용은 SPEC.md Phase 20.
 
-**접근법.**
-- React Flow 가 다중 선택/박스 선택을 일부 내장 — `selectionStore` 를 단일 ID 에서 다중으로 확장할지 결정(영향 큼). 우선 **복제(Cmd+D)** 만 단독 머지: 선택 노드의 graphStore 엔트리를 새 ID 로 클론 + 위치 오프셋 + 들어오는 엣지는 복제 안 함(또는 옵션). history push.
-- `KeyboardShortcuts.tsx` 에 핸들러 추가.
-
-**영향 모듈.** `ui/KeyboardShortcuts.tsx`, `state/graphStore.ts`(cloneNode), `state/selectionStore.ts`(다중 선택은 별도 단계).
-
-**게이트.** graphStore.test(clone). E2E: Cmd+D 로 노드 복제 스펙.
-
-**주의.** 다중 선택은 selectionStore·Inspector·CodeEditor 가 단일 선택 가정이라 파급이 크다. **복제만 먼저, 다중 선택은 별도 항목**으로 쪼개는 게 안전.
+**남은 일 — 다중 선택/화살표 이동.** `selectionStore` 는 이미 다중 id(`selectedNodeIds`)를 보관하므로 React Flow 박스 선택은 대부분 동작한다. Inspector/CodeEditor 가 단일 선택(`selectedNodeId`)을 가정하는 부분만 정리하면 별도 항목으로 진행 가능.
 
 ---
 

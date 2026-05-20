@@ -293,7 +293,14 @@ Shadertoy 호환 절차적 셰이더 이식성을 위해 포인터 좌표·프�
 - **정적 export**: `standalonePlayer.js` 도 canvas pointer 리스너 + 프레임 카운터로 `u_mouse`/`u_frame` 동형 바인딩.
 - **검증**: Vitest — `uniformParser.test`(u_mouse/u_frame system 인식 + Inspector 숨김), `mouseStore.test`(setPosition/Down/Up/reset 의 rev 증가 + vec4 패킹). Playwright E2E `phase-19-mouse-frame.spec.ts` — 풀스크린 셰이더가 화면을 `u_mouse.xy / u_resolution` 평면색으로 칠하고, 포인터를 좌하단→우상단으로 이동하면 R/G 채널이 함께 상승(포인터→u_mouse 경로 end-to-end 판별).
 
+### Phase 20 — 노드 복제 (Cmd/Ctrl+D) (완료)
+노드 에디터 편집 생산성 향상. 선택한 노드를 한 키로 복제.
+- **store**: `graphStore.cloneNode(id)` — `structuredClone` 으로 노드를 깊은 복사하고 `nextId(kind)` 로 새 id 부여, 원본 위치에서 (+40, +40) 오프셋. 들어오는/나가는 **엣지는 복제하지 않는다**(독립 노드로 시작). `pushHistory` + 구조 rev 증가라 undo/재컴파일 정상. 알 수 없는 id 면 `null` 반환.
+- **단축키**: `KeyboardShortcuts.tsx` 에 `Cmd/Ctrl+D` 추가 — 편집 대상(input/CodeMirror)에 포커스가 있으면 무시(에디터 멀티커서 보존), 그 외에는 `selectionStore.selectedNodeId` 를 복제하고 선택을 새 노드로 이동(Inspector/CodeEditor 가 즉시 따라감). 선택이 없으면 no-op.
+- **검증**: Vitest `graphStore.test` — 깊은 복사(클론 변형이 원본 불변)·엣지 미복제·오프셋·rev 증가·미지 id null. Playwright E2E `phase-20-node-duplicate.spec.ts` — Cmd+D 로 노드 수 +1, 선택이 클론으로 이동, 엣지 불변, 위치 오프셋 확인 + 무선택 no-op.
+
 ### (백로그)
+- 노드 다중 선택 박스/화살표 이동(selectionStore 는 이미 다중 id 보관, Inspector/CodeEditor 단일 선택 가정만 정리하면 됨).
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - GLSL LSP 도입(Monaco 전환 검토).
 - GIF 녹화(gif.js / WASM gifenc).

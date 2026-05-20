@@ -633,7 +633,7 @@ ShaderPlayground/
    │
    ├─ ui/                            # ── React 컴포넌트 ────────────────
    │  ├─ BootstrapGate.tsx           # share / autosave 복구 / 데모 분기 + 다이얼로그
-   │  ├─ KeyboardShortcuts.tsx       # Cmd+Z/Y/K, Space, Esc 등 전역 단축키
+   │  ├─ KeyboardShortcuts.tsx       # Cmd+Z/Y/D/K, Space, Esc 등 전역 단축키 (Cmd+D=선택 노드 복제)
    │  │
    │  ├─ NodeEditor/
    │  │  ├─ index.tsx                # React Flow 캔버스 + graphStore 양방향

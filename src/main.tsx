@@ -18,6 +18,20 @@ import { useRendererStore } from "./state/rendererStore";
 import { useSelectionStore } from "./state/selectionStore";
 import { useTimeStore } from "./state/timeStore";
 import { useViewportStore } from "./state/viewportStore";
+import { log, normalizeError } from "./utils/log";
+
+// 전역 안전망: 잡히지 않은 에러/거부를 로거에 기록 (Debugging-Plan P2).
+window.addEventListener("error", (e) => {
+  log.error("app", "window.onerror", {
+    message: e.message,
+    error: normalizeError(e.error),
+  });
+});
+window.addEventListener("unhandledrejection", (e) => {
+  log.error("app", "unhandledrejection", {
+    reason: normalizeError(e.reason),
+  });
+});
 
 // Wire the external registry's video blob lookup to the in-memory asset
 // store. Kept here (not in the registry or store) so neither layer needs to

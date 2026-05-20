@@ -201,6 +201,119 @@ export function parseHintComment(text: string): UniformHints {
   return hints;
 }
 
+/**
+ * Annotation tokens this serializer owns. Used to strip stale hints from a
+ * comment (trailing or preceding) before re-emitting the canonical forms, so
+ * any free-text the author wrote in the same comment survives a GUI edit.
+ * Keep the alternatives in sync with the patterns parseHintComment recognises.
+ */
+const ANNOTATION_TOKEN_RE =
+  /@range\s+-?\d+(?:\.\d+)?\s*\.\.\s*-?\d+(?:\.\d+)?|@min\s+-?\d+(?:\.\d+)?|@max\s+-?\d+(?:\.\d+)?|@step\s+-?\d+(?:\.\d+)?|@default\s+[^@\n]+|@label\s+(?:"[^"]*"|[^\n@]+)|@(?:color|slider|multi)\b/g;
+
+function fmtNum(n: number): string {
+  // parseFloat round-trips this; avoid scientific notation for typical ranges.
+  return String(n);
+}
+
+/**
+ * Reverse of {@link parseHintComment}: rewrites a single GLSL line comment so
+ * that the managed annotation keys reflect `hints`, preserving any leading
+ * free-text. `existing` may include or omit the leading `//`. Returns a comment
+ * starting with `//`; when nothing remains it returns the bare `//` so callers
+ * can decide to drop the comment entirely.
+ */
+export function serializeHintComment(
+  existing: string,
+  hints: UniformHints,
+): string {
+  const body = existing.replace(/^\s*\/\/\s?/, "");
+  const freeText = body
+    .replace(ANNOTATION_TOKEN_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const parts: string[] = [];
+  if (freeText) parts.push(freeText);
+  if (hints.control) parts.push(`@${hints.control}`);
+  if (hints.min !== undefined && hints.max !== undefined) {
+    parts.push(`@range ${fmtNum(hints.min)}..${fmtNum(hints.max)}`);
+  } else {
+    if (hints.min !== undefined) parts.push(`@min ${fmtNum(hints.min)}`);
+    if (hints.max !== undefined) parts.push(`@max ${fmtNum(hints.max)}`);
+  }
+  if (hints.step !== undefined) parts.push(`@step ${fmtNum(hints.step)}`);
+  if (hints.defaultValue !== undefined) {
+    const d = Array.isArray(hints.defaultValue)
+      ? hints.defaultValue.map(fmtNum).join(",")
+      : fmtNum(hints.defaultValue);
+    parts.push(`@default ${d}`);
+  }
+  if (hints.label !== undefined) parts.push(`@label "${hints.label}"`);
+
+  return parts.length ? `// ${parts.join(" ")}` : "//";
+}
+
+/**
+ * Strips managed annotation tokens from a comment-only line, preserving its
+ * indentation and any free-text. Returns null when the line held nothing but
+ * annotations (so the caller can delete the now-empty line).
+ */
+function stripManagedTokens(line: string): string | null {
+  const idx = line.indexOf("//");
+  if (idx < 0) return line;
+  const indent = line.slice(0, idx);
+  const body = line
+    .slice(idx + 2)
+    .replace(ANNOTATION_TOKEN_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return body ? `${indent}// ${body}` : null;
+}
+
+/**
+ * Writes `hints` back into the declaration of `name` within `source`. The
+ * canonical annotations land on the declaration's trailing comment; stale
+ * managed tokens on immediately-preceding comment-only lines are stripped so
+ * the trailing comment is the single source of truth (parseUniforms merges
+ * both, and a leftover preceding `@range` would otherwise win). Returns the
+ * rewritten source, or null when no matching declaration is found.
+ */
+export function writeUniformHints(
+  source: string,
+  name: string,
+  hints: UniformHints,
+): string | null {
+  const lines = source.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const commentIdx = line.indexOf("//");
+    const code = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
+    const m = RE_UNIFORM.exec(code);
+    if (!m || m[2] !== name) continue;
+
+    // Walk back over preceding comment-only lines, stripping managed tokens.
+    // Indices are collected descending so the later splice is index-safe.
+    const removeIdx: number[] = [];
+    for (let j = i - 1; j >= 0; j--) {
+      const prev = lines[j]!.trim();
+      if (!prev) continue;
+      if (!prev.startsWith("//")) break;
+      const stripped = stripManagedTokens(lines[j]!);
+      if (stripped === null) removeIdx.push(j);
+      else lines[j] = stripped;
+    }
+
+    const trailing = commentIdx >= 0 ? line.slice(commentIdx) : "";
+    const codeTrimmed = code.replace(/\s+$/, "");
+    const comment = serializeHintComment(trailing, hints);
+    lines[i] = comment === "//" ? codeTrimmed : `${codeTrimmed} ${comment}`;
+
+    for (const idx of removeIdx) lines.splice(idx, 1);
+    return lines.join("\n");
+  }
+  return null;
+}
+
 function applyHints(spec: UniformSpec, hints: UniformHints): UniformSpec {
   const out = { ...spec };
 

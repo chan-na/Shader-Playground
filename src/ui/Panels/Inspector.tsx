@@ -20,6 +20,7 @@ import { useSelectionStore } from "../../state/selectionStore";
 import { AudioInspector } from "./AudioInspector";
 import { ParamInspector } from "./ParamInspector";
 import { UniformControl } from "./UniformControl";
+import { UniformHintEditor } from "./UniformHintEditor";
 import { UtilityInspector } from "./UtilityInspector";
 import { filterUniforms } from "./uniformFilter";
 import { VideoInspector } from "./VideoInspector";
@@ -42,7 +43,9 @@ export function Inspector({ embedded = false }: InspectorProps) {
     (s) => s.nodes.find((n) => n.id === effectiveId) ?? null,
   );
   const setUniformValue = useGraphStore((s) => s.setUniformValue);
+  const setUniformHints = useGraphStore((s) => s.setUniformHints);
   const setResolutionScale = useGraphStore((s) => s.setResolutionScale);
+  const [editingHint, setEditingHint] = useState<string | null>(null);
 
   const shaderNode = node?.kind === "shader" ? (node as ShaderGraphNode) : null;
   const computeNode =
@@ -259,7 +262,31 @@ export function Inspector({ embedded = false }: InspectorProps) {
                       <span style={{ color: "#ccc", fontFamily: "monospace" }}>
                         {spec.label ?? spec.name}
                       </span>
-                      <span style={{ color: "#666" }}>{spec.type}</span>
+                      <span style={{ display: "flex", gap: 6 }}>
+                        <span style={{ color: "#666" }}>{spec.type}</span>
+                        <button
+                          type="button"
+                          title="범위·기본값·라벨 편집 (소스 주석에 기록)"
+                          data-testid="uniform-edit-toggle"
+                          data-edit-uniform={spec.name}
+                          onClick={() =>
+                            setEditingHint((cur) =>
+                              cur === spec.name ? null : spec.name,
+                            )
+                          }
+                          style={{
+                            padding: 0,
+                            fontSize: 11,
+                            lineHeight: 1,
+                            background: "none",
+                            border: "none",
+                            color: editingHint === spec.name ? "#2d5" : "#666",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ⚙
+                        </button>
+                      </span>
                     </div>
                     <UniformControl
                       spec={spec}
@@ -268,6 +295,16 @@ export function Inspector({ embedded = false }: InspectorProps) {
                         setUniformValue(uniformOwner.id, spec.name, v)
                       }
                     />
+                    {editingHint === spec.name && (
+                      <UniformHintEditor
+                        spec={spec}
+                        onApply={(hints) => {
+                          setUniformHints(uniformOwner.id, spec.name, hints);
+                          setEditingHint(null);
+                        }}
+                        onClose={() => setEditingHint(null)}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

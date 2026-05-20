@@ -10,7 +10,7 @@
 
 표현력을 직접 키우고 기존 컴파일/실행 구조에 자연스럽게 얹히는 **1 → 2** 가 최우선. 그다음 워크플로/디버깅(4·5·3) → 성능(7) → 비용 높은 디스크 연동(6) 순.
 
-> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. ✅ **3번(`u_mouse`/`u_frame` 시스템 유니폼)도 완료** — SPEC.md Phase 19. ✅ **4번(노드 복제 Cmd+D)도 완료** — SPEC.md Phase 20. 다음은 **5번(Inspector 주석 힌트 GUI 생성)**.
+> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. ✅ **3번(`u_mouse`/`u_frame` 시스템 유니폼)도 완료** — SPEC.md Phase 19. ✅ **4번(노드 복제 Cmd+D)도 완료** — SPEC.md Phase 20. ✅ **5번(Inspector 주석 힌트 GUI 생성)도 완료** — SPEC.md Phase 21. 다음은 **7번(썸네일 GPU 다운샘플)** 또는 **6번(셰이더 핫리로드 디스크 백업)**.
 
 | # | 항목 | 분류 | 난이도 | 추천도 |
 |---|---|---|---|---|
@@ -18,7 +18,7 @@
 | ~~2~~ | ~~N:1 합성 일반화~~ (완료 → Phase 18) | 표현력 | 중 | ★★★ |
 | ~~3~~ | ~~`u_mouse` / `u_frame` 시스템 유니폼~~ (완료 → Phase 19) | 표현력 | 하 | ★★ |
 | ~~4~~ | ~~노드 그래프 키보드 접근성 & 복제~~ (복제 완료 → Phase 20) | 워크플로 | 하 | ★★ |
-| 5 | Inspector 주석 힌트 GUI 생성 | 워크플로 | 중 | ★★ |
+| ~~5~~ | ~~Inspector 주석 힌트 GUI 생성~~ (완료 → Phase 21) | 워크플로 | 중 | ★★ |
 | 6 | 셰이더 핫리로드 디스크 백업 | 워크플로 | 상 | ★ |
 | 7 | 썸네일 GPU 다운샘플 | 성능 | 중 | ★★ |
 
@@ -50,18 +50,9 @@
 
 ---
 
-## 5. Inspector 주석 힌트 GUI 생성
+## 5. Inspector 주석 힌트 GUI 생성 — ✅ 완료 (SPEC.md Phase 21)
 
-**동기.** 현재 `// @range 0..5 @default 2` 같은 메타를 손으로 GLSL 에 써야 한다(Architecture §4.5). uniformParser 의 역방향 — 슬라이더에서 GUI 로 범위를 정하면 소스 주석을 자동 삽입.
-
-**접근법.**
-- UniformControl 우클릭/기어 메뉴 → "범위·기본값 편집" 팝오버.
-- 변경 시 해당 uniform 선언 라인의 트레일링 주석을 파싱→갱신→재작성. 기존 주석 보존하며 키만 갱신하는 직렬화기 필요(`@range`/`@default`/`@label`).
-- 소스 변경이므로 `updateShaderSource` 경로(구조 rev) 를 탄다.
-
-**영향 모듈.** `core/graph/uniformParser.ts`(주석 write-back 헬퍼 신규 + 테스트), `ui/Panels/UniformControl.tsx`, `state/graphStore.ts`.
-
-**게이트.** uniformParser.test 에 round-trip(parse→edit→serialize→parse) 테스트. E2E: GUI 로 범위 변경 → 소스 주석 반영 + 슬라이더 갱신.
+uniformParser 의 역방향. `serializeHintComment`/`writeUniformHints`(core/graph/uniformParser.ts)가 트레일링 주석에 `@range`/`@step`/`@default`/`@label` 정규형을 기록하고 앞줄 주석의 stale 토큰을 제거(파서 머지 충돌 방지), 자유 텍스트는 보존. `graphStore.setUniformHints` 가 shader fragment→vertex / compute vertex 로 라우팅하며 `updateShaderSource`/`updateComputeSource`(구조 rev). Inspector 각 uniform-row 의 ⚙ 토글이 `UniformHintEditor`(min/max/step/default/label) 인라인 에디터를 연다. 검증: `uniformParser.test` round-trip + `graphStore.test` + `phase-21-hint-editor.spec.ts`. 자세한 내용은 SPEC.md Phase 21.
 
 ---
 

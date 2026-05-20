@@ -63,6 +63,66 @@ describe("graphStore", () => {
     expect(useGraphStore.getState().edges).toHaveLength(0);
   });
 
+  it("cloneNode deep-copies under a new id, offsets, and skips edges", () => {
+    const s = useGraphStore.getState();
+    s.addNode({ id: "src", kind: "mesh", primitive: "cube" });
+    s.addNode(makeShader("dst"));
+    s.addEdge({
+      id: "e1",
+      source: "src",
+      sourceHandle: "mesh",
+      target: "dst",
+      targetHandle: "mesh",
+    });
+    s.updateNodePosition("src", { x: 100, y: 50 });
+
+    const before = useGraphStore.getState();
+    const newId = useGraphStore.getState().cloneNode("src");
+    if (!newId) throw new Error("cloneNode returned null");
+    const after = useGraphStore.getState();
+
+    expect(newId).not.toBe("src");
+    expect(after.nodes).toHaveLength(3);
+    const clone = after.nodes.find((n) => n.id === newId);
+    expect(clone?.kind).toBe("mesh");
+    // Edges are not duplicated.
+    expect(after.edges).toHaveLength(1);
+    // Offset from the original position.
+    expect(after.positions[newId]).toEqual({ x: 140, y: 90 });
+    expect(after.rev).toBe(before.rev + 1);
+  });
+
+  it("cloneNode performs a deep copy (mutating clone leaves source intact)", () => {
+    const cn: ComputeGraphNode = {
+      id: "c1",
+      kind: "compute",
+      vertexSource: "void main(){}",
+      count: 16,
+      primitive: "POINTS",
+      attributes: [
+        { inName: "a_position", outName: "v_position", size: 3, seed: "zero" },
+      ],
+      uniformValues: { u_k: 1 },
+    };
+    useGraphStore.getState().addNode(cn);
+    const newId = useGraphStore.getState().cloneNode("c1");
+    const clone = useGraphStore
+      .getState()
+      .nodes.find((n) => n.id === newId) as ComputeGraphNode;
+    const attr = clone.attributes[0];
+    if (attr) attr.size = 1;
+    clone.uniformValues.u_k = 99;
+    const original = useGraphStore
+      .getState()
+      .nodes.find((n) => n.id === "c1") as ComputeGraphNode;
+    expect(original.attributes[0]?.size).toBe(3);
+    expect(original.uniformValues.u_k).toBe(1);
+  });
+
+  it("cloneNode returns null for an unknown id", () => {
+    expect(useGraphStore.getState().cloneNode("nope")).toBeNull();
+  });
+
   it("updateShaderSource patches vertex/fragment sources", () => {
     useGraphStore.getState().addNode(makeShader("s1", "A"));
     useGraphStore.getState().updateShaderSource("s1", { fragmentSource: "B" });

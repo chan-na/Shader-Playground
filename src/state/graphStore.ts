@@ -20,6 +20,7 @@ import type {
   VideoGraphNode,
   WebcamGraphNode,
 } from "../core/graph/types";
+import { nextId } from "../utils/id";
 import { useHistoryStore } from "./historyStore";
 import type { NodePosition } from "./types";
 
@@ -32,6 +33,12 @@ export interface GraphState {
 
   setGraph: (g: Graph, positions?: Record<string, NodePosition>) => void;
   addNode: (node: GraphNode, position?: NodePosition) => void;
+  /**
+   * Deep-clone a node under a fresh id, offset slightly from the original.
+   * Edges are intentionally NOT duplicated. Returns the new id, or null when
+   * the source id is unknown.
+   */
+  cloneNode: (id: string) => string | null;
   removeNode: (id: string) => void;
   updateNodePosition: (id: string, position: NodePosition) => void;
   updateShaderSource: (
@@ -128,6 +135,22 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         : s.positions,
       rev: s.rev + 1,
     }));
+  },
+  cloneNode: (id) => {
+    const src = get().nodes.find((n) => n.id === id);
+    if (!src) return null;
+    const newId = nextId(src.kind);
+    const clone: GraphNode = { ...structuredClone(src), id: newId };
+    const srcPos = get().positions[id];
+    pushHistory(get());
+    set((s) => ({
+      nodes: [...s.nodes, clone],
+      positions: srcPos
+        ? { ...s.positions, [newId]: { x: srcPos.x + 40, y: srcPos.y + 40 } }
+        : s.positions,
+      rev: s.rev + 1,
+    }));
+    return newId;
   },
   removeNode: (id) => {
     pushHistory(get());

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { redoGraph, undoGraph } from "../state/graphStore";
+import { redoGraph, undoGraph, useGraphStore } from "../state/graphStore";
+import { useSelectionStore } from "../state/selectionStore";
 import { useTimeStore } from "../state/timeStore";
 
 /**
@@ -7,6 +8,7 @@ import { useTimeStore } from "../state/timeStore";
  *
  *   Cmd/Ctrl+Z         — undo
  *   Cmd/Ctrl+Shift+Z   — redo (also Cmd+Y on Windows-style)
+ *   Cmd/Ctrl+D         — duplicate the selected node
  *   Space              — toggle play/pause (when no text input has focus)
  */
 function isEditingTarget(target: EventTarget | null): boolean {
@@ -34,6 +36,16 @@ export function KeyboardShortcuts() {
       ) {
         e.preventDefault();
         redoGraph();
+        return;
+      }
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "d") {
+        // Leave editor multi-cursor (Cmd+D) alone while typing.
+        if (isEditingTarget(e.target)) return;
+        e.preventDefault();
+        const sel = useSelectionStore.getState().selectedNodeId;
+        if (!sel) return;
+        const newId = useGraphStore.getState().cloneNode(sel);
+        if (newId) useSelectionStore.getState().select(newId);
         return;
       }
       if (e.key === " " && !isEditingTarget(e.target)) {

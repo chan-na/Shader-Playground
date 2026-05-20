@@ -6,6 +6,8 @@ import {
   SYSTEM_UNIFORM_DESCRIPTIONS,
   SYSTEM_UNIFORMS,
   samplerUniforms,
+  serializeHintComment,
+  writeUniformHints,
 } from "./uniformParser";
 
 describe("parseUniforms", () => {
@@ -299,5 +301,107 @@ describe("parseHintComment @color", () => {
   });
   it("last control hint wins when combined", () => {
     expect(parseHintComment("// @color @slider").control).toBe("slider");
+  });
+});
+
+describe("serializeHintComment", () => {
+  it("emits canonical @range/@step/@default/@label", () => {
+    const c = serializeHintComment("//", {
+      min: 0,
+      max: 5,
+      step: 0.1,
+      defaultValue: 2,
+      label: "Intensity",
+    });
+    expect(c).toBe('// @range 0..5 @step 0.1 @default 2 @label "Intensity"');
+  });
+
+  it("emits a vector @default as comma list", () => {
+    const c = serializeHintComment("//", { defaultValue: [0.2, 0.5, 0.9] });
+    expect(c).toBe("// @default 0.2,0.5,0.9");
+  });
+
+  it("preserves free-text and replaces stale annotations", () => {
+    const c = serializeHintComment("// blur kernel @range 0..1 @step 0.5", {
+      min: 1,
+      max: 9,
+    });
+    expect(c).toBe("// blur kernel @range 1..9");
+  });
+
+  it("returns a bare // when nothing remains", () => {
+    expect(serializeHintComment("// @range 0..1", {})).toBe("//");
+  });
+
+  it("uses @min/@max when only one bound is given", () => {
+    expect(serializeHintComment("//", { min: -2 })).toBe("// @min -2");
+    expect(serializeHintComment("//", { max: 3 })).toBe("// @max 3");
+  });
+
+  it("emits an explicit control flag", () => {
+    expect(serializeHintComment("//", { control: "color" })).toContain(
+      "@color",
+    );
+  });
+});
+
+describe("writeUniformHints", () => {
+  it("writes a trailing comment onto a bare declaration", () => {
+    const out = writeUniformHints("uniform float u_x;", "u_x", {
+      min: 0,
+      max: 10,
+      defaultValue: 4,
+    });
+    expect(out).toBe("uniform float u_x; // @range 0..10 @default 4");
+  });
+
+  it("returns null when the uniform is absent", () => {
+    expect(writeUniformHints("uniform float u_x;", "u_y", { min: 0 })).toBe(
+      null,
+    );
+  });
+
+  it("strips stale hints from a preceding comment line", () => {
+    const src = `// @range -3..3 @step 0.1\nuniform float u_freq;`;
+    const out = writeUniformHints(src, "u_freq", {
+      min: 0,
+      max: 5,
+      step: 0.5,
+    });
+    expect(out).toBe("uniform float u_freq; // @range 0..5 @step 0.5");
+  });
+
+  it("keeps free-text on a preceding comment line", () => {
+    const src = `// tweak me @range 0..1\nuniform float u_amount;`;
+    const out = writeUniformHints(src, "u_amount", { min: 0, max: 2 });
+    expect(out).toBe("// tweak me\nuniform float u_amount; // @range 0..2");
+  });
+
+  it("round-trips parse → edit → serialize → parse", () => {
+    const src = `uniform float u_intensity; // @range 0..1 @default 0.5`;
+    const out = writeUniformHints(src, "u_intensity", {
+      min: -2,
+      max: 8,
+      step: 0.25,
+      defaultValue: 3,
+      label: "Power",
+    })!;
+    const spec = parseUniforms(out).find((u) => u.name === "u_intensity")!;
+    expect(spec.min).toBe(-2);
+    expect(spec.max).toBe(8);
+    expect(spec.step).toBe(0.25);
+    expect(spec.defaultValue).toBe(3);
+    expect(spec.label).toBe("Power");
+  });
+
+  it("preserves a @color control across an edit", () => {
+    const src = `uniform vec3 u_tint; // @color`;
+    const out = writeUniformHints(src, "u_tint", {
+      defaultValue: [0.1, 0.2, 0.3],
+      control: "color",
+    })!;
+    const spec = parseUniforms(out).find((u) => u.name === "u_tint")!;
+    expect(spec.control).toBe("color");
+    expect(spec.defaultValue).toEqual([0.1, 0.2, 0.3]);
   });
 });

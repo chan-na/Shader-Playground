@@ -299,6 +299,13 @@ Shadertoy 호환 절차적 셰이더 이식성을 위해 포인터 좌표·프�
 - **단축키**: `KeyboardShortcuts.tsx` 에 `Cmd/Ctrl+D` 추가 — 편집 대상(input/CodeMirror)에 포커스가 있으면 무시(에디터 멀티커서 보존), 그 외에는 `selectionStore.selectedNodeId` 를 복제하고 선택을 새 노드로 이동(Inspector/CodeEditor 가 즉시 따라감). 선택이 없으면 no-op.
 - **검증**: Vitest `graphStore.test` — 깊은 복사(클론 변형이 원본 불변)·엣지 미복제·오프셋·rev 증가·미지 id null. Playwright E2E `phase-20-node-duplicate.spec.ts` — Cmd+D 로 노드 수 +1, 선택이 클론으로 이동, 엣지 불변, 위치 오프셋 확인 + 무선택 no-op.
 
+### Phase 21 — Inspector 주석 힌트 GUI 생성 (완료)
+`uniformParser` 의 역방향. 슬라이더 옆 기어(⚙) 버튼으로 범위·기본값·라벨을 GUI 에서 정하면 GLSL 소스의 트레일링 주석에 `@range`/`@step`/`@default`/`@label` 을 자동 기록한다.
+- **직렬화기**: `uniformParser.ts` 에 `serializeHintComment(existing, hints)` — 주석에서 관리 토큰(`ANNOTATION_TOKEN_RE`)만 교체하고 작성자가 남긴 자유 텍스트는 보존, 정규형으로 재작성. `writeUniformHints(source, name, hints)` — 선언의 트레일링 주석에 정규형을 기록하고, 바로 앞 주석 전용 라인의 stale 토큰은 제거(파서가 양쪽을 머지하므로 앞줄 잔여 `@range` 가 이기는 것을 방지). 매칭 선언이 없으면 `null`.
+- **store**: `graphStore.setUniformHints(id, name, hints)` — shader 는 fragment→vertex 순으로 선언을 찾아 `updateShaderSource`, compute 는 `updateComputeSource` 로 라우팅(둘 다 구조 rev → 재컴파일·spec 재도출).
+- **UI**: `UniformHintEditor.tsx` 인라인 에디터(min/max/step/default/label). 벡터 컨트롤(multi/color)은 콤마 구분 default, 스칼라는 단일 숫자. vec3/vec4 의 명시적 color/multi 컨트롤은 `@color`/`@multi` 로 보존해 재파싱 시 이름 기반 추론이 뒤집지 않게 한다. Inspector 의 각 uniform-row 에 ⚙ 토글.
+- **검증**: Vitest `uniformParser.test`(serialize/write round-trip, 앞줄 stale 제거, 자유 텍스트 보존, 벡터 default, `@color` 보존) + `graphStore.test`(fragment/vertex/compute 라우팅·rev·미지 id no-op). Playwright E2E `phase-21-hint-editor.spec.ts` — GUI 로 범위 변경 → 소스 주석 반영 + 슬라이더 min/max 갱신 + 라벨 표시, 기어 토글 open/close, Cancel 무기록.
+
 ### (백로그)
 - 노드 다중 선택 박스/화살표 이동(selectionStore 는 이미 다중 id 보관, Inspector/CodeEditor 단일 선택 가정만 정리하면 됨).
 - 쉐이더 핫리로드 디스크 백업(File System Access API).

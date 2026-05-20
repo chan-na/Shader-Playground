@@ -438,4 +438,62 @@ describe("graphStore", () => {
     expect(undoGraph()).toBe(false);
     expect(redoGraph()).toBe(false);
   });
+
+  describe("setUniformHints", () => {
+    it("writes hints into the fragment source and bumps rev", () => {
+      const s = useGraphStore.getState();
+      s.addNode(makeShader("s1", "uniform float u_x;\nvoid main(){}"));
+      const before = useGraphStore.getState().rev;
+      s.setUniformHints("s1", "u_x", { min: 0, max: 5, defaultValue: 2 });
+
+      const node = useGraphStore.getState().nodes.find((n) => n.id === "s1");
+      expect((node as ShaderGraphNode).fragmentSource).toContain(
+        "uniform float u_x; // @range 0..5 @default 2",
+      );
+      expect(useGraphStore.getState().rev).toBe(before + 1);
+    });
+
+    it("falls back to the vertex source when not in the fragment", () => {
+      const s = useGraphStore.getState();
+      s.addNode({
+        id: "s1",
+        kind: "shader",
+        vertexSource: "uniform float u_freq;\nvoid main(){}",
+        fragmentSource: "void main(){}",
+        uniformValues: {},
+      } satisfies ShaderGraphNode);
+      s.setUniformHints("s1", "u_freq", { min: -1, max: 1 });
+
+      const node = useGraphStore.getState().nodes.find((n) => n.id === "s1");
+      expect((node as ShaderGraphNode).vertexSource).toContain(
+        "uniform float u_freq; // @range -1..1",
+      );
+    });
+
+    it("writes into a compute node's vertex source", () => {
+      const s = useGraphStore.getState();
+      const cn: ComputeGraphNode = {
+        id: "c1",
+        kind: "compute",
+        vertexSource: "uniform float u_speed;\nvoid main(){}",
+        count: 10,
+        primitive: "POINTS",
+        attributes: [],
+        uniformValues: {},
+      };
+      s.addNode(cn);
+      s.setUniformHints("c1", "u_speed", { min: 0, max: 3, step: 0.1 });
+
+      const node = useGraphStore.getState().nodes.find((n) => n.id === "c1");
+      expect((node as ComputeGraphNode).vertexSource).toContain(
+        "uniform float u_speed; // @range 0..3 @step 0.1",
+      );
+    });
+
+    it("is a no-op for an unknown id", () => {
+      const before = useGraphStore.getState().rev;
+      useGraphStore.getState().setUniformHints("nope", "u_x", { min: 0 });
+      expect(useGraphStore.getState().rev).toBe(before);
+    });
+  });
 });

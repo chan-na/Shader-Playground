@@ -20,6 +20,8 @@ import type {
   VideoGraphNode,
   WebcamGraphNode,
 } from "../core/graph/types";
+import type { UniformHints } from "../core/graph/uniformParser";
+import { writeUniformHints } from "../core/graph/uniformParser";
 import { nextId } from "../utils/id";
 import { useHistoryStore } from "./historyStore";
 import type { NodePosition } from "./types";
@@ -46,6 +48,12 @@ export interface GraphState {
     patch: { vertexSource?: string; fragmentSource?: string },
   ) => void;
   setUniformValue: (id: string, name: string, value: number | number[]) => void;
+  /**
+   * Write Inspector hint annotations (range/step/default/label) back into the
+   * uniform declaration's GLSL source comment. Routes through the structural
+   * source-update path so the change recompiles and re-derives the spec.
+   */
+  setUniformHints: (id: string, name: string, hints: UniformHints) => void;
   setResolutionScale: (id: string, scale: ResolutionScale) => void;
   setParamValue: (id: string, value: number | number[]) => void;
   setParamLabel: (id: string, label: string) => void;
@@ -204,6 +212,26 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }),
       uniformRev: s.uniformRev + 1,
     })),
+  setUniformHints: (id, name, hints) => {
+    const node = get().nodes.find((n) => n.id === id);
+    if (!node) return;
+    if (node.kind === "shader") {
+      const sn = node as ShaderGraphNode;
+      const frag = writeUniformHints(sn.fragmentSource, name, hints);
+      if (frag !== null) {
+        get().updateShaderSource(id, { fragmentSource: frag });
+        return;
+      }
+      const vert = writeUniformHints(sn.vertexSource, name, hints);
+      if (vert !== null) get().updateShaderSource(id, { vertexSource: vert });
+      return;
+    }
+    if (node.kind === "compute") {
+      const cn = node as ComputeGraphNode;
+      const vert = writeUniformHints(cn.vertexSource, name, hints);
+      if (vert !== null) get().updateComputeSource(id, vert);
+    }
+  },
   setResolutionScale: (id, scale) => {
     pushHistory(get());
     set((s) => ({

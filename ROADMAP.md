@@ -10,7 +10,7 @@
 
 표현력을 직접 키우고 기존 컴파일/실행 구조에 자연스럽게 얹히는 **1 → 2** 가 최우선. 그다음 워크플로/디버깅(4·5·3) → 성능(7) → 비용 높은 디스크 연동(6) 순.
 
-> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. ✅ **3번(`u_mouse`/`u_frame` 시스템 유니폼)도 완료** — SPEC.md Phase 19. ✅ **4번(노드 복제 Cmd+D)도 완료** — SPEC.md Phase 20. ✅ **5번(Inspector 주석 힌트 GUI 생성)도 완료** — SPEC.md Phase 21. 다음은 **7번(썸네일 GPU 다운샘플)** 또는 **6번(셰이더 핫리로드 디스크 백업)**.
+> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. ✅ **3번(`u_mouse`/`u_frame` 시스템 유니폼)도 완료** — SPEC.md Phase 19. ✅ **4번(노드 복제 Cmd+D)도 완료** — SPEC.md Phase 20. ✅ **5번(Inspector 주석 힌트 GUI 생성)도 완료** — SPEC.md Phase 21. ✅ **7번(썸네일 GPU 다운샘플)도 완료** — SPEC.md Phase 22. 다음은 **6번(셰이더 핫리로드 디스크 백업)**.
 
 | # | 항목 | 분류 | 난이도 | 추천도 |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@
 | ~~4~~ | ~~노드 그래프 키보드 접근성 & 복제~~ (복제 완료 → Phase 20) | 워크플로 | 하 | ★★ |
 | ~~5~~ | ~~Inspector 주석 힌트 GUI 생성~~ (완료 → Phase 21) | 워크플로 | 중 | ★★ |
 | 6 | 셰이더 핫리로드 디스크 백업 | 워크플로 | 상 | ★ |
-| 7 | 썸네일 GPU 다운샘플 | 성능 | 중 | ★★ |
+| ~~7~~ | ~~썸네일 GPU 다운샘플~~ (완료 → Phase 22) | 성능 | 중 | ★★ |
 
 ---
 
@@ -71,15 +71,6 @@ uniformParser 의 역방향. `serializeHintComment`/`writeUniformHints`(core/gra
 
 ---
 
-## 7. 썸네일 GPU 다운샘플
+## 7. 썸네일 GPU 다운샘플 — ✅ 완료 (SPEC.md Phase 22)
 
-**동기.** 현재 96×96 다운샘플이 CPU(`downsampleToThumb`, Architecture §6.2). 원본 FBO 가 클수록 PBO 전송량(풀해상도 RGBA)과 CPU 비용이 크다.
-
-**접근법.**
-- blit 단계에서 GPU 로 먼저 96×96 FBO 에 축소(텍스처드 쿼드 1패스) → 그 작은 FBO 를 PBO readback. 전송량이 `W×H×4` → `96×96×4` 로 급감, CPU 다운샘플 제거.
-- `asyncReadback` 의 request 가 원본 FBO 대신 thumb FBO 를 읽도록. thumb FBO 풀(노드당 1개) 신설.
-- 동기 폴백(`readback.ts`)은 그대로 두되 공유 상수만 유지.
-
-**영향 모듈.** `core/thumbnail/asyncReadback.ts`, 신규 thumb-blit 경로(`execute.ts` 또는 thumbnail 모듈), `core/gl/framebuffer.ts`.
-
-**게이트.** asyncReadback.test 보강. E2E: 기존 썸네일 라이브 갱신 스펙이 회귀 없이 통과(시각 결과 동일).
+`AsyncThumbnailReadback` 이 PBO readback 전에 GPU 로 다운샘플한다. 노드당 96×96 thumb FBO(`createFramebuffer(gl, 96, 96, false)`)에 원본 color 텍스처를 풀스크린 쿼드 1패스로 그려 넣고(프래그먼트에서 Y-flip → 결과가 top-down), 그 작은 FBO 만 PBO 로 읽는다. 전송량이 `W×H×4` → `96×96×4` 로 고정되고 CPU 박스필터(`downsampleToThumb`) 호출이 사라져 readback 은 버퍼를 바로 ImageData 로 감싼다. blit 프로그램/쿼드 VAO 는 인스턴스 lazy 싱글톤, thumb FBO·PBO 는 slot 단위. 검증: `asyncReadback.test`(readPixels 가 원본 크기 무관 96×96, blit 컴파일 실패 시 false). 자세한 내용은 SPEC.md Phase 22.

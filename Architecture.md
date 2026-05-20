@@ -335,15 +335,20 @@ commit(nodeId, image, now)    — 결과 ImageData 를 listener 로 푸시 + las
 
 ### 6.2 AsyncThumbnailReadback (`src/core/thumbnail/asyncReadback.ts`)
 
-WebGL2 PBO + `fenceSync` 로 메인 스레드 stall 없이 픽셀을 가져온다.
+WebGL2 PBO + `fenceSync` 로 메인 스레드 stall 없이 픽셀을 가져온다. **다운샘플은 GPU 에서 먼저** 수행하므로 readback 전송량은 원본 해상도와 무관하게 `96×96×4` 로 고정된다.
 
 ```
+buildBlit(gl):            # 인스턴스 lazy 싱글톤
+    풀스크린 쿼드 program(Y-flip 샘플) + VAO/VBO 생성
+
 request(gl, nodeId, fb):
-    slot = slots[nodeId] (없으면 PBO 생성)
     if slot.pending: return false
-    if dims 변경: bufferData(STREAM_READ)
-    bindFramebuffer(READ, fb.fbo)
-    readPixels(0,0,w,h, RGBA, U8, 0)   # PBO 에 비동기로 채워짐
+    slot = slots[nodeId] (없으면 PBO[96²·4] + thumb FBO[96×96, no-depth] 생성)
+    save(FRAMEBUFFER_BINDING, VIEWPORT)
+    downsampleInto(gl, blit, slot.thumb, fb.color.texture)   # 1 draw, GPU 축소
+    bindBuffer(PIXEL_PACK, slot.pbo)
+    readPixels(0,0,96,96, RGBA, U8, 0)   # thumb FBO → PBO 에 비동기로 채워짐
+    restore(framebuffer, viewport)
     slot.sync = fenceSync(SYNC_GPU_COMMANDS_COMPLETE, 0)
     slot.pending = true
 
@@ -351,15 +356,14 @@ poll(gl):
     for slot in slots:
         status = clientWaitSync(slot.sync, 0, 0)   # timeout=0 → non-blocking
         if status in {ALREADY_SIGNALED, CONDITION_SATISFIED}:
-            getBufferSubData(PBO, 0, buf)
-            image = downsampleToThumb(buf, w, h, 96)
-            yield {nodeId, image}
+            getBufferSubData(PBO, 0, buf[96²·4])
+            yield {nodeId, image: new ImageData(buf, 96, 96)}   # 이미 top-down
         # TIMEOUT_EXPIRED 이면 그대로 둠 — N 프레임 지연 허용
 ```
 
-- **노드당 in-flight 1 건.** request 중복은 false 로 거절.
-- **컴파일로 사라진 노드는 release()** — RAF 루프가 `lastPassNodeIds` 와 `plan.passes` 의 차집합에 대해 호출.
-- **96×96 다운샘플은 CPU 측** (`downsampleToThumb` in `src/core/thumbnail/readback.ts`). 원본 해상도가 클수록 CPU 비용이 크지만 10Hz 스로틀 + 가시성 컬링으로 한정된다.
+- **노드당 in-flight 1 건.** request 중복은 false 로 거절. blit program 컴파일 실패 시에도 false.
+- **컴파일로 사라진 노드는 release()** — RAF 루프가 `lastPassNodeIds` 와 `plan.passes` 의 차집합에 대해 호출. `release` 는 PBO + thumb FBO 를 함께 해제, `disposeAll` 은 추가로 blit 리소스까지 정리.
+- **96×96 다운샘플은 GPU 측** — 텍스처드 쿼드 1패스로 thumb FBO 에 축소(프래그먼트가 Y-flip 하여 readback 이 곧 top-down). CPU 박스필터(`downsampleToThumb`)는 더 이상 호출되지 않고, §6.4 의 동기 폴백 전용으로 남는다.
 
 ### 6.3 IntersectionObserver
 
@@ -367,7 +371,7 @@ poll(gl):
 
 ### 6.4 동기 fallback
 
-`src/core/thumbnail/readback.ts` 가 **동기 `gl.readPixels`** 경로를 그대로 보관하고 있다. `AsyncThumbnailReadback` 이 기본 경로지만, `downsampleToThumb` 와 `THUMB_SIZE` 상수는 동기 모듈에서 가져와 공유한다. 정적 export 등 PBO 가 쓰이지 않는 컨텍스트에 재사용 가능한 형태.
+`src/core/thumbnail/readback.ts` 가 **동기 CPU 박스필터** `downsampleToThumb` 와 공유 상수 `THUMB_SIZE` 를 보관한다. `THUMB_SIZE` 는 `AsyncThumbnailReadback`·`NodeThumbnail` 이 공유하고, `downsampleToThumb` 는 PBO·GPU 가 쓰이지 않는 컨텍스트(정적 export 등)를 위한 CPU 폴백으로 남는다 — Phase 22 이후 라이브 readback 경로(§6.2)는 GPU 다운샘플만 사용한다.
 
 ---
 

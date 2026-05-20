@@ -10,12 +10,12 @@
 
 표현력을 직접 키우고 기존 컴파일/실행 구조에 자연스럽게 얹히는 **1 → 2** 가 최우선. 그다음 워크플로/디버깅(4·5·3) → 성능(7) → 비용 높은 디스크 연동(6) 순.
 
-> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17 로 승격. 다음은 **2번(N:1 합성 일반화)**.
+> ✅ **1번(Pass별 해상도 스케일)은 완료** — SPEC.md Phase 17. ✅ **2번(N:1 합성 일반화)도 완료** — SPEC.md Phase 18. 다음은 **3번(`u_mouse`/`u_frame` 시스템 유니폼)**.
 
 | # | 항목 | 분류 | 난이도 | 추천도 |
 |---|---|---|---|---|
 | ~~1~~ | ~~Pass별 해상도 스케일~~ (완료 → Phase 17) | 표현력 | 중 | ★★★ |
-| 2 | N:1 합성 일반화 | 표현력 | 중 | ★★★ |
+| ~~2~~ | ~~N:1 합성 일반화~~ (완료 → Phase 18) | 표현력 | 중 | ★★★ |
 | 3 | `u_mouse` / `u_frame` 시스템 유니폼 | 표현력 | 하 | ★★ |
 | 4 | 노드 그래프 키보드 접근성 & 복제 | 워크플로 | 하 | ★★ |
 | 5 | Inspector 주석 힌트 GUI 생성 | 워크플로 | 중 | ★★ |
@@ -30,20 +30,9 @@
 
 ---
 
-## 2. N:1 합성 일반화
+## 2. N:1 합성 일반화 — ✅ 완료 (SPEC.md Phase 18)
 
-**동기.** 지금은 N:1 합성이 Blend 노드(2 sampler)로만 가능하다(Architecture §2.3, `multi_input` 금지). 그런데 ShaderNode 는 이미 GLSL 의 sampler uniform 마다 **서로 다른 핸들**을 입력 포트로 노출한다 — 즉 한 셰이더가 3개 텍스처를 받을 수 있는데, 현재 규칙은 "같은 `(target, targetHandle)` 에 2개 엣지"만 금지하면 충분하다. 실제로 검증 규칙은 이미 핸들 단위(`multi_input`)이므로, **서로 다른 핸들로 들어오는 N개 입력은 이미 허용되고 있을 가능성**이 높다. 확인 후 명시적으로 문서화/테스트로 굳히는 작업.
-
-**접근법.**
-- 먼저 `validate.ts` 와 `NodeEditor.onConnect` 가 정말로 *다른 핸들*은 막지 않는지 코드로 검증(가설: 막지 않음). 막힌다면 핸들 단위로 완화.
-- sampler 입력이 여러 개인 커스텀 셰이더 템플릿(예: 3-way blend, mask composite) 1~2개를 빌트인으로 추가해 기능을 노출.
-- 임의 fan-in DAG 에서 FBO 라우팅·토포 정렬이 정상인지 compile 테스트 보강.
-
-**영향 모듈.** `core/graph/validate.ts`(필요 시), `shaders/templates/*`, `ui/NodeEditor/Toolbar.tsx`·`CommandPalette`(템플릿 등록), `core/graph/compile.test.ts`.
-
-**게이트.** validate.test / compile.test 보강. E2E: 다중 sampler 합성 그래프 렌더 스펙.
-
-**주의.** 이건 "이미 되는지 확인 → 안 되면 완화 → 노출" 순서라 1번보다 코드 변경이 적을 수도, 검증으로 끝날 수도 있다. 시작 시 현 동작 확인이 첫 단계.
+가설대로 **연결·컴파일 파이프라인은 이미 핸들 단위로 일반화**되어 있었다. `validate.ts` 의 `multi_input` 은 `(target, targetHandle)` 단위라 동일 핸들만 금지하고, `onConnect` 도 동일 핸들 점유 시에만 거부. `compile.ts` 는 타깃의 모든 입력 엣지를 순회하며 texture 마다 `SamplerBinding{ unit: unit++ }` 라우팅 → 임의 fan-in 정상. 따라서 코드 완화 없이 **노출·테스트·문서화**로 마무리: 빌트인 템플릿 `Composite 3`(composite3.frag)·`Mask`(mask.frag) CommandPalette 등록, `validate.test` 에 다른 핸들 N:1 허용 + fan-in 토포 정렬 케이스, E2E `phase-18-fanin-composite.spec.ts`(R/G/B → u_a/u_b/u_c 합성). Architecture §2.3 문구도 "동일 핸들만 금지, 핸들 다른 N:1 허용" 으로 정정. 자세한 내용은 SPEC.md Phase 18.
 
 ---
 

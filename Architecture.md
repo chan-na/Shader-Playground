@@ -82,11 +82,13 @@
 | 코드 | 조건 |
 |---|---|
 | `missing_node` | 엣지가 존재하지 않는 노드를 가리킴 |
-| `multi_input` | 같은 `(target, targetHandle)` 에 두 개 이상의 엣지 — **N:1 금지** |
+| `multi_input` | 같은 `(target, targetHandle)` 에 두 개 이상의 엣지 — **한 핸들에 N:1 금지** |
 | `multiple_outputs` | Output 노드가 `MAX_OUTPUTS = 4` 를 초과 |
 | `cycle` | DFS 로 검출 |
 
-`multi_input` 은 `NodeEditor` 의 `onConnect` 가 이미 거부하므로 보통은 컴파일까지 도달하지 않는다. `isValidConnection` 은 *타입 매칭만* 검사하고, cycle 은 `onConnect` 가 가설 엣지를 추가한 그래프에 `validateGraph` 를 돌려 `code === 'cycle'` 이면 거부한다. 즉 1:N 분기는 허용, N:1 합성은 금지.
+`multi_input` 은 `NodeEditor` 의 `onConnect` 가 이미 거부하므로 보통은 컴파일까지 도달하지 않는다. `isValidConnection` 은 *타입 매칭만* 검사하고, cycle 은 `onConnect` 가 가설 엣지를 추가한 그래프에 `validateGraph` 를 돌려 `code === 'cycle'` 이면 거부한다.
+
+규칙은 **핸들 단위**라는 점이 핵심이다: 금지되는 것은 *동일 핸들*에 두 입력이 꽂히는 경우뿐이고, **서로 다른 핸들로 들어오는 N:1 합성(fan-in)은 허용**된다. ShaderNode 는 GLSL 의 sampler uniform 마다 별도 입력 핸들을 노출하므로(§2.2), 3-way blend·mask composite 처럼 한 셰이더가 여러 텍스처를 받는 일반 N:1 합성이 자연스럽게 성립한다. 빌트인 템플릿 `Composite 3`(u_a/u_b/u_c)·`Mask`(u_base/u_overlay/u_mask)가 이 패턴을 노출한다(Phase 18). 즉 1:N 분기와 (핸들이 다른) N:1 합성은 모두 허용, *동일 핸들* N:1 만 금지.
 
 ### 2.4 위상 정렬
 

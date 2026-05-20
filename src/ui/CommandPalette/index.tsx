@@ -12,6 +12,8 @@ import basicVert from "../../shaders/basic.vert?raw";
 import particleVert from "../../shaders/particles/particle.vert?raw";
 import blendFrag from "../../shaders/templates/blend.frag?raw";
 import blurFrag from "../../shaders/templates/blur.frag?raw";
+import composite3Frag from "../../shaders/templates/composite3.frag?raw";
+import maskFrag from "../../shaders/templates/mask.frag?raw";
 import noiseFrag from "../../shaders/templates/noise.frag?raw";
 import tonemapFrag from "../../shaders/templates/tonemap.frag?raw";
 import unlitFrag from "../../shaders/templates/unlit.frag?raw";
@@ -151,6 +153,8 @@ function buildCommands(): Command[] {
     { name: "Tonemap", frag: tonemapFrag },
     { name: "UV Debug", frag: uvDebugFrag },
     { name: "Blend", frag: blendFrag },
+    { name: "Composite 3", frag: composite3Frag },
+    { name: "Mask", frag: maskFrag },
   ];
   for (const tpl of shaderTemplates) {
     cmds.push({

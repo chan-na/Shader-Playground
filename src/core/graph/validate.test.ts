@@ -64,6 +64,38 @@ describe("validateGraph", () => {
     expect(errors.some((e) => e.code === "multi_input")).toBe(true);
   });
 
+  it("allows N:1 fan-in across distinct target handles", () => {
+    // multi_input is scoped per (target, targetHandle): three sources feeding
+    // three different sampler handles on one shader is a valid composite.
+    const g: Graph = {
+      nodes: [shader("a"), shader("b"), shader("c"), shader("dst")],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "texture",
+          target: "dst",
+          targetHandle: "u_a",
+        },
+        {
+          id: "e2",
+          source: "b",
+          sourceHandle: "texture",
+          target: "dst",
+          targetHandle: "u_b",
+        },
+        {
+          id: "e3",
+          source: "c",
+          sourceHandle: "texture",
+          target: "dst",
+          targetHandle: "u_c",
+        },
+      ],
+    };
+    expect(validateGraph(g)).toEqual([]);
+  });
+
   it("detects cycles", () => {
     const g: Graph = {
       nodes: [shader("a"), shader("b")],
@@ -159,6 +191,50 @@ describe("topologicalOrder", () => {
     expect(order.indexOf("a")).toBeLessThan(order.indexOf("b"));
     expect(order.indexOf("b")).toBeLessThan(order.indexOf("c"));
     expect(order.indexOf("c")).toBeLessThan(order.indexOf("o"));
+  });
+
+  it("orders all fan-in sources before the composite sink", () => {
+    // Three sources feeding distinct sampler handles on one shader must all
+    // precede it so their FBOs are rendered before the composite samples them.
+    const g: Graph = {
+      nodes: [shader("dst"), shader("a"), shader("b"), shader("c"), out("o")],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "texture",
+          target: "dst",
+          targetHandle: "u_a",
+        },
+        {
+          id: "e2",
+          source: "b",
+          sourceHandle: "texture",
+          target: "dst",
+          targetHandle: "u_b",
+        },
+        {
+          id: "e3",
+          source: "c",
+          sourceHandle: "texture",
+          target: "dst",
+          targetHandle: "u_c",
+        },
+        {
+          id: "e4",
+          source: "dst",
+          sourceHandle: "texture",
+          target: "o",
+          targetHandle: "texture",
+        },
+      ],
+    };
+    const order = topologicalOrder(g).map((n) => n.id);
+    const dstIdx = order.indexOf("dst");
+    expect(order.indexOf("a")).toBeLessThan(dstIdx);
+    expect(order.indexOf("b")).toBeLessThan(dstIdx);
+    expect(order.indexOf("c")).toBeLessThan(dstIdx);
+    expect(dstIdx).toBeLessThan(order.indexOf("o"));
   });
 
   it("handles disconnected nodes", () => {

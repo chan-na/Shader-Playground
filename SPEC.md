@@ -278,6 +278,13 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **정적 export**: `standalonePlayer.js` 는 이미 `pass.fbo.w/h` 단위로 viewport·u_resolution 을 처리하므로 `createFBO` 에 스케일만 반영. `projectSanitize`·`cloneGraphNode` 가 필드 검증/보존.
 - **검증**: Vitest — `scaledDimensions`(compile.test) 라운딩/클램프, `graphStore.setResolutionScale`(rev·비셰이더 무시), `projectSanitize`(유효/무효 스케일). Playwright E2E `phase-17-resolution-scale.spec.ts` — 0.25× 다운샘플 체인이 회귀 없이 렌더 + Inspector 드롭다운 반영.
 
+### Phase 18 — N:1 합성 일반화 (완료)
+한 셰이더가 여러 텍스처를 입력으로 받는 일반 N:1 합성(fan-in)을 정식 기능으로 노출. 검증 결과 **연결·컴파일 파이프라인은 이미 완전히 일반화**되어 있었다 — 코드 완화가 아니라 노출·테스트·문서화 작업.
+- **연결 규칙(기존)**: `validate.ts` 의 `multi_input` 은 `(target, targetHandle)` 단위라 *동일 핸들* 2입력만 금지하고, 서로 다른 핸들로 들어오는 N:1 은 이미 허용. `NodeEditor.onConnect` 도 같은 핸들이 점유된 경우에만 거부(`e.target === conn.target && e.targetHandle === conn.targetHandle`). ShaderNode 는 sampler uniform 마다 별도 입력 핸들을 노출하므로(registry `NODE_META.shader.inputs`) 다중 sampler 셰이더가 곧 N-입력 합성 노드.
+- **컴파일(기존)**: `compile.ts` 가 타깃의 모든 입력 엣지를 순회하며 texture 엣지마다 `SamplerBinding{ uniformName, sourceNodeId, unit: unit++ }` 을 생성 → 임의 fan-in 이 unit 0..N-1 로 라우팅. 토포 정렬(`topologicalOrder`)은 모든 source 가 sink 보다 앞서도록 보장.
+- **노출(신규)**: 빌트인 템플릿 `Composite 3`(`composite3.frag` — u_a/u_b/u_c + 가중치)·`Mask`(`mask.frag` — u_base/u_overlay/u_mask)를 CommandPalette 에 추가.
+- **검증**: Vitest `validate.test` — 서로 다른 핸들 N:1 이 `multi_input` 미발생 + fan-in 토포 정렬(3 source → 1 sink, 모두 sink 앞). Playwright E2E `phase-18-fanin-composite.spec.ts` — R/G/B 3 source 를 u_a/u_b/u_c 로 합성 → 세 채널 모두 출력(핸들별 라우팅 판별).
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - GLSL LSP 도입(Monaco 전환 검토).

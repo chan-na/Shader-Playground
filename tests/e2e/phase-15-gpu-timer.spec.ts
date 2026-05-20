@@ -107,8 +107,9 @@ test.describe("Phase 15 — GPU timer overlay", () => {
     await expect
       .poll(
         async () =>
-          await readSp(page, (sp) =>
-            Object.hasOwn(sp.gpuTimer.getState().byNode, "s1"),
+          await readSp(
+            page,
+            (sp) => sp.gpuTimer.getState().byNode.s1 !== undefined,
           ),
         { timeout: 5_000 },
       )

@@ -34,6 +34,7 @@ export interface InspectorProps {
 
 export function Inspector({ embedded = false }: InspectorProps) {
   const selectedId = useSelectionStore((s) => s.selectedNodeId);
+  const selectedCount = useSelectionStore((s) => s.selectedNodeIds.length);
   const firstShaderId = useGraphStore(
     (s) => s.nodes.find((n) => n.kind === "shader")?.id ?? null,
   );
@@ -94,6 +95,27 @@ export function Inspector({ embedded = false }: InspectorProps) {
   const body = (
     <div className="panel-body" style={{ overflowY: "auto" }}>
       <ViewportControls />
+
+      {selectedCount > 1 && (
+        <div
+          className="inspector-section"
+          data-testid="multi-select-banner"
+          style={{ color: "#bbb", fontSize: 12 }}
+        >
+          <strong>{selectedCount} nodes selected</strong>
+          {node && (
+            <span style={{ color: "#888" }}>
+              {" "}
+              · editing{" "}
+              <span style={{ fontFamily: "monospace" }}>{node.id}</span>
+            </span>
+          )}
+          <div style={{ color: "#666", fontSize: 11, marginTop: 4 }}>
+            화살표로 함께 이동, Delete로 함께 삭제. 아래 편집은 마지막으로
+            선택한 노드에만 적용됩니다.
+          </div>
+        </div>
+      )}
 
       {!node && <div className="inspector-empty">No node selected</div>}
       {node && (

@@ -326,8 +326,14 @@ Shadertoy 호환 절차적 셰이더 이식성을 위해 포인터 좌표·프�
 - **리소스**: blit program + 쿼드 VAO/VBO 는 인스턴스 lazy 싱글톤(`buildBlit`), PBO·thumb FBO 는 slot 단위. `release` 는 PBO+thumb FBO 동시 해제, `disposeAll` 은 blit 리소스까지 정리. `request` 는 그릴 때 `FRAMEBUFFER_BINDING`/`VIEWPORT` 를 저장·복원해 호출자 상태를 보존한다.
 - **검증**: Vitest `asyncReadback.test` — 원본 1024×768 이어도 `readPixels` 가 96×96(GPU 축소 증명), blit 프로그램 컴파일 실패 시 `request` 가 false, 다중 노드 독립 in-flight·release 정리. Playwright E2E 전 Phase 회귀 없이 통과(썸네일 시각 결과 동일). 동기 CPU 폴백 `downsampleToThumb` 는 자체 단위 테스트와 함께 readback.ts 에 보존(Architecture §6.4).
 
+### Phase 23 — 다중 선택 편집 (완료)
+`selectionStore` 는 이미 `selectedNodeIds` 집합을 보관하고 박스 선택(Shift+드래그)·다중 드래그·다중 삭제(Backspace/Delete)는 React Flow 가 네이티브로 처리하고 있었다. 남아 있던 단일 선택 가정 — 화살표 이동·전체 선택·Inspector 표시 — 을 마무리.
+- **화살표 이동**: `graphStore.nudgeNodes(ids, dx, dy)` 가 선택 노드들의 position 을 일괄 평행이동(드래그와 동일하게 `rev`/history 미변경 — position 은 비구조적). `KeyboardShortcuts` 가 ↑↓←→ 를 받아 선택 전체를 한 step(10px, Shift 40px) 이동. **React Flow 네이티브 이동과의 충돌 회피**: RF 는 노드/선택박스가 키보드 포커스(`:focus-visible`)일 때 화살표로 선택 전체를 옮기며 `preventDefault` 한다 — 우리 핸들러는 `e.defaultPrevented` 가 true 면 양보하고, 아무것도 포커스되지 않은(마우스 선택 직후 등) 경우에만 직접 이동.
+- **전체 선택**: `Cmd/Ctrl+A` 가 모든 노드를 선택(`setSelectedIds`). 텍스트 입력/CodeMirror 포커스 시에는 네이티브 select-all 보존.
+- **Inspector 다중 선택 인지**: 2개 이상 선택 시 `data-testid="multi-select-banner"` 배너로 "N nodes selected · editing <primary>" 표시. 아래 편집 컨트롤은 여전히 primary(마지막 선택 id, `selectedNodeId`)에만 적용됨을 명시.
+- **검증**: Vitest `graphStore.test` — `nudgeNodes` 가 나열된 노드만 평행이동·미나열 노드 불변·`rev`/history 불변·미지 id·no-op delta 무시. Playwright E2E `phase-23-multi-select.spec.ts` 4건 — (a) 화살표로 선택 쌍이 같은 방향·같은 delta 로 이동하고 비선택 노드는 불변, (b) 무선택 화살표 no-op, (c) Cmd+A 전체 선택, (d) Inspector 배너가 단일 선택엔 없고 다중 선택에 카운트·primary 표시.
+
 ### (백로그)
-- 노드 다중 선택 박스/화살표 이동(selectionStore 는 이미 다중 id 보관, Inspector/CodeEditor 단일 선택 가정만 정리하면 됨).
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - GLSL LSP 도입(Monaco 전환 검토).
 - GIF 녹화(gif.js / WASM gifenc).

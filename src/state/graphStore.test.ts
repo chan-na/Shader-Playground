@@ -63,6 +63,40 @@ describe("graphStore", () => {
     expect(useGraphStore.getState().edges).toHaveLength(0);
   });
 
+  it("nudgeNodes translates the listed nodes and leaves others untouched", () => {
+    const s = useGraphStore.getState();
+    s.addNode(makeShader("a"), { x: 10, y: 20 });
+    s.addNode(makeShader("b"), { x: 100, y: 100 });
+    s.addNode(makeShader("c"), { x: 0, y: 0 });
+
+    useGraphStore.getState().nudgeNodes(["a", "b"], 5, -7);
+    const after = useGraphStore.getState();
+    expect(after.positions.a).toEqual({ x: 15, y: 13 });
+    expect(after.positions.b).toEqual({ x: 105, y: 93 });
+    // Unlisted node stays put.
+    expect(after.positions.c).toEqual({ x: 0, y: 0 });
+  });
+
+  it("nudgeNodes does not bump rev or push history (positions are non-structural)", () => {
+    const s = useGraphStore.getState();
+    s.addNode(makeShader("a"), { x: 10, y: 20 });
+    useHistoryStore.getState().clear();
+    const beforeRev = useGraphStore.getState().rev;
+
+    useGraphStore.getState().nudgeNodes(["a"], 5, 5);
+    expect(useGraphStore.getState().rev).toBe(beforeRev);
+    expect(useHistoryStore.getState().past).toHaveLength(0);
+  });
+
+  it("nudgeNodes ignores unknown ids and no-op deltas", () => {
+    const s = useGraphStore.getState();
+    s.addNode(makeShader("a"), { x: 10, y: 20 });
+    useGraphStore.getState().nudgeNodes(["missing"], 5, 5);
+    expect(useGraphStore.getState().positions.a).toEqual({ x: 10, y: 20 });
+    useGraphStore.getState().nudgeNodes(["a"], 0, 0);
+    expect(useGraphStore.getState().positions.a).toEqual({ x: 10, y: 20 });
+  });
+
   it("cloneNode deep-copies under a new id, offsets, and skips edges", () => {
     const s = useGraphStore.getState();
     s.addNode({ id: "src", kind: "mesh", primitive: "cube" });

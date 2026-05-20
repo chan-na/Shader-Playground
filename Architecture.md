@@ -385,7 +385,7 @@ poll(gl):
 |---|---|---|---|---|
 | `graphStore` | nodes/edges/positions | `rev` 변화 | structural mutation 시 push | `uniformRev` 는 별도, 슬라이더 드래그 전용 |
 | `assetStore` | 메시·이미지 핸들 | `rev` 변화 | ✗ | 이미지 비트맵이 도착해 sampler 가 채워질 때만 의미 있음 |
-| `selectionStore` | `selectedNodeId` | ✗ | ✗ | Inspector·CodeEditor 가 구독 |
+| `selectionStore` | `selectedNodeIds[]` + `selectedNodeId`(primary=마지막) | ✗ | ✗ | NodeEditor 가 집합을 RF `selected` 로 동기화. Inspector·CodeEditor 는 primary 만 편집하고 2개 이상이면 다중 선택 배너 표시 (Phase 23) |
 | `editorStore` | activeStage, jumpRequest | ✗ | ✗ | jumpRequest 는 `rev` 카운터 포함 — 동일 행 두 번 클릭도 발화 |
 | `diagnosticsStore` | byNode[id] = {vertex, fragment, link}[] | ✗ | ✗ | recompile 직후 채워짐, CodeEditor 의 CM `setDiagnostics` 와 ProblemsPanel 이 모두 구독 |
 | `cameraStore` | OrbitCameraState | ✗ | ✗ | 입력 → `setCamera`, RAF 가 `getState`. `rev` 카운터(B2) 가 idle 게이트를 깨움 |
@@ -623,7 +623,7 @@ ShaderPlayground/
    │  ├─ graphStore.ts               # nodes/edges/positions + rev/uniformRev (+ test)
    │  ├─ assetStore.ts               # 메시/이미지 카탈로그 (런타임 핸들)
    │  ├─ assetActions.ts             # import + IndexedDB hydrate (+ test)
-   │  ├─ selectionStore.ts           # selectedNodeId (+ test)
+   │  ├─ selectionStore.ts           # selectedNodeIds[] + primary selectedNodeId (+ test)
    │  ├─ rendererStore.ts            # fps/frame/drawCalls/errors (+ test)
    │  ├─ cameraStore.ts              # OrbitCameraState 보관 + reset
    │  ├─ viewportStore.ts            # background rgb
@@ -641,7 +641,7 @@ ShaderPlayground/
    │
    ├─ ui/                            # ── React 컴포넌트 ────────────────
    │  ├─ BootstrapGate.tsx           # share / autosave 복구 / 데모 분기 + 다이얼로그
-   │  ├─ KeyboardShortcuts.tsx       # Cmd+Z/Y/D/K, Space, Esc 등 전역 단축키 (Cmd+D=선택 노드 복제)
+   │  ├─ KeyboardShortcuts.tsx       # 전역 단축키 — Cmd+Z/Y(undo/redo), Cmd+D(복제), Cmd+A(전체 선택), 화살표(선택 일괄 이동, Phase 23), Space(play/pause), Cmd+K
    │  │
    │  ├─ NodeEditor/
    │  │  ├─ index.tsx                # React Flow 캔버스 + graphStore 양방향

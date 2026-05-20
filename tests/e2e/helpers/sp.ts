@@ -138,6 +138,12 @@ export interface SpStores {
       setEnabled: (enabled: boolean) => void;
     };
   };
+  log: {
+    debug: (category: string, message: string, detail?: unknown) => void;
+    info: (category: string, message: string, detail?: unknown) => void;
+    warn: (category: string, message: string, detail?: unknown) => void;
+    error: (category: string, message: string, detail?: unknown) => void;
+  };
 }
 
 declare global {

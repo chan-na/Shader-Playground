@@ -14,6 +14,8 @@ export type LogCategory =
   | "app";
 
 export interface LogEntry {
+  /** Monotonic id, unique per entry — stable React key for the diagnostics list. */
+  seq: number;
   ts: number;
   level: LogLevel;
   category: LogCategory;
@@ -33,6 +35,7 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
 
 const buffer: LogEntry[] = [];
 const subscribers = new Set<(entry: LogEntry) => void>();
+let seqCounter = 0;
 
 // 콘솔 미러링은 DEV에서만. 버퍼엔 레벨과 무관하게 항상 저장하고,
 // 콘솔 출력만 minLevel로 게이트한다 (Debugging-Plan §3 P1 정책).
@@ -59,10 +62,11 @@ function emit(
   message: string,
   detail?: unknown,
 ): void {
+  const seq = ++seqCounter;
   const entry: LogEntry =
     detail === undefined
-      ? { ts: Date.now(), level, category, message }
-      : { ts: Date.now(), level, category, message, detail };
+      ? { seq, ts: Date.now(), level, category, message }
+      : { seq, ts: Date.now(), level, category, message, detail };
 
   buffer.push(entry);
   if (buffer.length > RING_CAPACITY) buffer.shift();

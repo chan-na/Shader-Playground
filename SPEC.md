@@ -260,6 +260,15 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **lifecycle hooks**: Viewport recompile 시 사라진 노드 ID 에 대해 `pool.release` + `store.removeNode`. context lost → restored 경로에서 pool 을 재생성하고 supported flag 를 다시 반영.
 - **검증**: Vitest 단위 18 건 (`gpuTimer.test.ts` 11 — extension probe / nest 방지 / 쿼리 재활용 / disjoint / release / dispose, `gpuTimerStore.test.ts` 7 — EMA / total / removeNode / supported·enabled 전이). Playwright E2E `phase-15-gpu-timer.spec.ts` 5 건 — (a) 스토어 shape 노출, (b) 칩 렌더 + ms 텍스트, (c) StatusBar GPU 컬럼 표시, (d) disable 토글이 UI 양쪽 다 숨김, (e) 노드 제거 시 `byNode` 에서 항목 정리.
 
+### Phase 16 — 디버깅 · 진단 인프라 (완료)
+개발자용 런타임 추적 인프라. 사용자 알림(`toastStore`)·GLSL 진단(`diagnosticsStore`)과 역할이 분리된, 평소 비가시 / 필요 시 열람하는 개발자 채널.
+- **중앙 로거 `src/utils/log.ts`**: 레벨(`debug`/`info`/`warn`/`error`)·카테고리(`gl`/`render`/`graph`/`assets`/`external`/`autosave`/`app`)별 로깅 + 500개 인메모리 링버퍼(초과 시 오래된 것 evict) + 구독/내보내기 API(`subscribeLog`/`exportLogText`/`clearLogBuffer`). 콘솔 미러링은 DEV 한정 + `minLevel` 게이트, 버퍼는 레벨과 무관하게 항상 기록. 어떤 store 도 import 하지 않는 leaf util (단방향).
+- **전역 안전망**: `main.tsx` 의 `window.onerror`/`unhandledrejection` 핸들러 → `log.error("app", …)`. `ErrorBoundary`(메인 작업 영역만 감쌈)가 렌더 중 uncaught 를 잡아 폴백 UI(새로고침 / 진단 복사) 제공.
+- **침묵 catch 추적화**: registry/audio·videoLoader/recorder/autoSave/cache 등 조용히 삼키던 실패 지점에 흔적만 추가(제어 흐름 불변). `rendererStore.errors` 는 최근 50건 상한.
+- **GL 에러 표면화**: `core/gl/glError.ts` 의 DEV 한정 `checkGlError` — program 링크·FBO 셋업은 무조건, 드로우 루프는 120프레임 스로틀(`gl.getError()` 동기 플러시 비용 회피). context lost/restored 상세 로깅.
+- **진단 패널 + 진단 정보 복사**: StatusBar `🛈 Diagnostics` 토글이 `debugUiStore.open` 을 켠다. `DiagnosticsPanel` 은 `subscribeLog` 로 실시간 갱신되는 로그 리스트(레벨/카테고리 필터 + Clear), `Copy` 는 `buildDiagnosticsReport`(로그 + GL renderer/version + 렌더 통계 + userAgent/화면/DPR + 그래프 노드·엣지 수)를 클립보드로(미지원 환경은 안전 폴백). GL 어댑터 identity 는 컨텍스트 생성 시 `rendererStore.glInfo` 에 1회 캡처.
+- **검증**: Vitest 단위 — `log.test.ts`, `debugUiStore.test.ts`, `diagnosticsReport.test.ts`, `DiagnosticsPanel.test.tsx`, `glError.test.ts` + program/framebuffer 보강. Playwright E2E `phase-16-diagnostics.spec.ts` — StatusBar 토글로 패널 열기 → 버퍼의 로그 엔트리 표시 → Clear 동작.
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - GLSL LSP 도입(Monaco 전환 검토).

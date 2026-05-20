@@ -5,6 +5,7 @@ import {
   updateExternalSources,
 } from "../../core/external/registry";
 import { createGLContext } from "../../core/gl/context";
+import { GpuTimerPool } from "../../core/gl/gpuTimer";
 import {
   compileGraph,
   type ExecutionPlan,
@@ -19,6 +20,7 @@ import {
   emptyDiagnostics,
   useDiagnosticsStore,
 } from "../../state/diagnosticsStore";
+import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { snapshotGraph, useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { thumbnailScheduler } from "../../state/thumbnailScheduler";
@@ -51,6 +53,10 @@ export function Viewport() {
 
     let plan: ExecutionPlan = emptyPlan(canvas.width || 1, canvas.height || 1);
     const asyncReadback = new AsyncThumbnailReadback();
+    // GPU timer is optional — the extension is Chrome-only. When absent the
+    // pool is null and the executePlan wrapping is a no-op via optional chain.
+    let gpuTimer: GpuTimerPool | null = GpuTimerPool.create(gl);
+    useGpuTimerStore.getState().setSupported(gpuTimer !== null);
     let lastPassNodeIds = new Set<string>();
     let lastRev = -1;
     let lastAssetRev = -1;
@@ -135,6 +141,10 @@ export function Viewport() {
       // Drop stale references the lost plan was holding; recompile() will
       // build a new plan against the freshly-restored context on the next tick.
       plan = emptyPlan(canvas.width || 1, canvas.height || 1);
+      // The previous timer pool referenced extension state from the lost
+      // context — re-probe so the next tick measures against the fresh GL.
+      gpuTimer = GpuTimerPool.create(gl);
+      useGpuTimerStore.getState().setSupported(gpuTimer !== null);
       clearErrors();
     };
     canvas.addEventListener("webglcontextlost", onContextLost as EventListener);
@@ -171,7 +181,11 @@ export function Viewport() {
         // to a deleted FBO would copy stale memory next time it fires.
         const nextIds = new Set(plan.passes.map((p) => p.nodeId));
         for (const prev of lastPassNodeIds) {
-          if (!nextIds.has(prev)) asyncReadback.release(gl, prev);
+          if (!nextIds.has(prev)) {
+            asyncReadback.release(gl, prev);
+            gpuTimer?.release(gl, prev);
+            useGpuTimerStore.getState().removeNode(prev);
+          }
         }
         lastPassNodeIds = nextIds;
       }
@@ -264,6 +278,7 @@ export function Viewport() {
       // Build a snapshot of param nodes for the frame.
       const params: Record<string, (typeof graph.nodes)[number]> = {};
       for (const n of graph.nodes) if (n.kind === "param") params[n.id] = n;
+      const timerEnabled = useGpuTimerStore.getState().enabled;
       executePlan(
         gl,
         plan,
@@ -278,8 +293,24 @@ export function Viewport() {
         },
         canvas.width,
         canvas.height,
+        timerEnabled ? gpuTimer : null,
       );
       bumpRenderTick();
+
+      // Drain any GPU timer queries that completed since the last frame and
+      // push the smoothed samples to the store. Disjoint events discard the
+      // batch; we ignore that case since the next frame restarts cleanly.
+      if (gpuTimer) {
+        try {
+          const samples = gpuTimer.poll(gl);
+          if (samples.length) {
+            const store = useGpuTimerStore.getState();
+            for (const s of samples) store.setSample(s.nodeId, s.ms);
+          }
+        } catch {
+          // Poll failure (context lost or driver quirk) — drop this batch.
+        }
+      }
 
       // Thumbnail readback (10Hz throttle handled by scheduler).
       // Async path: poll signaled fences first so committed images use the
@@ -321,6 +352,10 @@ export function Viewport() {
       cameraCtl.detach();
       asyncReadback.disposeAll(gl);
       disposeAllExternal(gl);
+      gpuTimer?.dispose(gl);
+      gpuTimer = null;
+      useGpuTimerStore.getState().reset();
+      useGpuTimerStore.getState().setSupported(false);
       plan.dispose();
       setReady(false);
     };

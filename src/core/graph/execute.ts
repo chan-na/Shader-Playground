@@ -10,6 +10,7 @@ import {
 } from "../camera/orbitCamera";
 import { getExternalTexture } from "../external/registry";
 import { bindFramebuffer } from "../gl/framebuffer";
+import type { GpuTimerPool } from "../gl/gpuTimer";
 import { drawMesh } from "../gl/mesh";
 import { setUniform } from "../gl/uniforms";
 import { resolveValueFor, type Value } from "../nodes/utility";
@@ -218,6 +219,7 @@ export function executePlan(
   ctx: FrameContext,
   canvasWidth: number,
   canvasHeight: number,
+  gpuTimer?: GpuTimerPool | null,
 ) {
   const passByNode = new Map<string, Pass>();
   for (const p of plan.passes) passByNode.set(p.nodeId, p);
@@ -236,7 +238,9 @@ export function executePlan(
   gl.viewport(0, 0, plan.width, plan.height);
   for (const pass of plan.passes) {
     if (pass.kind === "compute") {
+      gpuTimer?.begin(gl, pass.nodeId);
       executeComputePass(gl, pass, ctx, resolveCache);
+      gpuTimer?.end(gl);
       continue;
     }
     bindFramebuffer(gl, pass.fbo);
@@ -261,7 +265,9 @@ export function executePlan(
           cp.read === "A" ? pass.meshComputeVaos[0] : pass.meshComputeVaos[1];
       }
     }
+    gpuTimer?.begin(gl, pass.nodeId);
     drawMesh(gl, pass.mesh);
+    gpuTimer?.end(gl);
   }
 
   // Composite to canvas

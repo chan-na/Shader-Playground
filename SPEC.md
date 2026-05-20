@@ -100,11 +100,11 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 
 ## 2. 아키텍처 설계
 
-레이어 분리, 노드/포트 모델, 컴파일·렌더 파이프라인, 카메라, 썸네일 서브시스템, 상태 스토어 구조, 에러 처리, 직렬화, 정적 HTML export 등 **현 구현(Phase 12)의 동작 설명은 [Architecture.md](./Architecture.md) 로 이전**되었다. 본 SPEC 의 노드 모델·연결 규칙·페이즈 결정은 그쪽 문서의 §2 (그래프 모델) / §3 (컴파일) / §4 (렌더 루프) 와 일치하도록 유지된다.
+레이어 분리, 노드/포트 모델, 컴파일·렌더 파이프라인, 카메라, 썸네일 서브시스템, 상태 스토어 구조, 에러 처리, 직렬화, 정적 HTML export 등 **현 구현(Phase 22)의 동작 설명은 [Architecture.md](./Architecture.md) 로 이전**되었다. 본 SPEC 의 노드 모델·연결 규칙·페이즈 결정은 그쪽 문서의 §2 (그래프 모델) / §3 (컴파일) / §4 (렌더 루프) 와 일치하도록 유지된다.
 
 핵심 SPEC 차원 결정만 다시 한 번 요약:
 
-- 노드 종류는 10 가지 — `Mesh / Image / Webcam / Shader / Compute / Output / Param / Math / Swizzle / Combine`. Shader 와 Compute 의 입력 포트는 GLSL 의 `uniform` 선언으로부터 매번 다시 파싱되어 자동 생성된다.
+- 노드 종류는 12 가지 — `Mesh / Image / Webcam / Video / Audio / Shader / Compute / Output / Param / Math / Swizzle / Combine`. Shader 와 Compute 의 입력 포트는 GLSL 의 `uniform` 선언으로부터 매번 다시 파싱되어 자동 생성된다. Webcam / Video / Audio 는 plan 외부 싱글톤 풀(`core/external/registry.ts`)이 lifecycle 을 관리하는 라이브 외부 텍스처 소스다.
 - ShaderNode 는 vertex + fragment GLSL 한 쌍을 함께 보유. 메시 입력이 없으면 빌트인 `fullscreen.vert` 가 자동 주입되고 사용자의 vertex 소스는 사용되지 않는다.
 - ComputeNode 는 vertex GLSL 한 개와 `transformFeedbackVaryings` 로 캡처할 출력 attribute 목록을 보유. fragment 단계는 `RASTERIZER_DISCARD` 로 비활성화되고, ping-pong 두 vbo 세트로 매 프레임 시뮬레이션 결과를 갱신한다. 출력은 `mesh` 포트 하나 — 다운스트림 ShaderNode 가 mesh 입력으로 받아 POINTS/LINES/TRIANGLES 중 하나로 그린다.
 - 포트 타입은 6 가지 — `mesh / texture / float / vec2 / vec3 / vec4`. 분기(1:N)는 허용, 합성(N:1)은 금지. Output 노드는 그래프당 0~4 개, 5 개 이상은 검증 단계에서 거부.
@@ -117,7 +117,7 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 
 ## 3. 디렉토리 구조
 
-전체 트리와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-14a-기준) 로 이전되었다. 초안 SPEC 디렉토리와 실제 구현이 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 컴포넌트 분할 폐기, SidePanel 단일화, export 신설 등) 도 같은 문서의 §12.1 참조.
+전체 트리와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-22-기준) 로 이전되었다. 초안 SPEC 디렉토리와 실제 구현이 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 컴포넌트 분할 폐기, SidePanel 단일화, export 신설 등) 도 같은 문서의 §12.1 참조.
 
 ---
 
@@ -248,9 +248,23 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 - **CommandPalette / Toolbar**: `Add Webcam (live camera)` 항목 두 곳.
 - **검증**: Vitest 단위 22건 추가 (`external/registry` 11, `compile` +3 hasExternal/restore, `nodes/registry` +2 webcam port/clone, `projectSanitize` +4 deviceId 보존/oversize 드롭, `graphStore` +2 setWebcamConfig). Playwright E2E `phase-14-webcam.spec.ts` 4건 — (a) Chromium fake stream (`--use-fake-device-for-media-stream`) 이 webcam→shader→output 체인으로 렌더, (b) 노드 제거 시 dispose 안정 + 런타임 에러 0, (c) serialize/deserialize 라운드트립으로 webcam 노드 보존, (d) time pause 후에도 plan.hasExternal 로 인해 `stats.drawCalls > 0` 유지 (idle gate 우회 검증).
 
-### (백로그) — Phase 14b/c 예정
-- **Phase 14b — Video 노드**: AssetBrowser 에서 import 한 mp4/webm 을 texture 로. play/pause/loop/seek, IndexedDB videos store 에 Blob 캐시.
-- **Phase 14c — Audio 노드**: 마이크 또는 파일 → FFT 1D R8/R32F texture. fftSize 32~2048, source kind 직렬화. 출력은 texture 만 (라우드니스는 셰이더에서 평균).
+### Phase 14b — Video 노드 (완료)
+AssetBrowser 에서 import 한 mp4/webm 파일을 매 프레임 GL 텍스처로 업로드하는 외부 소스 노드. webcam 과 같은 `core/external/registry.ts` 싱글톤 풀에 얹혀 lifecycle 을 plan 외부에서 관리한다.
+- **새 노드 종류 `video`**: 입력 포트 0, 출력 `texture: texture` 단일. 필드 — `assetId`(import 한 비디오 에셋 참조, 미바인딩 시 null), `playing` / `loop` / `muted`, 옵셔널 `currentTime`(seek 타깃, 값이 바뀔 때만 restart 없이 `<video>` 가 seek). play/pause/loop/mute/seek 는 in-place 적용이고 **assetId 변경만 restart**.
+- **로더 (`core/assets/videoLoader.ts`)**: import 시 off-DOM `<video>` 를 마운트해 width/height/duration 메타데이터만 프로빙(8 초 하드 타임아웃 → 악성 파일이 import 를 멈추지 않음). 빈 `file.type` 는 확장자로 MIME 추론(`preload="auto"` 로 moov 박스가 끝에 있는 MP4 도 디코드). 원본 Blob 은 그대로 IndexedDB videos store 에 캐시.
+- **registry 핸들**: `VideoHandle` 이 resolved Blob → object URL → `<video>` 를 들고 첫 디코드 가능 프레임에서 `ready`. `updateExternalSources(gl)` 가 매 RAF `texSubImage2D(HTMLVideoElement)` 로 신선한 frame 업로드. assetId 는 `setVideoBlobResolver` 로 주입된 resolver 로 해석(registry 가 assetStore 를 직접 import 하지 않게 하는 단방향 경계).
+- **UI**: `VideoNodeView`(카드 라이브 `<video>` 프리뷰 + status), `VideoInspector`(에셋 선택 / play·pause / loop / mute / seek 스크럽). minimap 색 `#c156d6`. CommandPalette `Add Video (mp4/webm asset)` + Toolbar `+ Video`.
+- **정적 export**: `standalonePlayer.js` 가 video 소스를 자체 구현 — 임베드된 Blob → object URL → `<video>` 로 매 frame `texSubImage2D`, sampler fallback. 마이크/권한 디테일 없이 파일만.
+- **검증**: Vitest `videoLoader` 메타 프로빙·MIME 추론, `projectSanitize` 필드 검증/보존, `external/registry` video acquire/restart/release. Playwright E2E `phase-14b-video.spec.ts` 4 건 — (a) assetId 없는 video 노드가 컴파일·에러 보고하되 런타임 에러 0, (b) 노드 제거 시 dispose 안정, (c) Share URL 라운드트립 보존, (d) time pause 후에도 `plan.hasExternal` 로 렌더 루프 유지.
+
+### Phase 14c — Audio 노드 (완료)
+마이크 또는 파일 오디오를 `AnalyserNode` FFT bin 으로 떠서 1D R8 텍스처(`fftSize/2 × 1`)로 노출. 셰이더는 이 텍스처를 샘플해 스펙트럼·라우드니스(평균)를 시각화한다.
+- **새 노드 종류 `audio`**: 입력 포트 0, 출력 `texture: texture` 단일. 필드 — `sourceKind`(`mic` → `getUserMedia({audio:true})` / `file` → `decodeAudioData(blob)`), `assetId`(file 모드), `fftSize`(`AUDIO_FFT_SIZES` 32~2048 의 2 의 거듭제곱), `smoothing`(`AnalyserNode.smoothingTimeConstant` 0~1), file 모드의 `playing` / `loop`.
+- **로더 (`core/assets/audioLoader.ts`)**: import 시 임시 `AudioContext.decodeAudioData` 로 duration/sampleRate/channels 만 프로빙하고 디코드된 PCM 은 즉시 폐기(mp3→PCM 은 메모리 ~10 배). 재생은 영속된 Blob 에서 다시 디코드.
+- **registry 핸들**: `AudioHandle` 이 `AudioContext` + `AnalyserNode` 를 들고, mic 모드는 `MediaStreamAudioSourceNode`, file 모드는 `AudioBufferSourceNode`. `bins` 는 `fftSize/2` 크기 재사용 `Uint8Array`(fftSize 변경 시 재할당). 매 RAF `getByteFrequencyData(bins)` → R8 텍스처(`width=fftSize/2, height=1`) 업로드. assetId 는 `setAudioBlobResolver` 로 해석.
+- **UI**: `AudioNodeView`(source kind / fftSize / status 메타), `AudioInspector`(mic↔file 토글 / 에셋 선택 / fftSize 드롭다운 / smoothing 슬라이더 / play·loop). minimap 색 `#56c1d6`. CommandPalette `Add Audio (mic/file FFT texture)` + Toolbar `+ Audio`.
+- **정적 export**: `standalonePlayer.js` 가 file 모드 audio 를 자체 구현(`createAnalyser` + FFT bin → R8 텍스처). 마이크는 `getUserMedia({audio:false})` 로 비활성 — export 결과물은 파일 오디오만.
+- **검증**: Vitest `audioLoader` 메타 디코드, `projectSanitize`(sourceKind / fftSize / smoothing 클램프·검증), `external/registry` audio mic·file lifecycle. Playwright E2E `phase-14c-audio.spec.ts` 4 건 — (a) assetId 없는 file audio 노드가 컴파일·에러 보고하되 런타임 에러 0, (b) 노드 제거 시 dispose 안정, (c) Share URL 라운드트립 보존, (d) time pause 후에도 `plan.hasExternal` 로 렌더 루프 유지.
 
 ### Phase 15 — GPU Timer Overlay (완료)
 - **`EXT_disjoint_timer_query_webgl2` 통합**: `core/gl/gpuTimer.ts` 의 `GpuTimerPool` 이 `TIME_ELAPSED_EXT` 쿼리로 각 ShaderPass / ComputePass 의 GPU 시간을 비동기로 측정. extension 미노출 환경(Safari 등)에서는 `create()` 가 null → 모든 begin/end 가 옵셔널 체이닝으로 no-op.
@@ -346,7 +360,7 @@ Shadertoy 호환 절차적 셰이더 이식성을 위해 포인터 좌표·프�
 | GLTF 범위 | 지오메트리만 | 머티리얼/애니메이션 무시 |
 | 컴파일 트리거 | 디바운스 자동 재컴파일 | 향후 수동 컴파일 단축키 추가 가능 |
 | 직렬화 | JSON export/import (Phase 8), 에셋은 IndexedDB 캐시 | |
-| 노드 종류 | Mesh / Image / Webcam / Shader / Compute / Output / Parameter / Math / Swizzle / Combine | Parameter는 Phase 10, Math·Swizzle·Combine 유틸은 Phase 12, Compute(Transform Feedback) 은 Phase 13, Webcam (외부 라이브 텍스처) 은 Phase 14a. Output 은 최대 4개(Phase 10 분할 뷰포트). |
+| 노드 종류 | Mesh / Image / Webcam / Video / Audio / Shader / Compute / Output / Parameter / Math / Swizzle / Combine | Parameter는 Phase 10, Math·Swizzle·Combine 유틸은 Phase 12, Compute(Transform Feedback) 은 Phase 13, Webcam (외부 라이브 텍스처) 은 Phase 14a, Video 는 Phase 14b, Audio (FFT 텍스처) 는 Phase 14c. Output 은 최대 4개(Phase 10 분할 뷰포트). |
 | 의존성 무게 | 경량 우선 | three.js·Monaco는 의도적으로 회피 |
 
 이 디폴트 중 바꾸고 싶은 항목이 있으면 알려줘. 아니면 이대로 Phase 1부터 진행.

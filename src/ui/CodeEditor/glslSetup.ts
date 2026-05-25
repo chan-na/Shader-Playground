@@ -17,6 +17,7 @@ import {
 } from "@codemirror/view";
 import { glsl } from "codemirror-lang-glsl";
 import { glslAutocomplete } from "./autocomplete";
+import { glslHoverTooltip } from "./hover";
 
 const darkTheme = EditorView.theme(
   {
@@ -76,6 +77,7 @@ export function glslExtensions(): Extension[] {
     lintGutter(),
     glsl(),
     glslAutocomplete(),
+    glslHoverTooltip(),
     darkTheme,
     EditorView.lineWrapping,
   ];

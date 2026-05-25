@@ -11,6 +11,7 @@ import {
   glslSource,
   HINT_KEYWORDS,
   hintSource,
+  symbolCompletions,
   uniformCompletions,
 } from "./autocomplete";
 
@@ -103,6 +104,49 @@ describe("hintSource", () => {
     const src = "// plain comment";
     const ctx = makeContext(src, src.length);
     expect(hintSource(ctx)).toBeNull();
+  });
+});
+
+describe("symbolCompletions", () => {
+  it("surfaces in-scope locals/parameters above global uniforms", () => {
+    const src = `uniform float u_time;
+float helper(float x) {
+  float y = x * 2.0;
+  return y;
+}
+
+void main() {
+  vec3 c = vec3(0.0);
+  float a = 0.0;
+}
+`;
+    // Inside main() at line 9 (`float a = 0.0;`).
+    const opts = symbolCompletions(src, 9);
+    const names = opts.map((o) => o.label);
+    expect(names.indexOf("c")).toBeGreaterThanOrEqual(0);
+    expect(names.indexOf("a")).toBeGreaterThanOrEqual(0);
+    // Globals are present too…
+    expect(names).toContain("u_time");
+    expect(names).toContain("helper");
+    // …but appear AFTER the locals.
+    expect(names.indexOf("c")).toBeLessThan(names.indexOf("u_time"));
+    // helper()'s own internals are NOT visible from main().
+    expect(names).not.toContain("y");
+  });
+
+  it("renders functions with a parenthesized signature as `detail`", () => {
+    const src = `float helper(float x, vec2 p) { return x; }`;
+    const [helper] = symbolCompletions(src, 1).filter(
+      (o) => o.label === "helper",
+    );
+    expect(helper?.detail).toBe("float helper(float x, vec2 p)");
+  });
+
+  it("attaches the system-uniform description to known names like u_time", () => {
+    const src = `uniform float u_time;\nvoid main(){}`;
+    const opts = symbolCompletions(src, 2);
+    const uTime = opts.find((o) => o.label === "u_time");
+    expect(uTime?.info).toBeTruthy();
   });
 });
 

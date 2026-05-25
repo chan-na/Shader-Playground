@@ -167,6 +167,43 @@ export interface SpStores {
     >;
     dispose: () => void;
   };
+  glslSymbols: {
+    build: (source: string) => {
+      symbols: Array<{
+        name: string;
+        type: string;
+        kind: string;
+        line: number;
+        column: number;
+        scope: string | null;
+        parameters?: string;
+      }>;
+    };
+    visibleAt: (
+      table: { symbols: unknown[] },
+      line: number,
+    ) => Array<{
+      name: string;
+      type: string;
+      kind: string;
+      line: number;
+      column: number;
+      scope: string | null;
+    }>;
+    resolve: (
+      table: { symbols: unknown[] },
+      name: string,
+      line: number,
+    ) => {
+      name: string;
+      type: string;
+      kind: string;
+      line: number;
+      scope: string | null;
+    } | null;
+    builtins: Record<string, { signatures: string[]; description: string }>;
+    keywords: Record<string, string>;
+  };
   log: {
     debug: (category: string, message: string, detail?: unknown) => void;
     info: (category: string, message: string, detail?: unknown) => void;

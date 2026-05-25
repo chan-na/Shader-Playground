@@ -153,6 +153,20 @@ export interface SpStores {
       setEnabled: (enabled: boolean) => void;
     };
   };
+  glslValidator: () => {
+    validate: (
+      stage: "vertex" | "fragment",
+      source: string,
+    ) => Promise<
+      Array<{
+        line: number;
+        column?: number;
+        severity: "error" | "warning" | "info";
+        message: string;
+      }>
+    >;
+    dispose: () => void;
+  };
   log: {
     debug: (category: string, message: string, detail?: unknown) => void;
     info: (category: string, message: string, detail?: unknown) => void;

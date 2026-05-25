@@ -1,7 +1,9 @@
 import { setDiagnostics } from "@codemirror/lint";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { glslValidator } from "../../core/glsl/glslValidator";
+import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
@@ -56,6 +58,13 @@ export function CodeEditor() {
     effectiveId ? s.byNode[effectiveId] : undefined,
   );
 
+  // Live (pre-recompile) diagnostics from the OffscreenCanvas WebGL2 worker —
+  // see Architecture §8.4. Scoped to the currently-edited (node, stage); we
+  // clear it on switch (the validator may still be flying for the old doc).
+  const [liveDiags, setLiveDiags] = useState<GLSLDiagnostic[]>([]);
+  const setLiveDiagsRef = useRef(setLiveDiags);
+  setLiveDiagsRef.current = setLiveDiags;
+
   // Keep the latest (id, stage) in a ref so the mount-time listener can read it.
   ctxRef.current = { id: effectiveId, stage };
 
@@ -92,8 +101,34 @@ export function CodeEditor() {
       }
     }, 50);
 
+    // Live validate — runs ahead of (and independently from) the GL recompile
+    // pipeline. The worker is lazily created on the first dispatch (see
+    // GlslValidator) so editors that never see typing pay nothing. Resolved
+    // diagnostics are only applied if (id, stage) still matches when the
+    // promise lands, so node-switch races cannot push stale diags.
+    const liveValidate = debounce((value: string) => {
+      const { id, stage: st } = ctxRef.current;
+      if (!id) return;
+      const cur = useGraphStore.getState().nodes.find((n) => n.id === id);
+      if (!cur) return;
+      // Compute nodes only have a vertex source; shader nodes pick by tab.
+      const validateStage: "vertex" | "fragment" =
+        cur.kind === "compute" ? "vertex" : st;
+      void glslValidator()
+        .validate(validateStage, value)
+        .then((diags) => {
+          const ctx = ctxRef.current;
+          if (ctx.id !== id || ctx.stage !== st) return;
+          setLiveDiagsRef.current(diags);
+        });
+    }, 150);
+
     const updateListener = EditorView.updateListener.of((u) => {
-      if (u.docChanged) commit(u.state.doc.toString());
+      if (u.docChanged) {
+        const text = u.state.doc.toString();
+        commit(text);
+        liveValidate(text);
+      }
     });
 
     const view = new EditorView({
@@ -106,6 +141,7 @@ export function CodeEditor() {
     viewRef.current = view;
     return () => {
       commit.cancel();
+      liveValidate.cancel();
       view.destroy();
       viewRef.current = null;
     };
@@ -116,7 +152,9 @@ export function CodeEditor() {
   //  (b) the store source moved away from the value we last committed
   //      (i.e., an external change like graph reset). Mid-typing renders
   //      where store==lastCommitted and editor has newer text are skipped
-  //      so we never wipe in-flight edits.
+  //      so we never wipe in-flight edits. On a true document switch we also
+  //      drop any in-flight live diagnostic — the next keystroke (or the
+  //      upcoming store recompile) repopulates it.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -126,6 +164,7 @@ export function CodeEditor() {
     if (!switching && !externalChange) return;
     loadedKeyRef.current = key;
     lastCommittedRef.current = source;
+    if (switching) setLiveDiags([]);
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: source },
     });
@@ -154,7 +193,10 @@ export function CodeEditor() {
     clearJump();
   }, [jumpRequest, effectiveId, stage, clearJump]);
 
-  // Push diagnostics to CM
+  // Push diagnostics to CM — merge authoritative (recompile) diagnostics from
+  // diagnosticsStore with pre-compile diagnostics from the live worker. The
+  // store is the source of truth; when both have an entry at the same line
+  // and severity we drop the live one to avoid duplicate underlines (Phase 24).
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -164,14 +206,24 @@ export function CodeEditor() {
         : diags.fragment
       : [];
     const linkDiags = diags?.link ?? [];
-    const all = [...stageDiags, ...linkDiags];
+    const auth = [...stageDiags, ...linkDiags];
+    const authKeys = new Set(auth.map((d) => `${d.line}:${d.severity}`));
+    const live = liveDiags.filter(
+      (d) => !authKeys.has(`${d.line}:${d.severity}`),
+    );
+    const all = [...auth, ...live];
     view.dispatch(setDiagnostics(view.state, toCMDiagnostics(view, all)));
-  }, [diags, stage]);
+  }, [diags, stage, liveDiags]);
 
+  const stageLiveHasError = liveDiags.some((d) => d.severity === "error");
   const vertexHasError =
-    (diags?.vertex.length ?? 0) > 0 || (diags?.link.length ?? 0) > 0;
+    (diags?.vertex.length ?? 0) > 0 ||
+    (diags?.link.length ?? 0) > 0 ||
+    (stage === "vertex" && stageLiveHasError);
   const fragmentHasError =
-    (diags?.fragment.length ?? 0) > 0 || (diags?.link.length ?? 0) > 0;
+    (diags?.fragment.length ?? 0) > 0 ||
+    (diags?.link.length ?? 0) > 0 ||
+    (stage === "fragment" && stageLiveHasError);
 
   return (
     <div className="panel panel--code">

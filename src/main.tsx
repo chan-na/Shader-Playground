@@ -8,6 +8,10 @@ import {
 import { BUILTIN_FUNCTIONS, KEYWORD_DESCRIPTIONS } from "./core/glsl/builtins";
 import { glslValidator } from "./core/glsl/glslValidator";
 import {
+  classifyIdentifier,
+  classifySemanticTokens,
+} from "./core/glsl/semanticTokens";
+import {
   buildSymbolTable,
   resolveSymbol,
   symbolsVisibleAt,
@@ -73,6 +77,13 @@ if (import.meta.env.DEV) {
       resolve: resolveSymbol,
       builtins: BUILTIN_FUNCTIONS,
       keywords: KEYWORD_DESCRIPTIONS,
+    },
+    // Phase 26 — semantic token classifier exposed for E2E. Tests can drive
+    // `classify(source)` without going through the CodeMirror ViewPlugin to
+    // verify token kinds and offsets directly.
+    glslSemanticTokens: {
+      classify: classifySemanticTokens,
+      classifyIdentifier,
     },
     log,
   };

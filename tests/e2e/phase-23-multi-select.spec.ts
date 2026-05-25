@@ -16,6 +16,24 @@ const LAYOUT = {
   o1: { x: 400, y: 0 },
 };
 
+type XY = { x: number; y: number };
+
+/**
+ * Strongly-typed positions snapshot for the three nodes the trivial-mesh
+ * fixture creates. Resolves `Record<string, XY> → undefined` from the store
+ * shape into a fixed object so callers can do `.m1.x` without the
+ * noUncheckedIndexedAccess guard at every step.
+ */
+async function readPositions(
+  page: import("@playwright/test").Page,
+): Promise<{ m1: XY; s1: XY; o1: XY }> {
+  return readSp(page, (sp) => {
+    const p = sp.graph.getState().positions;
+    const fill = (v?: XY): XY => v ?? { x: Number.NaN, y: Number.NaN };
+    return { m1: fill(p.m1), s1: fill(p.s1), o1: fill(p.o1) };
+  });
+}
+
 async function blurActive(page: import("@playwright/test").Page) {
   await page.evaluate(() => {
     const el = document.activeElement;
@@ -40,17 +58,17 @@ test.describe("Phase 23 — multi-selection editing", () => {
     );
     await blurActive(page);
 
-    const before = await readSp(page, (sp) => sp.graph.getState().positions);
+    const before = await readPositions(page);
 
     await page.keyboard.press("ArrowRight");
 
     // Either our handler (10px) or React Flow's native move runs; assert the
     // direction and that the selected pair moved together, not the exact step.
     await expect
-      .poll(() => readSp(page, (sp) => sp.graph.getState().positions.m1.x))
+      .poll(async () => (await readPositions(page)).m1.x)
       .toBeGreaterThan(before.m1.x);
 
-    const after = await readSp(page, (sp) => sp.graph.getState().positions);
+    const after = await readPositions(page);
     expect(after.s1.x).toBeGreaterThan(before.s1.x);
     // Same horizontal delta for both selected nodes.
     expect(after.m1.x - before.m1.x).toBeCloseTo(after.s1.x - before.s1.x, 5);
@@ -67,10 +85,10 @@ test.describe("Phase 23 — multi-selection editing", () => {
     await withSp(page, (sp) => sp.selection.getState().select(null), null);
     await blurActive(page);
 
-    const before = await readSp(page, (sp) => sp.graph.getState().positions);
+    const before = await readPositions(page);
     await page.keyboard.press("ArrowDown");
     await page.waitForTimeout(150);
-    const after = await readSp(page, (sp) => sp.graph.getState().positions);
+    const after = await readPositions(page);
     expect(after).toEqual(before);
   });
 

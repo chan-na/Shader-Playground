@@ -5,6 +5,7 @@ import {
   setAudioBlobResolver,
   setVideoBlobResolver,
 } from "./core/external/registry";
+import { glslValidator } from "./core/glsl/glslValidator";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
 import { getAudioBlob, getVideoBlob, useAssetStore } from "./state/assetStore";
@@ -56,6 +57,7 @@ if (import.meta.env.DEV) {
     mouse: useMouseStore,
     renderer: useRendererStore,
     gpuTimer: useGpuTimerStore,
+    glslValidator,
     log,
   };
 }

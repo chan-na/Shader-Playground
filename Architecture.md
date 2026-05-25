@@ -468,6 +468,42 @@ diagnosticsStore.set(nodeId, {vertex, fragment, link})
 
 `rendererStore.stats.errors[]` 는 `pushError(msg)` 로 누적. `compileGraph` 가 throw 하거나 plan.errors (validate 결과) 가 있으면 한 줄 join. StatusBar 에 카운트, ProblemsPanel "Runtime errors" 섹션에 메시지 노출.
 
+### 8.4 라이브 GLSL 검증 (Phase 24)
+
+Authoritative recompile 경로(`graphStore.rev` → `compileGraph` → `gl.getShaderInfoLog`) 와 별개로, **CodeMirror 의 키스트로크마다** OffscreenCanvas WebGL2 워커에 셰이더를 보내 컴파일 로그를 받아오는 라이브 채널을 둔다. 사용자가 50ms commit debounce + 그래프 recompile 까지 기다리지 않고 밑줄을 본다.
+
+```
+CM updateListener (doc 변경)
+   │
+   ├─▶ commit (debounce 50ms)  ─▶ updateShaderSource ─▶ graphStore.rev++ ─▶ 권위 진단 (그대로)
+   │
+   └─▶ liveValidate (debounce 150ms)
+           │
+           ▼
+       glslValidator().validate(stage, source)
+           │  (lazy 첫 호출에 ?worker 인스턴스화)
+           ▼
+       Worker: OffscreenCanvas(1,1).getContext('webgl2')
+               → createShader/compileShader/getShaderInfoLog
+               → postMessage({log, ok})
+           │
+           ▼
+       parseShaderInfoLog(log) → GLSLDiagnostic[]
+           │  (ctxRef 가 promise 도착 시점에 같은 (node, stage) 면 적용)
+           ▼
+       setLiveDiags(diags)
+           │
+           ▼
+       CM diagnostics push effect: 권위 ∪ 라이브 (같은 line:severity 면 라이브 드롭)
+                                  → setDiagnostics → CM 밑줄
+```
+
+- **백엔드 선정 근거**: M0 측정 (`tests/measure/glsl-validator.spec.ts`) 에서 워커의 InfoLog 가 메인 스레드 GL 컨텍스트와 byte-perfect 일치(5/5 셰이더, syntax/undeclared/type-mismatch 포함) 함을 확인. 신규 의존성 0, 워커 소스 ~1KB, init 52ms. glslang-wasm (~1.8MB wasm, deprecated) 대비 모든 축에서 우세 — 측정 없이 채택.
+- **격리**: 워커는 메인 스레드 GL 컨텍스트와 분리된 OffscreenCanvas 라 사용자 셰이더가 잘못 컴파일돼도 렌더 GL state 를 오염시키지 않는다. 워커 GL 컨텍스트는 한 번 만들고 영구 재사용 (셰이더만 매 요청에 create/compile/delete).
+- **실패 모델**: 워커 construct/post/error 어느 단계 실패해도 클라이언트는 `[]` resolve. 권위 recompile 경로가 source of truth 로 그대로 동작 — 라이브는 *보조* 채널이다. 워커 미가용 환경에서는 기존 동작(컴파일 후 진단)만 남는다.
+- **머지/우선순위**: CodeEditor 진단 push effect 가 `auth = diagnosticsStore[stage] + link` 와 `live = liveDiags` 를 합성하되 *같은 `line:severity` 가 양쪽에 있으면 라이브 드롭*. 사용자가 에러를 고치는 순간 — 라이브는 즉시 비고, 권위는 다음 recompile 까지 잠시 stale — 잠깐 권위가 살아 있는 동안 라이브가 추가로 중복 표시하지 않는다.
+- **switch race**: `liveValidate` 가 dispatch 한 promise 가 다른 노드/스테이지로 전환된 뒤 도착하면 `ctxRef` 가 다른 `(id, stage)` 라 그대로 폐기. doc 교체 effect 는 switching 일 때 `setLiveDiags([])` 로 초기화.
+
 ---
 
 ## 9. 직렬화와 영속화
@@ -604,6 +640,10 @@ ShaderPlayground/
    │  │
    │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
    │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
+   │  │
+   │  ├─ glsl/                       # Phase 24 — 라이브 GLSL 검증 (OffscreenCanvas 워커)
+   │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
+   │  │  └─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
    │  │
    │  ├─ nodes/
    │  │  ├─ registry.ts              # 노드별 PortSpec + 동적 포트(Shader/Math/Swizzle/Combine) (+ test)

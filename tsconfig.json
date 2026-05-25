@@ -28,6 +28,7 @@
     "tests",
     "vitest.config.ts",
     "vite.config.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.measure.config.ts"
   ]
 }

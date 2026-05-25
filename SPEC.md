@@ -333,9 +333,18 @@ Shadertoy 호환 절차적 셰이더 이식성을 위해 포인터 좌표·프�
 - **Inspector 다중 선택 인지**: 2개 이상 선택 시 `data-testid="multi-select-banner"` 배너로 "N nodes selected · editing <primary>" 표시. 아래 편집 컨트롤은 여전히 primary(마지막 선택 id, `selectedNodeId`)에만 적용됨을 명시.
 - **검증**: Vitest `graphStore.test` — `nudgeNodes` 가 나열된 노드만 평행이동·미나열 노드 불변·`rev`/history 불변·미지 id·no-op delta 무시. Playwright E2E `phase-23-multi-select.spec.ts` 4건 — (a) 화살표로 선택 쌍이 같은 방향·같은 delta 로 이동하고 비선택 노드는 불변, (b) 무선택 화살표 no-op, (c) Cmd+A 전체 선택, (d) Inspector 배너가 단일 선택엔 없고 다중 선택에 카운트·primary 표시.
 
+### Phase 24 — 라이브 GLSL 검증 (완료)
+"GLSL LSP 도입(Monaco 전환 검토)" 백로그의 1차 실현. 진단 한정 — 자동완성·정의로 이동 등은 별도. **Monaco 전환 없이** CodeMirror 6 위에 OffscreenCanvas WebGL2 워커로 라이브 검증을 얹는 경량 통합.
+- **M0 측정 (`tests/measure/glsl-validator.spec.ts`)**: glslang-wasm 도입 전에 OffscreenCanvas WebGL2 워커 백엔드를 먼저 측정. SwiftShader 기준 5/5 셰이더에서 메인 스레드 GL 과 InfoLog byte-perfect 일치(`logsExactMatch: true`), worker init 52ms, source 986 bytes, 신규 의존성 0. 기존 `parseShaderInfoLog` 가 워커 로그를 그대로 처리(드라이버 포맷 일치). → glslang-wasm 측정 불필요로 판단, 직행 본 통합.
+- **워커 (`core/glsl/glslValidator.worker.ts`)**: Vite `?worker` 임포트. 싱글톤 `OffscreenCanvas(1,1).getContext('webgl2')` 를 첫 요청에 lazy init. 프로토콜 — `{type:'validate', reqId, stage, source}` 입력 → `{type:'validate', reqId, log, ok}` 출력. GL 미가용 환경(Safari 일부) 은 `glError` 로 첫 응답에 표면화.
+- **클라이언트 (`core/glsl/glslValidator.ts`)**: 한 앱당 워커 1 개(첫 validate 호출 시 생성). `validate(stage, source): Promise<GLSLDiagnostic[]>` — `parseShaderInfoLog` 로 파싱해 반환. **실패 모델**: 워커 construct/post/error 어느 단계 실패해도 `[]` resolve(authoritative recompile 경로는 그대로 — 라이브는 보조). 코얼레싱은 호출자(CodeEditor) 책임 — 클라이언트는 reqId 별로 독립 resolve.
+- **CodeEditor 통합 (`ui/CodeEditor/index.tsx`)**: CM `updateListener` 안에서 기존 50ms commit debounce 와 별도로 150ms `liveValidate` debounce. 결과는 `liveDiags` React 상태 — `(node, stage)` 가 promise 도착 시점에 그대로일 때만 적용해 switch race 방지. doc 교체 effect 에서 switching 이면 `setLiveDiags([])`. **머지 규칙**: 진단 push effect 가 `diagnosticsStore`(권위) ∪ `liveDiags`(라이브) 를 합성하되, **같은 `line:severity` 가 권위에 있으면 라이브 쪽을 드롭** — 중복 밑줄 회피. StageTabs 의 에러 닷도 `stage===활성 && stageLiveHasError` 시 즉시 빨강(권위 도착 전).
+- **DEV 브리지**: `window.__sp.glslValidator` 노출(다른 store 와 동형, DEV 빌드 한정). E2E 가 직접 `validate()` 를 부르고 결과를 검증.
+- **검증**: Vitest 단위 8건 — `glslValidator.test.ts` (fake worker 주입으로 RPC 라우팅·post 실패·worker construct 실패·dispose drain·error 이벤트 drain·out-of-order reply 라우팅·stray reqId 무시·clean log → []). Playwright E2E `phase-24-live-validation.spec.ts` 4건 — (a) `validate('fragment', BAD)` 가 정확한 line/severity/message 반환, (b) clean fragment → [], (c) CM 키스트로크 → 150ms 내 fragment 탭 `data-has-error="true"` (라이브 또는 직후 권위 경로 어느 쪽이든 wiring 증명), (d) singleton 동일 인스턴스.
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
-- GLSL LSP 도입(Monaco 전환 검토).
+- **GLSL LSP — 확장 범위**: Phase 24 가 *진단*만 다룸. 스코프 인식 자동완성(심볼 테이블), Hover 시그니처, Go-to-definition 은 별도 단계. CodeMirror 6 그대로(Monaco 전환은 여전히 회피 권장 — 진단 정합성을 OffscreenCanvas 백엔드가 이미 확보).
 - GIF 녹화(gif.js / WASM gifenc).
 
 ---

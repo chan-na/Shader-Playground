@@ -204,6 +204,18 @@ export interface SpStores {
     builtins: Record<string, { signatures: string[]; description: string }>;
     keywords: Record<string, string>;
   };
+  glslSemanticTokens: {
+    classify: (source: string) => Array<{
+      from: number;
+      to: number;
+      kind: string;
+    }>;
+    classifyIdentifier: (
+      table: { symbols: unknown[] },
+      name: string,
+      line: number,
+    ) => string | null;
+  };
   log: {
     debug: (category: string, message: string, detail?: unknown) => void;
     info: (category: string, message: string, detail?: unknown) => void;

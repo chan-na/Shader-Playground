@@ -18,6 +18,7 @@ import {
 import { glsl } from "codemirror-lang-glsl";
 import { glslAutocomplete } from "./autocomplete";
 import { glslHoverTooltip } from "./hover";
+import { glslSemanticHighlight } from "./semanticHighlight";
 
 const darkTheme = EditorView.theme(
   {
@@ -59,6 +60,22 @@ const darkTheme = EditorView.theme(
     ".cm-diagnostic-warning": {
       borderLeft: "3px solid #cca700",
     },
+    // Phase 26 — semantic token colors. Painted on top of the lexer-based
+    // syntax highlight so storage/control keywords keep their default style
+    // and only identifier roles are recolored. Palette mirrors the VS Code
+    // Dark+ convention used elsewhere in this repo (Inspector chips, hover
+    // signatures).
+    ".cm-glsl-token-uniform": { color: "#4ec9b0" },
+    ".cm-glsl-token-system-uniform": { color: "#ff9d00" },
+    ".cm-glsl-token-in": { color: "#9cdcfe" },
+    ".cm-glsl-token-out": { color: "#9cdcfe" },
+    ".cm-glsl-token-attribute": { color: "#9cdcfe" },
+    ".cm-glsl-token-varying": { color: "#9cdcfe" },
+    ".cm-glsl-token-const": { color: "#c586c0" },
+    ".cm-glsl-token-parameter": { color: "#9cdcfe" },
+    ".cm-glsl-token-struct-type": { color: "#4ec9b0" },
+    ".cm-glsl-token-function-user": { color: "#dcdcaa" },
+    ".cm-glsl-token-function-builtin": { color: "#7adba8" },
   },
   { dark: true },
 );
@@ -78,6 +95,7 @@ export function glslExtensions(): Extension[] {
     glsl(),
     glslAutocomplete(),
     glslHoverTooltip(),
+    glslSemanticHighlight(),
     darkTheme,
     EditorView.lineWrapping,
   ];

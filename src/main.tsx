@@ -5,7 +5,13 @@ import {
   setAudioBlobResolver,
   setVideoBlobResolver,
 } from "./core/external/registry";
+import { BUILTIN_FUNCTIONS, KEYWORD_DESCRIPTIONS } from "./core/glsl/builtins";
 import { glslValidator } from "./core/glsl/glslValidator";
+import {
+  buildSymbolTable,
+  resolveSymbol,
+  symbolsVisibleAt,
+} from "./core/glsl/symbolTable";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
 import { getAudioBlob, getVideoBlob, useAssetStore } from "./state/assetStore";
@@ -58,6 +64,16 @@ if (import.meta.env.DEV) {
     renderer: useRendererStore,
     gpuTimer: useGpuTimerStore,
     glslValidator,
+    // Phase 25 — LSP helpers exposed for E2E. Tests build a symbol table
+    // from a source string and resolve identifiers without round-tripping
+    // through CodeMirror.
+    glslSymbols: {
+      build: buildSymbolTable,
+      visibleAt: symbolsVisibleAt,
+      resolve: resolveSymbol,
+      builtins: BUILTIN_FUNCTIONS,
+      keywords: KEYWORD_DESCRIPTIONS,
+    },
     log,
   };
 }

@@ -5,7 +5,20 @@ import {
   type CompletionResult,
 } from "@codemirror/autocomplete";
 import type { Extension } from "@codemirror/state";
-import { parseUniforms } from "../../core/graph/uniformParser";
+import {
+  BUILTIN_FUNCTIONS,
+  KEYWORD_DESCRIPTIONS,
+} from "../../core/glsl/builtins";
+import {
+  buildSymbolTable,
+  type GlslSymbol,
+  symbolsVisibleAt,
+} from "../../core/glsl/symbolTable";
+import {
+  parseUniforms,
+  SYSTEM_UNIFORM_DESCRIPTIONS,
+  SYSTEM_UNIFORMS,
+} from "../../core/graph/uniformParser";
 
 export const GLSL_FUNCTIONS = [
   // Trigonometry
@@ -177,20 +190,35 @@ export const HINT_KEYWORDS: ReadonlyArray<{ label: string; info: string }> = [
   { label: "@multi", info: "Force multi-axis slider control" },
 ];
 
-const STATIC_FUNCTIONS: Completion[] = GLSL_FUNCTIONS.map((name) => ({
-  label: name,
-  type: "function",
-}));
+// Builtin function completions carry a one-line `info` (description) and a
+// `detail` (first signature) from `core/glsl/builtins.ts` so the popup
+// surfaces the same information the hover tooltip uses. Functions outside the
+// curated catalogue still appear, just without metadata (defensive — the
+// builtins test guards against drift).
+const STATIC_FUNCTIONS: Completion[] = GLSL_FUNCTIONS.map((name) => {
+  const spec = BUILTIN_FUNCTIONS[name];
+  const opt: Completion = { label: name, type: "function" };
+  if (spec) {
+    // noUncheckedIndexedAccess: signatures[] guaranteed non-empty by the
+    // builtins test (`each entry carries at least one signature`).
+    const sig = spec.signatures[0];
+    if (sig !== undefined) opt.detail = sig;
+    opt.info = spec.description;
+  }
+  return opt;
+});
 
 const STATIC_TYPES: Completion[] = GLSL_TYPES.map((name) => ({
   label: name,
   type: "type",
 }));
 
-const STATIC_KEYWORDS: Completion[] = GLSL_KEYWORDS.map((name) => ({
-  label: name,
-  type: "keyword",
-}));
+const STATIC_KEYWORDS: Completion[] = GLSL_KEYWORDS.map((name) => {
+  const opt: Completion = { label: name, type: "keyword" };
+  const desc = KEYWORD_DESCRIPTIONS[name];
+  if (desc) opt.info = desc;
+  return opt;
+});
 
 const STATIC_BASE: Completion[] = [
   ...STATIC_FUNCTIONS,
@@ -208,7 +236,56 @@ const HINT_COMPLETIONS: Completion[] = HINT_KEYWORDS.map(({ label, info }) => ({
 export function uniformCompletions(source: string): Completion[] {
   return parseUniforms(source).map((u) => {
     const opt: Completion = { label: u.name, type: "variable", detail: u.type };
-    if (u.label) opt.info = u.label;
+    // Prefer the author's `@label` over the system description; fall back to
+    // the system-uniform description so hovering `u_time` in the popup
+    // explains what it is.
+    const info = u.label ?? SYSTEM_UNIFORM_DESCRIPTIONS[u.name];
+    if (info) opt.info = info;
+    return opt;
+  });
+}
+
+/**
+ * Pick a `Completion.type` icon for a symbol-table entry — mostly cosmetic
+ * but it lets the user distinguish a parameter from a function in the popup.
+ * Returns a concrete string (not `Completion["type"]` which is optional) so
+ * we satisfy exactOptionalPropertyTypes when assigning to an object literal.
+ */
+function completionTypeFor(s: GlslSymbol): string {
+  switch (s.kind) {
+    case "function":
+      return "function";
+    case "struct":
+      return "type";
+    case "parameter":
+      return "variable";
+    default:
+      return "variable";
+  }
+}
+
+/**
+ * Convert symbol-table entries visible at `line` into autocomplete options.
+ * Order matters: callers should prepend these to the static builtin list so
+ * locals/parameters surface above generic vocabulary. Uniforms produced by
+ * the symbol walker are deduped against the uniformParser pass — we keep the
+ * symbol-table entry first since it carries the right scope info.
+ */
+export function symbolCompletions(source: string, line: number): Completion[] {
+  const table = buildSymbolTable(source);
+  return symbolsVisibleAt(table, line).map((s) => {
+    const opt: Completion = {
+      label: s.name,
+      type: completionTypeFor(s),
+      detail:
+        s.kind === "function"
+          ? `${s.type} ${s.name}(${s.parameters ?? ""})`
+          : s.type,
+    };
+    if (s.kind === "uniform" && SYSTEM_UNIFORMS.has(s.name)) {
+      const desc = SYSTEM_UNIFORM_DESCRIPTIONS[s.name];
+      if (desc) opt.info = desc;
+    }
     return opt;
   });
 }
@@ -244,9 +321,17 @@ export function hintSource(
 }
 
 /**
- * GLSL identifier completions: builtin types, builtin functions, keywords, and
- * uniforms parsed from the current document. Suppressed inside line comments
- * (hintSource handles the `@` vocabulary separately).
+ * GLSL identifier completions: scope-aware document symbols (locals,
+ * parameters, uniforms, functions, structs visible at the cursor), then the
+ * builtin vocabulary (functions / types / keywords). Suppressed inside line
+ * comments — `hintSource` handles the `@` vocabulary there.
+ *
+ * Ordering:
+ *   1. Symbol-table entries visible at the cursor (locals first per
+ *      `symbolsVisibleAt`).
+ *   2. Uniforms parsed by `uniformParser` not already covered by (1) — kept
+ *      so `// @label`-annotated uniforms surface their human label.
+ *   3. Static builtins.
  */
 export function glslSource(
   context: CompletionContext,
@@ -256,10 +341,16 @@ export function glslSource(
   // Auto-trigger only when a partial identifier precedes the cursor; Ctrl+Space
   // (explicit) still produces the full list at non-word positions.
   if (!word && !context.explicit) return null;
-  const options = [
-    ...uniformCompletions(context.state.doc.toString()),
-    ...STATIC_BASE,
-  ];
+
+  const doc = context.state.doc.toString();
+  const lineNo = context.state.doc.lineAt(context.pos).number;
+  const scoped = symbolCompletions(doc, lineNo);
+  const scopedNames = new Set(scoped.map((c) => c.label));
+  const uniformExtras = uniformCompletions(doc).filter(
+    (c) => !scopedNames.has(c.label),
+  );
+
+  const options = [...scoped, ...uniformExtras, ...STATIC_BASE];
   return {
     from: word ? word.from : context.pos,
     options,

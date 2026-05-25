@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 22)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 25)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -468,6 +468,58 @@ diagnosticsStore.set(nodeId, {vertex, fragment, link})
 
 `rendererStore.stats.errors[]` 는 `pushError(msg)` 로 누적. `compileGraph` 가 throw 하거나 plan.errors (validate 결과) 가 있으면 한 줄 join. StatusBar 에 카운트, ProblemsPanel "Runtime errors" 섹션에 메시지 노출.
 
+### 8.5 LSP-like 편집기 기능 (Phase 25)
+
+Phase 24 의 *진단* 채널과 별도로, **에디터 측 심볼 인식과 hover** 를 위한 정적 분석 계층. CodeMirror 6 위에 다음 두 모듈이 얹힌다:
+
+```
+CM updateListener (doc 변경)
+    │
+    └─▶ autocomplete (codemirror autocompletion override)
+            │  source = state.doc.toString(), line = state.doc.lineAt(pos).number
+            ▼
+        glslSource(context)
+            │
+            ├─▶ symbolCompletions(source, line)
+            │       └─ buildSymbolTable(source) → symbolsVisibleAt(table, line)
+            │
+            ├─▶ uniformCompletions(source)          // @label / system desc
+            │
+            └─▶ STATIC_BASE                          // GLSL_FUNCTIONS/TYPES/KEYWORDS
+                                                     // 빌트인은 BUILTIN_FUNCTIONS 에서
+                                                     // signature(detail) + 설명(info) 부착
+
+CM pointer (hover)
+    │
+    └─▶ hoverTooltip(view, pos)
+            │  identifierAt(line.text, line.from, pos)  → {from, to, word}
+            ▼
+        lookupHover(source, word, line)
+            │
+            ├─▶ resolveSymbol(buildSymbolTable, word, line)   // 1순위: 문서 심볼
+            ├─▶ BUILTIN_FUNCTIONS[word]                       // 2순위: 빌트인 함수
+            ├─▶ SYSTEM_UNIFORM_DESCRIPTIONS[word]             // 3순위: 미선언 system uniform
+            └─▶ KEYWORD_DESCRIPTIONS[word]                    // 4순위: storage/제어 키워드
+                                                              // 매칭 없으면 null → 툴팁 미표시
+```
+
+**심볼 테이블 (`core/glsl/symbolTable.ts`)** — 정규식 + 중괄호 깊이 워커:
+- 블록 코멘트는 공백으로 치환(라인 번호 유지), 라인 코멘트는 라인 단위 strip.
+- `depth === 0 && !structDepth`: storage-qualified decl(`uniform/in/out/attribute/varying/const`), `struct ... {`, 함수 헤더(`<retType> <name>(<args>) {`) 매칭. 함수 헤더 진입 시 파라미터들을 `scope = funcName` 로 추가.
+- `depth ≥ 1` 안에서: 로컬 변수 decl(쉼표 멀티 — `float a, b = 1.0;` 두 번째 패스로 수집), `for (int i = ...)` 인덕션 변수.
+- `if/for/while/return/case/switch` 키워드는 `NOT_A_FUNCTION` 화이트리스트로 함수 헤더 매칭에서 제외.
+- 출력 `GlslSymbol` 은 `{name, type, kind, line, column, scope, parameters?}`. `scope` 는 함수 이름 또는 `null`(top-level).
+- `symbolsVisibleAt(table, line)` — 라인의 enclosing 함수를 *해당 라인 이전의 마지막 함수 헤더* 로 근사(body 의 정확한 끝을 추적하지 않아도 sequential function 정의에서는 정확). 출력 순서: 로컬(decl ≤ line) → 파라미터 → 글로벌, 이름 중복은 처음 등장한 것만 유지(local shadow 글로벌이 우선).
+
+**빌트인 카탈로그 (`core/glsl/builtins.ts`)** — `BUILTIN_FUNCTIONS: Record<name, {signatures[], description}>` + `KEYWORD_DESCRIPTIONS`. `GLSL_FUNCTIONS` 와 양방향 일치(단위 테스트가 강제).
+
+**오작동 시나리오 — 명시적으로 받아들임**:
+- 중첩 블록 안의 로컬도 함수 scope 로 처리(블록 scope 추적 안 함). hover 가 잠시 풀어진 로컬을 제안할 뿐, 컴파일은 진단 채널이 잡으므로 안전.
+- 사용자가 GLSL 의 nested function 처럼 보이는 lambda 등을 적으면 헤더 매칭이 어긋날 수 있으나, GLSL ES 는 nested function decl 자체가 없어서 실제 셰이더에서는 발생하지 않음.
+- `for` 안의 동일 라인에 일반 decl 이 함께 있으면 dupe 회피 가드가 두 번째 등록을 막음.
+
+**DEV bridge** — `window.__sp.glslSymbols = { build, visibleAt, resolve, builtins, keywords }` (다른 store 와 동형, DEV 빌드 한정). E2E 가 CM 와이어링 없이 심볼 파싱 정확도를 직접 검증할 때 사용.
+
 ### 8.4 라이브 GLSL 검증 (Phase 24)
 
 Authoritative recompile 경로(`graphStore.rev` → `compileGraph` → `gl.getShaderInfoLog`) 와 별개로, **CodeMirror 의 키스트로크마다** OffscreenCanvas WebGL2 워커에 셰이더를 보내 컴파일 로그를 받아오는 라이브 채널을 둔다. 사용자가 50ms commit debounce + 그래프 recompile 까지 기다리지 않고 밑줄을 본다.
@@ -588,7 +640,7 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 
 ---
 
-## 12. 디렉토리 트리 (Phase 22 기준)
+## 12. 디렉토리 트리 (Phase 25 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -641,9 +693,11 @@ ShaderPlayground/
    │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
    │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
    │  │
-   │  ├─ glsl/                       # Phase 24 — 라이브 GLSL 검증 (OffscreenCanvas 워커)
+   │  ├─ glsl/                       # Phase 24/25 — 라이브 GLSL 검증 + LSP-like 정적 분석
    │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
-   │  │  └─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
+   │  │  ├─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
+   │  │  ├─ symbolTable.ts           # Phase 25 — uniform/in/out/const/local/parameter/function/struct 파서 + scope 추적 (+ test)
+   │  │  └─ builtins.ts              # Phase 25 — GLSL_FUNCTIONS 시그니처/설명 + KEYWORD_DESCRIPTIONS (+ test)
    │  │
    │  ├─ nodes/
    │  │  ├─ registry.ts              # 노드별 PortSpec + 동적 포트(Shader/Math/Swizzle/Combine) (+ test)
@@ -702,9 +756,11 @@ ShaderPlayground/
    │  │     └─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
    │  │
    │  ├─ CodeEditor/
-   │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync
+   │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync + 라이브 검증
    │  │  ├─ StageTabs.tsx            # vertex / fragment + 에러 닷
-   │  │  ├─ glslSetup.ts
+   │  │  ├─ glslSetup.ts             # CM extensions 묶음 (lint + autocomplete + hover + theme)
+   │  │  ├─ autocomplete.ts          # Phase 25 — scope-aware 자동완성 (symbolTable + builtins) (+ test)
+   │  │  ├─ hover.ts                 # Phase 25 — hoverTooltip + lookupHover (+ test)
    │  │  └─ lintAdapter.ts
    │  │
    │  ├─ Viewport/

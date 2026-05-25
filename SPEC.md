@@ -342,9 +342,18 @@ Shadertoy 호환 절차적 셰이더 이식성을 위해 포인터 좌표·프�
 - **DEV 브리지**: `window.__sp.glslValidator` 노출(다른 store 와 동형, DEV 빌드 한정). E2E 가 직접 `validate()` 를 부르고 결과를 검증.
 - **검증**: Vitest 단위 8건 — `glslValidator.test.ts` (fake worker 주입으로 RPC 라우팅·post 실패·worker construct 실패·dispose drain·error 이벤트 drain·out-of-order reply 라우팅·stray reqId 무시·clean log → []). Playwright E2E `phase-24-live-validation.spec.ts` 4건 — (a) `validate('fragment', BAD)` 가 정확한 line/severity/message 반환, (b) clean fragment → [], (c) CM 키스트로크 → 150ms 내 fragment 탭 `data-has-error="true"` (라이브 또는 직후 권위 경로 어느 쪽이든 wiring 증명), (d) singleton 동일 인스턴스.
 
+### Phase 25 — GLSL LSP (심볼 테이블 + Hover) (완료)
+Phase 24 의 *진단* 채널 위에 LSP-like 편집기 기능을 얹는다 — **CodeMirror 6 유지, Monaco 전환 없음**. 본 단계는 (a) 스코프 인식 심볼 테이블과 (b) Hover 툴팁 두 축으로 한정. Go-to-definition / Find references 는 백로그.
+- **심볼 테이블 (`core/glsl/symbolTable.ts`)**: 정규식 + 중괄호 깊이 워커. 추출 대상 — `uniform`/`in`/`out`/`attribute`/`varying`/`const` 같은 storage-qualified 글로벌, `struct` 선언, 함수 헤더(`<retType> <name>(<params>) {`), 그 파라미터, 함수 본문 안의 로컬 변수(쉼표 멀티 디클·`for` 인덕션 포함). 블록 코멘트는 공백으로 치환해 라인/컬럼 번호 보존, 라인 코멘트는 라인 단위로 스트립. 한 함수 안에서만 nested 스코프를 추적 — GLSL 은 nested function decl 없음. `if/for/while/return/case/switch` 키워드는 함수 헤더 모양과 겹쳐서 화이트리스트로 제외.
+- **빌트인 카탈로그 (`core/glsl/builtins.ts`)**: 자체 작성한 `BUILTIN_FUNCTIONS` (`GLSL_FUNCTIONS` 의 모든 이름에 시그니처 + 한 줄 설명). `KEYWORD_DESCRIPTIONS` 는 storage / control-flow 키워드 한 줄 설명. `genType / genIType / genBType` 스칼라+벡터 패밀리는 풀어쓰지 않음(`sin` 12 오버로드를 그대로 노출하면 툴팁이 시끄럽다). 단위 테스트가 `GLSL_FUNCTIONS` 와 양방향 일치 보장 — 한 쪽에서 추가/삭제 시 빨강.
+- **Scope-aware 자동완성 (`ui/CodeEditor/autocomplete.ts`)**: `glslSource` 가 `context.pos` 의 라인을 잡아 `symbolsVisibleAt(table, line)` 으로 in-scope 심볼(로컬 → 파라미터 → 글로벌 순)을 먼저, 그 다음 `uniformParser` 의 `@label` 정보가 붙은 uniform 보충분, 마지막에 빌트인 static base. 빌트인 함수의 `detail` 에 첫 시그니처, `info` 에 설명을 붙여 popup 이 hover 와 같은 정보를 노출. `Completion.type` 은 함수/스트럭트/변수 별로 색이 다르게 표시.
+- **Hover 툴팁 (`ui/CodeEditor/hover.ts`)**: `hoverTooltip` 확장. 포인터 아래 identifier 를 `identifierAt` 로 잡고 `lookupHover` 로 (1) 심볼 테이블 → (2) `BUILTIN_FUNCTIONS` → (3) `SYSTEM_UNIFORM_DESCRIPTIONS` → (4) `KEYWORD_DESCRIPTIONS` 순으로 해석. 매칭 없으면 `null` 반환(랜덤 단어에 잘못된 정보 보여주지 않음). 툴팁 DOM 은 시그니처 줄(monospace `#dcdcaa`) + 설명 줄(`#bbb`) 두 줄 구조, `.cm-glsl-hover` 클래스로 스타일 식별.
+- **DEV bridge**: `window.__sp.glslSymbols = { build, visibleAt, resolve, builtins, keywords }` 노출(다른 store 와 동형, DEV 빌드 한정). E2E 가 CM 와이어링을 거치지 않고도 심볼 파싱 정확도를 검증.
+- **검증**: Vitest 단위 48 건 — `symbolTable.test.ts` (21: storage globals / 함수+파라미터 / 로컬 / for-init / 멀티 디클 / 블록 코멘트 / 구조체 / scope 재진입 / line·column / `parseFunctionParameters` / `symbolsVisibleAt` shadow / `resolveSymbol`), `builtins.test.ts` (5: GLSL_FUNCTIONS 양방향 일치 / 시그니처 형식 / 키워드 설명 양방향 일치), `hover.test.ts` (15: `identifierAt` 경계 / `formatSymbolHover` per-kind / `lookupHover` 네 경로 + null), `autocomplete.test.ts` (+ 3: 스코프 순서, 함수 시그니처 detail, system desc info). Playwright E2E `phase-25-glsl-lsp.spec.ts` 4 건 — (a) 심볼 테이블이 글로벌/파라미터/로컬을 올바른 scope 태그로 잡음, (b) `symbolsVisibleAt` 이 in-scope 만 노출하고 다른 함수의 로컬을 누출 안 함, (c) CM 에디터에서 `u_time` hover 시 `.cm-glsl-hover` 툴팁에 시스템 설명 등장(CM 와이어링 end-to-end 증명), (d) 빌트인 카탈로그가 DEV bridge 로 시그니처/설명을 노출.
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
-- **GLSL LSP — 확장 범위**: Phase 24 가 *진단*만 다룸. 스코프 인식 자동완성(심볼 테이블), Hover 시그니처, Go-to-definition 은 별도 단계. CodeMirror 6 그대로(Monaco 전환은 여전히 회피 권장 — 진단 정합성을 OffscreenCanvas 백엔드가 이미 확보).
+- **GLSL LSP — 추가 확장**: Phase 24 / 25 가 진단·심볼 테이블·Hover 까지 다룸. **Go-to-definition (F12 / Cmd+Click)**, **Find references**, **Rename refactor**, **시맨틱 토큰 하이라이팅** 은 별도 단계. 본 phase 의 `core/glsl/symbolTable.ts` 가 이미 line/column 을 담고 있어 goto 구현은 작은 추가 PR 로 가능 — 사용자 요청 시 진행. CodeMirror 6 유지(Monaco 전환은 여전히 회피 권장).
 - GIF 녹화(gif.js / WASM gifenc).
 
 ---

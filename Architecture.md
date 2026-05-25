@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 12)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 22)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -51,6 +51,8 @@
 | `mesh` | — | `mesh: mesh` | `primitive` 또는 `assetId` (assetId 가 우선; 미로드 시 primitive fallback) |
 | `image` | — | `texture: texture` | `assetId` 로 비트맵 참조 |
 | `webcam` | — | `texture: texture` | `navigator.mediaDevices.getUserMedia` 로 받은 live MediaStream 을 매 프레임 `texSubImage2D(HTMLVideoElement)`. 옵셔널 `deviceId`; 핸들 lifecycle 은 plan 외부 (`core/external/registry.ts`) 가 관리. Phase 14a. |
+| `video` | — | `texture: texture` | import 한 mp4/webm 에셋(`assetId`)을 object URL `<video>` 로 디코드해 매 프레임 `texSubImage2D`. `playing`/`loop`/`muted`/`currentTime`(seek) 은 in-place, assetId 변경만 restart. webcam 과 같은 external registry 풀이 관리. Phase 14b. |
+| `audio` | — | `texture: texture` | mic(`getUserMedia({audio:true})`) 또는 file(`decodeAudioData`) → `AnalyserNode` FFT. 매 프레임 `getByteFrequencyData` → 1D R8 텍스처(`fftSize/2 × 1`). `sourceKind`/`fftSize`(32~2048)/`smoothing`/`playing`/`loop`. external registry 풀이 관리. Phase 14c. |
 | `shader` | `mesh: mesh?` + sampler 입력 (`sampler2D` 유니폼) + 비-샘플러 유니폼 입력 (`float/vec2/vec3/vec4`) | `texture: texture` | vertex + fragment 두 GLSL 소스를 함께 보유 |
 | `compute` | 비-샘플러 유니폼 입력만 (`float/vec2/vec3/vec4`) | `mesh: mesh` | vertex GLSL 한 개 + `transformFeedbackVaryings` 로 캡처되는 출력 attribute 페어 목록. fragment 단계는 `RASTERIZER_DISCARD` 로 비활성화. ping-pong 더블 버퍼로 매 프레임 시뮬레이션. primitive 는 POINTS/LINES/TRIANGLES 중 선택. |
 | `output` | `texture: texture` | — | 캔버스에 합성될 패스 마커 |
@@ -133,7 +135,7 @@
 
 ### 3.1 컴파일 절차
 
-0. **`reconcileExternal`** — webcam 노드 specs 를 모아 `core/external/registry.ts` 의 싱글톤 풀에 전달. 새 노드 ID 는 acquire 시작(비동기 getUserMedia), 사라진 노드 ID 는 release, deviceId 변경 시 restart. **validate 보다 먼저** 호출되므로 cycle 같은 일시적 fatal 이 카메라를 죽이지 않는다. `hasExternal` 도 이 시점에 결정되어 fatal 분기에서도 보존.
+0. **`reconcileExternal`** — 외부 소스 노드(webcam / video / audio) specs 를 모아 `core/external/registry.ts` 의 싱글톤 풀에 전달. 새 노드 ID 는 acquire 시작(webcam/audio-mic 는 비동기 getUserMedia, video/audio-file 은 resolver 로 Blob 해석), 사라진 노드 ID 는 release, restart 가 필요한 변경(webcam deviceId / video assetId / audio sourceKind·assetId)만 restart 하고 나머지(play/pause/loop/mute/seek/fftSize/smoothing)는 in-place 적용. **validate 보다 먼저** 호출되므로 cycle 같은 일시적 fatal 이 카메라/비디오/오디오를 죽이지 않는다. `hasExternal`(외부 소스 1 개 이상) 도 이 시점에 결정되어 fatal 분기에서도 보존.
 1. `validateGraph` — `cycle`/`multi_input`/`multiple_outputs` 중 하나라도 있으면 **patch 만 채운 emptyPlan** 으로 즉시 종료 (단 `hasExternal` 은 위에서 결정된 값을 그대로 캐리). `missing_node` 는 fatal 아님(엣지를 건너뛰고 계속).
 2. `topologicalOrder` → shader/compute 노드만 filter (두 종류 모두 패스를 생성).
 3. **ImageTexture 업로드**: 그래프의 모든 ImageNode 를 순회해 `assetStore` 에 비트맵이 있으면 `createImageTexture` 로 GPU 에 올린다. **키는 node.id** (assetId 가 아니다) — 그래야 다음 패스의 sampler 라우팅에서 `edge.source` 만으로 찾을 수 있다.
@@ -383,7 +385,7 @@ poll(gl):
 |---|---|---|---|---|
 | `graphStore` | nodes/edges/positions | `rev` 변화 | structural mutation 시 push | `uniformRev` 는 별도, 슬라이더 드래그 전용 |
 | `assetStore` | 메시·이미지 핸들 | `rev` 변화 | ✗ | 이미지 비트맵이 도착해 sampler 가 채워질 때만 의미 있음 |
-| `selectionStore` | `selectedNodeId` | ✗ | ✗ | Inspector·CodeEditor 가 구독 |
+| `selectionStore` | `selectedNodeIds[]` + `selectedNodeId`(primary=마지막) | ✗ | ✗ | NodeEditor 가 집합을 RF `selected` 로 동기화. Inspector·CodeEditor 는 primary 만 편집하고 2개 이상이면 다중 선택 배너 표시 (Phase 23) |
 | `editorStore` | activeStage, jumpRequest | ✗ | ✗ | jumpRequest 는 `rev` 카운터 포함 — 동일 행 두 번 클릭도 발화 |
 | `diagnosticsStore` | byNode[id] = {vertex, fragment, link}[] | ✗ | ✗ | recompile 직후 채워짐, CodeEditor 의 CM `setDiagnostics` 와 ProblemsPanel 이 모두 구독 |
 | `cameraStore` | OrbitCameraState | ✗ | ✗ | 입력 → `setCamera`, RAF 가 `getState`. `rev` 카운터(B2) 가 idle 게이트를 깨움 |
@@ -550,7 +552,7 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 
 ---
 
-## 12. 디렉토리 트리 (Phase 14a 기준)
+## 12. 디렉토리 트리 (Phase 22 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -612,14 +614,16 @@ ShaderPlayground/
    │     ├─ objLoader.ts             # @loaders.gl/obj 래퍼 (+ test)
    │     ├─ gltfLoader.ts            # @loaders.gl/gltf 래퍼 (지오메트리만)
    │     ├─ imageLoader.ts           # createImageBitmap 래퍼
-   │     ├─ cache.ts                 # IndexedDB 에셋 캐시 (mesh ArrayBuffer / image Blob)
-   │     └─ types.ts                 # GeometryHandle, ImageHandle
+   │     ├─ videoLoader.ts           # Phase 14b — mp4/webm 메타 프로빙 + Blob (+ test)
+   │     ├─ audioLoader.ts           # Phase 14c — decodeAudioData 메타 프로빙 + Blob (+ test)
+   │     ├─ cache.ts                 # IndexedDB 에셋 캐시 (mesh ArrayBuffer / image·video·audio Blob)
+   │     └─ types.ts                 # GeometryHandle, ImageHandle, VideoAssetHandle, AudioAssetHandle
    │
    ├─ state/                         # ── Zustand 스토어 ────────────────
    │  ├─ graphStore.ts               # nodes/edges/positions + rev/uniformRev (+ test)
    │  ├─ assetStore.ts               # 메시/이미지 카탈로그 (런타임 핸들)
    │  ├─ assetActions.ts             # import + IndexedDB hydrate (+ test)
-   │  ├─ selectionStore.ts           # selectedNodeId (+ test)
+   │  ├─ selectionStore.ts           # selectedNodeIds[] + primary selectedNodeId (+ test)
    │  ├─ rendererStore.ts            # fps/frame/drawCalls/errors (+ test)
    │  ├─ cameraStore.ts              # OrbitCameraState 보관 + reset
    │  ├─ viewportStore.ts            # background rgb
@@ -637,7 +641,7 @@ ShaderPlayground/
    │
    ├─ ui/                            # ── React 컴포넌트 ────────────────
    │  ├─ BootstrapGate.tsx           # share / autosave 복구 / 데모 분기 + 다이얼로그
-   │  ├─ KeyboardShortcuts.tsx       # Cmd+Z/Y/D/K, Space, Esc 등 전역 단축키 (Cmd+D=선택 노드 복제)
+   │  ├─ KeyboardShortcuts.tsx       # 전역 단축키 — Cmd+Z/Y(undo/redo), Cmd+D(복제), Cmd+A(전체 선택), 화살표(선택 일괄 이동, Phase 23), Space(play/pause), Cmd+K
    │  │
    │  ├─ NodeEditor/
    │  │  ├─ index.tsx                # React Flow 캔버스 + graphStore 양방향
@@ -648,6 +652,8 @@ ShaderPlayground/
    │  │     ├─ MeshNodeView.tsx
    │  │     ├─ ImageNodeView.tsx
    │  │     ├─ WebcamNodeView.tsx    # Phase 14a — live <video> preview + getExternalStream polling
+   │  │     ├─ VideoNodeView.tsx     # Phase 14b — live <video> preview + status
+   │  │     ├─ AudioNodeView.tsx     # Phase 14c — source kind / fftSize / status 메타
    │  │     ├─ ShaderNodeView.tsx    # FBO 라이브 썸네일 + 핸들/라벨
    │  │     ├─ OutputNodeView.tsx
    │  │     ├─ ParamNodeView.tsx     # Float/Vec3/Color/Time
@@ -669,11 +675,14 @@ ShaderPlayground/
    │  │
    │  └─ Panels/
    │     ├─ SidePanel.tsx            # Inspector ↔ Assets ↔ Problems 탭 컨테이너
-   │     ├─ Inspector.tsx            # 디스패처 (Shader/Param/Utility/Mesh/Webcam)
+   │     ├─ Inspector.tsx            # 디스패처 (Shader/Param/Utility/Mesh/Webcam/Video/Audio)
    │     ├─ UniformControl.tsx       # slider / multi / color
+   │     ├─ UniformHintEditor.tsx    # Phase 21 — ⚙ 주석 힌트 GUI (range/step/default/label)
    │     ├─ ParamInspector.tsx
    │     ├─ UtilityInspector.tsx
    │     ├─ WebcamInspector.tsx      # Phase 14a — device dropdown + live status
+   │     ├─ VideoInspector.tsx       # Phase 14b — 에셋 선택 / play·loop·mute / seek
+   │     ├─ AudioInspector.tsx       # Phase 14c — mic↔file / fftSize / smoothing / play·loop
    │     ├─ ViewportControls.tsx     # 카메라 Reset/FOV + 배경색 + 시간
    │     ├─ ProblemsPanel.tsx        # 진단 → select + setStage + requestJump
    │     ├─ AssetBrowser.tsx

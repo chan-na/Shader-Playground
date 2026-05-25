@@ -43,6 +43,13 @@ export interface GraphState {
   cloneNode: (id: string) => string | null;
   removeNode: (id: string) => void;
   updateNodePosition: (id: string, position: NodePosition) => void;
+  /**
+   * Translate several nodes at once by (dx, dy) in flow coordinates. Used by
+   * the arrow-key nudge for multi-selection. Like drags, this does not bump
+   * `rev` or push history — node position is non-structural. Unknown ids are
+   * ignored.
+   */
+  nudgeNodes: (ids: string[], dx: number, dy: number) => void;
   updateShaderSource: (
     id: string,
     patch: { vertexSource?: string; fragmentSource?: string },
@@ -175,6 +182,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
   updateNodePosition: (id, position) =>
     set((s) => ({ positions: { ...s.positions, [id]: position } })),
+  nudgeNodes: (ids, dx, dy) =>
+    set((s) => {
+      if (ids.length === 0 || (dx === 0 && dy === 0)) return {};
+      const positions = { ...s.positions };
+      let changed = false;
+      for (const id of ids) {
+        const p = positions[id];
+        if (!p) continue;
+        positions[id] = { x: p.x + dx, y: p.y + dy };
+        changed = true;
+      }
+      return changed ? { positions } : {};
+    }),
   updateShaderSource: (id, patch) => {
     pushHistory(get());
     set((s) => ({

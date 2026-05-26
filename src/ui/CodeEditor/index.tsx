@@ -11,6 +11,7 @@ import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { debounce } from "../../utils/debounce";
+import { setCurrentView } from "./currentView";
 import { glslExtensions } from "./glslSetup";
 import { toCMDiagnostics } from "./lintAdapter";
 import { StageTabs } from "./StageTabs";
@@ -139,9 +140,11 @@ export function CodeEditor() {
       parent: containerRef.current,
     });
     viewRef.current = view;
+    setCurrentView(view);
     return () => {
       commit.cancel();
       liveValidate.cancel();
+      setCurrentView(null);
       view.destroy();
       viewRef.current = null;
     };

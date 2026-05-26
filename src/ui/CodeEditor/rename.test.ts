@@ -1,7 +1,11 @@
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
-import { runRename, validateRenameName } from "./rename";
+import {
+  type CrossStageRenameContext,
+  runRename,
+  validateRenameName,
+} from "./rename";
 
 function viewOf(doc: string, cursorAt: number): EditorView {
   const state = EditorState.create({
@@ -113,6 +117,149 @@ describe("runRename", () => {
     expect(result.applied).toBe(false);
     if (!result.applied) expect(result.reason).toBe("not-on-identifier");
     view.destroy();
+  });
+
+  describe("cross-stage (Phase 28)", () => {
+    const VERT = `#version 300 es
+in vec3 a_position;
+uniform float u_amount;
+out vec2 v_uv;
+
+void main() {
+  v_uv = a_position.xy * u_amount;
+  gl_Position = vec4(a_position, 1.0);
+}
+`;
+    const FRAG_X = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform float u_amount;
+out vec4 outColor;
+
+void main() {
+  outColor = vec4(v_uv * u_amount, 0.0, 1.0);
+}
+`;
+
+    it("rewrites uniform in both stages and commits a both-stages patch", () => {
+      // Cursor on vertex `u_amount` decl (line 3 of VERT).
+      const view = viewOf(VERT, VERT.indexOf("u_amount") + 1);
+      // Wrapper object so TS doesn't narrow the let to null after the
+      // closure assignment (it can't statically prove the callback fires).
+      const captured: { origin: string | null; other: string | null } = {
+        origin: null,
+        other: null,
+      };
+      const ctx: CrossStageRenameContext = {
+        originStage: "vertex",
+        otherStageSource: FRAG_X,
+        applyBothStages(newOrigin, newOther) {
+          captured.origin = newOrigin;
+          captured.other = newOther;
+        },
+      };
+      const result = runRename(view, () => "u_strength", ctx);
+      expect(result.applied).toBe(true);
+      if (result.applied) {
+        expect(result.otherStageSites).toBe(2);
+        // Total: vertex (decl + 1 use) + fragment (decl + 1 use) = 4.
+        expect(result.sites).toBe(4);
+      }
+      // CM view (vertex stage) has the rewrite.
+      const afterVert = view.state.doc.toString();
+      expect(afterVert).not.toContain("u_amount");
+      expect(afterVert.match(/u_strength/g)?.length).toBe(2);
+      // applyBothStages received the rewritten origin AND the rewritten other.
+      expect(captured.origin).toBe(afterVert);
+      expect(captured.other).not.toBeNull();
+      expect(captured.other).not.toContain("u_amount");
+      expect(captured.other?.match(/u_strength/g)?.length).toBe(2);
+      view.destroy();
+    });
+
+    it("vertex-only attribute does NOT commit to fragment (partial rename)", () => {
+      // a_position is a vertex `in` (attribute). Fragment has no such name.
+      const view = viewOf(VERT, VERT.indexOf("a_position") + 1);
+      let bothCalled = false;
+      const ctx: CrossStageRenameContext = {
+        originStage: "vertex",
+        otherStageSource: FRAG_X,
+        applyBothStages() {
+          bothCalled = true;
+        },
+      };
+      const result = runRename(view, () => "a_pos", ctx);
+      expect(result.applied).toBe(true);
+      if (result.applied) {
+        expect(result.otherStageSites).toBe(0);
+      }
+      // No fragment-side change → applyBothStages was never invoked.
+      expect(bothCalled).toBe(false);
+      expect(view.state.doc.toString()).not.toContain("a_position");
+      view.destroy();
+    });
+
+    it("local rename does NOT commit other stage even when names collide", () => {
+      const V = `#version 300 es
+out vec2 v_uv;
+void main() {
+  vec2 n = vec2(0.5);
+  v_uv = n;
+}
+`;
+      const F = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+void main() {
+  vec4 n = vec4(v_uv, 0.0, 1.0);
+  outColor = n;
+}
+`;
+      // Cursor on vertex local n (line 4).
+      const pos = V.indexOf("vec2 n =") + "vec2 ".length;
+      const view = viewOf(V, pos + 1);
+      let bothCalled = false;
+      const ctx: CrossStageRenameContext = {
+        originStage: "vertex",
+        otherStageSource: F,
+        applyBothStages() {
+          bothCalled = true;
+        },
+      };
+      const result = runRename(view, () => "amt", ctx);
+      expect(result.applied).toBe(true);
+      if (result.applied) expect(result.otherStageSites).toBe(0);
+      expect(bothCalled).toBe(false);
+      // Vertex local was rewritten in the view; fragment `n` remains untouched
+      // (it wasn't passed through applyBothStages).
+      expect(view.state.doc.toString()).not.toContain(" n =");
+      expect(F).toContain("vec4 n ="); // sanity — F string itself unmodified
+      view.destroy();
+    });
+
+    it("applied from the fragment side too", () => {
+      // Cursor on fragment uniform u_amount.
+      const view = viewOf(FRAG_X, FRAG_X.indexOf("u_amount") + 1);
+      const captured: { value: { o: string; x: string } | null } = {
+        value: null,
+      };
+      const ctx: CrossStageRenameContext = {
+        originStage: "fragment",
+        otherStageSource: VERT,
+        applyBothStages(o, x) {
+          captured.value = { o, x };
+        },
+      };
+      const result = runRename(view, () => "u_k", ctx);
+      expect(result.applied).toBe(true);
+      expect(captured.value).not.toBeNull();
+      // o = new fragment, x = new vertex (the "other" side).
+      expect(captured.value?.o).toBe(view.state.doc.toString());
+      expect(captured.value?.o).not.toContain("u_amount");
+      expect(captured.value?.x).not.toContain("u_amount");
+      view.destroy();
+    });
   });
 
   it("scopes a local rename to its function body only", () => {

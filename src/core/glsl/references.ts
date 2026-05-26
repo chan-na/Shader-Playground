@@ -40,6 +40,40 @@ export interface ReferenceSite {
   isDefinition: boolean;
 }
 
+/** Which shader stage a {@link CrossStageReferenceSite} belongs to. */
+export type ShaderStage = "vertex" | "fragment";
+
+/** A reference site tagged with its owning shader stage. */
+export interface CrossStageReferenceSite extends ReferenceSite {
+  stage: ShaderStage;
+}
+
+export interface CrossStageSources {
+  vertex: string;
+  fragment: string;
+}
+
+// Globals whose name semantically belongs to the *program* (not to a single
+// stage's local scope) and are therefore candidates for cross-stage rename.
+// Specifically:
+//   - uniforms — linked program-wide; both stages must use the same name.
+//   - varyings — a vertex `out` and a fragment `in` with the same name form
+//     one logical link, so renaming one without the other breaks it.
+//   - in / out / varying / attribute storage qualifiers.
+//   - functions and structs — independently per-stage in the language but the
+//     overwhelming user intent on a shared name is "rename both at once".
+//   - top-level consts — same reasoning as functions.
+const CROSS_STAGE_KINDS = new Set([
+  "uniform",
+  "in",
+  "out",
+  "attribute",
+  "varying",
+  "const",
+  "function",
+  "struct",
+]);
+
 const IDENT_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
 
 function stripBlockComments(source: string): string {
@@ -114,4 +148,86 @@ export function findReferencesOf(
   }
 
   return sites;
+}
+
+/**
+ * Cross-stage reference finder for ShaderNode rename (Phase 28).
+ *
+ * Given both stage sources, an identifier name, the stage where the cursor
+ * landed (`originStage`) and the 1-based line at the cursor, returns every
+ * occurrence that should be renamed *together* with the origin binding. The
+ * rule is:
+ *
+ *   - The origin stage always uses the same logic as {@link findReferences}.
+ *     If the cursor is on a local, parameter, or any binding the symbol table
+ *     can resolve, the matched sites go into the result.
+ *
+ *   - The other stage is searched only when the origin binding is a top-level
+ *     (`scope === null`) symbol of a kind in {@link CROSS_STAGE_KINDS}. In
+ *     that stage we collect identifier occurrences whose own resolver lands
+ *     on a top-level symbol with the same name and a cross-stage-eligible
+ *     kind. If no such global exists in the other stage, the result is the
+ *     origin-stage sites alone — a clean partial rename.
+ *
+ * Locals and parameters never cross stages — `float k` inside vertex `main`
+ * is unrelated to a `float k` inside fragment `main` even though both are
+ * named identically. This matches the GLSL linker model.
+ *
+ * Stage A always appears before Stage B in the result for a given stage; the
+ * vertex stage is emitted before fragment when both contribute sites.
+ */
+export function findReferencesAcrossStages(
+  sources: CrossStageSources,
+  name: string,
+  originStage: ShaderStage,
+  atLine: number,
+): CrossStageReferenceSite[] {
+  const originSource =
+    originStage === "vertex" ? sources.vertex : sources.fragment;
+  const originTable = buildSymbolTable(originSource);
+  const target = resolveSymbol(originTable, name, atLine);
+  if (!target) return [];
+
+  const originSites = findReferencesOf(originSource, originTable, target).map(
+    (s): CrossStageReferenceSite => ({ ...s, stage: originStage }),
+  );
+
+  // Locals / parameters never share names across stages — bail with the
+  // origin-only sites. Same for any unknown kind we haven't whitelisted.
+  if (target.scope !== null || !CROSS_STAGE_KINDS.has(target.kind)) {
+    return sortByStageAndOffset(originSites);
+  }
+
+  const otherStage: ShaderStage =
+    originStage === "vertex" ? "fragment" : "vertex";
+  const otherSource =
+    otherStage === "vertex" ? sources.vertex : sources.fragment;
+  const otherTable = buildSymbolTable(otherSource);
+
+  // Find a matching cross-stage-eligible global in the other stage. We look
+  // it up via resolveSymbol at line 1 so only globals (scope === null) come
+  // back — function bodies start later.
+  const otherTarget = resolveSymbol(otherTable, target.name, 1);
+  if (
+    !otherTarget ||
+    otherTarget.scope !== null ||
+    !CROSS_STAGE_KINDS.has(otherTarget.kind)
+  ) {
+    return sortByStageAndOffset(originSites);
+  }
+
+  const otherSites = findReferencesOf(otherSource, otherTable, otherTarget).map(
+    (s): CrossStageReferenceSite => ({ ...s, stage: otherStage }),
+  );
+
+  return sortByStageAndOffset([...originSites, ...otherSites]);
+}
+
+function sortByStageAndOffset(
+  sites: CrossStageReferenceSite[],
+): CrossStageReferenceSite[] {
+  return [...sites].sort((a, b) => {
+    if (a.stage !== b.stage) return a.stage === "vertex" ? -1 : 1;
+    return a.from - b.from;
+  });
 }

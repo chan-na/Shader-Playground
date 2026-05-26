@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 26)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 27)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -552,6 +552,36 @@ buildSemanticDecorations(view)
 - **cost 통제**: 분류기는 라인 한 번씩만 정규식 + 심볼 테이블 lookup. 1000-line 셰이더에서도 < 1ms 추정이라 별도 debounce 없음. viewport 외 토큰은 RangeSetBuilder 에 추가하지 않으므로 큰 문서에서도 O(visible-lines) decoration 만 보유.
 - **DEV bridge**: `window.__sp.glslSemanticTokens = { classify, classifyIdentifier }` (다른 store/glsl 모듈과 동형, DEV 빌드 한정). E2E 가 CM 와이어링 없이 분류 정확도와 정렬 계약을 직접 검증.
 
+### 8.7 Goto / References / Rename (Phase 27)
+
+Phase 25 의 심볼 테이블 + `resolveSymbol` 을 그대로 재활용해 같은 declaration 으로 해석되는 모든 occurrence 를 모으고, 그 위에 (a) cursor 점프 (b) 단일 트랜잭션 rename (c) active reference 페인트 세 가지 surface 를 얹는다.
+
+```
+core/glsl/references.ts
+   findReferences(source, name, atLine)
+      ├─ buildSymbolTable + resolveSymbol(name, atLine) → target
+      ├─ source 의 모든 identifier 위치 스캔(블록/라인 코멘트 마스킹)
+      ├─ 각 위치에서 다시 resolveSymbol → target 과 line·column 일치만 채택
+      └─ ReferenceSite[] (from/to/line/column/isDefinition) — document 순서
+
+CodeMirror 와이어링 (glslSetup.ts)
+   ├─ glslGotoDefinition()    F12 keymap + Cmd/Ctrl+Click DOM 핸들러
+   │      └─ findDefinitionAt(view, pos) → EditorSelection.cursor + scrollIntoView
+   ├─ glslRename()            F2 keymap
+   │      └─ runRename(view, promptFn) → validateRenameName → findReferences
+   │           → view.dispatch({ changes: sites.map(...) })  // single undo step
+   └─ glslReferenceHighlight() StateField<DecorationSet>
+          └─ docChanged || selection 변화 시 buildReferenceDecorations
+                  → isDefinition ? .cm-glsl-ref-definition : .cm-glsl-ref-occurrence
+```
+
+- **Shadowing 규칙은 references 단에서 한 번 적용**: 한 occurrence 의 binding 이 target 과 다르면(예: 로컬이 글로벌을 가린 안쪽), 그 위치는 결과에서 빠진다. global rename 은 shadowed 안 된 곳만, local rename 은 자기 함수 본문만 변경되는 게 자동 보장된다.
+- **F12 / Cmd+Click 분기**: 키맵은 `view.state.selection.main.head` 기준, 클릭 핸들러는 `posAtCoords(clientXY)` 로 doc offset 계산. modifier(`metaKey || ctrlKey`) 가 없으면 무시 — CM 기본 selection 동작 보존. 미정의 식별자(builtin / keyword / no-binding) 는 silently no-op.
+- **Rename UX**: 기본 prompt 는 `window.prompt` (가장 마찰 적은 경로). 검증은 `^[A-Za-z_][A-Za-z0-9_]*$` + `GLSL_KEYWORDS ∪ GLSL_TYPES` 예약어 set. 결과는 `RenameResult` discriminated union — `applied: true` 면 `{ sites, newName }`, false 면 `{ reason }` 로 5 종 skip 사유(`not-on-identifier` / `no-binding` / `prompt-cancelled` / `unchanged` / `invalid-name`).
+- **Active highlight**: 단일 site(decl 만 존재)면 `Decoration.none` — 노이즈 회피. 비용은 cursor 이동마다 `buildSymbolTable + findReferences` 한 번이지만 playground 규모에서 < 1ms 추정이라 debounce 없음.
+- **CodeEditor observation bridge (`ui/CodeEditor/currentView.ts`)**: CodeEditor.tsx 가 mount/unmount 시 `setCurrentView(view)` / `setCurrentView(null)` 로 module-level ref 갱신. 프로덕션 코드는 의존하지 않고, `__sp.codeEditor = { getCursorLine, focus }` (DEV 한정) 으로 E2E 가 cursor 위치를 직접 읽는다 — F12 점프 결과 검증을 CM DOM 추측 없이 line number 비교로 처리.
+- **DEV bridge 추가**: `window.__sp.glslSymbols.findReferences` (references finder), `window.__sp.codeEditor` (cursor introspection). 기존 Phase 25 의 `glslSymbols` 객체에 한 함수만 더해 형태가 일관된다.
+
 ### 8.4 라이브 GLSL 검증 (Phase 24)
 
 Authoritative recompile 경로(`graphStore.rev` → `compileGraph` → `gl.getShaderInfoLog`) 와 별개로, **CodeMirror 의 키스트로크마다** OffscreenCanvas WebGL2 워커에 셰이더를 보내 컴파일 로그를 받아오는 라이브 채널을 둔다. 사용자가 50ms commit debounce + 그래프 recompile 까지 기다리지 않고 밑줄을 본다.
@@ -672,7 +702,7 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 
 ---
 
-## 12. 디렉토리 트리 (Phase 26 기준)
+## 12. 디렉토리 트리 (Phase 27 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -725,12 +755,13 @@ ShaderPlayground/
    │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
    │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
    │  │
-   │  ├─ glsl/                       # Phase 24/25/26 — 라이브 GLSL 검증 + LSP-like 정적 분석
+   │  ├─ glsl/                       # Phase 24/25/26/27 — 라이브 GLSL 검증 + LSP-like 정적 분석
    │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
    │  │  ├─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
    │  │  ├─ symbolTable.ts           # Phase 25 — uniform/in/out/const/local/parameter/function/struct 파서 + scope 추적 (+ test)
    │  │  ├─ builtins.ts              # Phase 25 — GLSL_FUNCTIONS 시그니처/설명 + KEYWORD_DESCRIPTIONS (+ test)
-   │  │  └─ semanticTokens.ts        # Phase 26 — 식별자 역할 분류기 (symbolTable + builtins + SYSTEM_UNIFORMS) (+ test)
+   │  │  ├─ semanticTokens.ts        # Phase 26 — 식별자 역할 분류기 (symbolTable + builtins + SYSTEM_UNIFORMS) (+ test)
+   │  │  └─ references.ts            # Phase 27 — findReferences (resolveSymbol 재진입으로 shadowing 존중) (+ test)
    │  │
    │  ├─ nodes/
    │  │  ├─ registry.ts              # 노드별 PortSpec + 동적 포트(Shader/Math/Swizzle/Combine) (+ test)
@@ -789,12 +820,16 @@ ShaderPlayground/
    │  │     └─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
    │  │
    │  ├─ CodeEditor/
-   │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync + 라이브 검증
+   │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync + 라이브 검증 + currentView 등록
    │  │  ├─ StageTabs.tsx            # vertex / fragment + 에러 닷
-   │  │  ├─ glslSetup.ts             # CM extensions 묶음 (lint + autocomplete + hover + semantic tokens + theme)
+   │  │  ├─ glslSetup.ts             # CM extensions 묶음 (lint + autocomplete + hover + semantic tokens + refs/goto/rename + theme)
    │  │  ├─ autocomplete.ts          # Phase 25 — scope-aware 자동완성 (symbolTable + builtins) (+ test)
    │  │  ├─ hover.ts                 # Phase 25 — hoverTooltip + lookupHover (+ test)
    │  │  ├─ semanticHighlight.ts     # Phase 26 — ViewPlugin + Decoration.mark + visibleRanges walker (+ test)
+   │  │  ├─ gotoDef.ts               # Phase 27 — F12 keymap + Cmd/Ctrl+Click DOM 핸들러 (+ test)
+   │  │  ├─ rename.ts                # Phase 27 — F2 keymap + single-transaction rewrite + reserved-word 검증 (+ test)
+   │  │  ├─ referenceHighlight.ts    # Phase 27 — StateField → Decoration set (커서 위 심볼의 occurrence 페인트) (+ test)
+   │  │  ├─ currentView.ts           # Phase 27 — module-level EditorView ref (DEV bridge 관찰 전용)
    │  │  └─ lintAdapter.ts
    │  │
    │  ├─ Viewport/

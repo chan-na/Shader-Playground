@@ -7,6 +7,7 @@ import {
 } from "./core/external/registry";
 import { BUILTIN_FUNCTIONS, KEYWORD_DESCRIPTIONS } from "./core/glsl/builtins";
 import { glslValidator } from "./core/glsl/glslValidator";
+import { findReferences } from "./core/glsl/references";
 import {
   classifyIdentifier,
   classifySemanticTokens,
@@ -16,6 +17,7 @@ import {
   resolveSymbol,
   symbolsVisibleAt,
 } from "./core/glsl/symbolTable";
+import { getCurrentView, getCursorLine } from "./ui/CodeEditor/currentView";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
 import { getAudioBlob, getVideoBlob, useAssetStore } from "./state/assetStore";
@@ -77,6 +79,9 @@ if (import.meta.env.DEV) {
       resolve: resolveSymbol,
       builtins: BUILTIN_FUNCTIONS,
       keywords: KEYWORD_DESCRIPTIONS,
+      // Phase 27 — reference finder. E2E can ask for every occurrence of a
+      // symbol at a given line without round-tripping through CodeMirror.
+      findReferences,
     },
     // Phase 26 — semantic token classifier exposed for E2E. Tests can drive
     // `classify(source)` without going through the CodeMirror ViewPlugin to
@@ -84,6 +89,14 @@ if (import.meta.env.DEV) {
     glslSemanticTokens: {
       classify: classifySemanticTokens,
       classifyIdentifier,
+    },
+    // Phase 27 — CodeMirror observation hook. Tests read cursor state /
+    // dispatch focus on the active editor without owning the React ref.
+    codeEditor: {
+      getCursorLine,
+      focus: () => {
+        getCurrentView()?.focus();
+      },
     },
     log,
   };

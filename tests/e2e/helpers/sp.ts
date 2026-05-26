@@ -203,6 +203,17 @@ export interface SpStores {
     } | null;
     builtins: Record<string, { signatures: string[]; description: string }>;
     keywords: Record<string, string>;
+    findReferences: (
+      source: string,
+      name: string,
+      atLine: number,
+    ) => Array<{
+      from: number;
+      to: number;
+      line: number;
+      column: number;
+      isDefinition: boolean;
+    }>;
   };
   glslSemanticTokens: {
     classify: (source: string) => Array<{
@@ -215,6 +226,10 @@ export interface SpStores {
       name: string,
       line: number,
     ) => string | null;
+  };
+  codeEditor: {
+    getCursorLine: () => number | null;
+    focus: () => void;
   };
   log: {
     debug: (category: string, message: string, detail?: unknown) => void;

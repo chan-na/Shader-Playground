@@ -17,7 +17,10 @@ import {
 } from "@codemirror/view";
 import { glsl } from "codemirror-lang-glsl";
 import { glslAutocomplete } from "./autocomplete";
+import { glslGotoDefinition } from "./gotoDef";
 import { glslHoverTooltip } from "./hover";
+import { glslReferenceHighlight } from "./referenceHighlight";
+import { glslRename } from "./rename";
 import { glslSemanticHighlight } from "./semanticHighlight";
 
 const darkTheme = EditorView.theme(
@@ -76,6 +79,17 @@ const darkTheme = EditorView.theme(
     ".cm-glsl-token-struct-type": { color: "#4ec9b0" },
     ".cm-glsl-token-function-user": { color: "#dcdcaa" },
     ".cm-glsl-token-function-builtin": { color: "#7adba8" },
+    // Phase 27 — cursor-aware reference highlight. Subtle backgrounds so they
+    // sit underneath the semantic-token foreground colors without fighting
+    // for attention.
+    ".cm-glsl-ref-occurrence": {
+      backgroundColor: "rgba(255, 255, 255, 0.10)",
+      borderRadius: "2px",
+    },
+    ".cm-glsl-ref-definition": {
+      backgroundColor: "rgba(255, 235, 130, 0.16)",
+      borderRadius: "2px",
+    },
   },
   { dark: true },
 );
@@ -96,6 +110,9 @@ export function glslExtensions(): Extension[] {
     glslAutocomplete(),
     glslHoverTooltip(),
     glslSemanticHighlight(),
+    glslReferenceHighlight(),
+    glslGotoDefinition(),
+    glslRename(),
     darkTheme,
     EditorView.lineWrapping,
   ];

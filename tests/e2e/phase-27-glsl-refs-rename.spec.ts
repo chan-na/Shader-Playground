@@ -166,9 +166,7 @@ void main() {
           if (!node) return false;
           // GraphNodeMinimal in the test types is loose; cast at runtime.
           const f = (node as { fragmentSource?: string }).fragmentSource;
-          return (
-            f != null && f.includes("u_amount") && !f.includes("u_strength")
-          );
+          return f?.includes("u_amount") === true && !f.includes("u_strength");
         });
       })
       .toBe(true);

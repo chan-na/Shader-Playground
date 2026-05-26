@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { findReferences, findReferencesOf } from "./references";
+import {
+  findReferences,
+  findReferencesAcrossStages,
+  findReferencesOf,
+} from "./references";
 import { buildSymbolTable, resolveSymbol } from "./symbolTable";
 
 const FRAG = `#version 300 es
@@ -152,5 +156,218 @@ describe("findReferencesOf", () => {
     expect(target).not.toBeNull();
     const sites = findReferencesOf(FRAG, table, target!);
     expect(sites).toHaveLength(2);
+  });
+});
+
+describe("findReferencesAcrossStages — Phase 28", () => {
+  // Vertex declares a varying `out v_uv` and a uniform `u_time`; the fragment
+  // shader receives the varying as `in v_uv` and reads the same uniform. A
+  // GLSL linker treats the pairs as one binding each — renaming any of them
+  // in isolation breaks the program, so cross-stage rename must hit both.
+  const VERT = `#version 300 es
+in vec3 a_position;
+uniform float u_time;
+out vec2 v_uv;
+
+void main() {
+  v_uv = a_position.xy;
+  gl_Position = vec4(a_position, u_time);
+}
+`;
+  const FRAG_X = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform float u_time;
+out vec4 outColor;
+
+void main() {
+  outColor = vec4(v_uv, sin(u_time), 1.0);
+}
+`;
+
+  it("renames a uniform across both stages when both declare it", () => {
+    // Cursor on the vertex declaration of u_time (line 3 of VERT).
+    const sites = findReferencesAcrossStages(
+      { vertex: VERT, fragment: FRAG_X },
+      "u_time",
+      "vertex",
+      3,
+    );
+    const vertex = sites.filter((s) => s.stage === "vertex");
+    const fragment = sites.filter((s) => s.stage === "fragment");
+    // Vertex: decl + 1 use inside main().
+    expect(vertex).toHaveLength(2);
+    expect(vertex.some((s) => s.isDefinition)).toBe(true);
+    // Fragment: decl + 1 use inside main().
+    expect(fragment).toHaveLength(2);
+    expect(fragment.some((s) => s.isDefinition)).toBe(true);
+    // Spans pull the exact text from each stage's source.
+    for (const s of vertex) expect(VERT.slice(s.from, s.to)).toBe("u_time");
+    for (const s of fragment) expect(FRAG_X.slice(s.from, s.to)).toBe("u_time");
+  });
+
+  it("renames a varying across the vertex `out` and the fragment `in`", () => {
+    // Cursor on the fragment declaration of v_uv (line 3 of FRAG_X).
+    const sites = findReferencesAcrossStages(
+      { vertex: VERT, fragment: FRAG_X },
+      "v_uv",
+      "fragment",
+      3,
+    );
+    const vertex = sites.filter((s) => s.stage === "vertex");
+    const fragment = sites.filter((s) => s.stage === "fragment");
+    expect(vertex.length).toBeGreaterThan(0);
+    expect(fragment.length).toBeGreaterThan(0);
+    expect(vertex.some((s) => s.isDefinition)).toBe(true);
+    expect(fragment.some((s) => s.isDefinition)).toBe(true);
+  });
+
+  it("partial rename — other stage doesn't declare the name → origin only", () => {
+    // a_position is only in vertex (it's an attribute / `in`). The fragment
+    // has no such symbol. Sites should be vertex-only.
+    const sites = findReferencesAcrossStages(
+      { vertex: VERT, fragment: FRAG_X },
+      "a_position",
+      "vertex",
+      2,
+    );
+    expect(sites.length).toBeGreaterThanOrEqual(2);
+    expect(sites.every((s) => s.stage === "vertex")).toBe(true);
+  });
+
+  it("locals stay inside their stage even when the other stage uses the same name", () => {
+    // Both stages reference `n` but as separate locals.
+    const V = `#version 300 es
+out float v_amt;
+void main() {
+  float n = 1.0;
+  v_amt = n;
+}
+`;
+    const F = `#version 300 es
+precision highp float;
+in float v_amt;
+out vec4 outColor;
+void main() {
+  float n = v_amt * 2.0;
+  outColor = vec4(n);
+}
+`;
+    // Cursor on vertex local n (line 4 of V).
+    const sites = findReferencesAcrossStages(
+      { vertex: V, fragment: F },
+      "n",
+      "vertex",
+      4,
+    );
+    expect(sites.every((s) => s.stage === "vertex")).toBe(true);
+    expect(sites).toHaveLength(2); // decl + 1 use, both in vertex.
+  });
+
+  it("parameters stay inside their stage", () => {
+    const V = `#version 300 es
+out vec2 v_uv;
+vec2 squeeze(vec2 p) { return p * 0.5; }
+void main() { v_uv = squeeze(vec2(1.0)); }
+`;
+    const F = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+vec3 squeeze(vec3 p) { return p * 0.25; }
+void main() { outColor = vec4(squeeze(vec3(v_uv, 1.0)), 1.0); }
+`;
+    // Cursor on the vertex parameter `p` (line 3 of V).
+    const sites = findReferencesAcrossStages(
+      { vertex: V, fragment: F },
+      "p",
+      "vertex",
+      3,
+    );
+    expect(sites.every((s) => s.stage === "vertex")).toBe(true);
+  });
+
+  it("cross-stage rename for a function name reaches both stages", () => {
+    const V = `#version 300 es
+out vec2 v_uv;
+vec2 squeeze(vec2 p) { return p * 0.5; }
+void main() { v_uv = squeeze(vec2(1.0)); }
+`;
+    const F = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+vec2 squeeze(vec2 p) { return p * 2.0; }
+void main() { outColor = vec4(squeeze(v_uv), 0.0, 1.0); }
+`;
+    const sites = findReferencesAcrossStages(
+      { vertex: V, fragment: F },
+      "squeeze",
+      "vertex",
+      3,
+    );
+    expect(sites.some((s) => s.stage === "vertex")).toBe(true);
+    expect(sites.some((s) => s.stage === "fragment")).toBe(true);
+  });
+
+  it("returns [] when the identifier has no binding in the origin stage", () => {
+    // `gone` is not declared anywhere.
+    const sites = findReferencesAcrossStages(
+      { vertex: VERT, fragment: FRAG_X },
+      "gone",
+      "vertex",
+      2,
+    );
+    expect(sites).toEqual([]);
+  });
+
+  it("emits vertex sites before fragment sites in stage groups", () => {
+    const sites = findReferencesAcrossStages(
+      { vertex: VERT, fragment: FRAG_X },
+      "u_time",
+      "fragment",
+      4,
+    );
+    // The two vertex sites should come first as a contiguous run.
+    const stageSeq = sites.map((s) => s.stage);
+    const firstFragment = stageSeq.indexOf("fragment");
+    expect(stageSeq.slice(0, firstFragment).every((x) => x === "vertex")).toBe(
+      true,
+    );
+    expect(stageSeq.slice(firstFragment).every((x) => x === "fragment")).toBe(
+      true,
+    );
+  });
+
+  it("global rename is blocked by a same-named local in the other stage", () => {
+    // Fragment has a local `u_time` shadowing the global of the same name.
+    // The cross-stage rename starts from the vertex global → in fragment we
+    // still find the global decl, but local uses inside the shadowing
+    // function must be excluded because they resolve to the local.
+    const V = `#version 300 es
+uniform float u_time;
+void main() { gl_Position = vec4(u_time); }
+`;
+    const F = `#version 300 es
+precision highp float;
+uniform float u_time;
+out vec4 outColor;
+void shadow() {
+  float u_time = 9.0;
+  outColor = vec4(u_time);
+}
+void main() { outColor = vec4(u_time); }
+`;
+    const sites = findReferencesAcrossStages(
+      { vertex: V, fragment: F },
+      "u_time",
+      "vertex",
+      2,
+    );
+    const fragment = sites.filter((s) => s.stage === "fragment");
+    // Fragment should pick up the global decl (line 3) and the use in main()
+    // (line 9), but NOT the local decl on line 6 or its use on line 7.
+    const fragLines = fragment.map((s) => s.line).sort((a, b) => a - b);
+    expect(fragLines).toEqual([3, 9]);
   });
 });

@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 27)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 28)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -552,9 +552,9 @@ buildSemanticDecorations(view)
 - **cost 통제**: 분류기는 라인 한 번씩만 정규식 + 심볼 테이블 lookup. 1000-line 셰이더에서도 < 1ms 추정이라 별도 debounce 없음. viewport 외 토큰은 RangeSetBuilder 에 추가하지 않으므로 큰 문서에서도 O(visible-lines) decoration 만 보유.
 - **DEV bridge**: `window.__sp.glslSemanticTokens = { classify, classifyIdentifier }` (다른 store/glsl 모듈과 동형, DEV 빌드 한정). E2E 가 CM 와이어링 없이 분류 정확도와 정렬 계약을 직접 검증.
 
-### 8.7 Goto / References / Rename (Phase 27)
+### 8.7 Goto / References / Rename (Phase 27 + Phase 28 cross-stage)
 
-Phase 25 의 심볼 테이블 + `resolveSymbol` 을 그대로 재활용해 같은 declaration 으로 해석되는 모든 occurrence 를 모으고, 그 위에 (a) cursor 점프 (b) 단일 트랜잭션 rename (c) active reference 페인트 세 가지 surface 를 얹는다.
+Phase 25 의 심볼 테이블 + `resolveSymbol` 을 그대로 재활용해 같은 declaration 으로 해석되는 모든 occurrence 를 모으고, 그 위에 (a) cursor 점프 (b) 단일 트랜잭션 rename (c) active reference 페인트 세 가지 surface 를 얹는다. Phase 28 에서 rename 은 ShaderNode 의 vertex + fragment 두 stage 를 묶는 *프로그램* 단위로 확장 — 한 `updateShaderSource({vertexSource,fragmentSource})` 패치 = 한 graph history push.
 
 ```
 core/glsl/references.ts
@@ -581,6 +581,51 @@ CodeMirror 와이어링 (glslSetup.ts)
 - **Active highlight**: 단일 site(decl 만 존재)면 `Decoration.none` — 노이즈 회피. 비용은 cursor 이동마다 `buildSymbolTable + findReferences` 한 번이지만 playground 규모에서 < 1ms 추정이라 debounce 없음.
 - **CodeEditor observation bridge (`ui/CodeEditor/currentView.ts`)**: CodeEditor.tsx 가 mount/unmount 시 `setCurrentView(view)` / `setCurrentView(null)` 로 module-level ref 갱신. 프로덕션 코드는 의존하지 않고, `__sp.codeEditor = { getCursorLine, focus }` (DEV 한정) 으로 E2E 가 cursor 위치를 직접 읽는다 — F12 점프 결과 검증을 CM DOM 추측 없이 line number 비교로 처리.
 - **DEV bridge 추가**: `window.__sp.glslSymbols.findReferences` (references finder), `window.__sp.codeEditor` (cursor introspection). 기존 Phase 25 의 `glslSymbols` 객체에 한 함수만 더해 형태가 일관된다.
+
+#### 8.7.1 Cross-stage rename (Phase 28)
+
+ShaderNode 는 vertex + fragment 두 GLSL 소스를 한 *프로그램* 으로 묶는다 — uniform / varying / function / struct 같은 글로벌은 GLSL 링커가 한 binding 으로 본다. Phase 28 의 rename 은 이 사실을 반영해 두 stage 의 occurrence 를 같은 트랜잭션으로 교체한다.
+
+```
+core/glsl/references.ts
+   findReferencesAcrossStages({vertex, fragment}, name, originStage, atLine)
+      ├─ originSource = stages[originStage]
+      ├─ resolveSymbol(originTable, name, atLine) → target
+      ├─ findReferencesOf(origin) → originSites  (각 site.stage = originStage)
+      │
+      └─ if target.scope === null && CROSS_STAGE_KINDS.has(target.kind):
+           otherTable = buildSymbolTable(otherSource)
+           otherTarget = resolveSymbol(otherTable, target.name, 1)
+           if otherTarget?.scope === null && CROSS_STAGE_KINDS.has(otherTarget.kind):
+             findReferencesOf(other) → otherSites
+      → sortByStageAndOffset(originSites + otherSites)
+
+ui/CodeEditor/rename.ts
+   runRename(view, promptFn, crossStage?)
+      ├─ collectSites — crossStage 가 있으면 findReferencesAcrossStages,
+      │                 없으면 Phase 27 의 findReferences
+      ├─ split → localSites (= origin stage) + otherSites
+      ├─ if crossStage && otherSites.length > 0:
+      │     newOrigin = applyEdits(source, localSites, next)
+      │     newOther  = applyEdits(crossStage.otherStageSource, otherSites, next)
+      │     crossStage.applyBothStages(newOrigin, newOther)   // 한 history push
+      └─ view.dispatch({ changes: localSites })               // CM undo step
+
+   resolveCrossStageContext()  (module-private)
+      ├─ selectionStore.getState().selectedNodeId → ShaderGraphNode 이어야
+      ├─ editorStore.getState().activeStage → originStage
+      └─ applyBothStages = (newOrigin, newOther) =>
+            graphStore.updateShaderSource(sn.id, {
+              vertexSource:  originStage === 'vertex' ? newOrigin : newOther,
+              fragmentSource: originStage === 'vertex' ? newOther : newOrigin,
+            })
+```
+
+- **`CROSS_STAGE_KINDS`**: `uniform / in / out / attribute / varying / const / function / struct`. 로컬 / 파라미터는 GLSL 링커가 다른 binding 으로 보므로 의도적으로 제외 — vertex `main` 의 `float k` 와 fragment `main` 의 `float k` 는 이름만 같은 별개 변수. 같은 stage 안에서는 Phase 27 의 shadowing 규칙 그대로.
+- **Partial rename**: other stage 에 동명 글로벌이 없으면 (예: vertex 의 `in a_position`) origin-stage 단독 rewrite. 결과는 partial 이지만 정상 종료 — 오류 아님.
+- **Other-stage shadowing**: other stage 의 글로벌 binding 은 잡되, 그 안에서 같은 이름의 로컬이 가린 곳(`resolveSymbol` 이 로컬을 돌려주는 위치)은 자동 제외. global rename 이 local 을 망가뜨리지 않는다.
+- **Single graph-history push**: `applyBothStages` 가 한 `updateShaderSource({ vertexSource, fragmentSource })` 패치로 양 stage 를 동시에 set. 이후 CM dispatch 가 origin stage 의 view 를 갱신하고, 50 ms 후 commit debounce 가 다시 `updateShaderSource(...)` 를 부를 때는 store 값이 같아 early-return → 추가 push 없음. Cmd+Z 한 번에 전체 rename 이 되돌려진다.
+- **ComputeNode / 비-Shader 선택**: `resolveCrossStageContext()` 가 `undefined` 반환 → `runRename` 은 Phase 27 의 single-document 경로로 폴백. 단위 테스트와 ComputeNode 편집기에서 기존 동작 변화 없음.
 
 ### 8.4 라이브 GLSL 검증 (Phase 24)
 
@@ -702,7 +747,7 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 
 ---
 
-## 12. 디렉토리 트리 (Phase 27 기준)
+## 12. 디렉토리 트리 (Phase 28 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -755,13 +800,13 @@ ShaderPlayground/
    │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
    │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
    │  │
-   │  ├─ glsl/                       # Phase 24/25/26/27 — 라이브 GLSL 검증 + LSP-like 정적 분석
+   │  ├─ glsl/                       # Phase 24/25/26/27/28 — 라이브 GLSL 검증 + LSP-like 정적 분석
    │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
    │  │  ├─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
    │  │  ├─ symbolTable.ts           # Phase 25 — uniform/in/out/const/local/parameter/function/struct 파서 + scope 추적 (+ test)
    │  │  ├─ builtins.ts              # Phase 25 — GLSL_FUNCTIONS 시그니처/설명 + KEYWORD_DESCRIPTIONS (+ test)
    │  │  ├─ semanticTokens.ts        # Phase 26 — 식별자 역할 분류기 (symbolTable + builtins + SYSTEM_UNIFORMS) (+ test)
-   │  │  └─ references.ts            # Phase 27 — findReferences (resolveSymbol 재진입으로 shadowing 존중) (+ test)
+   │  │  └─ references.ts            # Phase 27/28 — findReferences + findReferencesAcrossStages (cross-stage rename) (+ test)
    │  │
    │  ├─ nodes/
    │  │  ├─ registry.ts              # 노드별 PortSpec + 동적 포트(Shader/Math/Swizzle/Combine) (+ test)

@@ -27,7 +27,8 @@ export interface GraphNodeMinimal {
     | "param"
     | "math"
     | "swizzle"
-    | "combine";
+    | "combine"
+    | "group";
   [k: string]: unknown;
 }
 

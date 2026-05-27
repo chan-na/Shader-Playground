@@ -10,6 +10,7 @@ import { useTimeStore } from "../state/timeStore";
  *   Cmd/Ctrl+Shift+Z   — redo (also Cmd+Y on Windows-style)
  *   Cmd/Ctrl+D         — duplicate the selected node
  *   Cmd/Ctrl+A         — select every node (when not editing text)
+ *   Cmd/Ctrl+G         — wrap the current selection in a new group
  *   Arrow keys         — nudge the whole selection (Shift = coarse step)
  *   Space              — toggle play/pause (when no text input has focus)
  */
@@ -67,6 +68,17 @@ export function KeyboardShortcuts() {
         e.preventDefault();
         const ids = useGraphStore.getState().nodes.map((n) => n.id);
         useSelectionStore.getState().setSelectedIds(ids);
+        return;
+      }
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "g") {
+        // Cmd+G: wrap selection in a group. Skip while typing so browser
+        // "find next" (which is Cmd+G) stays available when an input has focus.
+        if (isEditingTarget(e.target)) return;
+        const sel = useSelectionStore.getState().selectedNodeIds;
+        if (sel.length < 2) return;
+        e.preventDefault();
+        const newId = useGraphStore.getState().groupSelected(sel);
+        if (newId) useSelectionStore.getState().select(newId);
         return;
       }
       const arrow = ARROW_DELTAS[e.key];

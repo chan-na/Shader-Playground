@@ -7,6 +7,7 @@ function snap(n: number): GraphSnapshot {
     nodes: [{ id: `n${n}`, kind: "output" }],
     edges: [],
     positions: {},
+    parents: {},
   };
 }
 

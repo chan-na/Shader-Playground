@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type {
   AudioGraphNode,
   ComputeGraphNode,
+  GroupGraphNode,
   ParamGraphNode,
   ResolutionScale,
   ShaderGraphNode,
@@ -18,6 +19,7 @@ import {
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { AudioInspector } from "./AudioInspector";
+import { GroupInspector } from "./GroupInspector";
 import { ParamInspector } from "./ParamInspector";
 import { UniformControl } from "./UniformControl";
 import { UniformHintEditor } from "./UniformHintEditor";
@@ -141,6 +143,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
               )}
             </div>
           </div>
+
+          {node.kind === "group" && (
+            <GroupInspector node={node as GroupGraphNode} />
+          )}
 
           {node.kind === "param" && (
             <ParamInspector node={node as ParamGraphNode} />

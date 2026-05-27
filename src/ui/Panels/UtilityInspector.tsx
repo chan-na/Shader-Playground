@@ -40,6 +40,7 @@ export function UtilityInspector({ node }: { node: GraphNode }) {
     case "compute":
     case "output":
     case "param":
+    case "group":
       return null;
     default:
       return assertNever(node);

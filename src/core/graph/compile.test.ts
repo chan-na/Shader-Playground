@@ -265,3 +265,37 @@ describe("compileGraph fatal-error early return", () => {
     expect(plan.errors.some((e) => e.code === "multiple_outputs")).toBe(true);
   });
 });
+
+describe("compileGraph groups (Phase 29)", () => {
+  it("treats group nodes as invisible to the render pipeline", () => {
+    // A graph with one shader pass, one output, and a couple of group nodes
+    // alongside. The presence of groups must not change the plan in any way.
+    const graphWithGroups: Graph = {
+      nodes: [
+        {
+          id: "g1",
+          kind: "group",
+          label: "Section A",
+          width: 300,
+          height: 200,
+        },
+        {
+          id: "g2",
+          kind: "group",
+          label: "Section B",
+          width: 200,
+          height: 150,
+        },
+      ],
+      edges: [],
+    };
+    const planWith = compileGraph(fakeGl, graphWithGroups, {
+      width: 64,
+      height: 64,
+    });
+    expect(planWith.errors).toEqual([]);
+    expect(planWith.passes).toEqual([]);
+    expect(planWith.hasExternal).toBe(false);
+    expect(planWith.hasCompute).toBe(false);
+  });
+});

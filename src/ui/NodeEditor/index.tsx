@@ -7,6 +7,7 @@ import {
   MiniMap,
   type Node,
   type NodeChange,
+  type OnNodeDrag,
   ReactFlow,
   type ReactFlowInstance,
 } from "@xyflow/react";
@@ -14,6 +15,8 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import "@xyflow/react/dist/style.css";
 import "./nodeCard.css";
 
+import { getAbsolutePosition } from "../../core/graph/parents";
+import type { GroupGraphNode } from "../../core/graph/types";
 import { validateGraph } from "../../core/graph/validate";
 import { nodeInputPorts, nodeOutputPorts } from "../../core/nodes/registry";
 import { importFiles } from "../../state/assetActions";
@@ -24,15 +27,24 @@ import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
 import { Toolbar } from "./Toolbar";
 
+/** Width/height approximation for non-group node cards when picking a target
+ *  group on drag-stop. The real measurements come from the DOM but we don't
+ *  need pixel accuracy — we just want the drop target picker to be forgiving.
+ */
+const DROP_CARD_W = 180;
+const DROP_CARD_H = 64;
+
 export function NodeEditor() {
   const graphNodes = useGraphStore((s) => s.nodes);
   const graphEdges = useGraphStore((s) => s.edges);
   const positions = useGraphStore((s) => s.positions);
+  const parents = useGraphStore((s) => s.parents);
   const rev = useGraphStore((s) => s.rev);
   const updateNodePosition = useGraphStore((s) => s.updateNodePosition);
   const removeNode = useGraphStore((s) => s.removeNode);
   const addEdge = useGraphStore((s) => s.addEdge);
   const removeEdge = useGraphStore((s) => s.removeEdge);
+  const setParentAction = useGraphStore((s) => s.setParent);
   const select = useSelectionStore((s) => s.select);
   const setSelectedIds = useSelectionStore((s) => s.setSelectedIds);
   const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds);
@@ -62,18 +74,33 @@ export function NodeEditor() {
 
   const rfNodes: Node[] = useMemo(() => {
     const sel = new Set(selectedNodeIds);
-    return graphNodes.map((n) => ({
-      id: n.id,
-      type: n.kind,
-      position: positions[n.id] ?? { x: 0, y: 0 },
-      data: { node: n },
-      // React Flow v12 controlled mode: highlight is driven by this flag,
-      // not by RF's internal state. Sync from selectionStore so clicks,
-      // shift-box selects, pane-clears, and programmatic selects all reach
-      // the DOM.
-      selected: sel.has(n.id),
-    }));
-  }, [graphNodes, positions, selectedNodeIds]);
+    return graphNodes.map((n) => {
+      const rf: Node = {
+        id: n.id,
+        type: n.kind,
+        position: positions[n.id] ?? { x: 0, y: 0 },
+        data: { node: n },
+        // React Flow v12 controlled mode: highlight is driven by this flag,
+        // not by RF's internal state. Sync from selectionStore so clicks,
+        // shift-box selects, pane-clears, and programmatic selects all reach
+        // the DOM.
+        selected: sel.has(n.id),
+      };
+      const pid = parents[n.id];
+      if (pid !== undefined) {
+        rf.parentId = pid;
+        // No `extent: 'parent'` here on purpose — we want drag-out to release
+        // a child back to the top level (or into a sibling group) naturally
+        // via onNodeDragStop. The visual leakage during the drag is brief and
+        // the position is normalized on drop.
+      }
+      if (n.kind === "group") {
+        const gn = n as GroupGraphNode;
+        rf.style = { width: gn.width, height: gn.height };
+      }
+      return rf;
+    });
+  }, [graphNodes, positions, parents, selectedNodeIds]);
 
   const rfEdges: Edge[] = useMemo(
     () =>
@@ -120,6 +147,73 @@ export function NodeEditor() {
   );
 
   const onPaneClick = useCallback(() => select(null), [select]);
+
+  /**
+   * After a drag releases, decide whether the moved node should reparent into
+   * a group it now overlaps (or release from its current group when dropped
+   * onto the canvas). Handles single drags AND multi-select drags by walking
+   * the `nodes` argument that React Flow hands us.
+   */
+  const onNodeDragStop = useCallback<OnNodeDrag>(
+    (_e, _node, nodes) => {
+      const draggedNodes = nodes && nodes.length > 0 ? nodes : [_node];
+      const state = useGraphStore.getState();
+      // Pre-compute absolute boxes for every group node so the picker is O(n·g)
+      // rather than O(n·g·depth).
+      const groupBoxes = state.nodes
+        .filter((n) => n.kind === "group")
+        .map((g) => {
+          const gn = g as GroupGraphNode;
+          const abs = getAbsolutePosition(g.id, state.positions, state.parents);
+          return {
+            id: g.id,
+            x1: abs.x,
+            y1: abs.y,
+            x2: abs.x + gn.width,
+            y2: abs.y + gn.height,
+            area: gn.width * gn.height,
+          };
+        });
+
+      for (const dragged of draggedNodes) {
+        const id = dragged.id;
+        const node = state.nodes.find((n) => n.id === id);
+        if (!node) continue;
+        // Resolve where the node CENTER landed in absolute coordinates. The
+        // RF event already wrote the new position into the store via
+        // onNodesChange, so getAbsolutePosition picks up the latest value.
+        const fresh = useGraphStore.getState();
+        const abs = getAbsolutePosition(id, fresh.positions, fresh.parents);
+        const w =
+          node.kind === "group" ? (node as GroupGraphNode).width : DROP_CARD_W;
+        const h =
+          node.kind === "group" ? (node as GroupGraphNode).height : DROP_CARD_H;
+        const cx = abs.x + w / 2;
+        const cy = abs.y + h / 2;
+
+        // Pick the smallest containing group whose interior holds the center
+        // point. "Smallest" gives nested groups priority over outer ones.
+        let bestId: string | undefined;
+        let bestArea = Infinity;
+        for (const g of groupBoxes) {
+          if (g.id === id) continue; // a group never parents itself
+          if (cx < g.x1 || cy < g.y1 || cx > g.x2 || cy > g.y2) continue;
+          if (g.area < bestArea) {
+            bestId = g.id;
+            bestArea = g.area;
+          }
+        }
+
+        const currentParent = fresh.parents[id];
+        if (bestId !== currentParent) {
+          // setParent will reject cycles (group landed inside its own
+          // descendant) and quietly no-op when nothing changed.
+          setParentAction(id, bestId);
+        }
+      }
+    },
+    [setParentAction],
+  );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
@@ -229,6 +323,7 @@ export function NodeEditor() {
           onEdgesChange={onEdgesChange}
           onPaneClick={onPaneClick}
           onConnect={onConnect}
+          onNodeDragStop={onNodeDragStop}
           isValidConnection={isValidConnection}
           onInit={(inst) => {
             flowRef.current = inst;

@@ -63,6 +63,7 @@ export function Toolbar() {
     const project = serializeProject(
       { nodes: s.nodes, edges: s.edges },
       s.positions,
+      s.parents,
     );
     const blob = new Blob([JSON.stringify(project, null, 2)], {
       type: "application/json",
@@ -83,7 +84,7 @@ export function Toolbar() {
     try {
       const text = await file.text();
       const parsed = deserializeProject(JSON.parse(text));
-      setGraph(parsed.graph, parsed.positions);
+      setGraph(parsed.graph, parsed.positions, parsed.parents);
       const meshIds: string[] = [];
       const imageIds: string[] = [];
       const videoIds: string[] = [];

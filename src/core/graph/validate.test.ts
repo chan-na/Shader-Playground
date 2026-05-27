@@ -247,4 +247,49 @@ describe("topologicalOrder", () => {
       .sort();
     expect(order).toEqual(["a", "m"]);
   });
+
+  it("validateGraph ignores group nodes (no ports, never in edges)", () => {
+    const g: Graph = {
+      nodes: [
+        {
+          id: "g1",
+          kind: "group",
+          label: "Effects",
+          width: 300,
+          height: 200,
+        },
+        shader("s"),
+        out("o"),
+      ],
+      edges: [
+        {
+          id: "e1",
+          source: "s",
+          sourceHandle: "texture",
+          target: "o",
+          targetHandle: "texture",
+        },
+      ],
+    };
+    expect(validateGraph(g)).toEqual([]);
+  });
+
+  it("topologicalOrder includes group nodes harmlessly (compile filters them out)", () => {
+    const g: Graph = {
+      nodes: [
+        {
+          id: "g",
+          kind: "group",
+          label: "G",
+          width: 200,
+          height: 150,
+        },
+        shader("s"),
+      ],
+      edges: [],
+    };
+    const ids = topologicalOrder(g).map((n) => n.id);
+    expect(ids).toContain("g");
+    expect(ids).toContain("s");
+  });
 });

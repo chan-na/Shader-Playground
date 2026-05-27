@@ -310,4 +310,105 @@ describe("serializeProject / deserializeProject", () => {
       expect(cb.values).toEqual([0.1, 0.2, 0.3, 0.4]);
     }
   });
+
+  it("round-trips groups and the parents map (Phase 29)", () => {
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "g1",
+          kind: "group",
+          label: "outer",
+          width: 400,
+          height: 300,
+          color: "#88aaff",
+        },
+        {
+          id: "g2",
+          kind: "group",
+          label: "inner",
+          width: 200,
+          height: 150,
+        },
+        { id: "m1", kind: "mesh", primitive: "cube", assetId: null },
+      ],
+      edges: [],
+    };
+    const positions = {
+      g1: { x: 100, y: 100 },
+      g2: { x: 50, y: 60 },
+      m1: { x: 20, y: 30 },
+    };
+    const parents = { g2: "g1", m1: "g2" };
+
+    const json = JSON.parse(
+      JSON.stringify(serializeProject(graph, positions, parents)),
+    );
+    const restored = deserializeProject(json);
+
+    expect(restored.parents).toEqual(parents);
+    const g1Restored = restored.graph.nodes.find((n) => n.id === "g1");
+    expect(g1Restored?.kind).toBe("group");
+    if (g1Restored?.kind === "group") {
+      expect(g1Restored.label).toBe("outer");
+      expect(g1Restored.color).toBe("#88aaff");
+      expect(g1Restored.width).toBe(400);
+    }
+    const g2Restored = restored.graph.nodes.find((n) => n.id === "g2");
+    if (g2Restored?.kind === "group") {
+      expect(g2Restored.color).toBeUndefined();
+    }
+    expect(restored.warnings).toEqual([]);
+  });
+
+  it("drops parent entries referencing unknown nodes", () => {
+    const graph: Graph = {
+      nodes: [{ id: "m1", kind: "mesh", primitive: "cube", assetId: null }],
+      edges: [],
+    };
+    const positions = { m1: { x: 10, y: 20 } };
+    const parents = { m1: "ghost" };
+    const json = JSON.parse(
+      JSON.stringify(serializeProject(graph, positions, parents)),
+    );
+    const restored = deserializeProject(json);
+    expect(restored.parents).toEqual({});
+  });
+
+  it("ignores parent cycles and warns", () => {
+    const graph: Graph = {
+      nodes: [
+        { id: "g1", kind: "group", label: "g1", width: 200, height: 150 },
+        { id: "g2", kind: "group", label: "g2", width: 200, height: 150 },
+      ],
+      edges: [],
+    };
+    const json = {
+      format: "shader-playground" as const,
+      version: PROJECT_FORMAT_VERSION,
+      exportedAt: new Date().toISOString(),
+      graph,
+      positions: { g1: { x: 0, y: 0 }, g2: { x: 0, y: 0 } },
+      parents: { g1: "g2", g2: "g1" },
+    };
+    const restored = deserializeProject(json);
+    expect(restored.parents).toEqual({});
+    expect(restored.warnings.some((w) => w.includes("Parent chain"))).toBe(
+      true,
+    );
+  });
+
+  it("treats missing `parents` field as empty (backward compat)", () => {
+    const json = {
+      format: "shader-playground" as const,
+      version: PROJECT_FORMAT_VERSION,
+      exportedAt: new Date().toISOString(),
+      graph: {
+        nodes: [{ id: "m1", kind: "mesh", primitive: "cube" }],
+        edges: [],
+      },
+      positions: { m1: { x: 0, y: 0 } },
+    };
+    const restored = deserializeProject(json);
+    expect(restored.parents).toEqual({});
+  });
 });

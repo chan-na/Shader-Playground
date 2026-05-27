@@ -342,6 +342,30 @@ function buildCommands(): Command[] {
 
   cmds.push(
     {
+      id: "add-group",
+      category: "Node",
+      label: "Add Group (empty container)",
+      keywords: "add node group container box section comment",
+      run: () => {
+        const id = useGraphStore
+          .getState()
+          .addGroup("Group", { x: -200, y: -120 }, { width: 360, height: 260 });
+        select(id);
+      },
+    },
+    {
+      id: "group-selected",
+      category: "Graph",
+      label: "Group selected nodes (Cmd/Ctrl+G)",
+      keywords: "group wrap selection nodes container box",
+      run: () => {
+        const sel = useSelectionStore.getState().selectedNodeIds;
+        if (sel.length < 2) return;
+        const newId = useGraphStore.getState().groupSelected(sel);
+        if (newId) select(newId);
+      },
+    },
+    {
       id: "preset-sphere",
       category: "Preset",
       label: "Load preset: Sphere",

@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 28)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 29)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -60,6 +60,7 @@
 | `math` (8 op) | `a: float`, 이항만 `b: float` | `value: float` | 단항: `abs/sin/cos` (`MATH_UNARY_OPS`) |
 | `swizzle` | `in: vec4` (스칼라는 broadcast) | `value: float\|vec2\|vec3\|vec4` (mask 길이) | mask 는 x/y/z/w 의 1~4 글자 |
 | `combine` (arity 2/3/4) | `x, y, (z, w): float` | `value: vec2\|vec3\|vec4` | arity 만큼 채널 노출 |
+| `group` (Phase 29) | — | — | 시각적 컨테이너. 포트 없음, `ExecutionPlan` 에 절대 들어가지 않음. `{label, color?, width, height}` 만 보유. 자식 관계는 `graphStore.parents` map 으로 보관 |
 
 포트 타입: `'mesh' | 'texture' | 'float' | 'vec2' | 'vec3' | 'vec4'`.
 
@@ -383,7 +384,7 @@ poll(gl):
 
 | Store | 보관 | recompile? | history? | 비고 |
 |---|---|---|---|---|
-| `graphStore` | nodes/edges/positions | `rev` 변화 | structural mutation 시 push | `uniformRev` 는 별도, 슬라이더 드래그 전용 |
+| `graphStore` | nodes/edges/positions/parents | `rev` 변화 | structural mutation 시 push | `uniformRev` 는 별도, 슬라이더 드래그 전용. `parents` (Phase 29) 는 자식→그룹 id 의 보조 컬렉션 — 구조 변경이라 rev/history 에 포함 |
 | `assetStore` | 메시·이미지 핸들 | `rev` 변화 | ✗ | 이미지 비트맵이 도착해 sampler 가 채워질 때만 의미 있음 |
 | `selectionStore` | `selectedNodeIds[]` + `selectedNodeId`(primary=마지막) | ✗ | ✗ | NodeEditor 가 집합을 RF `selected` 로 동기화. Inspector·CodeEditor 는 primary 만 편집하고 2개 이상이면 다중 선택 배너 표시 (Phase 23) |
 | `editorStore` | activeStage, jumpRequest | ✗ | ✗ | jumpRequest 는 `rev` 카운터 포함 — 동일 행 두 번 클릭도 발화 |
@@ -747,7 +748,7 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 
 ---
 
-## 12. 디렉토리 트리 (Phase 28 기준)
+## 12. 디렉토리 트리 (Phase 29 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -783,13 +784,14 @@ ShaderPlayground/
    │  │  └─ input.ts                 # createCameraController — pointer/wheel 부착
    │  │
    │  ├─ graph/
-   │  │  ├─ types.ts                 # GraphNode/Edge/Port + Param·Math·Swizzle·Combine·Compute
+   │  │  ├─ types.ts                 # GraphNode/Edge/Port + Param·Math·Swizzle·Combine·Compute·Group
    │  │  ├─ compile.ts               # graph → ExecutionPlan (ShaderPass | ComputePass) (+ test)
    │  │  ├─ execute.ts               # executePlan + splitLayout + TF dispatch
    │  │  ├─ validate.ts              # cycle / multi_input / multiple_outputs (+ test)
    │  │  ├─ diagnostics.ts           # GLSL 로그 파서 (+ test)
    │  │  ├─ uniformParser.ts         # uniform + 주석 힌트 (+ test)
    │  │  ├─ computeSeed.ts           # sphere/cube/random/zero seed 생성기 (+ test)
+   │  │  ├─ parents.ts               # Phase 29 — parent map + abs/relative 좌표 + cycle 가드 (+ test)
    │  │  └─ splitLayout.test.ts      # 분할 뷰포트 단위 테스트
    │  │
    │  ├─ thumbnail/
@@ -862,6 +864,7 @@ ShaderPlayground/
    │  │     ├─ ParamNodeView.tsx     # Float/Vec3/Color/Time
    │  │     ├─ UtilityNodeViews.tsx  # Math/Swizzle/Combine
    │  │     ├─ ComputeNodeView.tsx   # TF 컴퓨트 — count/primitive/attribute 메타 표시
+   │  │     ├─ GroupNodeView.tsx     # Phase 29 — 그룹 카드 + NodeResizer 컨테이너
    │  │     └─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
    │  │
    │  ├─ CodeEditor/
@@ -893,6 +896,7 @@ ShaderPlayground/
    │     ├─ WebcamInspector.tsx      # Phase 14a — device dropdown + live status
    │     ├─ VideoInspector.tsx       # Phase 14b — 에셋 선택 / play·loop·mute / seek
    │     ├─ AudioInspector.tsx       # Phase 14c — mic↔file / fftSize / smoothing / play·loop
+   │     ├─ GroupInspector.tsx       # Phase 29 — label/color 편집 + ungroup / delete-with-children
    │     ├─ ViewportControls.tsx     # 카메라 Reset/FOV + 배경색 + 시간
    │     ├─ ProblemsPanel.tsx        # 진단 → select + setStage + requestJump
    │     ├─ AssetBrowser.tsx

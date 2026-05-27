@@ -58,8 +58,9 @@ export async function encodeShareUrl(
   graph: Graph,
   positions: Record<string, NodePosition>,
   origin?: string,
+  parents?: import("../core/graph/parents").ParentsMap,
 ): Promise<string> {
-  const project = serializeProject(graph, positions);
+  const project = serializeProject(graph, positions, parents);
   const json = JSON.stringify(project);
   const bytes = new TextEncoder().encode(json);
   const compressed = await gzip(bytes);
@@ -80,6 +81,7 @@ export async function decodeShareHash(hash: string): Promise<{
   project: SerializedProject;
   graph: Graph;
   positions: Record<string, NodePosition>;
+  parents: import("../core/graph/parents").ParentsMap;
   warnings: string[];
 } | null> {
   const m = /[#&]share=([A-Za-z0-9_-]+)/.exec(hash);
@@ -97,6 +99,7 @@ export async function decodeShareHash(hash: string): Promise<{
       project,
       graph: parsed.graph,
       positions: parsed.positions,
+      parents: parsed.parents,
       warnings: parsed.warnings,
     };
   } catch {

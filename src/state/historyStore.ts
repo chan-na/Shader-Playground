@@ -1,5 +1,6 @@
 // biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + length-guarded undo/redo stack access
 import { create } from "zustand";
+import type { ParentsMap } from "../core/graph/parents";
 import type { GraphEdge, GraphNode } from "../core/graph/types";
 import type { NodePosition } from "./types";
 
@@ -7,6 +8,11 @@ export interface GraphSnapshot {
   nodes: GraphNode[];
   edges: GraphEdge[];
   positions: Record<string, NodePosition>;
+  /**
+   * Child → parent group id. Absent ⇒ top-level. Tracked here so undo of a
+   * group/ungroup operation also restores the parent assignments.
+   */
+  parents: ParentsMap;
 }
 
 const MAX_HISTORY = 100;
@@ -30,6 +36,7 @@ function cloneSnapshot(s: GraphSnapshot): GraphSnapshot {
     positions: Object.fromEntries(
       Object.entries(s.positions).map(([k, v]) => [k, { x: v.x, y: v.y }]),
     ),
+    parents: { ...s.parents },
   };
 }
 
@@ -59,7 +66,7 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     });
     if (s.past.length >= 2) return cloneSnapshot(s.past[s.past.length - 2]!);
     // Past is now empty — return an empty snapshot to restore.
-    return { nodes: [], edges: [], positions: {} };
+    return { nodes: [], edges: [], positions: {}, parents: {} };
   },
   redo: () => {
     const s = get();

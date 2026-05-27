@@ -171,6 +171,13 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
     ],
     outputs: () => [{ name: "value", type: "vec4" }],
   },
+  group: {
+    // Pure UI container — no ports. compile/validate ignore it entirely.
+    kind: "group",
+    label: "Group",
+    inputs: () => [],
+    outputs: () => [],
+  },
 };
 
 /** Math-node port surface depends on the chosen op (unary vs binary). */
@@ -299,6 +306,15 @@ export function cloneGraphNode(n: GraphNode): GraphNode {
         kind: "combine",
         arity: n.arity,
         values: [n.values[0], n.values[1], n.values[2], n.values[3]],
+      };
+    case "group":
+      return {
+        id: n.id,
+        kind: "group",
+        label: n.label,
+        width: n.width,
+        height: n.height,
+        ...(n.color !== undefined && { color: n.color }),
       };
     default:
       return assertNever(n);

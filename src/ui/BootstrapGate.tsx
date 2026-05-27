@@ -31,7 +31,9 @@ export function BootstrapGate() {
           const mod = await import("../state/shareUrl");
           const decoded = await mod.decodeShareHash(hash);
           if (decoded && !cancelled) {
-            useGraphStore.getState().setGraph(decoded.graph, decoded.positions);
+            useGraphStore
+              .getState()
+              .setGraph(decoded.graph, decoded.positions, decoded.parents);
             useHistoryStore.getState().clear();
             // Share takes precedence over recovery — drop any stale autosave.
             await clearSession();
@@ -79,7 +81,9 @@ export function BootstrapGate() {
   const restore = () => {
     try {
       const restored = deserializeProject(pending);
-      useGraphStore.getState().setGraph(restored.graph, restored.positions);
+      useGraphStore
+        .getState()
+        .setGraph(restored.graph, restored.positions, restored.parents);
       useHistoryStore.getState().clear();
     } catch (e) {
       log.warn(

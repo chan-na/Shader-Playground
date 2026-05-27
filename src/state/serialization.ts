@@ -1,3 +1,4 @@
+import type { ParentsMap } from "../core/graph/parents";
 import type { Graph, GraphEdge, GraphNode } from "../core/graph/types";
 import { validateGraph } from "../core/graph/validate";
 import { cloneGraphNode } from "../core/nodes/registry";
@@ -16,17 +17,31 @@ export interface SerializedProject {
   exportedAt: string;
   graph: Graph;
   positions: Record<string, NodePosition>;
+  /**
+   * Group nesting (Phase 29). Absent in pre-Phase-29 payloads — deserialize
+   * treats a missing field as "no nesting" so older share URLs still load.
+   */
+  parents?: ParentsMap;
 }
 
 export function serializeProject(
   graph: Graph,
   positions: Record<string, NodePosition>,
+  parents: ParentsMap = {},
 ): SerializedProject {
   // Strip any positions that don't correspond to a current node.
   const knownIds = new Set(graph.nodes.map((n) => n.id));
   const trimmedPositions: Record<string, NodePosition> = {};
   for (const [id, p] of Object.entries(positions)) {
     if (knownIds.has(id)) trimmedPositions[id] = { x: p.x, y: p.y };
+  }
+  // Strip parents entries pointing at unknown nodes, and drop self-cycles.
+  const trimmedParents: ParentsMap = {};
+  for (const [child, parent] of Object.entries(parents)) {
+    if (!knownIds.has(child)) continue;
+    if (!knownIds.has(parent)) continue;
+    if (child === parent) continue;
+    trimmedParents[child] = parent;
   }
   return {
     format: "shader-playground",
@@ -37,12 +52,14 @@ export function serializeProject(
       edges: graph.edges.map((e) => structuredCloneEdge(e)),
     },
     positions: trimmedPositions,
+    parents: trimmedParents,
   };
 }
 
 export interface DeserializedProject {
   graph: Graph;
   positions: Record<string, NodePosition>;
+  parents: ParentsMap;
   warnings: string[];
 }
 
@@ -102,9 +119,48 @@ export function deserializeProject(raw: unknown): DeserializedProject {
       warnings.push(`Validation: ${e.message}`);
     }
   }
+
+  // Sanitize parents: drop entries with unknown ids, self-cycles, and any
+  // chain that loops. The walk caps at MAX_DEPTH to defend against malformed
+  // payloads (e.g. handcrafted share URLs).
+  const knownIds = new Set(sanitizedNodes.map((n) => n.id));
+  const rawParents = (obj.parents ?? {}) as Record<string, unknown>;
+  const candidates: Record<string, string> = {};
+  for (const [child, parent] of Object.entries(rawParents)) {
+    if (typeof parent !== "string") continue;
+    if (!knownIds.has(child)) continue;
+    if (!knownIds.has(parent)) continue;
+    if (child === parent) continue;
+    candidates[child] = parent;
+  }
+  const parents: ParentsMap = {};
+  const MAX_DEPTH = 64;
+  for (const child of Object.keys(candidates)) {
+    let depth = 0;
+    let cur: string | undefined = candidates[child];
+    const seen = new Set<string>([child]);
+    let cycle = false;
+    while (cur !== undefined && depth < MAX_DEPTH) {
+      if (seen.has(cur)) {
+        cycle = true;
+        break;
+      }
+      seen.add(cur);
+      cur = candidates[cur];
+      depth++;
+    }
+    if (!cycle && depth < MAX_DEPTH) {
+      const p = candidates[child];
+      if (p !== undefined) parents[child] = p;
+    } else {
+      warnings.push(`Parent chain for ${child} dropped (cycle or too deep)`);
+    }
+  }
+
   return {
     graph: sanitizedGraph,
     positions,
+    parents,
     warnings,
   };
 }

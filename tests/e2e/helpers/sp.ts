@@ -29,11 +29,13 @@ export interface SpStores {
       nodes: GraphNodeMinimal[];
       edges: GraphEdge[];
       positions: Record<string, { x: number; y: number }>;
+      parents: Record<string, string>;
       rev: number;
       uniformRev: number;
       setGraph: (
         g: { nodes: GraphNodeMinimal[]; edges: GraphEdge[] },
         positions?: Record<string, { x: number; y: number }>,
+        parents?: Record<string, string>,
       ) => void;
       addNode: (
         node: GraphNodeMinimal,
@@ -52,6 +54,24 @@ export interface SpStores {
         value: number | number[],
       ) => void;
       setResolutionScale: (id: string, scale: 0.25 | 0.5 | 1) => void;
+      addGroup: (
+        label: string,
+        absolutePosition: { x: number; y: number },
+        size: { width: number; height: number },
+        options?: { parentId?: string; color?: string },
+      ) => string;
+      setParent: (id: string, newParentId: string | undefined) => boolean;
+      groupSelected: (ids: string[]) => string | null;
+      removeGroup: (
+        id: string,
+        mode: "delete-children" | "release-children",
+      ) => void;
+      setGroupLabel: (id: string, label: string) => void;
+      setGroupColor: (id: string, color: string | undefined) => void;
+      setGroupSize: (
+        id: string,
+        size: { width: number; height: number },
+      ) => void;
       reset: () => void;
     };
   };

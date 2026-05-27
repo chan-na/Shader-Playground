@@ -33,6 +33,34 @@ describe("buildExportedHtml", () => {
     expect(html).toContain('"kind":"output"');
   });
 
+  it("embeds group nodes verbatim — standalonePlayer ignores them at runtime", () => {
+    // The static export's mini-runtime only branches on kinds 'shader' /
+    // 'mesh' / 'webcam' / 'video' / 'audio' / 'param' / 'output'. Group nodes
+    // pass straight through serializeProject and are never matched by any
+    // filter inside standalonePlayer.js, so embedding them is a no-op.
+    const withGroup: Graph = {
+      nodes: [
+        ...sample.nodes,
+        {
+          id: "g1",
+          kind: "group",
+          label: "Section",
+          width: 300,
+          height: 200,
+        },
+      ],
+      edges: sample.edges,
+    };
+    const html = buildExportedHtml(withGroup, {});
+    // Group is part of the embedded project so deserialization survives.
+    expect(html).toContain('"kind":"group"');
+    // None of standalonePlayer's filters select 'group' — confirm the literal
+    // doesn't appear in the player source (a regression check against
+    // future edits that might accidentally pull groups into the render path).
+    const playerScript = html.split("window.__SP_PROJECT")[0] ?? "";
+    expect(playerScript).not.toMatch(/kind\s*===\s*['"]group['"]/);
+  });
+
   it("escapes any </script> in shader source", () => {
     const sneaky: Graph = {
       nodes: [

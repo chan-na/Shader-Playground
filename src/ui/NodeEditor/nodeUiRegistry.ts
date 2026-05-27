@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import type { GraphNodeKind } from "../../core/graph/types";
 import { AudioNodeView } from "./nodes/AudioNodeView";
 import { ComputeNodeView } from "./nodes/ComputeNodeView";
+import { GroupNodeView } from "./nodes/GroupNodeView";
 import { ImageNodeView } from "./nodes/ImageNodeView";
 import { MeshNodeView } from "./nodes/MeshNodeView";
 import { OutputNodeView } from "./nodes/OutputNodeView";
@@ -40,6 +41,7 @@ export const NODE_UI: Record<GraphNodeKind, NodeUiSpec> = {
   math: { view: MathNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
   swizzle: { view: SwizzleNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
   combine: { view: CombineNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
+  group: { view: GroupNodeView, minimapColor: "#5b6a7a" },
 };
 
 /** ReactFlow `nodeTypes` prop derived from NODE_UI in a single pass. */

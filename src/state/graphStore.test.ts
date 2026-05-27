@@ -434,6 +434,7 @@ describe("graphStore", () => {
       nodes: [{ id: "x", kind: "mesh", primitive: "cube" }],
       edges: [],
       positions: { x: { x: 4, y: 5 } },
+      parents: {},
     });
     const s = useGraphStore.getState();
     expect(s.nodes[0]?.id).toBe("x");
@@ -528,6 +529,289 @@ describe("graphStore", () => {
       const before = useGraphStore.getState().rev;
       useGraphStore.getState().setUniformHints("nope", "u_x", { min: 0 });
       expect(useGraphStore.getState().rev).toBe(before);
+    });
+  });
+
+  describe("groups", () => {
+    it("addGroup creates a group node at the requested position", () => {
+      const before = useGraphStore.getState().rev;
+      const id = useGraphStore
+        .getState()
+        .addGroup("Effects", { x: 100, y: 100 }, { width: 200, height: 150 });
+      const s = useGraphStore.getState();
+      const group = s.nodes.find((n) => n.id === id);
+      expect(group?.kind).toBe("group");
+      expect(s.positions[id]).toEqual({ x: 100, y: 100 });
+      expect(s.parents[id]).toBeUndefined();
+      expect(s.rev).toBe(before + 1);
+    });
+
+    it("addGroup clamps tiny sizes up to the minimum", () => {
+      const id = useGraphStore
+        .getState()
+        .addGroup("Tiny", { x: 0, y: 0 }, { width: 1, height: 1 });
+      const node = useGraphStore.getState().nodes.find((n) => n.id === id) as
+        | { width: number; height: number }
+        | undefined;
+      // GROUP_MIN_WIDTH=160, GROUP_MIN_HEIGHT=100.
+      expect(node?.width).toBeGreaterThanOrEqual(160);
+      expect(node?.height).toBeGreaterThanOrEqual(100);
+    });
+
+    it("setParent attaches a child to a group and preserves absolute position", () => {
+      const s = useGraphStore.getState();
+      s.addNode(
+        { id: "a", kind: "mesh", primitive: "cube" },
+        { x: 250, y: 250 },
+      );
+      const gid = s.addGroup(
+        "G",
+        { x: 200, y: 200 },
+        { width: 400, height: 300 },
+      );
+
+      const ok = s.setParent("a", gid);
+      expect(ok).toBe(true);
+      const next = useGraphStore.getState();
+      expect(next.parents.a).toBe(gid);
+      // a's stored position should now be (250-200, 250-200) = (50, 50)
+      expect(next.positions.a).toEqual({ x: 50, y: 50 });
+    });
+
+    it("setParent rejects a cycle and returns false", () => {
+      const s = useGraphStore.getState();
+      const g1 = s.addGroup("g1", { x: 0, y: 0 }, { width: 300, height: 200 });
+      const g2 = s.addGroup("g2", { x: 0, y: 0 }, { width: 300, height: 200 });
+      s.setParent(g2, g1);
+      const ok = useGraphStore.getState().setParent(g1, g2);
+      expect(ok).toBe(false);
+    });
+
+    it("setParent on undefined newParent releases to top-level and preserves abs pos", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup(
+        "G",
+        { x: 200, y: 200 },
+        { width: 300, height: 200 },
+      );
+      s.addNode(
+        { id: "a", kind: "mesh", primitive: "cube" },
+        { x: 250, y: 250 },
+      );
+      s.setParent("a", gid);
+      // a is now at (50, 50) relative to g.
+      const ok = useGraphStore.getState().setParent("a", undefined);
+      expect(ok).toBe(true);
+      const next = useGraphStore.getState();
+      expect(next.parents.a).toBeUndefined();
+      // After release, position should re-absolutize back to (250, 250).
+      expect(next.positions.a).toEqual({ x: 250, y: 250 });
+    });
+
+    it("setParent re-orders nodes so parent appears before child", () => {
+      const s = useGraphStore.getState();
+      s.addNode(
+        { id: "leaf", kind: "mesh", primitive: "cube" },
+        { x: 250, y: 250 },
+      );
+      const gid = s.addGroup(
+        "after",
+        { x: 200, y: 200 },
+        { width: 300, height: 300 },
+      );
+      // gid was added with [node, ...rest] semantics (front), but to confirm
+      // ordering survives setParent we add another sibling group and reparent.
+      const g2 = s.addGroup(
+        "second",
+        { x: 220, y: 220 },
+        { width: 200, height: 200 },
+      );
+      useGraphStore.getState().setParent("leaf", g2);
+      const ids = useGraphStore.getState().nodes.map((n) => n.id);
+      expect(ids.indexOf(g2)).toBeLessThan(ids.indexOf("leaf"));
+      // No effect on the unrelated group's order.
+      expect(ids).toContain(gid);
+    });
+
+    it("groupSelected wraps multiple nodes and assigns parentId", () => {
+      const s = useGraphStore.getState();
+      s.addNode(
+        { id: "a", kind: "mesh", primitive: "cube" },
+        { x: 100, y: 100 },
+      );
+      s.addNode(
+        { id: "b", kind: "mesh", primitive: "sphere" },
+        { x: 300, y: 200 },
+      );
+      const gid = s.groupSelected(["a", "b"]);
+      expect(gid).not.toBeNull();
+      const next = useGraphStore.getState();
+      expect(next.parents.a).toBe(gid);
+      expect(next.parents.b).toBe(gid);
+      // Group sits to the upper-left of the selection.
+      const groupAbs = next.positions[gid!]!;
+      expect(groupAbs.x).toBeLessThanOrEqual(100);
+      expect(groupAbs.y).toBeLessThanOrEqual(100);
+    });
+
+    it("groupSelected inherits the common parent (nested groups)", () => {
+      const s = useGraphStore.getState();
+      const outer = s.addGroup(
+        "outer",
+        { x: 50, y: 50 },
+        { width: 600, height: 500 },
+      );
+      s.addNode(
+        { id: "a", kind: "mesh", primitive: "cube" },
+        { x: 100, y: 100 },
+      );
+      s.addNode(
+        { id: "b", kind: "mesh", primitive: "sphere" },
+        { x: 200, y: 150 },
+      );
+      s.setParent("a", outer);
+      s.setParent("b", outer);
+
+      const inner = useGraphStore.getState().groupSelected(["a", "b"]);
+      const next = useGraphStore.getState();
+      expect(next.parents[inner!]).toBe(outer);
+      expect(next.parents.a).toBe(inner);
+      expect(next.parents.b).toBe(inner);
+    });
+
+    it("groupSelected falls back to top-level when selection has mixed parents", () => {
+      const s = useGraphStore.getState();
+      const g1 = s.addGroup("g1", { x: 0, y: 0 }, { width: 300, height: 300 });
+      s.addNode({ id: "a", kind: "mesh", primitive: "cube" }, { x: 50, y: 50 });
+      s.addNode(
+        { id: "b", kind: "mesh", primitive: "sphere" },
+        { x: 400, y: 50 },
+      );
+      s.setParent("a", g1);
+      // b stays top-level. groupSelected should produce a top-level group.
+      const gid = useGraphStore.getState().groupSelected(["a", "b"]);
+      expect(useGraphStore.getState().parents[gid!]).toBeUndefined();
+    });
+
+    it("groupSelected returns null for empty selection", () => {
+      const id = useGraphStore.getState().groupSelected([]);
+      expect(id).toBeNull();
+    });
+
+    it("removeGroup in release-children mode promotes children to top-level", () => {
+      const s = useGraphStore.getState();
+      s.addNode(
+        { id: "a", kind: "mesh", primitive: "cube" },
+        { x: 250, y: 250 },
+      );
+      const gid = s.addGroup(
+        "G",
+        { x: 200, y: 200 },
+        { width: 300, height: 300 },
+      );
+      s.setParent("a", gid);
+
+      useGraphStore.getState().removeGroup(gid, "release-children");
+      const next = useGraphStore.getState();
+      expect(next.nodes.some((n) => n.id === gid)).toBe(false);
+      expect(next.parents.a).toBeUndefined();
+      // Absolute position preserved.
+      expect(next.positions.a).toEqual({ x: 250, y: 250 });
+    });
+
+    it("removeGroup in delete-children mode cascades through descendants", () => {
+      const s = useGraphStore.getState();
+      s.addNode({ id: "a", kind: "mesh", primitive: "cube" });
+      s.addNode({ id: "b", kind: "mesh", primitive: "sphere" });
+      s.addEdge({
+        id: "e1",
+        source: "a",
+        sourceHandle: "mesh",
+        target: "b",
+        targetHandle: "mesh",
+      });
+      const inner = s.addGroup(
+        "inner",
+        { x: 0, y: 0 },
+        { width: 300, height: 300 },
+      );
+      const outer = s.addGroup(
+        "outer",
+        { x: 0, y: 0 },
+        { width: 600, height: 600 },
+      );
+      s.setParent("a", inner);
+      s.setParent("b", inner);
+      s.setParent(inner, outer);
+
+      useGraphStore.getState().removeGroup(outer, "delete-children");
+      const next = useGraphStore.getState();
+      expect(next.nodes.some((n) => n.id === outer)).toBe(false);
+      expect(next.nodes.some((n) => n.id === inner)).toBe(false);
+      expect(next.nodes.some((n) => n.id === "a")).toBe(false);
+      expect(next.nodes.some((n) => n.id === "b")).toBe(false);
+      expect(next.edges).toEqual([]);
+    });
+
+    it("setGroupLabel updates the label and bumps rev", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup(
+        "Old",
+        { x: 0, y: 0 },
+        { width: 200, height: 150 },
+      );
+      const beforeRev = useGraphStore.getState().rev;
+      useGraphStore.getState().setGroupLabel(gid, "New");
+      const after = useGraphStore.getState();
+      const node = after.nodes.find((n) => n.id === gid);
+      expect(node && node.kind === "group" ? node.label : null).toBe("New");
+      expect(after.rev).toBe(beforeRev + 1);
+    });
+
+    it("setGroupColor sets and clears the color field", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup("G", { x: 0, y: 0 }, { width: 200, height: 150 });
+      useGraphStore.getState().setGroupColor(gid, "#ff8844");
+      let node = useGraphStore.getState().nodes.find((n) => n.id === gid);
+      if (node?.kind === "group") expect(node.color).toBe("#ff8844");
+      useGraphStore.getState().setGroupColor(gid, undefined);
+      node = useGraphStore.getState().nodes.find((n) => n.id === gid);
+      if (node?.kind === "group") expect(node.color).toBeUndefined();
+    });
+
+    it("setGroupSize clamps below the minimum without bumping rev", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup("G", { x: 0, y: 0 }, { width: 300, height: 200 });
+      const beforeRev = useGraphStore.getState().rev;
+      useGraphStore.getState().setGroupSize(gid, { width: 10, height: 10 });
+      const node = useGraphStore.getState().nodes.find((n) => n.id === gid);
+      if (node?.kind === "group") {
+        expect(node.width).toBeGreaterThanOrEqual(160);
+        expect(node.height).toBeGreaterThanOrEqual(100);
+      }
+      // Resize is visual-only — no history/rev bump.
+      expect(useGraphStore.getState().rev).toBe(beforeRev);
+    });
+
+    it("removeNode of a parent group orphans its direct children at their absolute positions", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup(
+        "G",
+        { x: 200, y: 200 },
+        { width: 300, height: 200 },
+      );
+      s.addNode(
+        { id: "a", kind: "mesh", primitive: "cube" },
+        { x: 240, y: 230 },
+      );
+      s.setParent("a", gid);
+      // a's stored position is now (40, 30) relative to g (absolute 240, 230).
+      useGraphStore.getState().removeNode(gid);
+      const next = useGraphStore.getState();
+      expect(next.nodes.some((n) => n.id === "a")).toBe(true);
+      expect(next.parents.a).toBeUndefined();
+      // Position promoted from parent-relative back to absolute.
+      expect(next.positions.a).toEqual({ x: 240, y: 230 });
     });
   });
 });

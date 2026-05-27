@@ -15,6 +15,7 @@ const ALL_KINDS: GraphNodeKind[] = [
   "math",
   "swizzle",
   "combine",
+  "group",
 ];
 
 describe("NODE_UI registry", () => {

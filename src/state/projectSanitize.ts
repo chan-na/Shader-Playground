@@ -12,6 +12,7 @@ import type {
   GraphEdge,
   GraphNode,
   GraphNodeKind,
+  GroupGraphNode,
   ImageGraphNode,
   MathGraphNode,
   MathOp,
@@ -23,7 +24,13 @@ import type {
   VideoGraphNode,
   WebcamGraphNode,
 } from "../core/graph/types";
-import { AUDIO_FFT_SIZES } from "../core/graph/types";
+import {
+  AUDIO_FFT_SIZES,
+  GROUP_DEFAULT_HEIGHT,
+  GROUP_DEFAULT_WIDTH,
+  GROUP_MIN_HEIGHT,
+  GROUP_MIN_WIDTH,
+} from "../core/graph/types";
 
 /**
  * Hard caps for untrusted project payloads (share URL, imported JSON,
@@ -45,6 +52,9 @@ export const SANITIZE_LIMITS = {
   MAX_PARAM_LABEL_LEN: 256,
   MAX_SWIZZLE_LEN: 4,
   MAX_DEVICE_ID_LEN: 256,
+  MAX_GROUP_LABEL_LEN: 256,
+  MAX_GROUP_DIMENSION: 8192,
+  MAX_GROUP_COLOR_LEN: 16,
 } as const;
 
 const MESH_PRIMITIVES: ReadonlySet<MeshGraphNode["primitive"]> = new Set([
@@ -337,6 +347,28 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
         safeFiniteNumber(vs[3]),
       ];
       const node: CombineGraphNode = { id, kind: "combine", arity, values };
+      return node;
+    }
+    case "group": {
+      const labelRaw = typeof raw.label === "string" ? raw.label : "Group";
+      const label = labelRaw.slice(0, SANITIZE_LIMITS.MAX_GROUP_LABEL_LEN);
+      const widthRaw = safeFiniteNumber(raw.width, GROUP_DEFAULT_WIDTH);
+      const heightRaw = safeFiniteNumber(raw.height, GROUP_DEFAULT_HEIGHT);
+      const width = Math.min(
+        Math.max(GROUP_MIN_WIDTH, widthRaw),
+        SANITIZE_LIMITS.MAX_GROUP_DIMENSION,
+      );
+      const height = Math.min(
+        Math.max(GROUP_MIN_HEIGHT, heightRaw),
+        SANITIZE_LIMITS.MAX_GROUP_DIMENSION,
+      );
+      const node: GroupGraphNode = { id, kind: "group", label, width, height };
+      if (
+        typeof raw.color === "string" &&
+        raw.color.length <= SANITIZE_LIMITS.MAX_GROUP_COLOR_LEN
+      ) {
+        node.color = raw.color;
+      }
       return node;
     }
     default:

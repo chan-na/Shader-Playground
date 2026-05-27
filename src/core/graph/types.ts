@@ -12,7 +12,19 @@ export type GraphNodeKind =
   | "param"
   | "math"
   | "swizzle"
-  | "combine";
+  | "combine"
+  | "group";
+
+/** Minimum size for a group node's content area (flow units). */
+export const GROUP_MIN_WIDTH = 160;
+export const GROUP_MIN_HEIGHT = 100;
+
+/** Default size used when creating an empty group via the toolbar/palette. */
+export const GROUP_DEFAULT_WIDTH = 320;
+export const GROUP_DEFAULT_HEIGHT = 220;
+
+/** Padding around the bounding box when grouping a selection. */
+export const GROUP_SELECTION_PADDING = 32;
 
 /** Allowed AnalyserNode FFT sizes — must be a power of two within [32, 32768].
  *  Restricted to the typical set so the texture width stays in a sensible
@@ -191,6 +203,22 @@ export interface ComputeGraphNode extends BaseNode {
   uniformValues: Record<string, number | number[]>;
 }
 
+/**
+ * Purely visual grouping node. Has no ports, never enters the ExecutionPlan,
+ * and is ignored by validate/compile/execute. Children are tracked via the
+ * graph store's `parents` map (childId → groupId) rather than a field here so
+ * the relationship lives next to positions.
+ */
+export interface GroupGraphNode extends BaseNode {
+  kind: "group";
+  label: string;
+  /** Optional hex color (e.g. "#3a7" or "#3388aa"); absent ⇒ default tint. */
+  color?: string;
+  /** Group container size in flow coordinates. */
+  width: number;
+  height: number;
+}
+
 export type GraphNode =
   | MeshGraphNode
   | ImageGraphNode
@@ -203,7 +231,8 @@ export type GraphNode =
   | ParamGraphNode
   | MathGraphNode
   | SwizzleGraphNode
-  | CombineGraphNode;
+  | CombineGraphNode
+  | GroupGraphNode;
 
 export interface GraphEdge {
   id: string;

@@ -152,7 +152,11 @@ export function startAutoSave(): AutoSaveHandle {
       return {
         rev: s.rev,
         payload: () =>
-          serializeProject({ nodes: s.nodes, edges: s.edges }, s.positions),
+          serializeProject(
+            { nodes: s.nodes, edges: s.edges },
+            s.positions,
+            s.parents,
+          ),
       };
     },
     subscribe: (cb) => useGraphStore.subscribe(cb),

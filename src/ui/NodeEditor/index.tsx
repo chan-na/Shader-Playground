@@ -15,8 +15,12 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import "@xyflow/react/dist/style.css";
 import "./nodeCard.css";
 
-import { getAbsolutePosition } from "../../core/graph/parents";
+import {
+  getAbsolutePosition,
+  hasCollapsedAncestor,
+} from "../../core/graph/parents";
 import type { GroupGraphNode } from "../../core/graph/types";
+import { GROUP_COLLAPSED_HEIGHT } from "../../core/graph/types";
 import { validateGraph } from "../../core/graph/validate";
 import { nodeInputPorts, nodeOutputPorts } from "../../core/nodes/registry";
 import { importFiles } from "../../state/assetActions";
@@ -74,6 +78,11 @@ export function NodeEditor() {
 
   const rfNodes: Node[] = useMemo(() => {
     const sel = new Set(selectedNodeIds);
+    const collapsedGroupIds = new Set(
+      graphNodes
+        .filter((n) => n.kind === "group" && (n as GroupGraphNode).collapsed)
+        .map((n) => n.id),
+    );
     return graphNodes.map((n) => {
       const rf: Node = {
         id: n.id,
@@ -86,6 +95,11 @@ export function NodeEditor() {
         // the DOM.
         selected: sel.has(n.id),
       };
+      // Descendants of any collapsed group are hidden (RF also drops their
+      // connected edges). The collapsed group itself stays visible as a header.
+      if (hasCollapsedAncestor(n.id, parents, collapsedGroupIds)) {
+        rf.hidden = true;
+      }
       const pid = parents[n.id];
       if (pid !== undefined) {
         rf.parentId = pid;
@@ -96,7 +110,10 @@ export function NodeEditor() {
       }
       if (n.kind === "group") {
         const gn = n as GroupGraphNode;
-        rf.style = { width: gn.width, height: gn.height };
+        rf.style = {
+          width: gn.width,
+          height: gn.collapsed ? GROUP_COLLAPSED_HEIGHT : gn.height,
+        };
       }
       return rf;
     });
@@ -165,13 +182,16 @@ export function NodeEditor() {
         .map((g) => {
           const gn = g as GroupGraphNode;
           const abs = getAbsolutePosition(g.id, state.positions, state.parents);
+          // A collapsed group only occupies its header visually; restrict the
+          // drop hit-box to match so nodes don't reparent into empty space.
+          const h = gn.collapsed ? GROUP_COLLAPSED_HEIGHT : gn.height;
           return {
             id: g.id,
             x1: abs.x,
             y1: abs.y,
             x2: abs.x + gn.width,
-            y2: abs.y + gn.height,
-            area: gn.width * gn.height,
+            y2: abs.y + h,
+            area: gn.width * h,
           };
         });
 

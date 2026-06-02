@@ -315,6 +315,7 @@ export function cloneGraphNode(n: GraphNode): GraphNode {
         width: n.width,
         height: n.height,
         ...(n.color !== undefined && { color: n.color }),
+        ...(n.collapsed !== undefined && { collapsed: n.collapsed }),
       };
     default:
       return assertNever(n);

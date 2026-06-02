@@ -150,6 +150,26 @@ export function orderParentsBeforeChildren(
 }
 
 /**
+ * True when any ancestor of `id` in the parent chain is a collapsed group.
+ * Used by the editor to hide descendants of a collapsed group. The node's own
+ * id is never considered (a collapsed group still renders its own header).
+ * Defensive against cycles via the same fixed-depth cap as the other walkers.
+ */
+export function hasCollapsedAncestor(
+  id: string,
+  parents: ParentsMap,
+  collapsedGroupIds: ReadonlySet<string>,
+): boolean {
+  const MAX_DEPTH = 64;
+  let cur: string | undefined = parents[id];
+  for (let i = 0; i < MAX_DEPTH && cur !== undefined; i++) {
+    if (collapsedGroupIds.has(cur)) return true;
+    cur = parents[cur];
+  }
+  return false;
+}
+
+/**
  * Compute the parent-relative position needed for `id` to end up at
  * `targetAbsolute` once it lives under `newParentId`. When `newParentId` is
  * undefined (top-level), the result is just `targetAbsolute`.

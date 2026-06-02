@@ -4,6 +4,7 @@ import {
   allDescendants,
   directChildren,
   getAbsolutePosition,
+  hasCollapsedAncestor,
   parentDepth,
   relativePositionFor,
   wouldCreateParentCycle,
@@ -136,5 +137,34 @@ describe("relativePositionFor", () => {
     expect(
       relativePositionFor({ x: 200, y: 200 }, "g2", positions, parents),
     ).toEqual({ x: 70, y: 60 });
+  });
+});
+
+describe("hasCollapsedAncestor", () => {
+  it("returns true when the direct parent is collapsed", () => {
+    expect(hasCollapsedAncestor("a", { a: "g" }, new Set(["g"]))).toBe(true);
+  });
+
+  it("returns true when a grandparent is collapsed", () => {
+    const parents = { a: "g2", g2: "g1" };
+    expect(hasCollapsedAncestor("a", parents, new Set(["g1"]))).toBe(true);
+  });
+
+  it("returns false when no ancestor is collapsed", () => {
+    const parents = { a: "g2", g2: "g1" };
+    expect(hasCollapsedAncestor("a", parents, new Set())).toBe(false);
+  });
+
+  it("ignores the node's own id (collapsed group still renders)", () => {
+    expect(hasCollapsedAncestor("g", { g: "outer" }, new Set(["g"]))).toBe(
+      false,
+    );
+  });
+
+  it("is robust to a malformed parent cycle", () => {
+    // a → b → a loop should not hang; capped at MAX_DEPTH.
+    expect(hasCollapsedAncestor("a", { a: "b", b: "a" }, new Set(["z"]))).toBe(
+      false,
+    );
   });
 });

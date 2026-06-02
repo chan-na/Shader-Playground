@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 29)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 30)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -60,7 +60,7 @@
 | `math` (8 op) | `a: float`, 이항만 `b: float` | `value: float` | 단항: `abs/sin/cos` (`MATH_UNARY_OPS`) |
 | `swizzle` | `in: vec4` (스칼라는 broadcast) | `value: float\|vec2\|vec3\|vec4` (mask 길이) | mask 는 x/y/z/w 의 1~4 글자 |
 | `combine` (arity 2/3/4) | `x, y, (z, w): float` | `value: vec2\|vec3\|vec4` | arity 만큼 채널 노출 |
-| `group` (Phase 29) | — | — | 시각적 컨테이너. 포트 없음, `ExecutionPlan` 에 절대 들어가지 않음. `{label, color?, width, height}` 만 보유. 자식 관계는 `graphStore.parents` map 으로 보관 |
+| `group` (Phase 29) | — | — | 시각적 컨테이너. 포트 없음, `ExecutionPlan` 에 절대 들어가지 않음. `{label, color?, width, height, collapsed?}` 만 보유. 자식 관계는 `graphStore.parents` map 으로 보관. `collapsed`(Phase 30) ⇒ 헤더만 렌더 + 모든 후손 노드를 에디터에서 숨김 (`hasCollapsedAncestor`) |
 
 포트 타입: `'mesh' | 'texture' | 'float' | 'vec2' | 'vec3' | 'vec4'`.
 
@@ -748,7 +748,7 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 
 ---
 
-## 12. 디렉토리 트리 (Phase 29 기준)
+## 12. 디렉토리 트리 (Phase 30 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -791,7 +791,7 @@ ShaderPlayground/
    │  │  ├─ diagnostics.ts           # GLSL 로그 파서 (+ test)
    │  │  ├─ uniformParser.ts         # uniform + 주석 힌트 (+ test)
    │  │  ├─ computeSeed.ts           # sphere/cube/random/zero seed 생성기 (+ test)
-   │  │  ├─ parents.ts               # Phase 29 — parent map + abs/relative 좌표 + cycle 가드 (+ test)
+   │  │  ├─ parents.ts               # Phase 29/30 — parent map + abs/relative 좌표 + cycle 가드 + hasCollapsedAncestor (+ test)
    │  │  └─ splitLayout.test.ts      # 분할 뷰포트 단위 테스트
    │  │
    │  ├─ thumbnail/
@@ -864,7 +864,7 @@ ShaderPlayground/
    │  │     ├─ ParamNodeView.tsx     # Float/Vec3/Color/Time
    │  │     ├─ UtilityNodeViews.tsx  # Math/Swizzle/Combine
    │  │     ├─ ComputeNodeView.tsx   # TF 컴퓨트 — count/primitive/attribute 메타 표시
-   │  │     ├─ GroupNodeView.tsx     # Phase 29 — 그룹 카드 + NodeResizer 컨테이너
+   │  │     ├─ GroupNodeView.tsx     # Phase 29/30 — 그룹 카드 + NodeResizer + collapse 토글 + 라벨 인라인 편집
    │  │     └─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
    │  │
    │  ├─ CodeEditor/

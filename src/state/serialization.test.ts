@@ -360,6 +360,40 @@ describe("serializeProject / deserializeProject", () => {
     expect(restored.warnings).toEqual([]);
   });
 
+  it("round-trips a collapsed group and defaults missing collapsed to absent (Phase 30)", () => {
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "g1",
+          kind: "group",
+          label: "folded",
+          width: 300,
+          height: 200,
+          collapsed: true,
+        },
+        {
+          id: "g2",
+          kind: "group",
+          label: "open",
+          width: 300,
+          height: 200,
+        },
+      ],
+      edges: [],
+    };
+    const positions = { g1: { x: 0, y: 0 }, g2: { x: 400, y: 0 } };
+    const json = JSON.parse(
+      JSON.stringify(serializeProject(graph, positions, {})),
+    );
+    const restored = deserializeProject(json);
+    const g1 = restored.graph.nodes.find((n) => n.id === "g1");
+    const g2 = restored.graph.nodes.find((n) => n.id === "g2");
+    if (g1?.kind === "group") expect(g1.collapsed).toBe(true);
+    // Expanded groups omit the field entirely (no `collapsed: false` noise).
+    if (g2?.kind === "group") expect(g2.collapsed).toBeUndefined();
+    expect(restored.warnings).toEqual([]);
+  });
+
   it("drops parent entries referencing unknown nodes", () => {
     const graph: Graph = {
       nodes: [{ id: "m1", kind: "mesh", primitive: "cube", assetId: null }],

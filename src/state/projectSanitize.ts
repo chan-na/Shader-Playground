@@ -369,6 +369,7 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
       ) {
         node.color = raw.color;
       }
+      if (raw.collapsed === true) node.collapsed = true;
       return node;
     }
     default:

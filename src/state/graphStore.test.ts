@@ -813,5 +813,39 @@ describe("graphStore", () => {
       // Position promoted from parent-relative back to absolute.
       expect(next.positions.a).toEqual({ x: 240, y: 230 });
     });
+
+    it("toggleGroupCollapsed flips collapsed and bumps rev + history", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup("G", { x: 0, y: 0 }, { width: 300, height: 200 });
+      const beforeRev = useGraphStore.getState().rev;
+      const beforeHist = useHistoryStore.getState().past.length;
+
+      useGraphStore.getState().toggleGroupCollapsed(gid);
+      let node = useGraphStore.getState().nodes.find((n) => n.id === gid);
+      expect(node?.kind === "group" ? node.collapsed : null).toBe(true);
+      expect(useGraphStore.getState().rev).toBe(beforeRev + 1);
+      expect(useHistoryStore.getState().past.length).toBe(beforeHist + 1);
+
+      // Toggling again expands and pushes a second history entry.
+      useGraphStore.getState().toggleGroupCollapsed(gid);
+      node = useGraphStore.getState().nodes.find((n) => n.id === gid);
+      expect(node?.kind === "group" ? node.collapsed : null).toBe(false);
+      expect(useHistoryStore.getState().past.length).toBe(beforeHist + 2);
+
+      // The toggle participates in undo (exact restored value depends on the
+      // store's history model, exercised in the dedicated undo tests).
+      expect(undoGraph()).toBe(true);
+    });
+
+    it("toggleGroupCollapsed is a no-op on non-group and unknown ids", () => {
+      const s = useGraphStore.getState();
+      s.addNode({ id: "m", kind: "mesh", primitive: "cube" }, { x: 0, y: 0 });
+      const beforeRev = useGraphStore.getState().rev;
+      useGraphStore.getState().toggleGroupCollapsed("m");
+      useGraphStore.getState().toggleGroupCollapsed("nope");
+      expect(useGraphStore.getState().rev).toBe(beforeRev);
+      const node = useGraphStore.getState().nodes.find((n) => n.id === "m");
+      expect(node && "collapsed" in node).toBe(false);
+    });
   });
 });

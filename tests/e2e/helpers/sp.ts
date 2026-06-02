@@ -72,6 +72,7 @@ export interface SpStores {
         id: string,
         size: { width: number; height: number },
       ) => void;
+      toggleGroupCollapsed: (id: string) => void;
       reset: () => void;
     };
   };

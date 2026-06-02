@@ -164,6 +164,13 @@ export interface GraphState {
   setGroupLabel: (id: string, label: string) => void;
   setGroupColor: (id: string, color: string | undefined) => void;
   setGroupSize: (id: string, size: { width: number; height: number }) => void;
+  /**
+   * Flip a group between collapsed (header-only, descendants hidden) and
+   * expanded. Structural-tier (rev + history) so the state is undoable and
+   * auto-saved; recompile is a no-op since groups never enter the plan. No-op
+   * when `id` is unknown or not a group.
+   */
+  toggleGroupCollapsed: (id: string) => void;
 
   /** Replace state without bumping history (used by undo/redo). */
   applySnapshot: (snap: {
@@ -788,6 +795,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         };
         if (color !== undefined) next.color = color;
         return next;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
+  toggleGroupCollapsed: (id) => {
+    const target = get().nodes.find((n) => n.id === id);
+    if (!target || target.kind !== "group") return;
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== "group") return n;
+        const gn = n as GroupGraphNode;
+        return { ...gn, collapsed: !gn.collapsed };
       }),
       rev: s.rev + 1,
     }));

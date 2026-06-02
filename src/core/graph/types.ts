@@ -26,6 +26,12 @@ export const GROUP_DEFAULT_HEIGHT = 220;
 /** Padding around the bounding box when grouping a selection. */
 export const GROUP_SELECTION_PADDING = 32;
 
+/**
+ * Rendered height of a collapsed group — just the header bar. The stored
+ * `height` is preserved so expanding restores the previous container size.
+ */
+export const GROUP_COLLAPSED_HEIGHT = 30;
+
 /** Allowed AnalyserNode FFT sizes — must be a power of two within [32, 32768].
  *  Restricted to the typical set so the texture width stays in a sensible
  *  range and serialization can reject arbitrary numbers. */
@@ -217,6 +223,12 @@ export interface GroupGraphNode extends BaseNode {
   /** Group container size in flow coordinates. */
   width: number;
   height: number;
+  /**
+   * When true the group renders as just its header bar and all descendant
+   * nodes are hidden in the editor. Purely visual — the ExecutionPlan never
+   * sees groups, so collapsing has zero render-path effect. Absent ⇒ expanded.
+   */
+  collapsed?: boolean;
 }
 
 export type GraphNode =

@@ -24,6 +24,7 @@ import { getAudioBlob, getVideoBlob, useAssetStore } from "./state/assetStore";
 import { useCameraStore } from "./state/cameraStore";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
 import { useEditorStore } from "./state/editorStore";
+import { useGifRecorderStore } from "./state/gifRecorder";
 import { useGpuTimerStore } from "./state/gpuTimerStore";
 import { useGraphStore } from "./state/graphStore";
 import { useHistoryStore } from "./state/historyStore";
@@ -69,6 +70,9 @@ if (import.meta.env.DEV) {
     mouse: useMouseStore,
     renderer: useRendererStore,
     gpuTimer: useGpuTimerStore,
+    // Phase 31 — GIF recorder. E2E starts a recording, lets a few frames
+    // capture via the RAF loop, stops, and validates the produced blob.
+    gifRecorder: useGifRecorderStore,
     glslValidator,
     // Phase 25 — LSP helpers exposed for E2E. Tests build a symbol table
     // from a source string and resolve identifiers without round-tripping

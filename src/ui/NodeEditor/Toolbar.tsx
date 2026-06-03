@@ -16,6 +16,7 @@ import {
   SPLIT_DEMO_LAYOUT,
   TORUS_DEMO_LAYOUT,
 } from "../../state/demoGraph";
+import { useGifRecorderStore } from "../../state/gifRecorder";
 import { useGraphStore } from "../../state/graphStore";
 import { useRecorderStore } from "../../state/recorder";
 import {
@@ -175,6 +176,28 @@ export function Toolbar() {
     }
   };
   void recorderUrl;
+
+  const gifStatus = useGifRecorderStore((r) => r.status);
+  const toggleGif = async () => {
+    const g = useGifRecorderStore.getState();
+    const canvas = document.querySelector(
+      ".viewport-canvas",
+    ) as HTMLCanvasElement | null;
+    if (!canvas) return;
+    if (g.status === "idle") {
+      g.start();
+    } else if (g.status === "recording") {
+      const blob = await g.stop();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `shader-playground-${Date.now()}.gif`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    }
+  };
 
   const addMesh = () => {
     const id = nextId("mesh");
@@ -402,6 +425,38 @@ export function Toolbar() {
         ) : (
           <>
             <span aria-hidden="true">● </span>Record
+          </>
+        )}
+      </button>
+      <button
+        type="button"
+        style={{
+          ...btn,
+          background: gifStatus !== "idle" ? "#5c1a1a" : btn.background,
+          color: gifStatus !== "idle" ? "#ff8484" : btn.color,
+        }}
+        onClick={toggleGif}
+        disabled={gifStatus === "encoding"}
+        title="Record viewport to animated GIF"
+        aria-label={
+          gifStatus === "recording"
+            ? "Stop GIF recording"
+            : gifStatus === "encoding"
+              ? "Encoding GIF"
+              : "Start recording viewport to animated GIF"
+        }
+      >
+        {gifStatus === "recording" ? (
+          <>
+            <span aria-hidden="true">■ </span>GIF
+          </>
+        ) : gifStatus === "encoding" ? (
+          <>
+            <span aria-hidden="true">⏳ </span>GIF
+          </>
+        ) : (
+          <>
+            <span aria-hidden="true">● </span>GIF
           </>
         )}
       </button>

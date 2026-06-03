@@ -174,6 +174,22 @@ export interface SpStores {
       setEnabled: (enabled: boolean) => void;
     };
   };
+  gifRecorder: {
+    getState: () => {
+      status: "idle" | "recording" | "encoding";
+      frameCount: number;
+      elapsedMs: number;
+      lastBlobUrl: string | null;
+      error: string | null;
+      start: (options?: {
+        fps?: number;
+        maxSeconds?: number;
+        maxLongEdge?: number;
+        maxColors?: number;
+      }) => void;
+      stop: () => Promise<Blob | null>;
+    };
+  };
   glslValidator: () => {
     validate: (
       stage: "vertex" | "fragment",

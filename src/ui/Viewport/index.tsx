@@ -21,6 +21,7 @@ import {
   emptyDiagnostics,
   useDiagnosticsStore,
 } from "../../state/diagnosticsStore";
+import { useGifRecorderStore } from "../../state/gifRecorder";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { snapshotGraph, useGraphStore } from "../../state/graphStore";
 import { mouseVec4, useMouseStore } from "../../state/mouseStore";
@@ -269,9 +270,15 @@ export function Viewport() {
       // bg / graph mutations bump their store rev, which wakes the next frame.
       // External sources (webcam etc.) supply fresh frames every tick, so any
       // graph that contains one stays dirty as long as it exists.
+      // While a GIF recording is active we must keep rendering so frames keep
+      // arriving at a steady cadence even on an otherwise-static graph.
+      const gifRecording =
+        useGifRecorderStore.getState().status === "recording";
+
       const needsRender =
         playing ||
         plan.hasExternal ||
+        gifRecording ||
         structuralDirty ||
         uniformChanged ||
         cameraChanged ||
@@ -367,6 +374,15 @@ export function Viewport() {
         timerEnabled ? gpuTimer : null,
       );
       bumpRenderTick();
+
+      // GIF capture must read the drawing buffer in the same tick as the draw
+      // (the context uses preserveDrawingBuffer: false). The store throttles
+      // captures to its target fps internally.
+      if (gifRecording) {
+        const gif = useGifRecorderStore.getState();
+        gif.captureFrame(canvas);
+        gif.tick();
+      }
 
       // DEV-only GL error probe, throttled — gl.getError() forces a sync GPU
       // flush, so we sample every Nth frame rather than per-frame. No-op in

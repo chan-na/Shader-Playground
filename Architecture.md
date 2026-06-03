@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 30)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 31)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -380,7 +380,7 @@ poll(gl):
 
 ## 7. 상태 스토어 (Zustand)
 
-`src/state/*` 의 14 개 스토어. 책임 분리가 분명하므로 다음 표가 가장 빠른 인덱스다.
+`src/state/*` 의 15 개 스토어. 책임 분리가 분명하므로 다음 표가 가장 빠른 인덱스다.
 
 | Store | 보관 | recompile? | history? | 비고 |
 |---|---|---|---|---|
@@ -395,6 +395,7 @@ poll(gl):
 | `rendererStore` | ready, fps/frame/drawCalls/errors | ✗ | ✗ | StatusBar 가 구독 |
 | `historyStore` | past[]/future[], MAX=100 | ✗ | — | `suppressNext` 로 apply 중 재push 방지 |
 | `recorderStore` | MediaRecorder 상태 | ✗ | ✗ | start/stop/elapsedMs |
+| `gifRecorderStore` | GIF 캡처 상태 (status/frameCount/elapsedMs) | ✗ | ✗ | Phase 31. 프레임 버퍼는 스토어 밖 `_active` 싱글톤. Viewport RAF 가 `captureFrame`, stop 시 `core/gif` 로 인코드 |
 | `gpuTimerStore` | byNode EMA + totalMs + supported/enabled | ✗ | ✗ | Phase 15. Viewport 가 매 frame `setSample`, 노드 사라지면 `removeNode` |
 
 추가로 작업/디스패치 모듈(스토어 아님): `assetActions`(파일 import + IndexedDB 캐시), `autoSave`(30s 디바운스 스케줄러), `shareUrl`(`#share=` 인코딩), `serialization`(프로젝트 JSON v1).
@@ -746,9 +747,29 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 - 진행 시간은 RAF 가 `tick()` 호출로 갱신 (StatusBar/Toolbar 표시).
 - `captureStream` 미지원 (구 Safari) 또는 `MediaRecorder` 자체 미지원이면 `error` 필드로 보고하고 idle 유지.
 
+### 11.1 애니메이션 GIF 녹화 (Phase 31)
+
+WebM 과 별개로, 의존성 0 자체 인코더로 캔버스를 애니메이션 GIF 로 내보낸다. WebM 이 브라우저 코덱(`MediaRecorder`)에 위임하는 것과 달리 GIF 는 프레임 캡처·색 양자화·LZW 압축을 전부 직접 수행한다 — `standalonePlayer.js` 가 export 런타임을 의존성 0 으로 재구현하는 것과 같은 원칙.
+
+```
+core/gif/               # 순수 TS · DOM/GL 비의존
+   quantize.ts  buildPalette(frames, maxColors)  — rgb555 히스토그램 + median-cut 전역 팔레트
+                mapToPalette(rgba, palette)       — rgb555 캐시 nearest 매핑
+   lzw.ts       lzwEncode(indices, minCodeSize)  — GIF 가변폭 LZW (폭 증가 2^w+1, 4096 리셋)
+   encode.ts    encodeGif({width,height,frames}) — GIF89a 조립 (전역 팔레트 + NETSCAPE 루프)
+
+state/gifRecorder.ts    # 캡처 오케스트레이션 (recorder.ts 와 형제)
+   start() → captureFrame(canvas) ×N → stop() → image/gif Blob
+```
+
+- **프레임 캡처는 Viewport RAF 안에서**: 컨텍스트가 `preserveDrawingBuffer: false` 라 drawing buffer 는 tick 종료 후 무효화된다. 따라서 `gifRecorder.captureFrame(canvas)` 는 `executePlan` *직후 같은 tick* 에서 호출되어 스크래치 2D 캔버스로 `drawImage`(다운스케일, longest edge ≤ `maxLongEdge`) → `getImageData` 로 RGBA 를 떠 모은다. 목표 fps 스로틀 + `maxSeconds` 프레임 캡으로 메모리를 제한.
+- **dirty 게이트(B2)**: recording 중이면 `gifRecording` 이 `hasExternal` 과 동급의 무조건 dirty 신호가 되어, 시간 정지·정적 그래프에서도 프레임이 일정 cadence 로 렌더·캡처된다.
+- **인코딩은 stop 시 한 번**: 캡처 타임스탬프 차이로 프레임별 delay(centiseconds, 2cs 하한)를 산출하고 `encodeGif` 로 합성 → Blob → `URL.createObjectURL` → Toolbar 가 `.gif` 자동 다운로드. 무거운 프레임 버퍼는 zustand 밖 모듈 싱글톤(`_active`)에 두고 스토어에는 status/frameCount/elapsedMs 만.
+- **단일 전역 팔레트**: 모든 프레임이 한 256색 팔레트(local color table 없음)를 공유 — 인코더·출력 모두 간결. 짧은 셰이더 클립에는 품질 손실이 작다.
+
 ---
 
-## 12. 디렉토리 트리 (Phase 30 기준)
+## 12. 디렉토리 트리 (Phase 31 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -802,6 +823,11 @@ ShaderPlayground/
    │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
    │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
    │  │
+   │  ├─ gif/                        # Phase 31 — 의존성 0 애니메이션 GIF 인코더
+   │  │  ├─ quantize.ts              # median-cut 전역 팔레트 + nearest 매핑 (+ test)
+   │  │  ├─ lzw.ts                   # GIF 가변폭 LZW 압축 (+ test)
+   │  │  └─ encode.ts                # GIF89a 조립 (palette + NETSCAPE loop + frames) (+ test)
+   │  │
    │  ├─ glsl/                       # Phase 24/25/26/27/28 — 라이브 GLSL 검증 + LSP-like 정적 분석
    │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
    │  │  ├─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
@@ -841,6 +867,7 @@ ShaderPlayground/
    │  ├─ shareUrl.ts                 # gzip + base64url + URL hash (+ test)
    │  ├─ autoSave.ts                 # 30s debounce IndexedDB 자동저장 (+ test)
    │  ├─ recorder.ts                 # MediaRecorder → WebM/mp4
+   │  ├─ gifRecorder.ts              # Phase 31 — 캔버스 프레임 캡처 → core/gif 인코드 → GIF Blob (+ test)
    │  ├─ thumbnailScheduler.ts       # core/thumbnail/scheduler 싱글톤
    │  └─ gpuTimerStore.ts            # Phase 15 — byNode EMA ms + totalMs + supported/enabled (+ test)
    │

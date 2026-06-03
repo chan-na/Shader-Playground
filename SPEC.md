@@ -402,10 +402,18 @@ Phase 29 노드 그룹의 후속. 큰 그래프를 접어 화면을 정리하는
 - **검증**: Vitest 단위 — `graphStore.test`(toggle 플립 + rev/history + 비그룹/미지 id no-op), `parents.test`(`hasCollapsedAncestor` 직접/조상/없음/자기제외/cycle), `serialization.test`(collapsed 라운드트립 + 펼침은 필드 생략). Playwright E2E `phase-30-group-collapse.spec.ts` 6 건 — (a) store toggle 플립 + rev, (b) collapse 가 자식을 DOM 에서 숨기고 expand 가 복원(비그룹 o1 불변), (c) 헤더 chevron 버튼 토글, (d) 사전 접힘 그래프 로드가 collapsed 렌더 + 자식 숨김, (e) 헤더 더블클릭 인라인 rename, (f) collapse 후에도 렌더 루프 유지(`renderTick` 증가 + `errors` 비어있음).
 - **비범위 (Out of scope — 별도 백로그)**: 그룹 z-order 명시 조정, share URL 의 group 색상 프리셋 팔레트.
 
+### Phase 31 — 애니메이션 GIF 녹화 (완료)
+Phase 11 의 WebM 녹화·정적 HTML export 에 이어 공유 결과물을 **애니메이션 GIF** 로 내보내는 경로. 백로그의 `gif.js / gifenc` 제안 대신, 저장소의 zero-dep core 원칙(standalonePlayer 선례)·360 KiB 번들 게이트·순수 로직 테스트 문화에 맞춰 **의존성 0 자체 구현 인코더**를 택했다.
+- **자체 GIF89a 인코더 (`src/core/gif/`)**: 순수 TS, DOM·GL 비의존 3 모듈. `lzw.ts` — GIF 가변폭 LZW 압축(LSB-first 비트팩, clear/EOI, 4096 엔트리에서 테이블 리셋). 디코더가 한 코드 뒤처지는 특성을 반영해 폭 증가를 `2^width + 1` 시점으로 맞춰 lockstep 유지. `quantize.ts` — rgb555 히스토그램 위 median-cut 으로 ≤256 색 전역 팔레트 생성(`buildPalette`) + rgb555 캐시로 픽셀당 nearest 매핑(`mapToPalette`). `encode.ts` — 헤더 → LSD → 전역 팔레트 → NETSCAPE2.0 루프 → 프레임별 GCE/이미지 디스크립터/LZW → trailer 조립(`encodeGif`). 단일 전역 팔레트로 인코더·출력 모두 간결.
+- **`gifRecorderStore` (`src/state/gifRecorder.ts`)**: WebM 의 `recorder.ts` 와 형제. 무거운 프레임 버퍼는 zustand 밖 모듈 싱글톤(`_active`)에 두고, 상태(status idle/recording/encoding · frameCount · elapsedMs · lastBlobUrl)만 스토어에. `captureFrame(canvas)` 가 스크래치 2D 캔버스로 `drawImage` 다운스케일(longest edge ≤ `maxLongEdge`) → `getImageData` 로 RGBA 수집(목표 fps 스로틀, `maxSeconds` 프레임 캡). `stop()` 은 캡처 타임스탬프 차이로 프레임별 delay 를 산출(`frameDelays`)해 `encodeGif` → `image/gif` Blob. 인코딩은 한 번 yield 후 동기 수행.
+- **Viewport 통합**: 컨텍스트가 `preserveDrawingBuffer: false` 라 캡처는 **draw 와 같은 RAF tick 안**에서 해야 한다 — `executePlan` 직후 recording 중이면 `captureFrame` + `tick` 호출. dirty 게이트(B2)에 `gifRecording` 을 `hasExternal` 과 동급의 무조건 dirty 신호로 추가해 시간 정지·정적 그래프에서도 프레임이 일정 cadence 로 캡처된다.
+- **Toolbar**: WebM `● Record` 옆에 `● GIF` 토글(녹화 중 빨강 `■ GIF`, 인코딩 중 `⏳ GIF` disabled). 멈추면 `.gif` 자동 다운로드.
+- **검증**: Vitest 단위 30 건 — `lzw.test`(독립 표준 디코더로 round-trip: 빈/단일/반복/폭증가/4096 리셋/KwKwK 자기참조), `quantize.test`(팔레트 보존·gradient 축약·maxColors 클램프·nearest 매핑 round-trip), `encode.test`(내장 GIF 파서로 헤더/스크린 크기/루프 확장/픽셀 인덱스 복원/프레임별 delay·2cs 클램프), `gifRecorder.test`(frameDelays · fps 스로틀 · maxSeconds 캡 · 컨텍스트 부재 · 인코드 Blob · tick). Playwright E2E `phase-31-gif-recording.spec.ts` 4 건 — (a) 스토어 shape, (b) 라이브 캡처 후 **브라우저 `createImageBitmap` 로 GIF 디코드**(스펙 적합성의 authoritative 검증) + GIF89a 매직·dims, (c) 시간 정지 중에도 recording 이 렌더 루프를 깨워 `renderTick` 증가, (d) Toolbar GIF 버튼이 녹화 시작.
+- **비범위 (Out of scope — 별도 백로그)**: per-frame 로컬 팔레트/디더링, transparency(1-bit), 인코딩 Web Worker 오프로드(현재 메인 스레드 동기, 짧은 클립 기준), 정적 HTML export 의 GIF(녹화는 에디터 전용).
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - **GLSL LSP — 추가 확장**: Phase 24 / 25 / 26 / 27 / 28 가 진단·심볼 테이블·Hover·시맨틱 토큰·Goto/References/Rename·Cross-stage rename 까지 다룸. **함수 오버로드 해석**, **call hierarchy**, **for-init block-scope 정확도**, **그래프 연결을 따라가는 multi-program rename** 이 잠재 후속. CodeMirror 6 유지(Monaco 전환은 여전히 회피 권장).
-- GIF 녹화(gif.js / WASM gifenc).
 
 ---
 

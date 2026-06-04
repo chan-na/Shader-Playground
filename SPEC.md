@@ -409,7 +409,15 @@ Phase 11 의 WebM 녹화·정적 HTML export 에 이어 공유 결과물을 **�
 - **Viewport 통합**: 컨텍스트가 `preserveDrawingBuffer: false` 라 캡처는 **draw 와 같은 RAF tick 안**에서 해야 한다 — `executePlan` 직후 recording 중이면 `captureFrame` + `tick` 호출. dirty 게이트(B2)에 `gifRecording` 을 `hasExternal` 과 동급의 무조건 dirty 신호로 추가해 시간 정지·정적 그래프에서도 프레임이 일정 cadence 로 캡처된다.
 - **Toolbar**: WebM `● Record` 옆에 `● GIF` 토글(녹화 중 빨강 `■ GIF`, 인코딩 중 `⏳ GIF` disabled). 멈추면 `.gif` 자동 다운로드.
 - **검증**: Vitest 단위 30 건 — `lzw.test`(독립 표준 디코더로 round-trip: 빈/단일/반복/폭증가/4096 리셋/KwKwK 자기참조), `quantize.test`(팔레트 보존·gradient 축약·maxColors 클램프·nearest 매핑 round-trip), `encode.test`(내장 GIF 파서로 헤더/스크린 크기/루프 확장/픽셀 인덱스 복원/프레임별 delay·2cs 클램프), `gifRecorder.test`(frameDelays · fps 스로틀 · maxSeconds 캡 · 컨텍스트 부재 · 인코드 Blob · tick). Playwright E2E `phase-31-gif-recording.spec.ts` 4 건 — (a) 스토어 shape, (b) 라이브 캡처 후 **브라우저 `createImageBitmap` 로 GIF 디코드**(스펙 적합성의 authoritative 검증) + GIF89a 매직·dims, (c) 시간 정지 중에도 recording 이 렌더 루프를 깨워 `renderTick` 증가, (d) Toolbar GIF 버튼이 녹화 시작.
-- **비범위 (Out of scope — 별도 백로그)**: per-frame 로컬 팔레트/디더링, transparency(1-bit), 인코딩 Web Worker 오프로드(현재 메인 스레드 동기, 짧은 클립 기준), 정적 HTML export 의 GIF(녹화는 에디터 전용).
+- **비범위 (Out of scope — 별도 백로그)**: per-frame 로컬 팔레트/디더링, transparency(1-bit), 정적 HTML export 의 GIF(녹화는 에디터 전용). (인코딩 Web Worker 오프로드는 Phase 32 에서 구현됨.)
+
+### Phase 32 — GIF 인코딩 Web Worker 오프로드 (완료)
+Phase 31 의 GIF 인코더는 `stop()` 에서 quantize + LZW + GIF89a 조립을 **메인 스레드에서 동기 수행**해 몇 초짜리 클립은 인코딩 동안 에디터가 얼어붙었다. 순수 `core/gif/encode.ts` 는 그대로 두고, 그 호출만 워커로 옮긴다 — 의존성 0, Phase 24 의 `glslValidator` 워커/클라이언트 패턴을 그대로 재사용.
+- **워커 (`core/gif/gifEncoder.worker.ts`)**: Vite `?worker` 임포트. stateless data-in / bytes-out — `{type:'encode', reqId, width, height, frames, maxColors, loop}` 을 받아 `encodeGif` 를 돌리고 `{type:'encode', reqId, ok, bytes?, error?}` 로 응답. 결과 바이트 버퍼는 transferable 로 zero-copy 반환. **입력 프레임 버퍼는 일부러 transfer 하지 않는다** — 메인 스레드에 그대로 남겨 워커가 도중에 죽어도 인라인 폴백이 가능하도록.
+- **클라이언트 (`core/gif/gifEncoderClient.ts`)**: 앱당 워커 1 개(첫 `encode()` 에 lazy 생성), reqId 별 독립 Promise. **실패 모델은 validator 보다 강하다** — validator 는 실패 시 `[]` 를 주지만(라이브 진단은 보조), 사용자가 명시적으로 녹화한 GIF 는 잃으면 안 되므로 워커 construct/post/error 어느 단계 실패도 **메인 스레드 인라인 `encodeGif` 로 폴백**한다(최악의 경우 = Phase 31 의 동기 동작). 워커가 `ok:false` 로 인코드 에러를 보고하면(동일 입력은 인라인도 throw) 그대로 reject. `typeof Worker === 'undefined'` 가드는 default factory 한정이라 jsdom/SSR 은 곧장 인라인 경로(테스트 결정성), 주입된 `workerFactory` 는 항상 시도(워커 경로 단위 테스트).
+- **`gifRecorder.stop()` 연동**: 기존 동기 `encodeGif(...)` 호출을 `await gifEncoder().encode({...})` 로 교체. `status:'encoding'` 표시 → 워커가 인코딩하는 동안 메인 스레드 free → Blob 생성. 프레임 delay 산출(`frameDelays`)·캡처 경로는 불변.
+- **검증**: Vitest 단위 10 건 — `gifEncoderClient.test.ts` (fake worker 주입으로 RPC 라우팅 · ok:false reject · out-of-order reply · stray/malformed reqId 무시 · construct/post/error 인라인 폴백 · 잘못된 입력 reject · dispose · singleton). Playwright E2E 는 Phase 31 의 `phase-31-gif-recording.spec.ts` 4 건이 그대로 회귀 가드 — chromium 에서는 실제 워커 경로가 돌고 `createImageBitmap` 로 GIF 스펙 적합성을 authoritative 검증.
+- **비범위 (Out of scope — 별도 백로그)**: per-frame 로컬 팔레트/디더링, transparency(1-bit), 정적 HTML export 의 GIF, 인코딩 진행률 표시(현재 워커는 단일 메시지로 완료).
 
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).

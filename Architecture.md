@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 31)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 32)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -395,7 +395,7 @@ poll(gl):
 | `rendererStore` | ready, fps/frame/drawCalls/errors | ✗ | ✗ | StatusBar 가 구독 |
 | `historyStore` | past[]/future[], MAX=100 | ✗ | — | `suppressNext` 로 apply 중 재push 방지 |
 | `recorderStore` | MediaRecorder 상태 | ✗ | ✗ | start/stop/elapsedMs |
-| `gifRecorderStore` | GIF 캡처 상태 (status/frameCount/elapsedMs) | ✗ | ✗ | Phase 31. 프레임 버퍼는 스토어 밖 `_active` 싱글톤. Viewport RAF 가 `captureFrame`, stop 시 `core/gif` 로 인코드 |
+| `gifRecorderStore` | GIF 캡처 상태 (status/frameCount/elapsedMs) | ✗ | ✗ | Phase 31. 프레임 버퍼는 스토어 밖 `_active` 싱글톤. Viewport RAF 가 `captureFrame`, stop 시 `core/gif/gifEncoderClient` 의 워커로 인코드(Phase 32; 워커 미가용 시 인라인 폴백) |
 | `gpuTimerStore` | byNode EMA + totalMs + supported/enabled | ✗ | ✗ | Phase 15. Viewport 가 매 frame `setSample`, 노드 사라지면 `removeNode` |
 
 추가로 작업/디스패치 모듈(스토어 아님): `assetActions`(파일 import + IndexedDB 캐시), `autoSave`(30s 디바운스 스케줄러), `shareUrl`(`#share=` 인코딩), `serialization`(프로젝트 JSON v1).

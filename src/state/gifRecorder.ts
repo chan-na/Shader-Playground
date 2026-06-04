@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { encodeGif, type GifFrame } from "../core/gif/encode";
+import type { GifFrame } from "../core/gif/encode";
+import { gifEncoder } from "../core/gif/gifEncoderClient";
 import { log, normalizeError } from "../utils/log";
 import { toast } from "./toastStore";
 
@@ -184,9 +185,6 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
     }
 
     set({ status: "encoding" });
-    // Yield once so the UI can paint the "encoding" state before the
-    // synchronous encode blocks the main thread.
-    await Promise.resolve();
 
     try {
       const frames: GifFrame[] = active.frames.map((f) => ({
@@ -201,7 +199,9 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
         const frame = frames[i];
         if (frame) frame.delayMs = delays[i] ?? active.frameIntervalMs;
       }
-      const bytes = encodeGif({
+      // Offloaded to a worker so the LZW/quantize pass doesn't freeze the UI;
+      // falls back to an inline encode if no worker is available (Phase 32).
+      const bytes = await gifEncoder().encode({
         width: active.width,
         height: active.height,
         frames,

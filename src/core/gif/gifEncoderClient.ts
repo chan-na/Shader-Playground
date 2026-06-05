@@ -7,7 +7,9 @@
  * resolves `[]` on failure (live diagnostics are optional), a GIF the user
  * explicitly recorded must never be lost — so every failure path falls back to
  * an **inline synchronous encode** on the main thread. Worst case is therefore
- * exactly today's behaviour (a brief freeze); the common case offloads it.
+ * a brief freeze plus a non-dithered GIF (the inline path ships the default
+ * mapper so the Floyd–Steinberg pass stays in the worker chunk); the common
+ * case offloads encoding and keeps dithering.
  *
  * Inputs are deliberately *not* transferred into the worker, so the captured
  * frame buffers stay intact on the main thread and remain available for the
@@ -29,6 +31,8 @@ export interface GifEncodeJob {
   frames: GifEncodeFrameData[];
   maxColors: number;
   loop: boolean;
+  dither?: boolean;
+  localPalette?: boolean;
 }
 
 export interface GifEncoderOptions {
@@ -47,12 +51,15 @@ function asError(e: unknown): Error {
 }
 
 function encodeInline(job: GifEncodeJob): Uint8Array {
+  // Default mapper (no dithering) on purpose — keeps mapToPaletteDithered out of
+  // the main bundle. The fallback still produces a valid, complete GIF.
   return encodeGif({
     width: job.width,
     height: job.height,
     frames: job.frames,
     maxColors: job.maxColors,
     loop: job.loop,
+    localPalette: job.localPalette ?? false,
   });
 }
 
@@ -89,6 +96,8 @@ export class GifEncoderClient {
         frames: job.frames,
         maxColors: job.maxColors,
         loop: job.loop,
+        dither: job.dither ?? false,
+        localPalette: job.localPalette ?? false,
       };
       try {
         w.postMessage(msg);

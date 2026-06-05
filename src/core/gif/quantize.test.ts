@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { buildPalette, mapToPalette } from "./quantize";
+import { buildPalette, mapToPalette, mapToPaletteDithered } from "./quantize";
+
+/** Build a w×h solid RGBA frame (alpha = 255). */
+function solidRgba(
+  w: number,
+  h: number,
+  color: [number, number, number],
+): Uint8Array {
+  const out = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    out[i * 4] = color[0];
+    out[i * 4 + 1] = color[1];
+    out[i * 4 + 2] = color[2];
+    out[i * 4 + 3] = 255;
+  }
+  return out;
+}
 
 /** Build an RGBA frame from a flat list of [r,g,b] triplets (alpha = 255). */
 function frame(colors: ReadonlyArray<[number, number, number]>): Uint8Array {
@@ -101,5 +117,62 @@ describe("mapToPalette", () => {
       const i = (idx[p] ?? 0) * 3;
       expect(Math.abs((pal[i] ?? 0) - (f[p * 4] ?? 0))).toBeLessThanOrEqual(8);
     }
+  });
+});
+
+describe("mapToPaletteDithered", () => {
+  const blackWhite = Uint8Array.from([0, 0, 0, 255, 255, 255]);
+
+  it("produces one in-range index per pixel", () => {
+    const idx = mapToPaletteDithered(
+      solidRgba(4, 3, [120, 120, 120]),
+      blackWhite,
+      4,
+      3,
+    );
+    expect(idx.length).toBe(12);
+    for (const i of idx) expect(i).toBeLessThan(2);
+  });
+
+  it("does not dither when a solid color sits exactly on a palette entry", () => {
+    // Pure white against a black/white palette: zero error, every pixel index 1.
+    const idx = mapToPaletteDithered(
+      solidRgba(4, 4, [255, 255, 255]),
+      blackWhite,
+      4,
+      4,
+    );
+    expect([...idx].every((i) => i === 1)).toBe(true);
+  });
+
+  it("diffuses a flat mid-gray into a balanced mix of both extremes", () => {
+    // 50% gray has no palette entry, so error diffusion must spread it across
+    // both black and white. The mean index lands near 0.5 (neither extreme
+    // dominates), which plain nearest-color mapping could never produce.
+    const w = 8;
+    const h = 8;
+    const idx = mapToPaletteDithered(
+      solidRgba(w, h, [128, 128, 128]),
+      blackWhite,
+      w,
+      h,
+    );
+    const ones = [...idx].filter((i) => i === 1).length;
+    expect(ones).toBeGreaterThan(0);
+    expect(ones).toBeLessThan(w * h);
+    const mean = ones / (w * h);
+    expect(mean).toBeGreaterThan(0.35);
+    expect(mean).toBeLessThan(0.65);
+  });
+
+  it("handles a single-color palette without dividing by zero", () => {
+    const single = Uint8Array.from([10, 20, 30]);
+    const idx = mapToPaletteDithered(
+      solidRgba(3, 3, [200, 200, 200]),
+      single,
+      3,
+      3,
+    );
+    expect([...idx].every((i) => i === 0)).toBe(true);
   });
 });

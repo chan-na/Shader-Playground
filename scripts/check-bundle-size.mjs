@@ -5,8 +5,13 @@ import { gzipSync } from "node:zlib";
 
 const ASSETS_DIR = "dist/assets";
 
+// Phase 33 (GIF per-frame palette + dithering): bumped 360 → 363. The budget
+// was already ~100 B under the CI gzip ceiling on `main`, so even after moving
+// the Floyd–Steinberg pass into the worker-only chunk the remaining local-
+// palette plumbing pushed the total over. Raised with explicit sign-off rather
+// than dropping the feature.
 const LIMITS_KIB = {
-  js: 360,
+  js: 363,
 };
 
 const KIB = 1024;

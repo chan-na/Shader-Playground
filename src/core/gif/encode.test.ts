@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { encodeGif, type GifFrame } from "./encode";
+import { mapToPaletteDithered } from "./quantize";
 
 // --- Minimal GIF89a parser for verification -------------------------------
 
 interface ParsedImage {
   delayCs: number;
   indices: number[];
+  /** Local color table, when the image carries one. */
+  palette?: number[][];
 }
 interface ParsedGif {
   version: string;
@@ -87,7 +90,8 @@ function parseGif(bytes: Uint8Array): ParsedGif {
   const packed = u8();
   u8(); // bg index
   u8(); // aspect ratio
-  const gctSize = 2 << (packed & 0x07);
+  const hasGct = (packed & 0x80) !== 0;
+  const gctSize = hasGct ? 2 << (packed & 0x07) : 0;
   const palette: number[][] = [];
   for (let i = 0; i < gctSize; i++) palette.push([u8(), u8(), u8()]);
 
@@ -129,12 +133,19 @@ function parseGif(bytes: Uint8Array): ParsedGif {
       u16(); // top
       const w = u16();
       const h = u16();
-      u8(); // packed (no local table)
+      const ipacked = u8();
+      let localPalette: number[][] | undefined;
+      if (ipacked & 0x80) {
+        const lctSize = 2 << (ipacked & 0x07);
+        localPalette = [];
+        for (let i = 0; i < lctSize; i++) localPalette.push([u8(), u8(), u8()]);
+      }
       const minCodeSize = u8();
       const lzw = readSubBlocks();
       images.push({
         delayCs: pendingDelay,
         indices: lzwDecode(lzw, minCodeSize, w * h),
+        ...(localPalette ? { palette: localPalette } : {}),
       });
       pendingDelay = 0;
     } else {
@@ -246,5 +257,64 @@ describe("encodeGif", () => {
       }),
     );
     expect(gif.images[0]?.delayCs).toBe(2);
+  });
+
+  it("omits the global table and emits per-frame local tables when localPalette is set", () => {
+    const frames: GifFrame[] = [
+      { rgba: solid(2, 2, [255, 0, 0]), delayMs: 100 },
+      { rgba: solid(2, 2, [0, 255, 0]), delayMs: 100 },
+    ];
+    const gif = parseGif(
+      encodeGif({ width: 2, height: 2, frames, localPalette: true }),
+    );
+    // No global color table — each image carries its own.
+    expect(gif.palette).toHaveLength(0);
+    expect(gif.images).toHaveLength(2);
+    for (const img of gif.images) expect(img.palette).toBeDefined();
+
+    // Reconstruct each frame's pixels from its own local palette.
+    const decode = (img: ParsedImage): number[][] =>
+      img.indices.map((i) => img.palette?.[i] ?? [0, 0, 0]);
+    const img0 = gif.images[0];
+    const img1 = gif.images[1];
+    if (!img0 || !img1) throw new Error("missing image");
+    expect(
+      decode(img0).every((c) => c[0] === 255 && c[1] === 0 && c[2] === 0),
+    ).toBe(true);
+    expect(
+      decode(img1).every((c) => c[0] === 0 && c[1] === 255 && c[2] === 0),
+    ).toBe(true);
+  });
+
+  it("stays decodable with dithering enabled", () => {
+    // A 4×1 gradient against a 4-color palette forces real dithering choices;
+    // the stream must still decode to one valid palette index per pixel.
+    const w = 4;
+    const rgba = new Uint8Array(w * 4);
+    for (let x = 0; x < w; x++) {
+      const v = x * 80;
+      rgba[x * 4] = v;
+      rgba[x * 4 + 1] = v;
+      rgba[x * 4 + 2] = v;
+      rgba[x * 4 + 3] = 255;
+    }
+    const gif = parseGif(
+      encodeGif(
+        {
+          width: w,
+          height: 1,
+          frames: [{ rgba, delayMs: 100 }],
+          maxColors: 4,
+        },
+        mapToPaletteDithered,
+      ),
+    );
+    const img = gif.images[0];
+    if (!img) throw new Error("no image");
+    expect(img.indices).toHaveLength(w);
+    for (const i of img.indices) {
+      expect(i).toBeGreaterThanOrEqual(0);
+      expect(i).toBeLessThan(gif.palette.length);
+    }
   });
 });

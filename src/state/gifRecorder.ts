@@ -15,6 +15,10 @@ export interface GifRecorderOptions {
   maxLongEdge: number;
   /** Palette ceiling (2..256). */
   maxColors: number;
+  /** Floyd–Steinberg dithering to soften palette banding (Phase 33). */
+  dither: boolean;
+  /** Per-frame local palette instead of one shared global table (Phase 33). */
+  localPalette: boolean;
 }
 
 const GIF_DEFAULTS: GifRecorderOptions = {
@@ -22,6 +26,10 @@ const GIF_DEFAULTS: GifRecorderOptions = {
   maxSeconds: 10,
   maxLongEdge: 480,
   maxColors: 256,
+  // Quality-first defaults: dithering + per-frame palettes greatly improve the
+  // gradients typical of shader output, and the encode runs in a worker.
+  dither: true,
+  localPalette: true,
 };
 
 export interface GifRecorderState {
@@ -56,6 +64,8 @@ interface ActiveGif {
   maxFrames: number;
   maxColors: number;
   maxLongEdge: number;
+  dither: boolean;
+  localPalette: boolean;
   startAt: number;
   lastCaptureAt: number;
 }
@@ -130,6 +140,8 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
       maxFrames: Math.max(1, Math.ceil(opts.fps * opts.maxSeconds)),
       maxColors: opts.maxColors,
       maxLongEdge: opts.maxLongEdge,
+      dither: opts.dither,
+      localPalette: opts.localPalette,
       startAt: performance.now(),
       lastCaptureAt: -Infinity,
     };
@@ -207,6 +219,8 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
         frames,
         maxColors: active.maxColors,
         loop: true,
+        dither: active.dither,
+        localPalette: active.localPalette,
       });
       const blob = new Blob([bytes], { type: "image/gif" });
       const prev = get().lastBlobUrl;

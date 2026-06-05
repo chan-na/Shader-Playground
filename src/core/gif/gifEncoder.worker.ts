@@ -7,7 +7,8 @@
  * function wrapped in the standard reqId RPC (mirrors glslValidator.worker.ts).
  *
  * Protocol:
- *   in : { type:'encode', reqId, width, height, frames, maxColors, loop }
+ *   in : { type:'encode', reqId, width, height, frames, maxColors, loop,
+ *          dither?, localPalette? }
  *   out: { type:'encode', reqId, ok:true, bytes } | { ..., ok:false, error }
  *
  * The encoded byte buffer is transferred back (zero-copy). Inputs are *not*
@@ -22,6 +23,7 @@ declare const self: {
 };
 
 import { encodeGif } from "./encode";
+import { mapToPaletteDithered } from "./quantize";
 
 export interface GifEncodeFrameData {
   /** Tightly packed RGBA, `width * height * 4` bytes. */
@@ -38,6 +40,8 @@ export interface GifEncodeRequest {
   frames: GifEncodeFrameData[];
   maxColors: number;
   loop: boolean;
+  dither?: boolean;
+  localPalette?: boolean;
 }
 
 export interface GifEncodeResponse {
@@ -53,13 +57,20 @@ self.onmessage = (e: MessageEvent) => {
   if (!m || m.type !== "encode" || typeof m.reqId !== "number") return;
 
   try {
-    const bytes = encodeGif({
-      width: m.width,
-      height: m.height,
-      frames: m.frames,
-      maxColors: m.maxColors,
-      loop: m.loop,
-    });
+    // The worker is the only consumer that imports the dithering mapper, so the
+    // (heavier) Floyd–Steinberg pass stays in this chunk and never reaches the
+    // main bundle.
+    const bytes = encodeGif(
+      {
+        width: m.width,
+        height: m.height,
+        frames: m.frames,
+        maxColors: m.maxColors,
+        loop: m.loop,
+        localPalette: m.localPalette ?? false,
+      },
+      m.dither ? mapToPaletteDithered : undefined,
+    );
     const res: GifEncodeResponse = {
       type: "encode",
       reqId: m.reqId,

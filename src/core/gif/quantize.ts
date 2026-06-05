@@ -174,6 +174,75 @@ function paletteFromBoxes(boxes: ColorBucket[][]): Uint8Array {
   return palette;
 }
 
+/** Clamp a (possibly fractional) channel value into the 0..255 byte range. */
+function clamp255(v: number): number {
+  if (v < 0) return 0;
+  if (v > 255) return 255;
+  return v;
+}
+
+/**
+ * Map an RGBA frame to palette indices with Floyd–Steinberg error diffusion
+ * (Phase 33). Each pixel's quantization error is spread to its yet-unvisited
+ * neighbours (right 7/16, below-left 3/16, below 5/16, below-right 1/16), which
+ * trades hard banding for fine dithering noise — a large quality win on the
+ * gradients typical of shader output. No per-cell cache: error accumulation
+ * makes identical source colors map differently, so every pixel runs the
+ * nearest-color search (bounded by ≤256 palette entries; offloaded to the
+ * worker since Phase 32).
+ */
+export function mapToPaletteDithered(
+  rgba: Uint8Array,
+  palette: Uint8Array,
+  width: number,
+  height: number,
+): Uint8Array {
+  const colorCount = Math.floor(palette.length / 3);
+  const out = new Uint8Array(Math.max(0, width * height));
+  // Error carried into the current row and accumulated for the next one (RGB
+  // interleaved). `curr` is read+updated as we walk left→right; `next` becomes
+  // `curr` at the end of each row.
+  const curr = new Float32Array(width * 3);
+  const next = new Float32Array(width * 3);
+  const spread = (
+    buf: Float32Array,
+    x: number,
+    dr: number,
+    dg: number,
+    db: number,
+    factor: number,
+  ): void => {
+    const j = x * 3;
+    buf[j] = (buf[j] ?? 0) + dr * factor;
+    buf[j + 1] = (buf[j + 1] ?? 0) + dg * factor;
+    buf[j + 2] = (buf[j + 2] ?? 0) + db * factor;
+  };
+
+  for (let y = 0; y < height; y++) {
+    next.fill(0);
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x;
+      const i = p * 4;
+      const r = clamp255((rgba[i] ?? 0) + (curr[x * 3] ?? 0));
+      const g = clamp255((rgba[i + 1] ?? 0) + (curr[x * 3 + 1] ?? 0));
+      const b = clamp255((rgba[i + 2] ?? 0) + (curr[x * 3 + 2] ?? 0));
+      const idx = nearestColor(r, g, b, palette, colorCount);
+      out[p] = idx;
+      const dr = r - (palette[idx * 3] ?? 0);
+      const dg = g - (palette[idx * 3 + 1] ?? 0);
+      const db = b - (palette[idx * 3 + 2] ?? 0);
+      if (x + 1 < width) spread(curr, x + 1, dr, dg, db, 7 / 16);
+      if (y + 1 < height) {
+        if (x > 0) spread(next, x - 1, dr, dg, db, 3 / 16);
+        spread(next, x, dr, dg, db, 5 / 16);
+        if (x + 1 < width) spread(next, x + 1, dr, dg, db, 1 / 16);
+      }
+    }
+    curr.set(next);
+  }
+  return out;
+}
+
 /**
  * Map an RGBA frame to palette indices (one byte per pixel). A per-cell cache
  * (rgb555) bounds the nearest-color search to ≤32768 lookups per frame.

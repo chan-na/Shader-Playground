@@ -186,6 +186,8 @@ export interface SpStores {
         maxSeconds?: number;
         maxLongEdge?: number;
         maxColors?: number;
+        dither?: boolean;
+        localPalette?: boolean;
       }) => void;
       stop: () => Promise<Blob | null>;
     };

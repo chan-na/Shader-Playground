@@ -21,6 +21,9 @@
  * static import graph lets it stay in the encode worker chunk only — the rare
  * main-thread inline fallback ships the lighter default and never pulls the
  * dithering code into the initial bundle.
+ *
+ * An optional `onProgress(done, total)` callback (Phase 34) fires once per
+ * assembled frame so the worker can report encode progress back to the UI.
  */
 
 import { lzwEncode } from "./lzw";
@@ -55,6 +58,9 @@ export type FrameMapper = (
   width: number,
   height: number,
 ) => Uint8Array;
+
+/** Reports encode progress after each frame: `done` of `total` frames written. */
+export type EncodeProgress = (done: number, total: number) => void;
 
 const defaultMapper: FrameMapper = (rgba, palette) =>
   mapToPalette(rgba, palette);
@@ -99,6 +105,7 @@ function pushSubBlocks(out: number[], data: Uint8Array): void {
 export function encodeGif(
   opts: EncodeGifOptions,
   mapper: FrameMapper = defaultMapper,
+  onProgress?: EncodeProgress,
 ): Uint8Array {
   const { width, height, frames } = opts;
   if (width <= 0 || height <= 0) {
@@ -153,6 +160,7 @@ export function encodeGif(
     out.push(0x00);
   }
 
+  let done = 0;
   for (const frame of frames) {
     // Graphic Control Extension — disposal method 1 (leave in place), no
     // transparency. Delay is in centiseconds; clamp so browsers don't treat
@@ -183,6 +191,8 @@ export function encodeGif(
     const indices = mapper(frame.rgba, framePalette, width, height);
     out.push(frameBits); // LZW minimum code size
     pushSubBlocks(out, lzwEncode(indices, frameBits));
+
+    onProgress?.(++done, frames.length);
   }
 
   out.push(0x3b); // trailer

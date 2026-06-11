@@ -20,6 +20,7 @@ import { log, normalizeError } from "../../utils/log";
 import { encodeGif } from "./encode";
 import type {
   GifEncodeFrameData,
+  GifEncodeProgress,
   GifEncodeRequest,
   GifEncodeResponse,
 } from "./gifEncoder.worker";
@@ -33,6 +34,8 @@ export interface GifEncodeJob {
   loop: boolean;
   dither?: boolean;
   localPalette?: boolean;
+  /** Reports encode progress (done of total frames) from worker or inline path. */
+  onProgress?: (done: number, total: number) => void;
 }
 
 export interface GifEncoderOptions {
@@ -53,14 +56,18 @@ function asError(e: unknown): Error {
 function encodeInline(job: GifEncodeJob): Uint8Array {
   // Default mapper (no dithering) on purpose — keeps mapToPaletteDithered out of
   // the main bundle. The fallback still produces a valid, complete GIF.
-  return encodeGif({
-    width: job.width,
-    height: job.height,
-    frames: job.frames,
-    maxColors: job.maxColors,
-    loop: job.loop,
-    localPalette: job.localPalette ?? false,
-  });
+  return encodeGif(
+    {
+      width: job.width,
+      height: job.height,
+      frames: job.frames,
+      maxColors: job.maxColors,
+      loop: job.loop,
+      localPalette: job.localPalette ?? false,
+    },
+    undefined,
+    job.onProgress,
+  );
 }
 
 export class GifEncoderClient {
@@ -167,8 +174,16 @@ export class GifEncoderClient {
   }
 
   private onMessage(ev: MessageEvent): void {
-    const d = ev.data as GifEncodeResponse | undefined;
-    if (!d || d.type !== "encode" || typeof d.reqId !== "number") return;
+    const d = ev.data as GifEncodeResponse | GifEncodeProgress | undefined;
+    if (!d || typeof d.reqId !== "number") return;
+
+    if (d.type === "progress") {
+      // Progress is advisory — keep the job pending until the final reply.
+      this.pending.get(d.reqId)?.job.onProgress?.(d.done, d.total);
+      return;
+    }
+
+    if (d.type !== "encode") return;
     const p = this.pending.get(d.reqId);
     if (!p) return;
     this.pending.delete(d.reqId);

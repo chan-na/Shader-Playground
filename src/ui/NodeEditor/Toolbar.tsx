@@ -178,6 +178,7 @@ export function Toolbar() {
   void recorderUrl;
 
   const gifStatus = useGifRecorderStore((r) => r.status);
+  const gifEncodeProgress = useGifRecorderStore((r) => r.encodeProgress);
   const toggleGif = async () => {
     const g = useGifRecorderStore.getState();
     const canvas = document.querySelector(
@@ -452,7 +453,8 @@ export function Toolbar() {
           </>
         ) : gifStatus === "encoding" ? (
           <>
-            <span aria-hidden="true">⏳ </span>GIF
+            <span aria-hidden="true">⏳ </span>
+            {Math.round(gifEncodeProgress * 100)}%
           </>
         ) : (
           <>

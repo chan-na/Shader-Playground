@@ -9,7 +9,9 @@
  * Protocol:
  *   in : { type:'encode', reqId, width, height, frames, maxColors, loop,
  *          dither?, localPalette? }
- *   out: { type:'encode', reqId, ok:true, bytes } | { ..., ok:false, error }
+ *   out: { type:'progress', reqId, done, total } (one per assembled frame)
+ *        then { type:'encode', reqId, ok:true, bytes }
+ *        | { type:'encode', reqId, ok:false, error }
  *
  * The encoded byte buffer is transferred back (zero-copy). Inputs are *not*
  * transferred — the client keeps them so it can fall back to an inline encode
@@ -52,6 +54,13 @@ export interface GifEncodeResponse {
   error?: string;
 }
 
+export interface GifEncodeProgress {
+  type: "progress";
+  reqId: number;
+  done: number;
+  total: number;
+}
+
 self.onmessage = (e: MessageEvent) => {
   const m = e.data as GifEncodeRequest | undefined;
   if (!m || m.type !== "encode" || typeof m.reqId !== "number") return;
@@ -70,6 +79,15 @@ self.onmessage = (e: MessageEvent) => {
         localPalette: m.localPalette ?? false,
       },
       m.dither ? mapToPaletteDithered : undefined,
+      (done, total) => {
+        const p: GifEncodeProgress = {
+          type: "progress",
+          reqId: m.reqId,
+          done,
+          total,
+        };
+        self.postMessage(p);
+      },
     );
     const res: GifEncodeResponse = {
       type: "encode",

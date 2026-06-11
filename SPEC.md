@@ -417,7 +417,7 @@ Phase 31 의 GIF 인코더는 `stop()` 에서 quantize + LZW + GIF89a 조립을 
 - **클라이언트 (`core/gif/gifEncoderClient.ts`)**: 앱당 워커 1 개(첫 `encode()` 에 lazy 생성), reqId 별 독립 Promise. **실패 모델은 validator 보다 강하다** — validator 는 실패 시 `[]` 를 주지만(라이브 진단은 보조), 사용자가 명시적으로 녹화한 GIF 는 잃으면 안 되므로 워커 construct/post/error 어느 단계 실패도 **메인 스레드 인라인 `encodeGif` 로 폴백**한다(최악의 경우 = Phase 31 의 동기 동작). 워커가 `ok:false` 로 인코드 에러를 보고하면(동일 입력은 인라인도 throw) 그대로 reject. `typeof Worker === 'undefined'` 가드는 default factory 한정이라 jsdom/SSR 은 곧장 인라인 경로(테스트 결정성), 주입된 `workerFactory` 는 항상 시도(워커 경로 단위 테스트).
 - **`gifRecorder.stop()` 연동**: 기존 동기 `encodeGif(...)` 호출을 `await gifEncoder().encode({...})` 로 교체. `status:'encoding'` 표시 → 워커가 인코딩하는 동안 메인 스레드 free → Blob 생성. 프레임 delay 산출(`frameDelays`)·캡처 경로는 불변.
 - **검증**: Vitest 단위 10 건 — `gifEncoderClient.test.ts` (fake worker 주입으로 RPC 라우팅 · ok:false reject · out-of-order reply · stray/malformed reqId 무시 · construct/post/error 인라인 폴백 · 잘못된 입력 reject · dispose · singleton). Playwright E2E 는 Phase 31 의 `phase-31-gif-recording.spec.ts` 4 건이 그대로 회귀 가드 — chromium 에서는 실제 워커 경로가 돌고 `createImageBitmap` 로 GIF 스펙 적합성을 authoritative 검증.
-- **비범위 (Out of scope — 별도 백로그)**: per-frame 로컬 팔레트/디더링, transparency(1-bit), 정적 HTML export 의 GIF, 인코딩 진행률 표시(현재 워커는 단일 메시지로 완료). (per-frame 로컬 팔레트 + 디더링은 Phase 33 에서 구현됨.)
+- **비범위 (Out of scope — 별도 백로그)**: per-frame 로컬 팔레트/디더링, transparency(1-bit), 정적 HTML export 의 GIF, 인코딩 진행률 표시(현재 워커는 단일 메시지로 완료). (per-frame 로컬 팔레트 + 디더링은 Phase 33, 인코딩 진행률 표시는 Phase 34 에서 구현됨.)
 
 ### Phase 33 — GIF per-frame 로컬 팔레트 + 디더링 (완료)
 Phase 31/32 의 GIF 결과물 품질을 끌어올리는 마감. 셰이더 출력의 그라데이션/네온이 단일 256색 전역 팔레트에서 밴딩되던 문제를, **Floyd–Steinberg 디더링**과 **프레임별 로컬 팔레트**로 해소한다. 순수 `core/gif/` 로직만 확장 — 의존성 0, 인코딩은 Phase 32 워커 경로 위에서 그대로 돈다.
@@ -428,7 +428,17 @@ Phase 31/32 의 GIF 결과물 품질을 끌어올리는 마감. 셰이더 출력
 - **`gifRecorderStore` 품질 기본값**: `GifRecorderOptions` 에 `dither`/`localPalette` 추가, **둘 다 기본 on**(셰이더 출력엔 디더+로컬 팔레트가 큰 품질 이득, 인코딩은 워커가 처리). `stop()` 의 encode job 에 함께 전달. Toolbar `● GIF` 버튼 UX·다운로드 경로는 불변.
 - **번들 예산 (`scripts/check-bundle-size.mjs`)**: JS gzip 한계를 **360 → 363 KiB 로 상향**. main 시점에 예산이 이미 CI gzip 천장 대비 ~100B 여유뿐이라, 디더링을 워커 전용 청크로 분리했음에도 로컬-팔레트 plumbing 잔여분이 총합을 넘겨, 기능 드롭 대신 **명시적 사용자 승인 하에** 한계를 올림(가드 우회 아님 — 예산 재조정).
 - **검증**: Vitest 단위 — `quantize.test.ts` (+4: in-range 인덱스 · 팔레트 정확색 무디더 · mid-gray 가 양 극단으로 균형 확산(mean≈0.5) · 단일색 팔레트 안전), `encode.test.ts` (+2: localPalette 시 전역 테이블 생략 + 프레임별 로컬 테이블에서 원색 복원 / mapper 로 `mapToPaletteDithered` 주입 시 픽셀당 유효 인덱스로 디코드 — 테스트 파서에 로컬 컬러 테이블 디코드 추가). Playwright E2E `phase-33-gif-quality.spec.ts` 2 건 — (a) `localPalette+dither` 녹화본을 브라우저 `createImageBitmap` 로 디코드 + LSD packed 로 전역 테이블 부재 확인, (b) `localPalette:false` 전역-테이블 경로도 디코드 + 전역 테이블 존재 확인(두 인코더 분기 모두 브라우저 스펙 적합). Phase 31 의 4 건도 새 기본값(dither+local) 위에서 그대로 회귀 가드.
-- **비범위 (Out of scope — 별도 백로그)**: transparency(1-bit), 정적 HTML export 의 GIF, 인코딩 진행률 표시, per-frame palette 의 색 안정화(프레임 간 팔레트 떨림 억제), 인라인 폴백의 디더링(현재 워커 경로에서만 — 메인 번들 보호 의도).
+- **비범위 (Out of scope — 별도 백로그)**: transparency(1-bit), 정적 HTML export 의 GIF, per-frame palette 의 색 안정화(프레임 간 팔레트 떨림 억제), 인라인 폴백의 디더링(현재 워커 경로에서만 — 메인 번들 보호 의도). (인코딩 진행률 표시는 Phase 34 에서 구현됨.)
+
+### Phase 34 — GIF 인코딩 진행률 표시 (완료)
+Phase 31~33 의 GIF 인코더는 워커가 완료를 *단일 메시지* 로만 보고해, 멀티초 클립을 인코딩하는 동안 Toolbar 의 `⏳ GIF` 칩이 아무 피드백을 주지 않았다. 순수 `core/gif/` 로직과 Phase 32 워커/클라이언트 RPC 위에 **프레임 단위 progress** 채널을 얹는 경량 확장 — 의존성 0, 무거운 코드 추가 없음.
+- **`encodeGif(opts, mapper?, onProgress?)` (`core/gif/encode.ts`)**: 옵셔널 세 번째 인자 `EncodeProgress = (done, total) => void` 를 추가. 프레임 루프가 한 프레임을 조립할 때마다 `onProgress(++done, frames.length)` 를 호출한다. 미지정 시 기존과 byte-identical (기존 단위 테스트·인라인 폴백 무영향). `for...of` + 카운터라 `noUncheckedIndexedAccess` 인덱스 단언 없이 `frame: GifFrame` 을 그대로 유지.
+- **워커 progress 메시지 (`gifEncoder.worker.ts`)**: 새 `GifEncodeProgress = { type:'progress', reqId, done, total }`. `encodeGif` 에 progress 콜백을 주입해 프레임마다 post 하고, 최종 `{type:'encode', ok, bytes}` 응답은 그대로 마지막에 보낸다(progress N=total 이 bytes 보다 먼저 도착하도록 순서 보존).
+- **클라이언트 통과 (`gifEncoderClient.ts`)**: `GifEncodeJob.onProgress?` 추가, `PendingJob` 에 보관. `onMessage` 가 `type:'progress'` 분기에서 **pending 을 유지한 채** `job.onProgress?.(done,total)` 만 호출하고, `type:'encode'` 에서만 resolve/reject. 인라인 폴백(`encodeInline`)도 `job.onProgress` 를 `encodeGif` 로 전달해 워커가 없는 환경(jsdom/SSR/실패 폴백)에서도 progress 가 동일하게 보고된다. unknown reqId progress 는 무시.
+- **`gifRecorderStore.encodeProgress: number` (0..1)**: `stop()` 의 encode job 에 `onProgress: (done,total)=>set({encodeProgress: done/total})` 연결. `start()` / encode 시작 / idle 복귀(성공·실패)에서 0 으로 리셋.
+- **Toolbar**: `encoding` 상태에서 `⏳ GIF` 대신 `⏳ {Math.round(progress*100)}%` 표시(`gifEncodeProgress` 구독). 녹화/다운로드 경로는 불변.
+- **검증**: Vitest 단위 +5 건 — `encode.test`(onProgress 프레임당 1회·단조·완결 카운트 / onProgress 옵셔널), `gifEncoderClient.test`(progress 메시지를 `job.onProgress` 로 순서대로 전달 + promise 미settle / unknown reqId progress 무시 / 인라인 폴백도 progress 보고), `gifRecorder.test`(encode 중 encodeProgress 가 1 까지 상승 후 idle 에서 0 리셋, start 가 잔여 progress 클리어). Playwright E2E `phase-34-gif-progress.spec.ts` 2 건 — (a) 스토어가 `encodeProgress` 노출 + idle 에서 0, (b) chromium 실제 워커 경로에서 라이브 녹화→stop 시 progress 가 단조 증가하며 1 에 도달하고 완료 후 idle·0 으로 복귀(스토어 subscribe 로 transient 값 포착). Phase 31~33 기존 GIF 스펙은 회귀 가드로 유지.
+- **비범위 (Out of scope — 별도 백로그)**: transparency(1-bit), 정적 HTML export 의 GIF, per-frame palette 색 안정화, 인라인 폴백의 디더링.
 
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).

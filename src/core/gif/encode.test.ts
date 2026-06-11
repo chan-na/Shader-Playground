@@ -317,4 +317,30 @@ describe("encodeGif", () => {
       expect(i).toBeLessThan(gif.palette.length);
     }
   });
+
+  it("reports onProgress once per frame with a monotonic, complete count", () => {
+    const frames: GifFrame[] = [
+      { rgba: solid(2, 2, [255, 0, 0]), delayMs: 100 },
+      { rgba: solid(2, 2, [0, 255, 0]), delayMs: 100 },
+      { rgba: solid(2, 2, [0, 0, 255]), delayMs: 100 },
+    ];
+    const calls: Array<[number, number]> = [];
+    encodeGif({ width: 2, height: 2, frames }, undefined, (done, total) =>
+      calls.push([done, total]),
+    );
+    expect(calls).toEqual([
+      [1, 3],
+      [2, 3],
+      [3, 3],
+    ]);
+  });
+
+  it("does not require onProgress (optional)", () => {
+    const bytes = encodeGif({
+      width: 2,
+      height: 2,
+      frames: [{ rgba: solid(2, 2, [1, 2, 3]), delayMs: 100 }],
+    });
+    expect(parseGif(bytes).images).toHaveLength(1);
+  });
 });

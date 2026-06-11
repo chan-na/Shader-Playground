@@ -179,6 +179,7 @@ export interface SpStores {
       status: "idle" | "recording" | "encoding";
       frameCount: number;
       elapsedMs: number;
+      encodeProgress: number;
       lastBlobUrl: string | null;
       error: string | null;
       start: (options?: {
@@ -191,6 +192,9 @@ export interface SpStores {
       }) => void;
       stop: () => Promise<Blob | null>;
     };
+    subscribe: (
+      listener: (state: { encodeProgress: number; status: string }) => void,
+    ) => () => void;
   };
   glslValidator: () => {
     validate: (

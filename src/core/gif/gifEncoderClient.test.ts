@@ -197,6 +197,63 @@ describe("GifEncoderClient", () => {
     await expect(p).rejects.toThrow(/disposed/);
   });
 
+  it("forwards worker progress messages to job.onProgress", async () => {
+    const { c, w } = makeClient();
+    const progress: Array<[number, number]> = [];
+    const p = c.encode({
+      ...solidJob(),
+      onProgress: (done, total) => progress.push([done, total]),
+    });
+    const reqId = sentReqId(w, 0);
+    w.reply({ type: "progress", reqId, done: 1, total: 3 });
+    w.reply({ type: "progress", reqId, done: 2, total: 3 });
+    w.reply({ type: "progress", reqId, done: 3, total: 3 });
+    // Progress must not settle the promise — the job stays pending.
+    const payload = new Uint8Array([1, 2, 3]);
+    w.reply({ type: "encode", reqId, ok: true, bytes: payload });
+    await expect(p).resolves.toEqual(payload);
+    expect(progress).toEqual([
+      [1, 3],
+      [2, 3],
+      [3, 3],
+    ]);
+  });
+
+  it("ignores progress for an unknown reqId", async () => {
+    const { c, w } = makeClient();
+    const progress: number[] = [];
+    const p = c.encode({
+      ...solidJob(),
+      onProgress: (done) => progress.push(done),
+    });
+    expect(() =>
+      w.reply({ type: "progress", reqId: 999, done: 1, total: 1 }),
+    ).not.toThrow();
+    w.reply({
+      type: "encode",
+      reqId: sentReqId(w, 0),
+      ok: true,
+      bytes: new Uint8Array([0]),
+    });
+    await p;
+    expect(progress).toEqual([]);
+  });
+
+  it("reports progress through the inline fallback path", async () => {
+    const c = new GifEncoderClient({
+      workerFactory: () => {
+        throw new Error("no worker here");
+      },
+    });
+    const progress: Array<[number, number]> = [];
+    const bytes = await c.encode({
+      ...solidJob(),
+      onProgress: (done, total) => progress.push([done, total]),
+    });
+    expect(isGif89a(bytes)).toBe(true);
+    expect(progress).toEqual([[1, 1]]);
+  });
+
   it("gifEncoder() returns a stable singleton", () => {
     expect(gifEncoder()).toBe(gifEncoder());
   });

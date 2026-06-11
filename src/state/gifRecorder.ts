@@ -37,6 +37,8 @@ export interface GifRecorderState {
   startedAt: number | null;
   elapsedMs: number;
   frameCount: number;
+  /** Encode progress 0..1 while status is "encoding" (Phase 34). */
+  encodeProgress: number;
   lastBlobUrl: string | null;
   error: string | null;
 
@@ -116,6 +118,7 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
   startedAt: null,
   elapsedMs: 0,
   frameCount: 0,
+  encodeProgress: 0,
   lastBlobUrl: null,
   error: null,
 
@@ -150,6 +153,7 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
       startedAt: _active.startAt,
       elapsedMs: 0,
       frameCount: 0,
+      encodeProgress: 0,
       error: null,
     });
   },
@@ -196,7 +200,7 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
       return null;
     }
 
-    set({ status: "encoding" });
+    set({ status: "encoding", encodeProgress: 0 });
 
     try {
       const frames: GifFrame[] = active.frames.map((f) => ({
@@ -221,17 +225,25 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
         loop: true,
         dither: active.dither,
         localPalette: active.localPalette,
+        onProgress: (done, total) => {
+          set({ encodeProgress: total > 0 ? done / total : 0 });
+        },
       });
       const blob = new Blob([bytes], { type: "image/gif" });
       const prev = get().lastBlobUrl;
       if (prev) URL.revokeObjectURL(prev);
       const url = URL.createObjectURL(blob);
-      set({ status: "idle", startedAt: null, lastBlobUrl: url });
+      set({
+        status: "idle",
+        startedAt: null,
+        encodeProgress: 0,
+        lastBlobUrl: url,
+      });
       return blob;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       log.error("render", "GIF encode failed", normalizeError(e));
-      set({ status: "idle", startedAt: null, error: msg });
+      set({ status: "idle", startedAt: null, encodeProgress: 0, error: msg });
       toast.error(`GIF 인코딩 실패: ${msg}`);
       return null;
     }

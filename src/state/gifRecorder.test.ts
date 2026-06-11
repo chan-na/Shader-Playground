@@ -30,6 +30,7 @@ function resetStore() {
     startedAt: null,
     elapsedMs: 0,
     frameCount: 0,
+    encodeProgress: 0,
     lastBlobUrl: null,
     error: null,
   });
@@ -151,6 +152,34 @@ describe("useGifRecorderStore", () => {
     expect(blob?.type).toBe("image/gif");
     expect(useGifRecorderStore.getState().status).toBe("idle");
     expect(useGifRecorderStore.getState().lastBlobUrl).toBe("blob:gif-mock");
+  });
+
+  it("drives encodeProgress during encode and resets it on start", async () => {
+    installFakeContext();
+    const canvas = makeCanvas(32, 24);
+    useGifRecorderStore.getState().start({ fps: 20, maxLongEdge: 16 });
+    const r = useGifRecorderStore.getState();
+    const seen: number[] = [];
+    const unsub = useGifRecorderStore.subscribe((s) =>
+      seen.push(s.encodeProgress),
+    );
+    for (let i = 0; i < 3; i++) {
+      r.captureFrame(canvas);
+      clock += 60;
+    }
+    // jsdom has no Worker, so stop() encodes inline and reports progress
+    // synchronously for each of the 3 frames before resolving.
+    await useGifRecorderStore.getState().stop();
+    unsub();
+    // Progress climbed to a full frame before the idle reset.
+    expect(Math.max(...seen)).toBeCloseTo(1, 5);
+    // Back to idle: progress reset.
+    expect(useGifRecorderStore.getState().encodeProgress).toBe(0);
+
+    // A fresh recording clears any lingering progress.
+    useGifRecorderStore.setState({ encodeProgress: 0.5 });
+    useGifRecorderStore.getState().start();
+    expect(useGifRecorderStore.getState().encodeProgress).toBe(0);
   });
 
   it("honors the maxSeconds frame cap", () => {

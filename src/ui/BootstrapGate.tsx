@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { hydrateGraphAssets } from "../state/assetActions";
 import { clearSession, loadSession, startAutoSave } from "../state/autoSave";
 import { createDemoGraph, DEMO_LAYOUT } from "../state/demoGraph";
 import { useGraphStore } from "../state/graphStore";
@@ -34,6 +35,7 @@ export function BootstrapGate() {
             useGraphStore
               .getState()
               .setGraph(decoded.graph, decoded.positions, decoded.parents);
+            hydrateGraphAssets(decoded.graph.nodes);
             useHistoryStore.getState().clear();
             // Share takes precedence over recovery — drop any stale autosave.
             await clearSession();
@@ -84,6 +86,7 @@ export function BootstrapGate() {
       useGraphStore
         .getState()
         .setGraph(restored.graph, restored.positions, restored.parents);
+      hydrateGraphAssets(restored.graph.nodes);
       useHistoryStore.getState().clear();
     } catch (e) {
       log.warn(

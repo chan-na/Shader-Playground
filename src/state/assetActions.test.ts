@@ -38,6 +38,7 @@ import {
   forgetImage,
   forgetMesh,
   hydrateAssetsFor,
+  hydrateGraphAssets,
   importFiles,
 } from "./assetActions";
 import { useAssetStore } from "./assetStore";
@@ -293,5 +294,48 @@ describe("hydrateAssetsFor", () => {
 
     expect(useAssetStore.getState().meshes).toEqual({});
     expect(useAssetStore.getState().images).toEqual({});
+  });
+});
+
+describe("hydrateGraphAssets (H5)", () => {
+  beforeEach(() => {
+    useAssetStore.setState({ meshes: {}, images: {}, rev: 0 });
+    vi.clearAllMocks();
+  });
+
+  it("collects assetIds from graph nodes and hydrates the store", async () => {
+    const m = meshHandle("mesh1");
+    const img = imageHandle("img1");
+    vi.mocked(loadCachedMesh).mockResolvedValue(m);
+    vi.mocked(loadCachedImage).mockResolvedValue({
+      handle: img,
+      blob: new Blob(),
+    });
+
+    hydrateGraphAssets([
+      { id: "n1", kind: "mesh", primitive: "cube", assetId: "mesh1" },
+      { id: "n2", kind: "image", assetId: "img1" },
+      // No assetId → contributes nothing (falls back to placeholder).
+      { id: "n3", kind: "mesh", primitive: "sphere" },
+      { id: "n4", kind: "output" },
+    ]);
+
+    await vi.waitFor(() => {
+      expect(useAssetStore.getState().meshes.mesh1).toBe(m);
+      expect(useAssetStore.getState().images.img1).toBe(img);
+    });
+    expect(loadCachedMesh).toHaveBeenCalledTimes(1);
+    expect(loadCachedMesh).toHaveBeenCalledWith("mesh1");
+  });
+
+  it("does not touch IndexedDB when no node references an asset", async () => {
+    hydrateGraphAssets([
+      { id: "n1", kind: "mesh", primitive: "cube" },
+      { id: "n2", kind: "output" },
+    ]);
+    // Give any accidental async a tick to run before asserting no-op.
+    await Promise.resolve();
+    expect(loadCachedMesh).not.toHaveBeenCalled();
+    expect(loadCachedImage).not.toHaveBeenCalled();
   });
 });

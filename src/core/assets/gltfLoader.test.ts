@@ -116,4 +116,79 @@ describe("loadGltfFromFile", () => {
     expect(handle.data.indices).toBeDefined();
     expect(handle.data.indices?.length).toBe(3);
   });
+
+  it("merges every primitive across meshes with rebased indices (M1)", async () => {
+    // Two primitives (e.g. a multi-material GLB), each a single triangle.
+    mockedParse.mockResolvedValueOnce({
+      json: { meshes: [{ name: "multi" }] },
+      meshes: [
+        {
+          primitives: [
+            {
+              attributes: {
+                POSITION: {
+                  componentType: 5126,
+                  count: 3,
+                  value: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+                },
+              },
+              indices: {
+                componentType: 5123,
+                count: 3,
+                value: new Uint16Array([0, 1, 2]),
+              },
+            },
+          ],
+        },
+        {
+          primitives: [
+            {
+              attributes: {
+                POSITION: {
+                  componentType: 5126,
+                  count: 3,
+                  value: new Float32Array([2, 0, 0, 3, 0, 0, 2, 1, 0]),
+                },
+              },
+              indices: {
+                componentType: 5123,
+                count: 3,
+                value: new Uint16Array([0, 1, 2]),
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const handle = await loadGltfFromFile(makeFile());
+    // Both primitives are kept, not just the first → 6 vertices, 6 indices.
+    expect(handle.data.vertexCount).toBe(6);
+    expect(handle.data.indices?.length).toBe(6);
+    // The second primitive's indices are rebased by the first's vertex count.
+    expect(Array.from(handle.data.indices ?? [])).toEqual([0, 1, 2, 3, 4, 5]);
+    const posAttr = handle.data.attributes.find((a) => a.name === "a_position");
+    expect(posAttr?.data.length).toBe(6 * 3);
+  });
+
+  it("reports a glTF-specific error (not 'OBJ') when POSITION is absent (M1)", async () => {
+    mockedParse.mockResolvedValueOnce({
+      json: { meshes: [{ name: "broken" }] },
+      meshes: [
+        {
+          primitives: [
+            {
+              attributes: {
+                NORMAL: {
+                  componentType: 5126,
+                  count: 3,
+                  value: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    await expect(loadGltfFromFile(makeFile())).rejects.toThrow(/glTF.*POSITION/);
+  });
 });

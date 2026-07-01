@@ -37,7 +37,7 @@ import {
 import type { UniformHints } from "../core/graph/uniformParser";
 import { writeUniformHints } from "../core/graph/uniformParser";
 import { nextId } from "../utils/id";
-import { useHistoryStore } from "./historyStore";
+import { type GraphSnapshot, useHistoryStore } from "./historyStore";
 import type { NodePosition } from "./types";
 
 type GroupRemoveMode = "delete-children" | "release-children";
@@ -852,9 +852,25 @@ export function snapshotGraph(): Graph {
   return { nodes: s.nodes, edges: s.edges };
 }
 
-/** Pop the last history entry into the live graph. */
+/** Snapshot the current live graph for the undo/redo stacks. */
+function liveSnapshot(): GraphSnapshot {
+  const s = useGraphStore.getState();
+  return {
+    nodes: s.nodes,
+    edges: s.edges,
+    positions: s.positions,
+    parents: s.parents,
+  };
+}
+
+/**
+ * Pop the last history entry into the live graph. Since every mutation pushes
+ * its *pre-mutation* snapshot, the top of `past` is exactly the state to return
+ * to; the current live graph is handed to the store so it lands on the redo
+ * stack.
+ */
 export function undoGraph(): boolean {
-  const prev = useHistoryStore.getState().undo();
+  const prev = useHistoryStore.getState().undo(liveSnapshot());
   if (!prev) return false;
   useGraphStore.getState().applySnapshot(prev);
   return true;
@@ -862,7 +878,7 @@ export function undoGraph(): boolean {
 
 /** Re-apply the most recently undone graph. */
 export function redoGraph(): boolean {
-  const next = useHistoryStore.getState().redo();
+  const next = useHistoryStore.getState().redo(liveSnapshot());
   if (!next) return false;
   useGraphStore.getState().applySnapshot(next);
   return true;

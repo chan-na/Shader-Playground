@@ -441,32 +441,60 @@ describe("graphStore", () => {
     expect(s.positions.x).toEqual({ x: 4, y: 5 });
   });
 
-  it("undoGraph applies a previous snapshot when history is non-empty", () => {
+  const liveIds = () => useGraphStore.getState().nodes.map((n) => n.id);
+
+  it("undoGraph restores exactly the pre-mutation graph (C1 regression)", () => {
     useGraphStore
       .getState()
       .addNode({ id: "a", kind: "mesh", primitive: "cube" });
     useGraphStore
       .getState()
       .addNode({ id: "b", kind: "mesh", primitive: "sphere" });
-    expect(useGraphStore.getState().nodes).toHaveLength(2);
+    expect(liveIds()).toEqual(["a", "b"]);
 
+    // Undo must step back exactly one mutation → [a], not wipe to [].
     expect(undoGraph()).toBe(true);
-    // historyStore.undo returns past[length-2] (not the most recent push) —
-    // we just assert the call succeeded and live state shrunk.
-    expect(useGraphStore.getState().nodes.length).toBeLessThan(2);
+    expect(liveIds()).toEqual(["a"]);
   });
 
-  it("redoGraph restores a previously undone snapshot", () => {
+  it("add→add→undo→undo→redo→redo round-trips by node id (C1 regression)", () => {
     useGraphStore
       .getState()
       .addNode({ id: "a", kind: "mesh", primitive: "cube" });
     useGraphStore
       .getState()
       .addNode({ id: "b", kind: "mesh", primitive: "sphere" });
+
     undoGraph();
-    expect(redoGraph()).toBe(true);
-    // After redo, future-head was cloned back into live state.
-    expect(useGraphStore.getState().nodes.length).toBeGreaterThan(0);
+    expect(liveIds()).toEqual(["a"]);
+    undoGraph();
+    expect(liveIds()).toEqual([]);
+    redoGraph();
+    expect(liveIds()).toEqual(["a"]);
+    redoGraph();
+    expect(liveIds()).toEqual(["a", "b"]);
+  });
+
+  it("an edit after undo clears redo and stays undoable (H4 regression)", () => {
+    useGraphStore
+      .getState()
+      .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+    useGraphStore
+      .getState()
+      .addNode({ id: "b", kind: "mesh", primitive: "sphere" });
+    undoGraph(); // back to [a], redo stack holds [a, b]
+    expect(liveIds()).toEqual(["a"]);
+
+    // A fresh edit's pre-state must be recorded AND the diverged redo dropped.
+    useGraphStore
+      .getState()
+      .addNode({ id: "c", kind: "mesh", primitive: "cube" });
+    expect(liveIds()).toEqual(["a", "c"]);
+    expect(redoGraph()).toBe(false);
+
+    // The edit is itself undoable (suppressNext no longer swallows the push).
+    expect(undoGraph()).toBe(true);
+    expect(liveIds()).toEqual(["a"]);
   });
 
   it("undoGraph / redoGraph return false when stacks are empty", () => {

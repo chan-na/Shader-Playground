@@ -168,6 +168,13 @@ export function CodeEditor() {
     loadedKeyRef.current = key;
     lastCommittedRef.current = source;
     if (switching) setLiveDiags([]);
+    // Same-document external change where the editor already shows exactly
+    // `source` (e.g. a cross-stage F2 rename that mutated the doc via its own
+    // dispatch *and* committed to the store in the same turn): skip the full
+    // replace. A {from:0,to:len} dispatch carries no selection, so it would
+    // otherwise collapse the cursor to offset 0. On a real document switch we
+    // always reload (cursor reset there is expected). (M11)
+    if (!switching && source === view.state.doc.toString()) return;
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: source },
     });

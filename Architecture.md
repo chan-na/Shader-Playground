@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 32)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 34)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -145,13 +145,13 @@
      - **메시 결정**: `(target=sn.id, handle='mesh')` 인 엣지가 있으면 메시 노드에서 가져오고 `meshIsFullscreen=false`. 없거나 메시 노드가 비어 있으면 `quad` 프리미티브 + `fullscreen.vert` 가 자동 주입되어 `meshIsFullscreen=true`.
      - **컴퓨트 mesh 입력 특수 경로**: 메시 엣지의 source 가 ComputeNode 인 경우, 컴파일 시점에 해당 ComputePass 의 두 vbo 세트(A/B) 각각에 대해 VAO 두 개를 만들어 `pass.meshComputeVaos = [vaoA, vaoB]` 로 보관. `pass.meshComputeNodeId` 로 연결된 ComputePass 를 식별. `pass.mesh.primitive` 는 ComputeNode 의 primitive 를, `vertexCount` 는 ComputeNode 의 `count` 를 그대로 가져온다.
      - **프로그램 컴파일**: `createProgram(gl, vertexSource, fragmentSource)`. 실패하면 `shaderErrors[node.id]` 에 stage 정보와 함께 누적되고 해당 패스는 건너뛰어진다 — 그래프 나머지는 계속 컴파일됨.
-     - **FBO** 할당 (plan 의 `width × height` 단일 해상도).
+     - **FBO** 할당 — 노드의 `resolutionScale`(Phase 17)를 canvas `width × height` 에 곱한 뒤 `scaledDimensions` 로 반올림·최소 1px 클램프한 per-pass 해상도(`pass.width × pass.height`)로 생성. `resolutionScale` 이 없으면 1× 라서 캔버스 해상도와 동일. plan 최상위 `width/height` 는 캔버스 원본 해상도를 유지한다.
      - **입력 라우팅**: `sn.id` 로 들어오는 모든 엣지를 순회.
        - `targetHandle === 'mesh'` 는 위에서 처리했으므로 스킵.
        - source 가 `param / math / swizzle / combine` → **`paramBinding`** (CPU 평가 경로).
        - 그 외 (`shader / image / mesh-by-accident`) → **`samplerBinding`** + 텍스처 유닛 증가.
    - **ComputePass (`kind: 'compute'`)**:
-     - **TF 프로그램 컴파일**: vertex shader 만 진짜 로직이고 fragment 는 빌트인 `tfNoop.frag` (의미 없는 dummy 출력 — `RASTERIZER_DISCARD` 로 어차피 폐기). `createComputeProgram` 이 link 전에 `gl.transformFeedbackVaryings(prog, [outNames], INTERLEAVED 또는 SEPARATE)` 를 호출. 현재 구현은 attribute slot 별 분리된 vbo 를 쓰므로 `SEPARATE_ATTRIBS`.
+     - **TF 프로그램 컴파일**: vertex shader 만 진짜 로직이고 fragment 는 빌트인 `tfNoop.frag` (의미 없는 dummy 출력 — `RASTERIZER_DISCARD` 로 어차피 폐기). `createTransformFeedbackProgram`(`core/gl/program.ts`) 이 link 전에 `gl.transformFeedbackVaryings(prog, [outNames], INTERLEAVED 또는 SEPARATE)` 를 호출. 현재 구현은 attribute slot 별 분리된 vbo 를 쓰므로 `SEPARATE_ATTRIBS`.
      - **Ping-pong 버퍼**: attribute slot 마다 두 vbo (A/B) 를 만들고 seed 함수(`sphere`/`cube`/`random`/`zero`) 로 양쪽 모두 초기화. read 측이 다음 프레임 입력, write 측이 다음 프레임 출력. compile 시 `read = 'A'` 로 시작.
      - **VAO**: vbo 세트마다 VAO 1 개. `vaoA` 는 A 측 vbo 를 attribute pointer 로 묶고, `vaoB` 는 B 측. 매 dispatch 마다 read 에 맞는 VAO 가 bound 되고 다른 측이 TF 캡처 대상.
      - **TF object**: `tfA` 는 A 측 vbo 들을 `bindBufferBase` 로 묶고, `tfB` 는 B 측. dispatch 시 read 측의 TF 가 캡처 대상.
@@ -180,16 +180,16 @@
    - 사라진 패스에 대응하는 `asyncReadback` 슬롯 `release(gl, prevId)` — PBO 가 사라진 FBO 의 stale 메모리를 읽지 않도록.
    - `thumbnailScheduler.bumpAll()` 로 모든 썸네일을 즉시 갱신 큐에 다시 올림.
 3. **유니폼 변경 감지**: `uniformRev` 가 변했으면 `bumpAll()` 만(컴파일은 안 함).
-4. **dirty 게이트(B2)**: 다음 조건 중 하나라도 참이면 이 프레임을 *렌더링 프레임*으로 마크한다 — `timeStore.playing === true`, **`plan.hasExternal === true`** (Phase 14a; webcam 같은 라이브 소스가 있으면 시간 정지와 무관하게 무조건 dirty), 또는 마지막 프레임 대비 `graphStore.rev` / `assetStore.rev` / `graphStore.uniformRev` / `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 중 하나라도 변화. 어떤 조건도 참이 아니면 **이번 프레임은 `executePlan` 을 스킵**하고, async readback 펜스만 펌프한 뒤 다음 RAF 만 등록한다. 정적 그래프 + 정지 시간 + 외부 소스 없음 = GPU 0 비용. 카메라/슬라이더/스크럽 등 모든 사용자 입력은 자기 스토어의 `rev` 를 올려 다음 프레임을 깨운다. **컴퓨트 패스의 영향(Phase 13)**: 컴퓨트 패스가 한 개 이상이면 `timeStore.playing === true` 일 때 무조건 dirty(애초에 위 첫 조건에 해당). 시간이 정지된 idle 상태에서는 컴퓨트 dispatch 도 건너뛰므로 시뮬레이션이 멈춘 채 GPU 0 비용을 유지한다 — 다음 dispatch 시 read 측의 직전 결과부터 다시 시작. **외부 입력의 영향(Phase 14a)**: webcam 노드가 있으면 `hasExternal` 이 시간 정지를 덮어쓰므로 일시정지 중에도 카메라 프레임이 흐른다 — 매 RAF tick 의 `updateExternalSources(gl)` 가 `texSubImage2D(HTMLVideoElement)` 로 신선한 frame 을 GL 텍스처에 업로드.
+4. **dirty 게이트(B2)**: 다음 조건 중 하나라도 참이면 이 프레임을 *렌더링 프레임*으로 마크한다 — `timeStore.playing === true`, **`plan.hasExternal === true`** (Phase 14a; webcam 같은 라이브 소스가 있으면 시간 정지와 무관하게 무조건 dirty), **`gifRecorderStore.status === 'recording'`** (Phase 31; GIF 녹화 중에는 정적 그래프라도 일정 케이던스로 프레임을 계속 그려야 하므로 무조건 dirty), 또는 마지막 프레임 대비 `graphStore.rev` / `assetStore.rev` / `graphStore.uniformRev` / `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` / `mouseStore.rev` 중 하나라도 변화. 어떤 조건도 참이 아니면 **이번 프레임은 `executePlan` 을 스킵**하고, async readback 펜스만 펌프한 뒤 다음 RAF 만 등록한다. 정적 그래프 + 정지 시간 + 외부 소스 없음 = GPU 0 비용. 카메라/슬라이더/스크럽 등 모든 사용자 입력은 자기 스토어의 `rev` 를 올려 다음 프레임을 깨운다. **컴퓨트 패스의 영향(Phase 13)**: 컴퓨트 패스가 한 개 이상이면 `timeStore.playing === true` 일 때 무조건 dirty(애초에 위 첫 조건에 해당). 시간이 정지된 idle 상태에서는 컴퓨트 dispatch 도 건너뛰므로 시뮬레이션이 멈춘 채 GPU 0 비용을 유지한다 — 다음 dispatch 시 read 측의 직전 결과부터 다시 시작. **외부 입력의 영향(Phase 14a)**: webcam 노드가 있으면 `hasExternal` 이 시간 정지를 덮어쓰므로 일시정지 중에도 카메라 프레임이 흐른다 — 매 RAF tick 의 `updateExternalSources(gl)` 가 `texSubImage2D(HTMLVideoElement)` 로 신선한 frame 을 GL 텍스처에 업로드.
 5. **유니폼 핫패치**: (렌더 프레임에서만) 현재 `graphStore.nodes` 의 `shader` 노드들의 `uniformValues` 를 `pass.uniformValues` 로 그대로 복사. 슬라이더 드래그가 매 프레임 즉시 반영되는 경로.
 6. **시간 진행**: `timeStore.advance(dt/1000)` — `playing=false` 면 noop. dirty 게이트와 무관하게 매 틱 호출되므로 idle 중 wall-clock 만 지나가도 `simTime` 은 변하지 않는다.
 7. **FPS 통계**: 500ms 누적분으로 `setStats({fps, frame, drawCalls})`. idle 프레임에서는 `drawCalls = 0` 으로 보고된다.
-8. **실행**: `executePlan(gl, plan, FrameContext, canvasWidth, canvasHeight)` + `rendererStore.bumpRenderTick()`. `renderTick` 은 누적 카운터로, idle 게이트가 작동하는지를 E2E 가 확인하는 신호다.
+8. **실행**: `executePlan(gl, plan, FrameContext, canvasWidth, canvasHeight, gpuTimer)` + `rendererStore.bumpRenderTick()`. (`gpuTimer` 는 supported && enabled 일 때만 전달되는 `GpuTimerPool`, 아니면 `null` — §4.6.) `renderTick` 은 누적 카운터로, idle 게이트가 작동하는지를 E2E 가 확인하는 신호다.
 9. **썸네일**: `asyncReadback.poll(gl)` → 완료된 슬롯들을 `scheduler.commit`, `scheduler.pickReady(now)` → 대상 노드에 대해 `asyncReadback.request`.
 
 ### 4.2 FrameContext
 
-`{ time, width, height, camera, background?, params?, graph? }`. `graph` 는 `paramBindings` 가 있을 때만 필요하지만 현재 Viewport 는 항상 넘긴다.
+`{ time, width, height, camera, mouse?, frame?, background?, params?, graph? }`. `mouse` 는 `u_mouse`(vec4), `frame` 은 `u_frame` 값이다. `graph` 는 `paramBindings` 가 있을 때만 필요하지만 현재 Viewport 는 `graph` 와 함께 `mouse`/`frame` 도 항상 넘긴다.
 
 ### 4.3 executePlan (`src/core/graph/execute.ts`)
 
@@ -197,7 +197,7 @@
 for each pass in plan.passes:           # 토포 순서가 보존되어 있음 (Shader | Compute union)
     if pass.kind == 'compute':
         useProgram(pass.program)
-        bindUserUniforms     # uniformValues + paramBindings; system u_time 만 자동
+        bindUserUniforms     # uniformValues + paramBindings; system u_time / u_frame 자동
         bindVertexArray(pass.read == 'A' ? vaoA : vaoB)             # 입력 attribute
         bindTransformFeedback(pass.read == 'A' ? tfB : tfA)         # 캡처 대상
         enable(RASTERIZER_DISCARD)
@@ -210,7 +210,7 @@ for each pass in plan.passes:           # 토포 순서가 보존되어 있음 (
         bindFramebuffer(pass.fbo); clear()
         depth on if !fullscreen, off if fullscreen
         useProgram(pass.program)
-        bindSystemUniforms   # u_time, u_resolution; matrix 는 메시일 때만
+        bindSystemUniforms   # u_time, u_resolution, u_mouse, u_frame; matrix(u_view/u_proj/u_model/u_camera) 는 메시일 때만
         bindUserUniforms     # uniformValues 위에 paramBindings 덮어쓰기
         bindSamplers         # FBO color attach 또는 imageTextures 에서
         if pass.meshComputeNodeId:                                  # 컴퓨트 mesh 입력
@@ -374,13 +374,13 @@ poll(gl):
 
 ### 6.4 동기 fallback
 
-`src/core/thumbnail/readback.ts` 가 **동기 CPU 박스필터** `downsampleToThumb` 와 공유 상수 `THUMB_SIZE` 를 보관한다. `THUMB_SIZE` 는 `AsyncThumbnailReadback`·`NodeThumbnail` 이 공유하고, `downsampleToThumb` 는 PBO·GPU 가 쓰이지 않는 컨텍스트(정적 export 등)를 위한 CPU 폴백으로 남는다 — Phase 22 이후 라이브 readback 경로(§6.2)는 GPU 다운샘플만 사용한다.
+`src/core/thumbnail/readback.ts` 가 **동기 CPU 박스필터** `downsampleToThumb` 와 공유 상수 `THUMB_SIZE` 를 보관한다. `THUMB_SIZE` 는 `AsyncThumbnailReadback`·`NodeThumbnail` 이 공유하고, `downsampleToThumb` 는 PBO·GPU 가 없는 컨텍스트를 위한 CPU 박스필터로 export 되어 있으나 현재 프로덕션 호출자는 없고 단위 테스트(`asyncReadback.test.ts`)에서만 쓰인다 — Phase 22 이후 라이브 readback 경로(§6.2)는 GPU 다운샘플만 사용한다.
 
 ---
 
 ## 7. 상태 스토어 (Zustand)
 
-`src/state/*` 의 15 개 스토어. 책임 분리가 분명하므로 다음 표가 가장 빠른 인덱스다.
+`src/state/*` 의 16 개 스토어. 책임 분리가 분명하므로 다음 표가 가장 빠른 인덱스다.
 
 | Store | 보관 | recompile? | history? | 비고 |
 |---|---|---|---|---|
@@ -392,11 +392,14 @@ poll(gl):
 | `cameraStore` | OrbitCameraState | ✗ | ✗ | 입력 → `setCamera`, RAF 가 `getState`. `rev` 카운터(B2) 가 idle 게이트를 깨움 |
 | `viewportStore` | background rgb | ✗ | ✗ | placeholder/composite 클리어 색. `rev` 카운터(B2) 가 배경 변경 시 idle 게이트를 깨움 |
 | `timeStore` | simTime, playing, speed | ✗ | ✗ | `advance(dt)` 는 RAF 가 호출. `rev` 는 play/pause/scrub/speed 변경에만 올라가고 `advance` 는 올리지 않음 |
+| `mouseStore` | x/y + clickX/clickY + down | ✗ | ✗ | Phase 19. `u_mouse`(vec4: xy=현재 포인터, zw=마지막 클릭) 시스템 유니폼 소스. `rev` 카운터(B2) 가 일시정지 중 포인터 이동 시 idle 게이트를 깨움 |
 | `rendererStore` | ready, fps/frame/drawCalls/errors | ✗ | ✗ | StatusBar 가 구독 |
 | `historyStore` | past[]/future[], MAX=100 | ✗ | — | `suppressNext` 로 apply 중 재push 방지 |
 | `recorderStore` | MediaRecorder 상태 | ✗ | ✗ | start/stop/elapsedMs |
 | `gifRecorderStore` | GIF 캡처 상태 (status/frameCount/elapsedMs) | ✗ | ✗ | Phase 31. 프레임 버퍼는 스토어 밖 `_active` 싱글톤. Viewport RAF 가 `captureFrame`, stop 시 `core/gif/gifEncoderClient` 의 워커로 인코드(Phase 32; 워커 미가용 시 인라인 폴백) |
 | `gpuTimerStore` | byNode EMA + totalMs + supported/enabled | ✗ | ✗ | Phase 15. Viewport 가 매 frame `setSample`, 노드 사라지면 `removeNode` |
+| `toastStore` | toast[] (id/kind/message/durationMs) | ✗ | ✗ | 사일런트 에러·알림 표면화. `push`/`dismiss`/`clear`, kind별 기본 duration 후 자동 소멸. `toast.info/success/warning/error` 래퍼 제공, Toasts UI 가 구독 |
+| `debugUiStore` | 진단 패널 open + level/category 필터 | ✗ | ✗ | 개발자 진단 패널(DiagnosticsPanel) 전용 UI 상태. `utils/log` 의 타입만 import 하는 leaf 스토어라 순환 위험 없음 |
 
 추가로 작업/디스패치 모듈(스토어 아님): `assetActions`(파일 import + IndexedDB 캐시), `autoSave`(30s 디바운스 스케줄러), `shareUrl`(`#share=` 인코딩), `serialization`(프로젝트 JSON v1).
 
@@ -409,7 +412,7 @@ poll(gl):
 
 `setParamLabel`/`setMathConfig`/`setSwizzleMask`/`setCombineConfig`/`setComputeConfig`/`updateComputeSource` 는 **포트 표면 또는 GPU 자원을 바꾸므로** `rev` 를 올리고 history 도 푸시한다 (recompile 으로 ping-pong 버퍼/TF object/VAO 가 새로 만들어짐).
 
-추가로 B2 가 도입한 `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` 는 같은 패턴이다 — 자기 스토어가 사용자 입력으로 변경됐다는 신호만 RAF 의 dirty 게이트에 전달한다. `timeStore.advance()` 만은 매 프레임 호출되는 hot path 라 rev 를 올리지 않는다.
+추가로 B2 가 도입한 `cameraStore.rev` / `timeStore.rev` / `viewportStore.rev` / `mouseStore.rev` 는 같은 패턴이다 — 자기 스토어가 사용자 입력으로 변경됐다는 신호만 RAF 의 dirty 게이트에 전달한다. `timeStore.advance()` 만은 매 프레임 호출되는 hot path 라 rev 를 올리지 않는다.
 
 ### 7.2 Undo/Redo
 
@@ -579,7 +582,7 @@ CodeMirror 와이어링 (glslSetup.ts)
 
 - **Shadowing 규칙은 references 단에서 한 번 적용**: 한 occurrence 의 binding 이 target 과 다르면(예: 로컬이 글로벌을 가린 안쪽), 그 위치는 결과에서 빠진다. global rename 은 shadowed 안 된 곳만, local rename 은 자기 함수 본문만 변경되는 게 자동 보장된다.
 - **F12 / Cmd+Click 분기**: 키맵은 `view.state.selection.main.head` 기준, 클릭 핸들러는 `posAtCoords(clientXY)` 로 doc offset 계산. modifier(`metaKey || ctrlKey`) 가 없으면 무시 — CM 기본 selection 동작 보존. 미정의 식별자(builtin / keyword / no-binding) 는 silently no-op.
-- **Rename UX**: 기본 prompt 는 `window.prompt` (가장 마찰 적은 경로). 검증은 `^[A-Za-z_][A-Za-z0-9_]*$` + `GLSL_KEYWORDS ∪ GLSL_TYPES` 예약어 set. 결과는 `RenameResult` discriminated union — `applied: true` 면 `{ sites, newName }`, false 면 `{ reason }` 로 5 종 skip 사유(`not-on-identifier` / `no-binding` / `prompt-cancelled` / `unchanged` / `invalid-name`).
+- **Rename UX**: 기본 prompt 는 `window.prompt` (가장 마찰 적은 경로). 검증은 `^[A-Za-z_][A-Za-z0-9_]*$` + `GLSL_KEYWORDS ∪ GLSL_TYPES` 예약어 set. 결과는 `RenameResult` discriminated union — `applied: true` 면 `{ sites, otherStageSites, newName }`(`otherStageSites` = 다른 stage 에서 교체된 site 수, single-document rename 은 0), false 면 `{ reason }` 로 5 종 skip 사유(`not-on-identifier` / `no-binding` / `prompt-cancelled` / `unchanged` / `invalid-name`).
 - **Active highlight**: 단일 site(decl 만 존재)면 `Decoration.none` — 노이즈 회피. 비용은 cursor 이동마다 `buildSymbolTable + findReferences` 한 번이지만 playground 규모에서 < 1ms 추정이라 debounce 없음.
 - **CodeEditor observation bridge (`ui/CodeEditor/currentView.ts`)**: CodeEditor.tsx 가 mount/unmount 시 `setCurrentView(view)` / `setCurrentView(null)` 로 module-level ref 갱신. 프로덕션 코드는 의존하지 않고, `__sp.codeEditor = { getCursorLine, focus }` (DEV 한정) 으로 E2E 가 cursor 위치를 직접 읽는다 — F12 점프 결과 검증을 CM DOM 추측 없이 line number 비교로 처리.
 - **DEV bridge 추가**: `window.__sp.glslSymbols.findReferences` (references finder), `window.__sp.codeEditor` (cursor introspection). 기존 Phase 25 의 `glslSymbols` 객체에 한 함수만 더해 형태가 일관된다.
@@ -665,6 +668,15 @@ CM updateListener (doc 변경)
 - **머지/우선순위**: CodeEditor 진단 push effect 가 `auth = diagnosticsStore[stage] + link` 와 `live = liveDiags` 를 합성하되 *같은 `line:severity` 가 양쪽에 있으면 라이브 드롭*. 사용자가 에러를 고치는 순간 — 라이브는 즉시 비고, 권위는 다음 recompile 까지 잠시 stale — 잠깐 권위가 살아 있는 동안 라이브가 추가로 중복 표시하지 않는다.
 - **switch race**: `liveValidate` 가 dispatch 한 promise 가 다른 노드/스테이지로 전환된 뒤 도착하면 `ctxRef` 가 다른 `(id, stage)` 라 그대로 폐기. doc 교체 effect 는 switching 일 때 `setLiveDiags([])` 로 초기화.
 
+### 8.8 디버깅 · 진단 인프라 (Phase 16)
+
+`toastStore`(사용자 알림) · `diagnosticsStore`(GLSL 진단) 와 역할이 분리된, 평소 비가시 / 필요 시 열람하는 개발자 채널.
+
+- **중앙 로거 (`src/utils/log.ts`)** — 레벨(`debug`/`info`/`warn`/`error`) · 카테고리(`gl`/`render`/`graph`/`assets`/`external`/`autosave`/`app`)별 로깅 + 500 엔트리 인메모리 링버퍼(초과 시 오래된 것부터 evict) + 구독/내보내기 API(`subscribeLog` / `exportLogText` / `clearLogBuffer`). 콘솔 미러링은 DEV 한정 + `minLevel` 게이트, 버퍼는 레벨과 무관하게 항상 기록. 어떤 store 도 import 하지 않는 leaf util (단방향).
+- **전역 안전망** — `main.tsx` 의 `window.onerror` / `unhandledrejection` 핸들러 → `log.error("app", …)`. `ErrorBoundary`(메인 작업 영역만 감쌈)가 렌더 중 uncaught 를 잡아 폴백 UI(새로고침 / 진단 복사) 를 띄운다.
+- **GL 에러 표면화 (`src/core/gl/glError.ts`)** — DEV 한정 `checkGlError(gl, context)`. `gl.getError()` 로 첫 플래그를 읽고 남은 플래그를 최대 16 회까지 drain(stale 오류가 다음 probe 로 새지 않게). program 링크 · FBO 셋업은 무조건 호출, 드로우 루프는 호출부의 프레임 카운터로 스로틀(동기 플러시 비용 회피). context lost/restored 도 로깅.
+- **진단 패널** — StatusBar `🛈 Diagnostics` 토글이 `debugUiStore.open` 을 켠다. `DiagnosticsPanel` 은 `subscribeLog` 로 실시간 갱신되는 로그 리스트(레벨/카테고리 필터 + Clear), `Copy` 는 `buildDiagnosticsReport(...)`(로그 + GL renderer/version + 렌더 통계 + userAgent/화면/DPR + 그래프 노드·엣지 수)를 클립보드로 복사(미지원 환경은 안전 폴백). GL 어댑터 identity 는 컨텍스트 생성 시 `rendererStore.glInfo` 에 1회 캡처.
+
 ---
 
 ## 9. 직렬화와 영속화
@@ -674,7 +686,7 @@ CM updateListener (doc 변경)
                        │  graphStore + positions    │
                        └─────────────┬──────────────┘
                                      │
-                       serializeProject({format, version=1, exportedAt, graph, positions})
+                       serializeProject({format, version=1, exportedAt, graph, positions, parents})
                                      │
               ┌──────────────────────┼────────────────────────────┐
               ▼                      ▼                            ▼
@@ -685,9 +697,10 @@ CM updateListener (doc 변경)
 
 ### 9.1 프로젝트 포맷 (`src/state/serialization.ts`)
 
-`{ format: 'shader-playground', version: 1, exportedAt: ISO, graph, positions }`.
+`{ format: 'shader-playground', version: 1, exportedAt: ISO, graph, positions, parents? }`. `parents` 는 Phase 29 그룹 중첩(child→parent) 맵이며 pre-Phase-29 페이로드에는 없어 optional — 없으면 '중첩 없음' 으로 로드해 옛 share URL 도 그대로 열린다.
 
-- 노드는 `kind` 별로 손수 정규화(`structuredCloneNode`) — 알 수 없는 키가 같이 흘러들지 않게.
+- 직렬화 시 노드는 `kind` 별로 손수 클론(`cloneGraphNode`, `src/core/nodes/registry.ts`) — 알 수 없는 키가 같이 흘러들지 않게. 역직렬화 시에는 신뢰할 수 없는 페이로드를 `src/state/projectSanitize.ts` 의 `sanitizeGraphNode`/`sanitizeGraphEdge` 로 정규화한다.
+- 역직렬화는 `projectSanitize.ts` 의 하드 캡을 적용한다: `MAX_NODES 2048` / `MAX_EDGES 8192` 초과 시 throw, 노드/엣지별로 NaN·범위 초과·미지 enum 을 안전값으로 클램프하거나 드롭(warnings 로 보고), shader 소스 64 KiB 상한. `parents` 는 미지 id·자기순환·깊이 64(`MAX_DEPTH`) 초과 체인을 잘라낸다 — 손수 만든 악성 share URL 방어.
 - 검증은 import 시 `validateGraph` 를 돌려 `missing_node`/`multiple_outputs` 만 warnings 로 노출. `cycle` 은 fatal 처럼 보이지만 deserialize 자체는 통과하고 컴파일 시 그쪽에서 막힌다.
 - `version` 이 미래 값이면 `warnings` 로 알리고 로드는 시도.
 
@@ -696,7 +709,7 @@ CM updateListener (doc 변경)
 - 키: `IDBDatabase('shader-playground-session') / store('session') / key 'autosave'`.
 - 스케줄러는 `graphStore.subscribe` 로 모든 변경을 받아 30 초 debounce, `rev === lastSavedRev` 이면 패스. **bootstrap 직후 rev 와 lastSavedRev 가 같으므로 데모 그래프 자체는 자동저장에 쓰이지 않는다** — 첫 클린 부팅에서 복구 다이얼로그가 뜨지 않는 이유.
 - `BootstrapGate` 의 `startAutoSave()` 는 idempotent. 같은 모듈 안에서 모든 인스턴스가 싱글톤 `_activeHandle` 을 공유.
-- `flush()` 는 unload 직전 강제 저장 훅 (현재 unload 리스너는 안 걸려 있지만 API 는 노출).
+- `flush()` 는 강제 저장 훅. `startAutoSave()` 가 `attachUnloadFlush` 로 `beforeunload`/`pagehide` 에 flush 를 붙여 탭 종료·새로고침·iOS Safari 이탈 직전 best-effort 저장하고, `stopAutoSave()` 가 리스너를 해제한다 (30 초 debounce 최악 지연을 unload tick 이 커밋할 수 있게 함).
 
 ### 9.3 Share URL (`src/state/shareUrl.ts`)
 
@@ -706,7 +719,7 @@ CM updateListener (doc 변경)
 serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip') → base64url
 ```
 
-복호도 정확히 역순. `CompressionStream` 미지원 브라우저는 passthrough(압축 안 함) — 동작은 하되 URL 이 길어짐. payload 정규식은 `[#&]share=([A-Za-z0-9_-]+)`.
+복호도 정확히 역순. `CompressionStream` 미지원 브라우저는 passthrough(압축 안 함) — 동작은 하되 URL 이 길어짐. payload 정규식은 `[#&]share=([A-Za-z0-9_-]+)`. 또한 hash payload 가 64 KiB(`MAX_SHARE_HASH_PAYLOAD_BYTES`)를 넘거나 gzip 해제 후 JSON 이 1 MiB(`MAX_SHARE_JSON_BYTES`)를 넘으면 `decodeShareHash` 가 null 을 반환한다 — 과대·악성 공유 링크 방어.
 
 ### 9.4 BootstrapGate 우선순위
 
@@ -721,7 +734,7 @@ serializeProject → JSON.stringify → TextEncoder → CompressionStream('gzip'
 
 ### 9.5 에셋 캐시 (`src/core/assets/cache.ts`)
 
-별도 IndexedDB (`shader-playground` DB, `meshes`/`images` 스토어). MeshAttribute 들은 `ArrayBuffer.slice` 로 재현 가능한 형태로 저장(`view.byteOffset` 보정). 이미지는 원본 `Blob` 으로 저장하고 hydrate 시 `createImageBitmap(blob, {premultiplyAlpha:'none'})` 로 비트맵 복원. 프로젝트 JSON 에는 assetId 만 들어가므로 그래프와 에셋이 분리되어 share URL 도 가벼움.
+별도 IndexedDB (`shader-playground` DB v3, `meshes`/`images`/`videos`/`audios` 스토어 — 비디오·오디오도 원본 Blob 으로 캐시/hydrate). MeshAttribute 들은 `ArrayBuffer.slice` 로 재현 가능한 형태로 저장(`view.byteOffset` 보정). 이미지는 원본 `Blob` 으로 저장하고 hydrate 시 `createImageBitmap(blob, {premultiplyAlpha:'none'})` 로 비트맵 복원. 프로젝트 JSON 에는 assetId 만 들어가므로 그래프와 에셋이 분리되어 share URL 도 가벼움.
 
 ---
 
@@ -755,8 +768,11 @@ WebM 과 별개로, 의존성 0 자체 인코더로 캔버스를 애니메이션
 core/gif/               # 순수 TS · DOM/GL 비의존
    quantize.ts  buildPalette(frames, maxColors)  — rgb555 히스토그램 + median-cut 전역 팔레트
                 mapToPalette(rgba, palette)       — rgb555 캐시 nearest 매핑
+                mapToPaletteDithered(rgba,palette,w,h) — Floyd–Steinberg 오차확산 디더링 매핑 (Phase 33)
    lzw.ts       lzwEncode(indices, minCodeSize)  — GIF 가변폭 LZW (폭 증가 2^w+1, 4096 리셋)
-   encode.ts    encodeGif({width,height,frames}) — GIF89a 조립 (전역 팔레트 + NETSCAPE 루프)
+   encode.ts    encodeGif(opts, mapper?, onProgress?) — GIF89a 조립 (전역/로컬 팔레트 + NETSCAPE 루프, mapper 주입 · 프레임별 진행 콜백)
+   gifEncoderClient.ts encode(job) — 워커 클라이언트 (lazy · Promise · 실패 시 인라인 폴백, Phase 32)
+   gifEncoder.worker.ts encodeGif 를 워커에서 실행 (?worker · reqId RPC, Phase 32)
 
 state/gifRecorder.ts    # 캡처 오케스트레이션 (recorder.ts 와 형제)
    start() → captureFrame(canvas) ×N → stop() → image/gif Blob
@@ -764,12 +780,31 @@ state/gifRecorder.ts    # 캡처 오케스트레이션 (recorder.ts 와 형제)
 
 - **프레임 캡처는 Viewport RAF 안에서**: 컨텍스트가 `preserveDrawingBuffer: false` 라 drawing buffer 는 tick 종료 후 무효화된다. 따라서 `gifRecorder.captureFrame(canvas)` 는 `executePlan` *직후 같은 tick* 에서 호출되어 스크래치 2D 캔버스로 `drawImage`(다운스케일, longest edge ≤ `maxLongEdge`) → `getImageData` 로 RGBA 를 떠 모은다. 목표 fps 스로틀 + `maxSeconds` 프레임 캡으로 메모리를 제한.
 - **dirty 게이트(B2)**: recording 중이면 `gifRecording` 이 `hasExternal` 과 동급의 무조건 dirty 신호가 되어, 시간 정지·정적 그래프에서도 프레임이 일정 cadence 로 렌더·캡처된다.
-- **인코딩은 stop 시 한 번**: 캡처 타임스탬프 차이로 프레임별 delay(centiseconds, 2cs 하한)를 산출하고 `encodeGif` 로 합성 → Blob → `URL.createObjectURL` → Toolbar 가 `.gif` 자동 다운로드. 무거운 프레임 버퍼는 zustand 밖 모듈 싱글톤(`_active`)에 두고 스토어에는 status/frameCount/elapsedMs 만.
-- **단일 전역 팔레트**: 모든 프레임이 한 256색 팔레트(local color table 없음)를 공유 — 인코더·출력 모두 간결. 짧은 셰이더 클립에는 품질 손실이 작다.
+- **인코딩은 stop 시 한 번**: 캡처 타임스탬프 차이로 프레임별 delay(centiseconds, 2cs 하한)를 산출하고, `stop()` 은 `status` 를 `"encoding"` 으로 바꾼 뒤 모듈 싱글톤 `gifEncoder().encode()`(Phase 32 워커 클라이언트, 인라인 폴백)로 합성 → Blob → `URL.createObjectURL` → Toolbar 가 `.gif` 자동 다운로드. 무거운 프레임 버퍼는 zustand 밖 모듈 싱글톤(`_active`)에 두고 스토어에는 status/frameCount/elapsedMs/encodeProgress 만.
+- **팔레트/디더링 기본값 (Phase 33)**: 초기(Phase 31)에는 모든 프레임이 한 256색 전역 팔레트(local color table 없음)를 공유했으나, 지금은 `gifRecorder` 기본값이 per-frame 로컬 팔레트(`localPalette:true`) + Floyd–Steinberg 디더링(`dither:true`)이다(§11.3). 색이 시간에 따라 변하는 클립의 충실도를 높인다. `localPalette:false` 로 단일 전역 팔레트 모드도 여전히 선택 가능.
+
+### 11.2 인코딩 Web Worker 오프로드 (Phase 32)
+
+`core/gif/gifEncoder.worker.ts` + `core/gif/gifEncoderClient.ts`:
+
+- **워커 위임**: `gifRecorder.stop()` 은 이제 `encodeGif` 를 직접 부르지 않고 모듈 싱글톤 `gifEncoder()`(`GifEncoderClient`)의 `encode(job)` 로 위임한다. LZW·양자화 패스가 워커에서 돌아 멀티초 녹화가 에디터를 얼리지 않는다.
+- **무상태 RPC**: 워커는 data-in / bytes-out 무상태 함수를 `reqId` RPC(`glslValidator.worker.ts` 와 동형)로 감싼 것뿐. 인코딩된 바이트 버퍼는 transfer(zero-copy)로 돌려받는다. **입력 프레임은 transfer 하지 않는다** — 워커가 도중에 죽어도 클라이언트가 원본을 그대로 들고 인라인 폴백을 돌릴 수 있게 하기 위함.
+- **절대 잃지 않는 폴백**: 워커 생성 실패·postMessage 실패·`error` 이벤트 등 모든 실패 경로는 메인 스레드 **인라인 인코드로 폴백**한다(사용자가 명시적으로 녹화한 GIF 는 유실 금지 — validator 가 실패 시 `[]` 를 반환하는 것과 대비되는 강한 실패 모델). 인라인 경로는 기본 mapper(디더링 없음)만 실어 `mapToPaletteDithered` 를 초기 번들 밖 워커 청크에 격리한다. jsdom 등 `Worker` 미정의 환경에서는 바로 인라인 경로로 간다.
+
+### 11.3 per-frame 로컬 팔레트 + 디더링 (Phase 33)
+
+- **로컬 팔레트**: `encodeGif({localPalette:true})` 는 전역 색표 대신 프레임마다 자체 ≤256색 로컬 색표를 싣고 전역 색표를 생략한다. 색이 시간에 따라 변하는 클립의 충실도를 높인다. `gifRecorder` 기본값이 `localPalette: true` 로 바뀌어 §11.1 의 "단일 전역 팔레트" 는 더 이상 기본이 아니다.
+- **Floyd–Steinberg 디더링**: `quantize.ts` 의 `mapToPaletteDithered(rgba, palette, w, h)` 가 각 픽셀의 양자화 오차를 아직 방문하지 않은 이웃(우 7/16, 하좌 3/16, 하 5/16, 하우 1/16)으로 확산해 하드 밴딩을 미세 노이즈로 바꾼다 — 셰이더 그라디언트에서 큰 품질 이득. 오차 누적으로 같은 색이 다르게 매핑되므로 per-cell 캐시 없이 픽셀마다 nearest 탐색을 돈다.
+- **mapper 주입**: `encodeGif` 의 두 번째 인자로 per-pixel 매핑 함수를 주입한다. 워커는 `dither` 플래그에 따라 `mapToPaletteDithered` 를, 인라인 폴백은 기본 nearest(`mapToPalette`)를 넘긴다 — 무거운 디더링 패스를 워커 청크에만 묶어두기 위함. `gifRecorder` 기본값 `dither: true`.
+
+### 11.4 인코딩 진행률 (Phase 34)
+
+- **진행 콜백**: `encodeGif` 는 선택적 `onProgress(done, total)` 콜백을 받아 프레임 하나를 조립할 때마다 호출한다. 워커는 이를 `{type:'progress', reqId, done, total}` 메시지로 메인 스레드에 중계하며, 최종 응답 전까지 job 을 pending 으로 유지한다.
+- **encodeProgress 상태**: `gifRecorder.stop()` 은 `status` 를 `"encoding"` 으로 바꾸고 진행 콜백에서 `encodeProgress`(0..1)를 갱신한다. 인코딩이 끝나면 `idle` 로 복귀하며 진행률을 리셋한다. StatusBar/Toolbar 가 이 값을 표시한다.
 
 ---
 
-## 12. 디렉토리 트리 (Phase 31 기준)
+## 12. 디렉토리 트리 (Phase 34 기준)
 
 > `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
 
@@ -779,10 +814,15 @@ ShaderPlayground/
 ├─ vite.config.ts
 ├─ vitest.config.ts
 ├─ tsconfig.json
+├─ biome.json                        # Biome 린트/포맷 설정
+├─ knip.json                         # Knip 데드코드 설정
+├─ playwright.config.ts              # Playwright E2E 러너 (SwiftShader chromium)
 ├─ package.json
 ├─ SPEC.md
 ├─ Architecture.md
 ├─ README.md
+├─ CLAUDE.md                         # Claude 작업 규약 / 품질 게이트
+├─ tests/e2e/                        # Playwright E2E 스펙 (Phase 1~12)
 └─ src/
    ├─ main.tsx                       # React 엔트리, App 마운트
    ├─ App.tsx                        # 셸 (NodeEditor / Viewport / CodeEditor / SidePanel / StatusBar + overlay)
@@ -790,19 +830,24 @@ ShaderPlayground/
    ├─ test-setup.ts                  # Vitest + jsdom 부트스트랩
    ├─ vite-env.d.ts
    │
+   ├─ build/                         # ── 빌드 전용 (Vite 플러그인) ─────
+   │  └─ cspMetaPlugin.ts            # 프로덕션 HTML 에만 CSP meta 주입 (dev/E2E 제외) (+ test)
+   │
    ├─ core/                          # ── React 비의존 ──────────────────
    │  ├─ gl/
-   │  │  ├─ context.ts               # WebGL2 컨텍스트 생성/검증
-   │  │  ├─ program.ts               # 컴파일/링크 + InfoLog 노출
-   │  │  ├─ texture.ts               # 텍스처 생성/포맷
-   │  │  ├─ framebuffer.ts           # FBO + 컬러/깊이 어태치먼트
-   │  │  ├─ mesh.ts                  # VBO/VAO 업로드/draw
-   │  │  ├─ uniforms.ts              # 유니폼 setter 디스패처
-   │  │  └─ gpuTimer.ts              # Phase 15 — EXT_disjoint_timer_query_webgl2 풀 (+ test)
+   │  │  ├─ context.ts               # WebGL2 컨텍스트 생성/검증 (+ test)
+   │  │  ├─ program.ts               # 컴파일/링크 + InfoLog 노출 (+ test)
+   │  │  ├─ texture.ts               # 텍스처 생성/포맷 (+ test)
+   │  │  ├─ framebuffer.ts           # FBO + 컬러/깊이 어태치먼트 (+ test)
+   │  │  ├─ mesh.ts                  # VBO/VAO 업로드/draw (+ test)
+   │  │  ├─ uniforms.ts              # 유니폼 setter 디스패처 (+ test)
+   │  │  ├─ gpuTimer.ts              # Phase 15 — EXT_disjoint_timer_query_webgl2 풀 (+ test)
+   │  │  ├─ glError.ts               # DEV 전용 gl.getError() 표면화 (셋업 무조건 / 드로우 스로틀) (+ test)
+   │  │  └─ fakeGl.ts                # 테스트 전용 가짜 WebGL2 컨텍스트 (GL 모듈 단위 테스트용)
    │  │
    │  ├─ camera/
    │  │  ├─ orbitCamera.ts           # OrbitCameraState + view/proj/orbit/pan/zoom (+ test)
-   │  │  └─ input.ts                 # createCameraController — pointer/wheel 부착
+   │  │  └─ input.ts                 # createCameraController — pointer/wheel 부착 (+ test)
    │  │
    │  ├─ graph/
    │  │  ├─ types.ts                 # GraphNode/Edge/Port + Param·Math·Swizzle·Combine·Compute·Group
@@ -811,6 +856,7 @@ ShaderPlayground/
    │  │  ├─ validate.ts              # cycle / multi_input / multiple_outputs (+ test)
    │  │  ├─ diagnostics.ts           # GLSL 로그 파서 (+ test)
    │  │  ├─ uniformParser.ts         # uniform + 주석 힌트 (+ test)
+   │  │  ├─ uniformCache.ts          # 패스별 유니폼 값 변경 감지 (엄격 비교 — 재업로드 스킵) (+ test)
    │  │  ├─ computeSeed.ts           # sphere/cube/random/zero seed 생성기 (+ test)
    │  │  ├─ parents.ts               # Phase 29/30 — parent map + abs/relative 좌표 + cycle 가드 + hasCollapsedAncestor (+ test)
    │  │  └─ splitLayout.test.ts      # 분할 뷰포트 단위 테스트
@@ -823,10 +869,12 @@ ShaderPlayground/
    │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
    │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
    │  │
-   │  ├─ gif/                        # Phase 31 — 의존성 0 애니메이션 GIF 인코더
-   │  │  ├─ quantize.ts              # median-cut 전역 팔레트 + nearest 매핑 (+ test)
+   │  ├─ gif/                        # Phase 31~34 — 의존성 0 애니메이션 GIF 인코더 (worker 오프로드 · per-frame 팔레트 · 진행률)
+   │  │  ├─ quantize.ts              # median-cut 팔레트 + nearest / Floyd–Steinberg 디더 매핑 (+ test)
    │  │  ├─ lzw.ts                   # GIF 가변폭 LZW 압축 (+ test)
-   │  │  └─ encode.ts                # GIF89a 조립 (palette + NETSCAPE loop + frames) (+ test)
+   │  │  ├─ encode.ts                # GIF89a 조립 (palette + NETSCAPE loop + frames + onProgress) (+ test)
+   │  │  ├─ gifEncoderClient.ts      # Phase 32 — 워커 클라이언트 (lazy · Promise · 실패 시 인라인 폴백) (+ test)
+   │  │  └─ gifEncoder.worker.ts     # Phase 32 — encodeGif 를 워커에서 실행 (?worker · reqId RPC)
    │  │
    │  ├─ glsl/                       # Phase 24/25/26/27/28 — 라이브 GLSL 검증 + LSP-like 정적 분석
    │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
@@ -843,42 +891,53 @@ ShaderPlayground/
    │  └─ assets/
    │     ├─ primitives.ts            # cube/sphere/plane/torus/quad 생성기 (+ test)
    │     ├─ objLoader.ts             # @loaders.gl/obj 래퍼 (+ test)
-   │     ├─ gltfLoader.ts            # @loaders.gl/gltf 래퍼 (지오메트리만)
-   │     ├─ imageLoader.ts           # createImageBitmap 래퍼
+   │     ├─ gltfLoader.ts            # @loaders.gl/gltf 래퍼 (지오메트리만) (+ test)
+   │     ├─ imageLoader.ts           # createImageBitmap 래퍼 (+ test)
    │     ├─ videoLoader.ts           # Phase 14b — mp4/webm 메타 프로빙 + Blob (+ test)
    │     ├─ audioLoader.ts           # Phase 14c — decodeAudioData 메타 프로빙 + Blob (+ test)
-   │     ├─ cache.ts                 # IndexedDB 에셋 캐시 (mesh ArrayBuffer / image·video·audio Blob)
+   │     ├─ cache.ts                 # IndexedDB 에셋 캐시 (mesh ArrayBuffer / image·video·audio Blob) (+ test)
    │     └─ types.ts                 # GeometryHandle, ImageHandle, VideoAssetHandle, AudioAssetHandle
    │
    ├─ state/                         # ── Zustand 스토어 ────────────────
+   │  ├─ types.ts                    # 공유 상태 타입 (NodePosition 등)
    │  ├─ graphStore.ts               # nodes/edges/positions + rev/uniformRev (+ test)
-   │  ├─ assetStore.ts               # 메시/이미지 카탈로그 (런타임 핸들)
+   │  ├─ assetStore.ts               # 메시/이미지 카탈로그 (런타임 핸들) (+ test)
    │  ├─ assetActions.ts             # import + IndexedDB hydrate (+ test)
    │  ├─ selectionStore.ts           # selectedNodeIds[] + primary selectedNodeId (+ test)
    │  ├─ rendererStore.ts            # fps/frame/drawCalls/errors (+ test)
-   │  ├─ cameraStore.ts              # OrbitCameraState 보관 + reset
-   │  ├─ viewportStore.ts            # background rgb
+   │  ├─ cameraStore.ts              # OrbitCameraState 보관 + reset (+ test)
+   │  ├─ viewportStore.ts            # background rgb (+ test)
+   │  ├─ mouseStore.ts               # u_mouse 포인터 위치 (framebuffer px · bottom-left · xy 현재 / zw 마지막 down) (+ test)
    │  ├─ timeStore.ts                # simTime/playing/speed/advance (+ test)
-   │  ├─ diagnosticsStore.ts         # byNode[id]={vertex/fragment/link}
+   │  ├─ diagnosticsStore.ts         # byNode[id]={vertex/fragment/link} (+ test)
    │  ├─ editorStore.ts              # activeStage + jumpRequest(rev) (+ test)
    │  ├─ historyStore.ts             # Undo/Redo 100건 + suppressNext (+ test)
    │  ├─ demoGraph.ts                # 부트스트랩/프리셋 그래프 시드 (+ test)
    │  ├─ serialization.ts            # 프로젝트 JSON v1 (+ test)
+   │  ├─ projectSanitize.ts          # 비신뢰 프로젝트(share/import/autosave) 하드 캡 검증 (+ test)
    │  ├─ shareUrl.ts                 # gzip + base64url + URL hash (+ test)
    │  ├─ autoSave.ts                 # 30s debounce IndexedDB 자동저장 (+ test)
-   │  ├─ recorder.ts                 # MediaRecorder → WebM/mp4
-   │  ├─ gifRecorder.ts              # Phase 31 — 캔버스 프레임 캡처 → core/gif 인코드 → GIF Blob (+ test)
-   │  ├─ thumbnailScheduler.ts       # core/thumbnail/scheduler 싱글톤
-   │  └─ gpuTimerStore.ts            # Phase 15 — byNode EMA ms + totalMs + supported/enabled (+ test)
+   │  ├─ recorder.ts                 # MediaRecorder → WebM/mp4 (+ test)
+   │  ├─ gifRecorder.ts              # Phase 31~34 — 캔버스 프레임 캡처 → core/gif 인코드 → GIF Blob (+ encodeProgress) (+ test)
+   │  ├─ thumbnailScheduler.ts       # core/thumbnail/scheduler 싱글톤 (+ test)
+   │  ├─ gpuTimerStore.ts            # Phase 15 — byNode EMA ms + totalMs + supported/enabled (+ test)
+   │  ├─ toastStore.ts               # 사용자 토스트 큐 (info/success/warning/error) (+ test)
+   │  └─ debugUiStore.ts             # 진단 패널 open + level/category 필터 (leaf store — log 타입만 의존) (+ test)
    │
    ├─ ui/                            # ── React 컴포넌트 ────────────────
    │  ├─ BootstrapGate.tsx           # share / autosave 복구 / 데모 분기 + 다이얼로그
    │  ├─ KeyboardShortcuts.tsx       # 전역 단축키 — Cmd+Z/Y(undo/redo), Cmd+D(복제), Cmd+A(전체 선택), 화살표(선택 일괄 이동, Phase 23), Space(play/pause), Cmd+K
+   │  ├─ ErrorBoundary.tsx           # 최상위 에러 경계 → RecoveryDialog + 로그 export (+ test)
+   │  ├─ RecoveryDialog.tsx          # 크래시 복구 다이얼로그 (ESC 격리 · 로그 복사) (+ test)
+   │  ├─ Toasts.tsx                  # toastStore 구독 → ToastRow 리스트
+   │  ├─ ToastRow.tsx                # 단일 토스트 행 (kind 아이콘 + dismiss) (+ test)
    │  │
    │  ├─ NodeEditor/
    │  │  ├─ index.tsx                # React Flow 캔버스 + graphStore 양방향
    │  │  ├─ Toolbar.tsx              # 노드 팔레트 / 저장 / Share / Record / Export HTML
    │  │  ├─ NodeThumbnail.tsx        # 카드 <canvas> + IntersectionObserver
+   │  │  ├─ nodeUiRegistry.ts        # GraphNodeKind → NodeView 컴포넌트 매핑 (+ test)
+   │  │  ├─ HelpModal.tsx            # 단축키/도움말 모달 (+ test)
    │  │  ├─ nodeCard.css
    │  │  └─ nodes/
    │  │     ├─ MeshNodeView.tsx
@@ -892,7 +951,10 @@ ShaderPlayground/
    │  │     ├─ UtilityNodeViews.tsx  # Math/Swizzle/Combine
    │  │     ├─ ComputeNodeView.tsx   # TF 컴퓨트 — count/primitive/attribute 메타 표시
    │  │     ├─ GroupNodeView.tsx     # Phase 29/30 — 그룹 카드 + NodeResizer + collapse 토글 + 라벨 인라인 편집
-   │  │     └─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
+   │  │     ├─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
+   │  │     ├─ PortHandle.tsx        # 포트 핸들 (React Flow Handle 래퍼)
+   │  │     ├─ ValueInput.tsx        # 숫자 입력 위젯 (라이브 커밋) (+ test)
+   │  │     └─ paramNodeViewHelpers.ts # 파람 값 → 카드 표시 문자열 (Time scale/offset) (+ test)
    │  │
    │  ├─ CodeEditor/
    │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync + 라이브 검증 + currentView 등록
@@ -911,23 +973,27 @@ ShaderPlayground/
    │  │  └─ index.tsx                # <canvas> + RAF + asyncReadback 펌프 + cameraCtl
    │  │
    │  ├─ CommandPalette/
-   │  │  └─ index.tsx                # Cmd+K — 노드/프리셋/Math/Swizzle/Combine 추가
+   │  │  ├─ index.tsx                # Cmd+K — 노드/프리셋/Math/Swizzle/Combine 추가
+   │  │  └─ helpers.ts               # fuzzyMatch 등 검색 스코어링 (+ test)
    │  │
    │  └─ Panels/
    │     ├─ SidePanel.tsx            # Inspector ↔ Assets ↔ Problems 탭 컨테이너
    │     ├─ Inspector.tsx            # 디스패처 (Shader/Param/Utility/Mesh/Webcam/Video/Audio)
    │     ├─ UniformControl.tsx       # slider / multi / color
    │     ├─ UniformHintEditor.tsx    # Phase 21 — ⚙ 주석 힌트 GUI (range/step/default/label)
+   │     ├─ uniformFilter.ts         # 유니폼 검색 쿼리 정규화/필터 (+ test)
    │     ├─ ParamInspector.tsx
    │     ├─ UtilityInspector.tsx
    │     ├─ WebcamInspector.tsx      # Phase 14a — device dropdown + live status
    │     ├─ VideoInspector.tsx       # Phase 14b — 에셋 선택 / play·loop·mute / seek
    │     ├─ AudioInspector.tsx       # Phase 14c — mic↔file / fftSize / smoothing / play·loop
    │     ├─ GroupInspector.tsx       # Phase 29 — label/color 편집 + ungroup / delete-with-children
-   │     ├─ ViewportControls.tsx     # 카메라 Reset/FOV + 배경색 + 시간
+   │     ├─ ViewportControls.tsx     # 카메라 Reset/FOV + 배경색 + 시간 (+ test)
    │     ├─ ProblemsPanel.tsx        # 진단 → select + setStage + requestJump
+   │     ├─ DiagnosticsPanel.tsx     # 개발자 진단 패널 — 로그/GL 정보 + 버그리포트 스냅샷 (+ test)
+   │     ├─ diagnosticsReport.ts     # 버그리포트 스냅샷 순수 조립기 (주입식 · store 무의존) (+ test)
    │     ├─ AssetBrowser.tsx
-   │     └─ StatusBar.tsx
+   │     └─ StatusBar.tsx            # (+ test)
    │
    ├─ export/                        # ── 정적 HTML export ──────────────
    │  ├─ htmlExport.ts               # Project JSON → 단일 파일 HTML (+ test)
@@ -948,11 +1014,15 @@ ShaderPlayground/
    │     ├─ noise.frag
    │     ├─ tonemap.frag
    │     ├─ blend.frag               # 두 sampler + u_mix + u_mode(0=mix/1=add/2=mul/3=screen)
+   │     ├─ mask.frag                # base/overlay/mask 3-sampler 마스킹 합성
+   │     ├─ composite3.frag          # 3-sampler 가중 합성 (u_a/u_b/u_c + u_wa/u_wb/u_wc)
    │     └─ particlePoint.frag       # 컴퓨트 점 렌더용 fragment
    │
    └─ utils/
       ├─ debounce.ts                 # (+ test)
-      └─ id.ts
+      ├─ id.ts                       # (+ test)
+      ├─ log.ts                      # 개발자용 런타임 로거 (store 무의존 · 단방향) (+ test)
+      └─ assertNever.ts              # discriminated union exhaustiveness 가드
 ```
 
 ### 12.1 초안과 달라진 지점

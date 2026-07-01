@@ -1,6 +1,6 @@
 # ShaderPlayground
 
-WebGL2 기반 노드 그래프 셰이더 플레이그라운드. React Flow 캔버스에서 메시·이미지·셰이더·파라미터·유틸리티 노드를 연결해 그래프를 구성하고, CodeMirror 6 인라인 에디터에서 GLSL을 작성하면 디바운스 후 재컴파일되어 다중 FBO 패스로 렌더된다. 모든 ShaderNode 카드에는 96×96 라이브 썸네일이 WebGL2 PBO + `fenceSync` 비동기 readback으로 표시되고, 그래프는 IndexedDB 자동저장 / `#share=` URL / 의존성 0의 단일 HTML 파일로 영속화·공유할 수 있다.
+WebGL2 기반 노드 그래프 셰이더 플레이그라운드. React Flow 캔버스에서 메시·이미지·웹캠·비디오·오디오·셰이더·컴퓨트·파라미터·유틸리티 노드를 연결해 그래프를 구성하고(노드 그룹핑 지원), CodeMirror 6 인라인 에디터에서 GLSL을 작성하면 디바운스 후 재컴파일되어 다중 FBO 패스로 렌더된다. 모든 ShaderNode 카드에는 96×96 라이브 썸네일이 WebGL2 PBO + `fenceSync` 비동기 readback으로 표시되고, 그래프는 IndexedDB 자동저장 / `#share=` URL / 의존성 0의 단일 HTML 파일로 영속화·공유할 수 있다.
 
 자세한 기능 명세는 [SPEC.md](./SPEC.md), 시스템 구조는 [Architecture.md](./Architecture.md), 코드 작업 규약은 [CLAUDE.md](./CLAUDE.md)를 참고.
 
@@ -49,7 +49,7 @@ npm run test:watch      # watch 모드
 npm run test:coverage   # v8 커버리지 리포트
 ```
 
-테스트는 `src/**/*.test.{ts,tsx}` 위치에 모듈과 동거한다. 커버리지 임계치(lines 30% / functions 22% / branches 22% / statements 30%)는 `vitest.config.ts`에 강제되어 있어 임계치 미달 시 `npm run check`가 실패한다.
+테스트는 `src/**/*.test.{ts,tsx}` 위치에 모듈과 동거한다. 커버리지 임계치(lines 50% / functions 47% / branches 42% / statements 50%)는 `vitest.config.ts`에 강제되어 있어 임계치 미달 시 `npm run check`가 실패한다.
 
 ### E2E 테스트 — Playwright
 
@@ -59,15 +59,16 @@ npm run test:e2e:ui       # Playwright UI 모드 (대화형 디버깅)
 npm run test:e2e:headed   # 브라우저 창을 띄워 실행
 ```
 
-Phase 1~12 핵심 시나리오 26건이 `tests/e2e/`에 있다. dev 서버는 `playwright.config.ts`의 `webServer.command`로 자동 기동되며, 이미 `npm run dev`가 떠 있으면 재사용한다 (chromium / SwiftShader / workers 1 / 직렬 실행).
+Phase 1~34 핵심 시나리오가 `tests/e2e/`의 30개 스펙 파일에 있다. dev 서버는 `playwright.config.ts`의 `webServer.command`로 자동 기동되며, 이미 `npm run dev`가 떠 있으면 재사용한다 (chromium / SwiftShader / workers 1 / 직렬 실행).
 
 ## 품질 게이트
 
-머지 전 반드시 둘 다 초록이어야 한다. CI는 `check`와 `e2e` 잡을 분리해 동일한 게이트를 검증한다.
+머지 전 반드시 셋 다 초록이어야 한다. CI는 `check`·`e2e`·`bundle-size` 세 잡으로 분리해 동일한 게이트를 검증한다.
 
 ```bash
 npm run check       # typecheck → lint → deadcode → circular → unit test (순차, 첫 실패에서 즉시 중단)
-npm run test:e2e    # Playwright 26건
+npm run test:e2e    # Playwright (Phase 1~34, 30개 스펙)
+npm run build && npm run size:check    # gzip 번들 크기 예산 가드 (CI bundle-size 잡)
 ```
 
 `npm run check`가 묶는 단계:
@@ -104,7 +105,7 @@ src/
 │  ├─ camera/            # OrbitCamera 상태/입력 바인딩
 │  └─ assets/            # 프리미티브 / OBJ·GLTF·이미지 로더 / IndexedDB 캐시
 │
-├─ state/                # ── Zustand 스토어 14개 + 직렬화/공유/녹화/자동저장 ──
+├─ state/                # ── Zustand 스토어 16개(녹화 컨트롤러 포함) + 직렬화/공유/자동저장 ──
 │  ├─ graphStore.ts      # nodes/edges/positions + rev/uniformRev
 │  ├─ assetStore.ts      # 메시/이미지 런타임 핸들 카탈로그
 │  ├─ selectionStore.ts  # selectedNodeId
@@ -113,13 +114,14 @@ src/
 │  ├─ cameraStore.ts / viewportStore.ts / timeStore.ts / rendererStore.ts
 │  ├─ historyStore.ts    # Undo/Redo 최대 100건
 │  ├─ recorder.ts        # MediaRecorder → WebM/mp4
+│  ├─ gifRecorder.ts     # 애니메이션 GIF 녹화 (Web Worker 인코딩, Phase 31~34)
 │  ├─ autoSave.ts        # 30초 디바운스 IndexedDB 저장
 │  ├─ shareUrl.ts        # gzip + base64url + #share=...
 │  └─ serialization.ts   # 프로젝트 JSON v1
 │
 ├─ ui/                   # ── React 18 컴포넌트 ──
 │  ├─ NodeEditor/        # React Flow 캔버스, Toolbar, 커스텀 노드 뷰
-│  ├─ CodeEditor/        # CodeMirror 6 + GLSL + lint 어댑터
+│  ├─ CodeEditor/        # CodeMirror 6 + GLSL(호버/정의 이동/이름 변경/자동완성/시맨틱 하이라이트) + lint 어댑터
 │  ├─ Viewport/          # <canvas> + RAF 루프 + asyncReadback 펌프
 │  ├─ CommandPalette/    # Cmd+K — 노드/프리셋/유틸 추가
 │  ├─ Panels/            # SidePanel (Inspector ↔ Assets ↔ Problems) + StatusBar
@@ -137,7 +139,7 @@ src/
 - **UI는 Core를 직접 부르지 않는다.** UI는 스토어에 패치를 보내고, RAF 루프가 매 프레임 `snapshotGraph()` / `snapshotAssets()`로 스냅샷을 떠서 Core에 넘긴다.
 - **렌더 루프는 React 외부에서 RAF로 독립 구동.** Viewport의 `useEffect` 한 번에서 시작되고, 컴포넌트 리렌더와 무관하게 회전한다.
 
-전체 트리(`.test.ts` 동거 포함)와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-12-기준) 참조.
+전체 트리(`.test.ts` 동거 포함)와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-34-기준) 참조.
 
 ## 기술 스택
 

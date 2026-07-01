@@ -195,7 +195,17 @@ export class AsyncThumbnailReadback {
     for (const [nodeId, slot] of this.slots) {
       if (!slot.pending || !slot.sync) continue;
       const status = gl.clientWaitSync(slot.sync, 0, 0);
-      if (status === gl.TIMEOUT_EXPIRED || status === gl.WAIT_FAILED) continue;
+      if (status === gl.TIMEOUT_EXPIRED) continue;
+      if (status === gl.WAIT_FAILED) {
+        // WAIT_FAILED is terminal (e.g. context loss), not a transient timeout.
+        // Drop the fence and clear pending so a fresh request can be issued —
+        // otherwise the slot stays pinned as pending forever and request()
+        // returns false for this node for the rest of the session.
+        gl.deleteSync(slot.sync);
+        slot.sync = null;
+        slot.pending = false;
+        continue;
+      }
       // Either ALREADY_SIGNALED or CONDITION_SATISFIED — safe to fetch.
       gl.deleteSync(slot.sync);
       slot.sync = null;

@@ -345,11 +345,30 @@ const MAX_COMPOSITE_OUTPUTS = 4;
 interface CompositeState {
   program: WebGLProgram;
   vao: WebGLVertexArrayObject;
+  vbo: WebGLBuffer;
   countLoc: WebGLUniformLocation | null;
   cellLocs: Array<WebGLUniformLocation | null>;
 }
 
 let _composite: CompositeState | null = null;
+
+/**
+ * Drop the cached composite pipeline so the next `compositeOutputs` rebuilds it
+ * against the current GL context. Must be called on WebGL context loss/restore:
+ * WebGL reuses the same `gl` object across a loss, so keying the cache on it
+ * would keep handing back the same dead program/VAO. An explicit reset is the
+ * only correct invalidation. `gl` may be null (or a lost context) — the deletes
+ * are then harmless no-ops and we still clear the JS reference.
+ */
+export function resetComposite(gl: WebGL2RenderingContext | null): void {
+  if (!_composite) return;
+  if (gl) {
+    gl.deleteProgram(_composite.program);
+    gl.deleteVertexArray(_composite.vao);
+    gl.deleteBuffer(_composite.vbo);
+  }
+  _composite = null;
+}
 
 function ensureComposite(gl: WebGL2RenderingContext): CompositeState {
   if (_composite) return _composite;
@@ -433,7 +452,7 @@ void main() {
   gl.vertexAttribPointer(attrLoc, 2, gl.FLOAT, false, 0, 0);
   gl.bindVertexArray(null);
 
-  _composite = { program, vao, countLoc, cellLocs };
+  _composite = { program, vao, vbo, countLoc, cellLocs };
   return _composite;
 }
 

@@ -13,7 +13,7 @@ import {
   emptyPlan,
 } from "../../core/graph/compile";
 import { parseShaderInfoLog } from "../../core/graph/diagnostics";
-import { executePlan } from "../../core/graph/execute";
+import { executePlan, resetComposite } from "../../core/graph/execute";
 import { AsyncThumbnailReadback } from "../../core/thumbnail/asyncReadback";
 import { snapshotAssets, useAssetStore } from "../../state/assetStore";
 import { useCameraStore } from "../../state/cameraStore";
@@ -195,6 +195,13 @@ export function Viewport() {
       lastAssetRev = -1;
       lastUniformRev = -1;
       lastPassNodeIds = new Set<string>();
+      // Module-global GL singletons aren't reachable from recompile(): drop the
+      // composite pipeline and thumbnail readback so they rebuild against the
+      // restored context instead of reusing dead handles. WebGL reuses the same
+      // `gl` object across loss, so deletes here are safe no-ops; the point is
+      // to clear the cached JS references.
+      resetComposite(gl);
+      asyncReadback.disposeAll(gl);
     };
     const onContextRestored = () => {
       contextLost = false;

@@ -155,6 +155,10 @@ export function Viewport() {
           }
           diagStore.set(id, d);
         }
+        // Prune diagnostics for shader nodes that no longer exist (deleted /
+        // undone / replaced) so ProblemsPanel rows and badge counts don't keep
+        // reporting phantom problems (M10).
+        diagStore.retainOnly(shaderNodeIds);
       } catch (e) {
         pushError(String(e));
       }

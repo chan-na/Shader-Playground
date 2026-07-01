@@ -58,4 +58,22 @@ describe("diagnosticsStore", () => {
     useDiagnosticsStore.getState().reset();
     expect(useDiagnosticsStore.getState().byNode).toEqual({});
   });
+
+  it("retainOnly drops entries for nodes that no longer exist (M10)", () => {
+    const d = emptyDiagnostics();
+    useDiagnosticsStore.getState().set("live", d);
+    useDiagnosticsStore.getState().set("deleted", d);
+    useDiagnosticsStore.getState().retainOnly(["live"]);
+    const s = useDiagnosticsStore.getState().byNode;
+    expect(Object.keys(s)).toEqual(["live"]);
+    expect(s.deleted).toBeUndefined();
+  });
+
+  it("retainOnly preserves object identity when nothing is pruned (M10)", () => {
+    useDiagnosticsStore.getState().set("a", emptyDiagnostics());
+    const before = useDiagnosticsStore.getState().byNode;
+    useDiagnosticsStore.getState().retainOnly(["a", "not-present"]);
+    // No key was removed, so subscribers must not see a new byNode reference.
+    expect(useDiagnosticsStore.getState().byNode).toBe(before);
+  });
 });

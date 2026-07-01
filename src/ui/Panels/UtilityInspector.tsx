@@ -75,7 +75,7 @@ function MathInspector({ node }: { node: MathGraphNode }) {
           step={0.01}
           value={node.a}
           onChange={(e) =>
-            setMathConfig(node.id, { a: parseFloat(e.target.value) })
+            setMathConfig(node.id, { a: parseFloat(e.target.value) || 0 })
           }
         />
       </div>
@@ -89,7 +89,7 @@ function MathInspector({ node }: { node: MathGraphNode }) {
             step={0.01}
             value={node.b}
             onChange={(e) =>
-              setMathConfig(node.id, { b: parseFloat(e.target.value) })
+              setMathConfig(node.id, { b: parseFloat(e.target.value) || 0 })
             }
           />
         </div>
@@ -165,7 +165,7 @@ function CombineInspector({ node }: { node: CombineGraphNode }) {
             value={node.values[i]}
             onChange={(e) => {
               const next: [number, number, number, number] = [...node.values];
-              next[i] = parseFloat(e.target.value);
+              next[i] = parseFloat(e.target.value) || 0;
               setCombineConfig(node.id, { values: next });
             }}
           />

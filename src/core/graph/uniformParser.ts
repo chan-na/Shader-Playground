@@ -15,6 +15,33 @@ type UniformType =
   | "sampler2D"
   | "samplerCube";
 
+/**
+ * Every GLSL type this parser understands. `RE_UNIFORM` captures the type as a
+ * bare `\w+`, so unknown types (sampler3D, uvec3, uint, struct names, …) must be
+ * rejected rather than cast blindly — an unknown type otherwise falls through to
+ * the `"multi"` control with a scalar default and crashes the Inspector.
+ */
+const UNIFORM_TYPES: readonly UniformType[] = [
+  "float",
+  "vec2",
+  "vec3",
+  "vec4",
+  "int",
+  "ivec2",
+  "ivec3",
+  "ivec4",
+  "bool",
+  "mat2",
+  "mat3",
+  "mat4",
+  "sampler2D",
+  "samplerCube",
+];
+
+function isUniformType(t: string): t is UniformType {
+  return UNIFORM_TYPES.some((u) => u === t);
+}
+
 export interface UniformSpec {
   name: string;
   type: UniformType;
@@ -85,16 +112,18 @@ function defaultRangeFor(
     }
     return { min: -1, max: 1, step: 0.002, defaultValue: 0 };
   }
-  if (type.startsWith("vec")) {
+  if (type.startsWith("vec") || type.startsWith("ivec")) {
     const len = VEC_LEN[type] ?? 3;
-    if (isColorName(name)) {
+    const isInt = type.startsWith("ivec");
+    // Colors are float vectors only; ivec keeps the generic numeric layout.
+    if (!isInt && isColorName(name)) {
       const def = len === 4 ? [1, 1, 1, 1] : [1, 1, 1];
       return { min: 0, max: 1, step: 0.001, defaultValue: def };
     }
     return {
-      min: -1,
-      max: 1,
-      step: 0.002,
+      min: isInt ? 0 : -1,
+      max: isInt ? 10 : 1,
+      step: isInt ? 1 : 0.002,
       defaultValue: new Array(len).fill(0),
     };
   }
@@ -402,7 +431,11 @@ export function parseUniforms(source: string): UniformSpec[] {
 
     const m = RE_UNIFORM.exec(code);
     if (!m) continue;
-    const type = m[1] as UniformType;
+    const rawType = m[1];
+    // Skip GLSL types we don't model (sampler3D, uvec3, uint, struct names, …)
+    // instead of casting them into the UniformType union unchecked.
+    if (rawType === undefined || !isUniformType(rawType)) continue;
+    const type = rawType;
     const name = m[2]!;
     if (seen.has(name)) continue;
     seen.add(name);

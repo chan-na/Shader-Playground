@@ -40,6 +40,9 @@ export function KeyboardShortcuts() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && !e.shiftKey && e.key.toLowerCase() === "z") {
+        // Leave native / CodeMirror text undo alone while a field is focused —
+        // otherwise Cmd+Z rolls back the graph instead of the text being typed.
+        if (isEditingTarget(e.target)) return;
         e.preventDefault();
         undoGraph();
         return;
@@ -48,6 +51,7 @@ export function KeyboardShortcuts() {
         (mod && e.shiftKey && e.key.toLowerCase() === "z") ||
         (mod && e.key.toLowerCase() === "y")
       ) {
+        if (isEditingTarget(e.target)) return;
         e.preventDefault();
         redoGraph();
         return;

@@ -189,6 +189,8 @@ describe("loadGltfFromFile", () => {
         },
       ],
     });
-    await expect(loadGltfFromFile(makeFile())).rejects.toThrow(/glTF.*POSITION/);
+    await expect(loadGltfFromFile(makeFile())).rejects.toThrow(
+      /glTF.*POSITION/,
+    );
   });
 });

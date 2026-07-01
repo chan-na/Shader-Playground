@@ -346,6 +346,7 @@
     gl.bindVertexArray(null);
     return {
       vao: vao,
+      vbos: vbos,
       ibo: ibo,
       indexCount: indexCount,
       vertexCount: data.vertexCount,
@@ -586,7 +587,7 @@
   }
 
   // ── webcam sources (live MediaStream → texSubImage2D each frame) ───────────
-  // Acquired once at startup; rebuild() resets passes/FBOs but never tears
+  // Acquired once at startup; resizePasses() reallocates FBOs but never tears
   // these down because that would re-prompt for permission on every resize.
   var webcamSources = {};
   function initWebcams() {
@@ -818,14 +819,48 @@
   initVideos();
   initAudios();
 
-  function rebuild() {
-    // Dispose any previous resources (best-effort).
+  function disposeFbo(fbo) {
+    if (!fbo) return;
+    gl.deleteFramebuffer(fbo.fbo);
+    gl.deleteTexture(fbo.tex);
+    gl.deleteRenderbuffer(fbo.depth);
+  }
+
+  function disposePass(p) {
+    disposeFbo(p.fbo);
+    // The graph is static, so programs/meshes are built once; still, free them
+    // fully here so buildPasses() never leaks if it is ever re-run.
+    if (p.program && p.program.program) gl.deleteProgram(p.program.program);
+    if (p.mesh) {
+      if (p.mesh.vao) gl.deleteVertexArray(p.mesh.vao);
+      if (p.mesh.ibo) gl.deleteBuffer(p.mesh.ibo);
+      if (p.mesh.vbos)
+        p.mesh.vbos.forEach((b) => {
+          gl.deleteBuffer(b);
+        });
+    }
+  }
+
+  // Resize only reallocates each pass's FBO at the new canvas size — programs
+  // and meshes are size-independent and never recompiled (the graph is static).
+  // Previously a resize rebuilt everything, leaking the old programs/VAOs/VBOs
+  // and re-compiling every shader on every resize event.
+  function resizePasses() {
+    var W = canvas.width,
+      H = canvas.height;
     passes.forEach((p) => {
-      if (p.fbo) {
-        gl.deleteFramebuffer(p.fbo.fbo);
-        gl.deleteTexture(p.fbo.tex);
-        gl.deleteRenderbuffer(p.fbo.depth);
-      }
+      disposeFbo(p.fbo);
+      p.fbo = createFBO(
+        gl,
+        Math.max(1, Math.round(W * p.scale)),
+        Math.max(1, Math.round(H * p.scale)),
+      );
+    });
+  }
+
+  function buildPasses() {
+    passes.forEach((p) => {
+      disposePass(p);
     });
     passes = [];
     passById = {};
@@ -874,7 +909,14 @@
         .forEach((e) => {
           var src = nodes.find((n) => n.id === e.source);
           if (!src) return;
-          if (src.kind === "param") {
+          // param/math/swizzle/combine are value sources → uniforms; everything
+          // else (shader/mesh/image/webcam/video/audio) is a texture sampler.
+          if (
+            src.kind === "param" ||
+            src.kind === "math" ||
+            src.kind === "swizzle" ||
+            src.kind === "combine"
+          ) {
             paramBindings.push({
               uniformName: e.targetHandle,
               sourceNodeId: e.source,
@@ -893,6 +935,7 @@
         program: compiled,
         mesh: mesh,
         fbo: fbo,
+        scale: scale,
         meshIsFullscreen: meshIsFullscreen,
         samplers: samplers,
         paramBindings: paramBindings,
@@ -903,7 +946,7 @@
     });
   }
 
-  rebuild();
+  buildPasses();
 
   var blit = createProgram(gl, BLIT_VERT, BLIT_FRAG);
   var blitMesh = uploadMesh(gl, makeQuad(), blit.attributes);
@@ -946,12 +989,118 @@
     mouse[3] = p[1];
   });
 
+  // Value-node resolution — mirrors Core src/core/nodes/utility.ts so the
+  // exported HTML evaluates param/math/swizzle/combine chains exactly like the
+  // editor. Previously only `param` nodes fed uniforms; math/swizzle/combine
+  // were mis-routed to texture samplers and their uniforms stuck at defaults.
+  var MASK_INDEX = { x: 0, y: 1, z: 2, w: 3 };
+  var MATH_UNARY = { abs: 1, sin: 1, cos: 1 };
+
+  function asScalar(v) {
+    if (typeof v === "number") return v;
+    return Array.isArray(v) && v.length > 0 && v[0] !== undefined ? v[0] : 0;
+  }
+
+  function asVec(v, len) {
+    if (Array.isArray(v)) {
+      var out = v.slice();
+      while (out.length < len) out.push(0);
+      return out;
+    }
+    var a = [];
+    for (var i = 0; i < len; i++) a.push(v);
+    return a;
+  }
+
+  function applySwizzle(input, mask) {
+    var src = asVec(input, 4);
+    var out = [];
+    for (var i = 0; i < mask.length; i++) {
+      var idx = MASK_INDEX[mask[i]];
+      out.push(idx === undefined || src[idx] === undefined ? 0 : src[idx]);
+    }
+    if (out.length === 1) return out[0];
+    return out;
+  }
+
+  function computeMath(op, a, b) {
+    switch (op) {
+      case "add":
+        return a + b;
+      case "subtract":
+        return a - b;
+      case "multiply":
+        return a * b;
+      case "divide":
+        return b === 0 ? 0 : a / b;
+      case "pow": {
+        var r = Math.pow(a, b);
+        return isFinite(r) ? r : 0;
+      }
+      case "abs":
+        return Math.abs(a);
+      case "sin":
+        return Math.sin(a);
+      case "cos":
+        return Math.cos(a);
+      default:
+        return 0;
+    }
+  }
+
   function paramValue(node, time) {
     if (node.paramKind === "time") {
-      var arr = Array.isArray(node.value) ? node.value : [node.value || 1, 0];
-      return time * (arr[0] || 1) + (arr[1] || 0);
+      var arr = Array.isArray(node.value) ? node.value : [node.value, 0];
+      // Only the array *hole* falls back to 1 — a genuine scale of 0 is kept
+      // (matches Core's `[scale = 1, offset = 0]` destructuring).
+      var scale = arr.length > 0 && arr[0] !== undefined ? arr[0] : 1;
+      var offset = arr.length > 1 && arr[1] !== undefined ? arr[1] : 0;
+      return time * scale + offset;
     }
     return node.value;
+  }
+
+  function inputValue(targetId, handle, fallback, time, cache) {
+    var edge = edges.find(function (e) {
+      return e.target === targetId && e.targetHandle === handle;
+    });
+    if (!edge) return fallback;
+    return resolveValue(edge.source, time, cache);
+  }
+
+  function resolveValue(nodeId, time, cache) {
+    if (cache.has(nodeId)) return cache.get(nodeId);
+    cache.set(nodeId, 0); // cycle sentinel
+    var node = nodes.find(function (n) {
+      return n.id === nodeId;
+    });
+    if (!node) return 0;
+    var value;
+    if (node.kind === "param") {
+      value = paramValue(node, time);
+    } else if (node.kind === "math") {
+      var a = asScalar(inputValue(node.id, "a", node.a, time, cache));
+      if (MATH_UNARY[node.op]) {
+        value = computeMath(node.op, a, 0);
+      } else {
+        var b = asScalar(inputValue(node.id, "b", node.b, time, cache));
+        value = computeMath(node.op, a, b);
+      }
+    } else if (node.kind === "swizzle") {
+      var src = inputValue(node.id, "in", [0, 0, 0, 0], time, cache);
+      value = applySwizzle(src, node.mask);
+    } else if (node.kind === "combine") {
+      var ch = ["x", "y", "z", "w"];
+      var out = [];
+      for (var i = 0; i < node.arity; i++) {
+        out.push(asScalar(inputValue(node.id, ch[i], node.values[i], time, cache)));
+      }
+      value = out;
+    } else {
+      value = 0;
+    }
+    cache.set(nodeId, value);
+    return value;
   }
 
   function setUniform(loc, value) {
@@ -978,7 +1127,7 @@
   function frame(now) {
     if (sizeDirty || resize()) {
       sizeDirty = false;
-      rebuild();
+      resizePasses();
     }
     updateWebcams();
     updateVideos();
@@ -1025,12 +1174,11 @@
         setUniform(u["u_model"], model);
       }
 
-      // User uniforms with param overrides.
+      // User uniforms with value-node overrides (param/math/swizzle/combine).
       var effective = Object.assign({}, pass.uniformValues);
+      var valueCache = new Map();
       pass.paramBindings.forEach((b) => {
-        var src = nodes.find((n) => n.id === b.sourceNodeId);
-        if (src && src.kind === "param")
-          effective[b.uniformName] = paramValue(src, t);
+        effective[b.uniformName] = resolveValue(b.sourceNodeId, t, valueCache);
       });
       Object.keys(effective).forEach((k) => {
         if (u[k] !== undefined) setUniform(u[k], effective[k]);

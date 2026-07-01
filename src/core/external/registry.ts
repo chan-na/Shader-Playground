@@ -778,7 +778,11 @@ async function startAudioFile(handle: AudioHandle) {
     if (handle.disposed) return;
     handle.buffer = audioBuffer;
     handle.ready = true;
-    if (spec.playing) startAudioBufferSource(handle);
+    // Read the LIVE spec, not the one captured at entry: applyAudioSpec may
+    // have toggled `playing` while decodeAudioData was in flight (that toggle
+    // was a no-op because buffer was still null), so the captured value is
+    // stale and would silently drop a Play issued during decode.
+    if (handle.spec.playing) startAudioBufferSource(handle);
   } catch (e) {
     handle.error = String(e);
     log.warn("external", "audio file decode failed", normalizeError(e));

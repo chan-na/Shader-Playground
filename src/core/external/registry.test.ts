@@ -564,3 +564,89 @@ describe("external texture lifecycle (M3/M5)", () => {
     expect(externalHandleCount()).toBe(0);
   });
 });
+
+describe("audio file play toggled during decode (M4)", () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  afterEach(() => {
+    __setAudioContextFactoryForTests(null);
+    setAudioBlobResolver(null);
+  });
+
+  it("starts playback when Play is pressed while decodeAudioData is in flight", async () => {
+    let bufferSources = 0;
+    let resolveDecode: (buf: unknown) => void = () => {};
+    const analyser = {
+      fftSize: 0,
+      smoothingTimeConstant: 0,
+      frequencyBinCount: 16,
+      getByteFrequencyData: (arr: Uint8Array) => arr.fill(0),
+      disconnect: () => {},
+    };
+    const ctx = {
+      createAnalyser: () => analyser,
+      decodeAudioData: () =>
+        new Promise((res) => {
+          resolveDecode = res;
+        }),
+      createBufferSource: () => {
+        bufferSources += 1;
+        return {
+          buffer: null,
+          loop: false,
+          connect: () => {},
+          start: () => {},
+          stop: () => {},
+          disconnect: () => {},
+        };
+      },
+      resume: () => Promise.resolve(),
+      close: () => Promise.resolve(),
+      destination: {},
+    } as unknown as AudioContext;
+
+    __setAudioContextFactoryForTests(() => ctx);
+    setAudioBlobResolver(
+      () =>
+        ({
+          arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+        }) as unknown as Blob,
+    );
+
+    // Start paused, then flush until startAudioFile is suspended on decode.
+    reconcileExternal([
+      {
+        nodeId: "af1",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: "asset1",
+        fftSize: 32,
+        smoothing: 0.8,
+        playing: false,
+        loop: false,
+      },
+    ]);
+    await flush();
+    expect(bufferSources).toBe(0);
+
+    // User hits Play mid-decode: buffer is still null so this is a no-op now…
+    reconcileExternal([
+      {
+        nodeId: "af1",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: "asset1",
+        fftSize: 32,
+        smoothing: 0.8,
+        playing: true,
+        loop: false,
+      },
+    ]);
+    expect(bufferSources).toBe(0);
+
+    // …but once decode completes, the LIVE spec (playing:true) must start it.
+    resolveDecode({});
+    await flush();
+    expect(bufferSources).toBe(1);
+  });
+});

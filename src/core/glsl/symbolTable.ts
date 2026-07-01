@@ -79,11 +79,54 @@ const RE_STORAGE_DECL =
 // Local variable declaration inside a function body. Allows a precision
 // qualifier and an optional initializer expression but stops at the first
 // `,` or `;` so multi-decl shorthand (`float x = 0.0, y = 1.0;`) leaves the
-// `, y = ...` tail for the comma-walker below to harvest. We deliberately
-// do NOT allow `,` inside the initializer — GLSL has no comma operator at
-// declaration scope, so any `,` we see at this point starts a new declarator.
+// `, y = ...` tail for the comma-walker below to harvest. Because `[^,;]+`
+// stops at the first comma, an initializer with a call (`= mix(a, b, t)`)
+// matches with a comma *inside* the parens; the walker guards against that
+// with bracketDepth()/splitTopLevelDeclarators() so call args aren't harvested
+// as phantom locals.
 const RE_LOCAL_DECL =
   /^\s*(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+([A-Za-z_][\w]*)\s*(?:\[\d+\])?\s*(?:=\s*[^,;]+)?\s*([,;])/;
+
+/** Net bracket depth of `s` — positive if it leaves ()/[]/{} open. */
+function bracketDepth(s: string): number {
+  let d = 0;
+  for (const c of s) {
+    if (c === "(" || c === "[" || c === "{") d++;
+    else if (c === ")" || c === "]" || c === "}") d--;
+  }
+  return d;
+}
+
+/**
+ * Split a declaration tail (`, b = mix(x, y), c;`) into declarator segments at
+ * brace/paren depth-0 commas, stopping at the depth-0 semicolon. Commas nested
+ * inside a function-call / array initializer are NOT separators, so
+ * `vec3 c = mix(a, b, t);` yields no extra declarators (b/t are call args).
+ */
+function splitTopLevelDeclarators(tail: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let seg = "";
+  for (const ch of tail) {
+    if (ch === "(" || ch === "[" || ch === "{") {
+      depth++;
+      seg += ch;
+    } else if (ch === ")" || ch === "]" || ch === "}") {
+      depth = Math.max(0, depth - 1);
+      seg += ch;
+    } else if (depth === 0 && ch === ";") {
+      out.push(seg);
+      return out;
+    } else if (depth === 0 && ch === ",") {
+      out.push(seg);
+      seg = "";
+    } else {
+      seg += ch;
+    }
+  }
+  if (seg.trim()) out.push(seg);
+  return out;
+}
 const RE_STRUCT = /^\s*struct\s+([A-Za-z_][\w]*)\s*\{/;
 // Function declaration header: `<returnType> <name>(<params>) [const]? {`.
 // We require the trailing `{` on the same line — multi-line headers are rare
@@ -298,24 +341,17 @@ export function buildSymbolTable(source: string): SymbolTable {
             column: firstCol,
             scope: currentFn,
           });
-          // If terminator was `,`, walk forward and collect additional
-          // names until the semicolon. This handles `vec3 a, b = vec3(0);`.
-          if (lm[3] === ",") {
+          // If the terminator was `,`, walk forward and collect additional
+          // declarators until the semicolon (`vec3 a, b = vec3(0);`). But only
+          // when that comma is a real separator: the regex's `[^,;]+` stops at
+          // the FIRST comma, which for `vec3 c = mix(a, b, t);` sits *inside*
+          // the initializer call (unbalanced `(`), so bracketDepth(lm[0]) > 0 —
+          // there are no extra declarators, only call arguments.
+          if (lm[3] === "," && bracketDepth(lm[0]) === 0) {
             const tail = code.slice(lm[0].length);
-            const semiIdx = tail.indexOf(";");
-            const declTail = semiIdx >= 0 ? tail.slice(0, semiIdx) : tail;
-            const extraNames = declTail
-              .split(",")
-              .map((s) => s.trim())
-              .map((s) => {
-                const eq = s.indexOf("=");
-                return (eq >= 0 ? s.slice(0, eq) : s).trim();
-              })
-              .filter(Boolean);
-            // Re-scan each name's column position relative to the original line.
             let cursor = code.indexOf(lm[0]) + lm[0].length;
-            for (const n of extraNames) {
-              const m2 = IDENT_TOKEN.exec(n);
+            for (const declarator of splitTopLevelDeclarators(tail)) {
+              const m2 = IDENT_TOKEN.exec(declarator);
               if (!m2) continue;
               const idx = code.indexOf(m2[0], cursor);
               if (idx < 0) continue;

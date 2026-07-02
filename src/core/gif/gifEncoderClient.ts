@@ -89,12 +89,15 @@ export class GifEncoderClient {
    * the encode itself is invalid (the same input would throw synchronously too).
    */
   encode(job: GifEncodeJob): Promise<Uint8Array> {
+    // Guard progress against going backwards: a worker→inline fallback restarts
+    // the encode from frame 0, which would otherwise make the bar jump back.
+    const guarded = this.monotonicProgress(job);
     const w = this.ensureWorker();
-    if (!w) return this.inline(job);
+    if (!w) return this.inline(guarded);
 
     const reqId = ++this.nextReqId;
     return new Promise<Uint8Array>((resolve, reject) => {
-      this.pending.set(reqId, { resolve, reject, job });
+      this.pending.set(reqId, { resolve, reject, job: guarded });
       const msg: GifEncodeRequest = {
         type: "encode",
         reqId,
@@ -115,9 +118,29 @@ export class GifEncoderClient {
           "gifEncoder postMessage failed; encoding inline",
           normalizeError(e),
         );
-        this.inline(job).then(resolve, reject);
+        this.inline(guarded).then(resolve, reject);
       }
     });
+  }
+
+  /**
+   * Wrap `job.onProgress` so it never reports a lower `done` than already seen.
+   * The worker path and the inline-fallback path both drive the same wrapped
+   * callback, so a mid-encode worker death (which restarts inline from 0) holds
+   * the reported progress steady instead of jumping backwards.
+   */
+  private monotonicProgress(job: GifEncodeJob): GifEncodeJob {
+    const orig = job.onProgress;
+    if (!orig) return job;
+    let maxDone = -1;
+    return {
+      ...job,
+      onProgress: (done: number, total: number) => {
+        if (done < maxDone) return;
+        maxDone = done;
+        orig(done, total);
+      },
+    };
   }
 
   /** Terminate the worker and reject any in-flight jobs. */

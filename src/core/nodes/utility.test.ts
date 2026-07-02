@@ -31,6 +31,11 @@ describe("computeMath", () => {
     expect(computeMath("sin", 0, 999)).toBe(0);
     expect(computeMath("cos", 0, 999)).toBe(1);
   });
+  it("pow clamps NaN/Infinity results to 0 (L10)", () => {
+    expect(computeMath("pow", 2, 3)).toBe(8);
+    expect(computeMath("pow", -1, 0.5)).toBe(0); // would be NaN
+    expect(computeMath("pow", 0, -1)).toBe(0); // would be Infinity
+  });
 });
 
 describe("isValidSwizzleMask", () => {
@@ -61,6 +66,12 @@ describe("applySwizzle", () => {
   });
   it("pads short vectors with zeros for higher channels", () => {
     expect(applySwizzle([1, 2], "xyzw")).toEqual([1, 2, 0, 0]);
+  });
+  it("returns a scalar 0 for empty/invalid masks to match the float port (L10)", () => {
+    // swizzleOutputPort is `float` for these, so the value must be a scalar too.
+    expect(applySwizzle([1, 2, 3], "")).toBe(0);
+    expect(applySwizzle([1, 2, 3], "rgba")).toBe(0);
+    expect(applySwizzle([1, 2, 3], "xyzwx")).toBe(0);
   });
 });
 
@@ -155,19 +166,10 @@ describe("resolveValueFor", () => {
     expect(resolveValueFor("missing", graph, ctx, new Map())).toBe(0);
   });
 
-  it("memoises fan-out: the same source is resolved once per cache", () => {
-    const evals = 0;
+  it("memoises fan-out: a source is resolved once and reused from cache (L39)", () => {
     const graph: Graph = {
       nodes: [
-        // A param wrapped in a math node so we can count evaluations cheaply
-        {
-          id: "p",
-          kind: "param",
-          paramKind: "float",
-          // Use a getter to count reads — but value is plain, so instead we wrap.
-          // Easier: pre-seed cache and verify it isn't replaced.
-          value: 7,
-        },
+        { id: "p", kind: "param", paramKind: "float", value: 7 },
         { id: "m1", kind: "math", op: "multiply", a: 1, b: 2 },
         { id: "m2", kind: "math", op: "multiply", a: 1, b: 3 },
       ],
@@ -189,10 +191,40 @@ describe("resolveValueFor", () => {
       ],
     };
     const cache = new Map();
-    resolveValueFor("m1", graph, ctx, cache);
-    resolveValueFor("m2", graph, ctx, cache);
-    expect(cache.get("p")).toBe(7);
-    expect(evals).toBe(0); // sanity — no eval counter actually plumbed; cache presence is the assertion
+    expect(resolveValueFor("m1", graph, ctx, cache)).toBe(14); // 7 * 2
+    // Poison the cache: a second resolve that RE-evaluated `p` would read 7
+    // again → 21. Reusing the memoised entry reads 100 → 300. The latter proves
+    // the fan-out source is not re-evaluated.
+    cache.set("p", 100);
+    expect(resolveValueFor("m2", graph, ctx, cache)).toBe(300); // 100 * 3
+    expect(cache.get("p")).toBe(100);
+  });
+
+  it("is cycle-safe: a mutual reference terminates via the zero sentinel (L39)", () => {
+    const graph: Graph = {
+      nodes: [
+        { id: "a", kind: "math", op: "add", a: 1, b: 0 },
+        { id: "b", kind: "math", op: "add", a: 1, b: 0 },
+      ],
+      edges: [
+        {
+          id: "e1",
+          source: "b",
+          sourceHandle: "value",
+          target: "a",
+          targetHandle: "a",
+        },
+        {
+          id: "e2",
+          source: "a",
+          sourceHandle: "value",
+          target: "b",
+          targetHandle: "a",
+        },
+      ],
+    };
+    // Must not recurse forever — the pre-seeded 0 sentinel breaks the loop.
+    expect(resolveValueFor("a", graph, ctx, new Map())).toBe(0);
   });
 });
 

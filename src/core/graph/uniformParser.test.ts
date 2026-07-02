@@ -368,6 +368,22 @@ describe("serializeHintComment", () => {
     expect(serializeHintComment("// @range 0..1", {})).toBe("//");
   });
 
+  it("keeps free-text that trails a @default value (L9)", () => {
+    // The @default strip token used to be greedy ([^@\n]+) and swallowed the
+    // trailing note on round-trip; it must now match only the numeric value.
+    const c = serializeHintComment("// @default 0.5 tweak me", {
+      defaultValue: 0.25,
+    });
+    expect(c).toBe("// tweak me @default 0.25");
+  });
+
+  it("keeps free-text trailing a vector @default (L9)", () => {
+    const c = serializeHintComment("// @default 1,0,0 base tint", {
+      defaultValue: [0, 1, 0],
+    });
+    expect(c).toBe("// base tint @default 0,1,0");
+  });
+
   it("uses @min/@max when only one bound is given", () => {
     expect(serializeHintComment("//", { min: -2 })).toBe("// @min -2");
     expect(serializeHintComment("//", { max: 3 })).toBe("// @max 3");

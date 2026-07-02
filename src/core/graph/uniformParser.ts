@@ -237,7 +237,7 @@ export function parseHintComment(text: string): UniformHints {
  * Keep the alternatives in sync with the patterns parseHintComment recognises.
  */
 const ANNOTATION_TOKEN_RE =
-  /@range\s+-?\d+(?:\.\d+)?\s*\.\.\s*-?\d+(?:\.\d+)?|@min\s+-?\d+(?:\.\d+)?|@max\s+-?\d+(?:\.\d+)?|@step\s+-?\d+(?:\.\d+)?|@default\s+[^@\n]+|@label\s+(?:"[^"]*"|[^\n@]+)|@(?:color|slider|multi)\b/g;
+  /@range\s+-?\d+(?:\.\d+)?\s*\.\.\s*-?\d+(?:\.\d+)?|@min\s+-?\d+(?:\.\d+)?|@max\s+-?\d+(?:\.\d+)?|@step\s+-?\d+(?:\.\d+)?|@default\s+-?\d*\.?\d+(?:\s*,\s*-?\d*\.?\d+)*|@label\s+(?:"[^"]*"|[^\n@]+)|@(?:color|slider|multi)\b/g;
 
 function fmtNum(n: number): string {
   // parseFloat round-trips this; avoid scientific notation for typical ranges.

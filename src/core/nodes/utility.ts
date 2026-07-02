@@ -44,6 +44,10 @@ function asScalar(v: Value): Scalar {
 }
 
 export function applySwizzle(input: Value, mask: string): Value {
+  // An empty/invalid mask has a float output port (swizzleOutputPort), so the
+  // value must be a scalar too — returning [] / [0,0,0] here mismatches the
+  // declared shape downstream.
+  if (!isValidSwizzleMask(mask)) return 0;
   const src = asVec(input, 4);
   const out: number[] = [];
   for (const c of mask) {
@@ -64,8 +68,12 @@ export function computeMath(op: MathOp, a: Scalar, b: Scalar): Scalar {
       return a * b;
     case "divide":
       return b === 0 ? 0 : a / b;
-    case "pow":
-      return a ** b;
+    case "pow": {
+      // pow can produce NaN (e.g. (-1)**0.5) or Infinity (0**-1); those would
+      // be uploaded as a uniform and break the shader. Clamp to 0.
+      const r = a ** b;
+      return Number.isFinite(r) ? r : 0;
+    }
     case "abs":
       return Math.abs(a);
     case "sin":

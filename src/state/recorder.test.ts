@@ -38,12 +38,18 @@ function uninstallMediaRecorder() {
     undefined;
 }
 
-function makeFakeCanvas(withCaptureStream: boolean): HTMLCanvasElement {
+function makeFakeCanvas(
+  withCaptureStream: boolean,
+  onTrackStop?: () => void,
+): HTMLCanvasElement {
   const c = document.createElement("canvas");
   if (withCaptureStream) {
+    const stream = {
+      getTracks: () => [{ stop: () => onTrackStop?.() }],
+    } as unknown as MediaStream;
     (
       c as HTMLCanvasElement & { captureStream: (fps: number) => MediaStream }
-    ).captureStream = () => ({}) as MediaStream;
+    ).captureStream = () => stream;
   }
   return c;
 }
@@ -52,7 +58,6 @@ function resetRecorder() {
   useRecorderStore.setState({
     status: "idle",
     startedAt: null,
-    elapsedMs: 0,
     lastBlobUrl: null,
     error: null,
   });
@@ -142,17 +147,37 @@ describe("recorder store", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalled();
   });
 
-  it("tick() updates elapsedMs only while recording", async () => {
-    resetRecorder();
-    useRecorderStore.getState().tick();
-    expect(useRecorderStore.getState().elapsedMs).toBe(0);
-
+  it("stop() stops the capture-stream tracks so the canvas isn't left live (L15)", async () => {
     installMediaRecorder();
-    const canvas = makeFakeCanvas(true);
+    let stops = 0;
+    const canvas = makeFakeCanvas(true, () => {
+      stops += 1;
+    });
     await useRecorderStore.getState().start(canvas, 30);
-    useRecorderStore.getState().tick();
-    // elapsed reflects performance.now() - startedAt — non-negative.
-    expect(useRecorderStore.getState().elapsedMs).toBeGreaterThanOrEqual(0);
+    await useRecorderStore.getState().stop();
+    expect(stops).toBe(1);
+  });
+
+  it("start() stops capture tracks when MediaRecorder construction throws (L15)", async () => {
+    class ThrowingMediaRecorder {
+      constructor() {
+        throw new Error("codec init failed");
+      }
+      static isTypeSupported() {
+        return true;
+      }
+    }
+    (
+      globalThis as unknown as { MediaRecorder: typeof ThrowingMediaRecorder }
+    ).MediaRecorder = ThrowingMediaRecorder;
+    let stops = 0;
+    const canvas = makeFakeCanvas(true, () => {
+      stops += 1;
+    });
+    await useRecorderStore.getState().start(canvas, 30);
+    // The tracks captureStream opened must be released even though recording
+    // never started.
+    expect(stops).toBe(1);
   });
 
   it("start() surfaces an error when MediaRecorder construction throws", async () => {

@@ -65,6 +65,24 @@ describe("assetStore", () => {
     expect(s.rev).toBe(revBefore + 1);
   });
 
+  it("removeImage closes the decoded ImageBitmap to free memory (L27)", () => {
+    let closed = 0;
+    const handle: ImageHandle = {
+      ...mkImage("bmp"),
+      // Minimal ImageBitmap-shaped stub with a close() spy.
+      bitmap: {
+        width: 1,
+        height: 1,
+        close: () => {
+          closed += 1;
+        },
+      } as unknown as ImageBitmap,
+    };
+    useAssetStore.getState().addImage(handle);
+    useAssetStore.getState().removeImage("bmp");
+    expect(closed).toBe(1);
+  });
+
   it("snapshotAssets returns current meshes and images by reference", () => {
     useAssetStore.getState().addMesh(mkMesh("m1"));
     useAssetStore.getState().addImage(mkImage("i1"));

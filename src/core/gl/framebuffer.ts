@@ -16,45 +16,60 @@ export function createFramebuffer(
   withDepth = true,
 ): Framebuffer {
   const color = createColorTexture(gl, width, height);
-  const fbo = gl.createFramebuffer();
-  if (!fbo) throw new Error("createFramebuffer returned null");
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-  gl.framebufferTexture2D(
-    gl.FRAMEBUFFER,
-    gl.COLOR_ATTACHMENT0,
-    gl.TEXTURE_2D,
-    color.texture,
-    0,
-  );
-
+  let fbo: WebGLFramebuffer | null = null;
   let depth: WebGLRenderbuffer | null = null;
-  if (withDepth) {
-    depth = gl.createRenderbuffer();
-    if (!depth) throw new Error("createRenderbuffer returned null");
-    gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
-    gl.renderbufferStorage(
-      gl.RENDERBUFFER,
-      gl.DEPTH_COMPONENT24,
-      width,
-      height,
-    );
-    gl.framebufferRenderbuffer(
+  try {
+    fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error("createFramebuffer returned null");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(
       gl.FRAMEBUFFER,
-      gl.DEPTH_ATTACHMENT,
-      gl.RENDERBUFFER,
-      depth,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      color.texture,
+      0,
     );
-    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-  }
 
-  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-  if (status !== gl.FRAMEBUFFER_COMPLETE) {
-    const hex = `0x${status.toString(16)}`;
-    log.warn("gl", `Framebuffer incomplete: ${hex}`, { status, width, height });
-    throw new Error(`Framebuffer incomplete: ${hex}`);
+    if (withDepth) {
+      depth = gl.createRenderbuffer();
+      if (!depth) throw new Error("createRenderbuffer returned null");
+      gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
+      gl.renderbufferStorage(
+        gl.RENDERBUFFER,
+        gl.DEPTH_COMPONENT24,
+        width,
+        height,
+      );
+      gl.framebufferRenderbuffer(
+        gl.FRAMEBUFFER,
+        gl.DEPTH_ATTACHMENT,
+        gl.RENDERBUFFER,
+        depth,
+      );
+      gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+    }
+
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+      const hex = `0x${status.toString(16)}`;
+      log.warn("gl", `Framebuffer incomplete: ${hex}`, {
+        status,
+        width,
+        height,
+      });
+      throw new Error(`Framebuffer incomplete: ${hex}`);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { fbo, color, depth, width, height };
+  } catch (e) {
+    // Free whatever was allocated before the failure so a transient error
+    // (e.g. an oversized viewport making the FBO incomplete) doesn't leak the
+    // color texture / FBO / renderbuffer on the GPU.
+    disposeTexture(gl, color);
+    if (fbo) gl.deleteFramebuffer(fbo);
+    if (depth) gl.deleteRenderbuffer(depth);
+    throw e;
   }
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  return { fbo, color, depth, width, height };
 }
 
 export function disposeFramebuffer(

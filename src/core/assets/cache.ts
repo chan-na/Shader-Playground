@@ -80,6 +80,19 @@ function openDb(): Promise<IDBDatabase> {
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
+    // Another tab holding an older DB version open blocks the upgrade. Without
+    // this handler the open request hangs forever, freezing hydrate/import.
+    req.onblocked = () =>
+      reject(
+        new Error(
+          "IndexedDB upgrade blocked — close other tabs of this app and reload",
+        ),
+      );
+  });
+  // A failed open must not be cached, or every later call reuses the rejection.
+  _dbPromise = _dbPromise.catch((e) => {
+    _dbPromise = null;
+    throw e;
   });
   return _dbPromise;
 }

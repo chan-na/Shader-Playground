@@ -66,6 +66,12 @@ export const useAssetStore = create<AssetState>((set) => ({
   removeImage: (id) =>
     set((s) => {
       const images = { ...s.images };
+      // Release the decoded ImageBitmap's (off-heap) memory eagerly — the GC
+      // does not account for it, so dropping only the reference leaks it.
+      const bitmap = images[id]?.bitmap;
+      if (bitmap && "close" in bitmap && typeof bitmap.close === "function") {
+        bitmap.close();
+      }
       delete images[id];
       return { images, rev: s.rev + 1 };
     }),

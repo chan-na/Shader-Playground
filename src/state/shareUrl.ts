@@ -42,12 +42,42 @@ async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(buf);
 }
 
-async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
-  if (typeof DecompressionStream === "undefined") return bytes;
+async function gunzip(
+  bytes: Uint8Array,
+  maxBytes = Number.POSITIVE_INFINITY,
+): Promise<Uint8Array> {
+  if (typeof DecompressionStream === "undefined") {
+    if (bytes.byteLength > maxBytes) {
+      throw new Error("Decompressed payload exceeds size limit");
+    }
+    return bytes;
+  }
   const ds = new DecompressionStream("gzip");
   const stream = new Response(bytes).body?.pipeThrough(ds);
-  const buf = await new Response(stream).arrayBuffer();
-  return new Uint8Array(buf);
+  if (!stream) return bytes;
+  // Read incrementally and abort as soon as the running total exceeds the cap,
+  // so a zip bomb (tiny compressed → huge inflated) can't fully expand in
+  // memory before a post-hoc byteLength check (the previous behaviour).
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let result = await reader.read();
+  while (!result.done) {
+    total += result.value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error("Decompressed payload exceeds size limit");
+    }
+    chunks.push(result.value);
+    result = await reader.read();
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.byteLength;
+  }
+  return out;
 }
 
 /**
@@ -90,8 +120,9 @@ export async function decodeShareHash(hash: string): Promise<{
   if (payload.length > MAX_SHARE_HASH_PAYLOAD_BYTES) return null;
   try {
     const bytes = base64UrlToBytes(payload);
-    const decompressed = await gunzip(bytes);
-    if (decompressed.byteLength > MAX_SHARE_JSON_BYTES) return null;
+    // Cap during decompression (throws past the limit) instead of after — a
+    // zip bomb must not be allowed to fully inflate first.
+    const decompressed = await gunzip(bytes, MAX_SHARE_JSON_BYTES);
     const json = new TextDecoder().decode(decompressed);
     const project = JSON.parse(json) as SerializedProject;
     const parsed = deserializeProject(project);

@@ -129,4 +129,22 @@ describe("orbitCamera", () => {
     const m = modelMatrix(out as unknown as Float32Array);
     expect(m).toBe(out);
   });
+
+  it("clamps extreme zoom/orbit so viewMatrix never degenerates (L40)", () => {
+    const c = defaultCameraState();
+    // Zoom far past both limits — distance must stay within [min, max] so eye
+    // never collapses onto target (a zero forward vector → NaN lookAt).
+    const zoomedIn = zoom(clampCamera({ ...c, distance: -1000 }), -1e6);
+    const zoomedOut = zoom(clampCamera({ ...c, distance: 1e9 }), 1e6);
+    expect(zoomedIn.distance).toBeGreaterThanOrEqual(c.minDistance);
+    expect(zoomedOut.distance).toBeLessThanOrEqual(c.maxDistance);
+    // Orbit past vertical — pitch clamps short of ±π/2 so up stays non-parallel.
+    const tiltedUp = orbit(c, 0, 1e6);
+    const tiltedDown = orbit(c, 0, -1e6);
+    expect(tiltedUp.pitch).toBeLessThanOrEqual(c.maxPitch);
+    expect(tiltedDown.pitch).toBeGreaterThanOrEqual(c.minPitch);
+    for (const s of [zoomedIn, zoomedOut, tiltedUp, tiltedDown]) {
+      for (const v of viewMatrix(s)) expect(Number.isFinite(v)).toBe(true);
+    }
+  });
 });

@@ -120,6 +120,15 @@ type ExternalHandle = WebcamHandle | VideoHandle | AudioHandle;
 const handles = new Map<string, ExternalHandle>();
 
 /**
+ * The GL context of the most recent frame upload. `reconcileExternal` runs
+ * inside compile (no GL context in scope), so it stashes this to hand to
+ * `disposeHandle` when tearing down a removed/kind-swapped/restarted source —
+ * otherwise the GPU texture is orphaned (only its JS reference is nulled) and
+ * leaks until context loss. Set by `updateExternalSources` every render tick.
+ */
+let lastRenderGl: WebGL2RenderingContext | null = null;
+
+/**
  * Optional override for getUserMedia — tests inject a fake here so they do
  * not depend on the global MediaDevices API. When null, the real
  * navigator.mediaDevices.getUserMedia is used.
@@ -202,7 +211,7 @@ export function reconcileExternal(specs: ExternalSpec[]) {
   for (const id of Array.from(handles.keys())) {
     if (!ids.has(id)) {
       const h = handles.get(id);
-      if (h) disposeHandle(h);
+      if (h) disposeHandle(h, lastRenderGl ?? undefined);
     }
   }
   for (const spec of specs) {
@@ -210,12 +219,12 @@ export function reconcileExternal(specs: ExternalSpec[]) {
     if (existing) {
       if (existing.kind !== spec.kind) {
         // Kind switch on the same node id — tear down and re-acquire.
-        disposeHandle(existing);
+        disposeHandle(existing, lastRenderGl ?? undefined);
         handles.set(spec.nodeId, acquire(spec));
         continue;
       }
       if (needsRestart(existing, spec)) {
-        disposeHandle(existing);
+        disposeHandle(existing, lastRenderGl ?? undefined);
         handles.set(spec.nodeId, acquire(spec));
         continue;
       }
@@ -287,6 +296,7 @@ export function getExternalAudioBins(nodeId: string): Uint8Array | null {
 }
 
 export function updateExternalSources(gl: WebGL2RenderingContext) {
+  lastRenderGl = gl;
   for (const h of handles.values()) {
     uploadFrame(gl, h);
   }
@@ -768,7 +778,11 @@ async function startAudioFile(handle: AudioHandle) {
     if (handle.disposed) return;
     handle.buffer = audioBuffer;
     handle.ready = true;
-    if (spec.playing) startAudioBufferSource(handle);
+    // Read the LIVE spec, not the one captured at entry: applyAudioSpec may
+    // have toggled `playing` while decodeAudioData was in flight (that toggle
+    // was a no-op because buffer was still null), so the captured value is
+    // stale and would silently drop a Play issued during decode.
+    if (handle.spec.playing) startAudioBufferSource(handle);
   } catch (e) {
     handle.error = String(e);
     log.warn("external", "audio file decode failed", normalizeError(e));

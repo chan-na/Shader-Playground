@@ -38,11 +38,12 @@ function pointer(type: string, init: PointerInit = {}): Event {
   return e;
 }
 
-function wheel(deltaY: number): WheelEvent {
+function wheel(deltaY: number, deltaMode = 0): WheelEvent {
   return new WheelEvent("wheel", {
     bubbles: true,
     cancelable: true,
     deltaY,
+    deltaMode,
   });
 }
 
@@ -162,6 +163,24 @@ describe("createCameraController", () => {
     canvas.dispatchEvent(wheel(500));
     expect(updates.length).toBe(1);
     expect(ctrl.state.distance).toBeGreaterThan(dist0);
+  });
+
+  it("normalizes line-mode wheel deltas to match pixel-mode zoom (M2/L40)", () => {
+    // Firefox physical wheels report deltaMode=1 (lines, ≈3/notch). 3 lines must
+    // zoom the same as 48 pixels (3 × 16px/line), not ~30× weaker.
+    const pixelCtrl = createCameraController();
+    const pixelCanvas = makeCanvas();
+    pixelCtrl.attach(pixelCanvas);
+
+    const lineCtrl = createCameraController();
+    const lineCanvas = makeCanvas();
+    lineCtrl.attach(lineCanvas);
+
+    pixelCanvas.dispatchEvent(wheel(48, 0)); // DOM_DELTA_PIXEL
+    lineCanvas.dispatchEvent(wheel(3, 1)); // DOM_DELTA_LINE (3 × 16 = 48px)
+
+    expect(lineCtrl.state.distance).toBeGreaterThan(0);
+    expect(lineCtrl.state.distance).toBeCloseTo(pixelCtrl.state.distance, 5);
   });
 
   it("contextmenu is prevented (so right-drag pan doesn't open menu)", () => {

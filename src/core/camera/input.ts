@@ -6,6 +6,10 @@ import {
   zoom,
 } from "./orbitCamera";
 
+/** Approx pixels per wheel "line" / "page" for deltaMode normalisation. */
+const WHEEL_LINE_PX = 16;
+const WHEEL_PAGE_PX = 800;
+
 export interface CameraController {
   state: OrbitCameraState;
   attach(canvas: HTMLCanvasElement): void;
@@ -58,7 +62,14 @@ export function createCameraController(
   };
 
   const onWheel = (e: WheelEvent) => {
-    state = zoom(state, e.deltaY);
+    // Normalise the wheel delta to pixels. Firefox reports line (deltaMode 1)
+    // or page (deltaMode 2) units with tiny magnitudes (≈3 per notch), so
+    // passing the raw deltaY makes zoom ~30× weaker there than Chrome's pixels.
+    let delta = e.deltaY;
+    if (e.deltaMode === 1) delta *= WHEEL_LINE_PX;
+    else if (e.deltaMode === 2)
+      delta *= canvas ? canvas.clientHeight || WHEEL_PAGE_PX : WHEEL_PAGE_PX;
+    state = zoom(state, delta);
     notify();
     e.preventDefault();
   };

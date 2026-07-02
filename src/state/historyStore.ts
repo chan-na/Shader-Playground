@@ -1,4 +1,3 @@
-// biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + length-guarded undo/redo stack access
 import { create } from "zustand";
 import type { ParentsMap } from "../core/graph/parents";
 import type { GraphEdge, GraphNode } from "../core/graph/types";
@@ -20,12 +19,17 @@ const MAX_HISTORY = 100;
 export interface HistoryState {
   past: GraphSnapshot[];
   future: GraphSnapshot[];
-  /** Suppress the next snapshot push (used when applying undo/redo). */
-  suppressNext: boolean;
 
   push: (snap: GraphSnapshot) => void;
-  undo: () => GraphSnapshot | null;
-  redo: () => GraphSnapshot | null;
+  /**
+   * Restore the most recent past snapshot. The caller passes the *current* live
+   * snapshot so it can be moved onto the redo stack — the store never fabricates
+   * "the present" from `past`. Returns the snapshot to apply, or null when there
+   * is nothing to undo.
+   */
+  undo: (current: GraphSnapshot) => GraphSnapshot | null;
+  /** Mirror of {@link undo}: replays the most recently undone snapshot. */
+  redo: (current: GraphSnapshot) => GraphSnapshot | null;
   clear: () => void;
 }
 
@@ -43,41 +47,32 @@ function cloneSnapshot(s: GraphSnapshot): GraphSnapshot {
 export const useHistoryStore = create<HistoryState>((set, get) => ({
   past: [],
   future: [],
-  suppressNext: false,
   push: (snap) => {
-    if (get().suppressNext) {
-      set({ suppressNext: false });
-      return;
-    }
     set((s) => {
       const next = [...s.past, cloneSnapshot(snap)];
       while (next.length > MAX_HISTORY) next.shift();
       return { past: next, future: [] };
     });
   },
-  undo: () => {
+  undo: (current) => {
     const s = get();
-    if (s.past.length === 0) return null;
-    const head = s.past[s.past.length - 1]!;
+    const target = s.past[s.past.length - 1];
+    if (target === undefined) return null;
     set({
       past: s.past.slice(0, -1),
-      future: [head, ...s.future],
-      suppressNext: true,
+      future: [cloneSnapshot(current), ...s.future],
     });
-    if (s.past.length >= 2) return cloneSnapshot(s.past[s.past.length - 2]!);
-    // Past is now empty — return an empty snapshot to restore.
-    return { nodes: [], edges: [], positions: {}, parents: {} };
+    return cloneSnapshot(target);
   },
-  redo: () => {
+  redo: (current) => {
     const s = get();
-    if (s.future.length === 0) return null;
-    const head = s.future[0]!;
+    const target = s.future[0];
+    if (target === undefined) return null;
     set({
-      past: [...s.past, cloneSnapshot(head)],
+      past: [...s.past, cloneSnapshot(current)],
       future: s.future.slice(1),
-      suppressNext: true,
     });
-    return cloneSnapshot(head);
+    return cloneSnapshot(target);
   },
-  clear: () => set({ past: [], future: [], suppressNext: false }),
+  clear: () => set({ past: [], future: [] }),
 }));

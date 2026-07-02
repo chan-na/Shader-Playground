@@ -1,13 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  cacheAudio,
   cacheImage,
   cacheMesh,
+  cacheVideo,
+  deleteCachedAudio,
   deleteCachedImage,
   deleteCachedMesh,
+  deleteCachedVideo,
+  loadCachedAudio,
   loadCachedImage,
   loadCachedMesh,
+  loadCachedVideo,
 } from "./cache";
-import type { GeometryHandle, ImageHandle } from "./types";
+import type {
+  AudioAssetHandle,
+  GeometryHandle,
+  ImageHandle,
+  VideoAssetHandle,
+} from "./types";
 
 const meshHandle = (id: string): GeometryHandle => ({
   id,
@@ -144,5 +155,67 @@ describe("cache (IndexedDB-backed)", () => {
   it("deleteCachedMesh / deleteCachedImage are no-ops for unknown ids", async () => {
     await expect(deleteCachedMesh("never-existed")).resolves.toBeUndefined();
     await expect(deleteCachedImage("never-existed")).resolves.toBeUndefined();
+  });
+
+  it("round-trips a mesh attribute backed by a byteOffset>0 subarray (L38)", async () => {
+    // A typed-array view into a larger buffer: the cache must slice from
+    // byteOffset, not from 0, or it would serialize the leading padding.
+    const backing = new Float32Array([9, 9, 9, 0, 0, 0, 1, 0, 0, 0, 1, 0]);
+    const view = backing.subarray(3); // byteOffset = 12, the real 9 positions
+    const handle: GeometryHandle = {
+      id: "mesh-offset",
+      name: "mesh-offset",
+      data: {
+        vertexCount: 3,
+        attributes: [{ name: "a_position", size: 3, data: view }],
+        indices: new Uint16Array([0, 1, 2]),
+      },
+    };
+    await cacheMesh(handle);
+    const loaded = await loadCachedMesh("mesh-offset");
+    expect(Array.from(loaded?.data.attributes[0]?.data ?? [])).toEqual([
+      0, 0, 0, 1, 0, 0, 0, 1, 0,
+    ]);
+  });
+
+  it("round-trips a video handle + blob and deletes it (L38)", async () => {
+    const handle: VideoAssetHandle = {
+      id: "vid-rt",
+      name: "clip",
+      width: 4,
+      height: 3,
+      duration: 1.5,
+      mimeType: "video/mp4",
+    };
+    await cacheVideo(handle, new Blob([new Uint8Array([1, 2, 3])]));
+    const r = await loadCachedVideo("vid-rt");
+    expect(r?.handle).toEqual(handle);
+    expect(r?.blob).toBeDefined();
+
+    await deleteCachedVideo("vid-rt");
+    expect(await loadCachedVideo("vid-rt")).toBeNull();
+  });
+
+  it("round-trips an audio handle + blob and deletes it (L38)", async () => {
+    const handle: AudioAssetHandle = {
+      id: "aud-rt",
+      name: "track",
+      duration: 2,
+      sampleRate: 44_100,
+      channels: 2,
+      mimeType: "audio/mpeg",
+    };
+    await cacheAudio(handle, new Blob([new Uint8Array([4, 5])]));
+    const r = await loadCachedAudio("aud-rt");
+    expect(r?.handle).toEqual(handle);
+    expect(r?.blob).toBeDefined();
+
+    await deleteCachedAudio("aud-rt");
+    expect(await loadCachedAudio("aud-rt")).toBeNull();
+  });
+
+  it("returns null when loading unknown video/audio ids (L38)", async () => {
+    expect(await loadCachedVideo("no-vid")).toBeNull();
+    expect(await loadCachedAudio("no-aud")).toBeNull();
   });
 });

@@ -84,9 +84,13 @@ export class GpuTimerPool {
    * (recycling the WebGLQuery objects) and emit nothing for that frame.
    */
   poll(gl: WebGL2RenderingContext): GpuTimerSample[] {
+    // Read GPU_DISJOINT_EXT every frame — the getParameter read also resets the
+    // sticky flag. If we skipped it on idle frames (no pending queries), a
+    // disjoint fired while idle would linger and invalidate the next frame's
+    // otherwise-valid queries.
+    const disjoint = gl.getParameter(this.ext.GPU_DISJOINT_EXT) as boolean;
     if (this.pending.length === 0) return [];
 
-    const disjoint = gl.getParameter(this.ext.GPU_DISJOINT_EXT) as boolean;
     if (disjoint) {
       for (const p of this.pending) this.idle.push(p.query);
       this.pending = [];

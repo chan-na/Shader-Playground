@@ -11,6 +11,12 @@ export interface DiagnosticsState {
   byNode: Record<string, NodeDiagnostics>;
   set: (nodeId: string, diags: NodeDiagnostics) => void;
   clear: (nodeId: string) => void;
+  /**
+   * Drop diagnostics for every node not in `nodeIds`. Called after each
+   * recompile so deleting a node with compile errors doesn't leave a phantom
+   * ProblemsPanel row / inflated badge behind.
+   */
+  retainOnly: (nodeIds: string[]) => void;
   reset: () => void;
 }
 
@@ -23,6 +29,19 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set) => ({
       const byNode = { ...s.byNode };
       delete byNode[nodeId];
       return { byNode };
+    }),
+  retainOnly: (nodeIds) =>
+    set((s) => {
+      const keep = new Set(nodeIds);
+      let changed = false;
+      const byNode: Record<string, NodeDiagnostics> = {};
+      for (const [id, diags] of Object.entries(s.byNode)) {
+        if (keep.has(id)) byNode[id] = diags;
+        else changed = true;
+      }
+      // Preserve the identity when nothing was pruned so subscribers don't
+      // re-render on every recompile.
+      return changed ? { byNode } : s;
     }),
   reset: () => set({ byNode: {} }),
 }));

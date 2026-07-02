@@ -1,5 +1,12 @@
 import { create } from "zustand";
 
+/**
+ * Upper bound (seconds) on a single advance step. A backgrounded tab or a GC
+ * pause makes the RAF delta balloon to seconds; without a cap simTime would
+ * jump forward by the whole stalled interval on the next frame.
+ */
+const MAX_ADVANCE_DT = 0.1;
+
 export interface TimeState {
   /** Simulated shader time in seconds — what u_time sees. */
   simTime: number;
@@ -35,6 +42,7 @@ export const useTimeStore = create<TimeState>((set, get) => ({
   advance: (dt) => {
     const { playing, speed, simTime } = get();
     if (!playing) return;
-    set({ simTime: simTime + dt * speed });
+    const clamped = Math.min(Math.max(dt, 0), MAX_ADVANCE_DT);
+    set({ simTime: simTime + clamped * speed });
   },
 }));

@@ -17,10 +17,11 @@ export function buildExportedHtml(
   const title = opts?.title ?? "Shader Playground export";
   const w = opts?.width ?? 800;
   const h = opts?.height ?? 600;
-  // Inline JSON safely — close </script> and -- escapes prevent injection.
-  const safeJson = JSON.stringify(project)
-    .replace(/<\/script>/gi, "<\\/script>")
-    .replace(/<!--/g, "<\\!--");
+  // Inline JSON safely. Escaping every `<` as `<` neutralises all
+  // `<`-based script breakouts (`</script>`, `</script ` with whitespace/slash,
+  // `<!--`, …) — the JS string literal parser turns `<` back into `<`, so
+  // the runtime value is unchanged while the HTML parser never sees a raw `<`.
+  const safeJson = JSON.stringify(project).replace(/</g, "\\u003c");
 
   return `<!doctype html>
 <html lang="en">

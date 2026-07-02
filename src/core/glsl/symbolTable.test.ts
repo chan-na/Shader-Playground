@@ -111,6 +111,32 @@ float noise(vec2 p, float k) {
     ]);
   });
 
+  it("does not register function-call args as phantom locals (M6)", () => {
+    const src = `void main() {
+  vec3 a = vec3(0.0);
+  vec3 b = vec3(1.0);
+  float t = 0.5;
+  vec3 c = mix(a, b, t);
+}
+`;
+    const table = buildSymbolTable(src);
+    const locals = table.symbols.filter((s) => s.kind === "local");
+    // `mix(a, b, t)` is a single declarator (c); a/b/t are call args, not extra
+    // declarators — they must not be re-added as phantom vec3 locals.
+    expect(locals.map((l) => l.name)).toEqual(["a", "b", "t", "c"]);
+  });
+
+  it("handles a later declarator with a call initializer (M6)", () => {
+    const src = `void main() {
+  vec3 a, b = mix(vec3(0.0), vec3(1.0), 0.5), c;
+}
+`;
+    const table = buildSymbolTable(src);
+    const locals = table.symbols.filter((s) => s.kind === "local");
+    // Commas inside mix(...) are skipped; only a, b, c are declarators.
+    expect(locals.map((l) => l.name)).toEqual(["a", "b", "c"]);
+  });
+
   it("strips block comments while preserving line numbers", () => {
     const src = `/* leading
 comment block

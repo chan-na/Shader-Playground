@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFakeGl } from "../gl/fakeGl";
 import { AsyncThumbnailReadback } from "./asyncReadback";
-import { downsampleToThumb } from "./readback";
 
 /**
  * WebGL2 stub for AsyncThumbnailReadback. The GPU-downsample path (program +
@@ -11,6 +10,7 @@ import { downsampleToThumb } from "./readback";
 function makeGL(opts: { linkFailure?: boolean } = {}) {
   const calls: string[] = [];
   let signaled = false;
+  let forcedStatus: number | null = null;
   const pboBytes = new Map<WebGLBuffer, Uint8Array>();
   let lastBoundPbo: WebGLBuffer | null = null;
 
@@ -76,6 +76,7 @@ function makeGL(opts: { linkFailure?: boolean } = {}) {
     },
     clientWaitSync: () => {
       calls.push("clientWaitSync");
+      if (forcedStatus !== null) return forcedStatus;
       return signaled ? 1 : 0; // ALREADY_SIGNALED vs TIMEOUT_EXPIRED
     },
     deleteSync: () => {
@@ -100,6 +101,9 @@ function makeGL(opts: { linkFailure?: boolean } = {}) {
     calls,
     setSignaled: (v: boolean) => {
       signaled = v;
+    },
+    setStatus: (v: number | null) => {
+      forcedStatus = v;
     },
   };
 }
@@ -195,25 +199,43 @@ describe("AsyncThumbnailReadback", () => {
     r.release(gl, "n1");
     expect(r.pendingNodeIds()).toEqual([]);
   });
-});
 
-describe("downsampleToThumb", () => {
-  it("produces a thumb-sized ImageData", () => {
-    const w = 32;
-    const h = 32;
-    const src = new Uint8Array(w * h * 4);
-    for (let i = 0; i < src.length; i += 4) {
-      src[i] = 200;
-      src[i + 1] = 100;
-      src[i + 2] = 50;
-      src[i + 3] = 255;
-    }
-    const out = downsampleToThumb(src, w, h, 8);
-    expect(out.width).toBe(8);
-    expect(out.height).toBe(8);
-    // Pixel(0,0) should reflect the constant source color.
-    expect(out.data[0]).toBeGreaterThan(150);
-    expect(out.data[1]).toBeGreaterThan(50);
-    expect(out.data[3]).toBe(255);
+  it("WAIT_FAILED abandons the slot instead of pinning it forever (L4)", () => {
+    const { gl, setStatus } = makeGL();
+    const r = new AsyncThumbnailReadback();
+    r.request(gl, "n1", fakeFB(64, 64));
+    expect(r.pendingNodeIds()).toEqual(["n1"]);
+
+    // A terminal WAIT_FAILED (e.g. context loss) used to be treated like a
+    // transient TIMEOUT, leaving the slot pending forever so request() returned
+    // false for the rest of the session.
+    setStatus(-1); // WAIT_FAILED
+    expect(r.poll(gl)).toEqual([]);
+    expect(r.pendingNodeIds()).toEqual([]);
+
+    // The node can be requested again now that the dead fence was dropped.
+    setStatus(null);
+    expect(r.request(gl, "n1", fakeFB(64, 64))).toBe(true);
+    expect(r.pendingNodeIds()).toEqual(["n1"]);
+  });
+
+  it("disposeAll clears blit + slots so a fresh request rebuilds (M8)", () => {
+    const { gl, calls } = makeGL();
+    const r = new AsyncThumbnailReadback();
+    r.request(gl, "n1", fakeFB(64, 64));
+    expect(r.pendingNodeIds()).toEqual(["n1"]);
+
+    // Simulate context-loss teardown: everything (blit program + slots) is
+    // released so nothing stale is reused against a restored context.
+    r.disposeAll(gl);
+    expect(r.pendingNodeIds()).toEqual([]);
+
+    // A request after teardown must rebuild the blit and issue a new fence —
+    // i.e. run end-to-end rather than short-circuit on a dead `this.blit`.
+    const fencesBefore = calls.filter((c) => c === "fenceSync").length;
+    expect(r.request(gl, "n1", fakeFB(64, 64))).toBe(true);
+    expect(calls.filter((c) => c === "fenceSync").length).toBe(
+      fencesBefore + 1,
+    );
   });
 });

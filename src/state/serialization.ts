@@ -94,7 +94,24 @@ export function deserializeProject(raw: unknown): DeserializedProject {
       `Project exceeds edge limit (${SANITIZE_LIMITS.MAX_EDGES})`,
     );
   }
-  const positions = (obj.positions ?? {}) as Record<string, NodePosition>;
+  // Positions come from untrusted payloads too — validate the shape rather than
+  // casting blind, so a malformed `{x:"a"}` / NaN can't reach React Flow.
+  const rawPositions = (obj.positions ?? {}) as Record<string, unknown>;
+  const positions: Record<string, NodePosition> = {};
+  for (const [id, pos] of Object.entries(rawPositions)) {
+    if (!pos || typeof pos !== "object") continue;
+    const { x, y } = pos as { x?: unknown; y?: unknown };
+    if (
+      typeof x === "number" &&
+      Number.isFinite(x) &&
+      typeof y === "number" &&
+      Number.isFinite(y)
+    ) {
+      positions[id] = { x, y };
+    } else {
+      warnings.push(`Position dropped for ${id}: malformed coordinates`);
+    }
+  }
 
   const sanitizedNodes: GraphNode[] = [];
   for (const raw of graph.nodes) {
@@ -149,7 +166,11 @@ export function deserializeProject(raw: unknown): DeserializedProject {
       cur = candidates[cur];
       depth++;
     }
-    if (!cycle && depth < MAX_DEPTH) {
+    // Accept when the walk reached the chain end (`cur === undefined`), even at
+    // exactly MAX_DEPTH hops. Only a cycle, or a chain still continuing past the
+    // cap (`cur !== undefined`), is dropped — the previous `depth < MAX_DEPTH`
+    // test also discarded a valid acyclic chain of exactly MAX_DEPTH ancestors.
+    if (!cycle && cur === undefined) {
       const p = candidates[child];
       if (p !== undefined) parents[child] = p;
     } else {

@@ -79,6 +79,41 @@ describe("parseUniforms", () => {
     expect(u.find((x) => x.name === "u_tex")?.control).toBe("sampler");
   });
 
+  it("gives ivec* an array default so the multi control never crashes (H1)", () => {
+    const src = `
+      uniform ivec2 u_cells;
+      uniform ivec3 u_grid;
+      uniform ivec4 u_box;
+    `;
+    const u = parseUniforms(src);
+    const cells = u.find((x) => x.name === "u_cells")!;
+    expect(cells.type).toBe("ivec2");
+    expect(cells.control).toBe("multi");
+    // Regression: ivec used to fall through to a scalar `0` default, which made
+    // UniformControl's `arr.map` throw. Default must be an N-length array.
+    expect(Array.isArray(cells.defaultValue)).toBe(true);
+    expect(cells.defaultValue).toEqual([0, 0]);
+    expect(cells.step).toBe(1); // integer-friendly step
+    expect(u.find((x) => x.name === "u_grid")?.defaultValue).toEqual([0, 0, 0]);
+    expect(u.find((x) => x.name === "u_box")?.defaultValue).toEqual([
+      0, 0, 0, 0,
+    ]);
+  });
+
+  it("skips unsupported GLSL types instead of misclassifying them (M7)", () => {
+    const src = `
+      uniform sampler3D u_vol;
+      uniform usampler2D u_idx;
+      uniform uvec3 u_counts;
+      uniform uint u_seed;
+      uniform float u_ok;
+    `;
+    const u = parseUniforms(src);
+    // Only the known type survives; none of the unknowns leak in as a bogus
+    // "multi"/scalar spec that would crash the Inspector.
+    expect(u.map((x) => x.name)).toEqual(["u_ok"]);
+  });
+
   it("ignores commented-out uniforms", () => {
     const src = `
       // uniform float u_dead;
@@ -331,6 +366,22 @@ describe("serializeHintComment", () => {
 
   it("returns a bare // when nothing remains", () => {
     expect(serializeHintComment("// @range 0..1", {})).toBe("//");
+  });
+
+  it("keeps free-text that trails a @default value (L9)", () => {
+    // The @default strip token used to be greedy ([^@\n]+) and swallowed the
+    // trailing note on round-trip; it must now match only the numeric value.
+    const c = serializeHintComment("// @default 0.5 tweak me", {
+      defaultValue: 0.25,
+    });
+    expect(c).toBe("// tweak me @default 0.25");
+  });
+
+  it("keeps free-text trailing a vector @default (L9)", () => {
+    const c = serializeHintComment("// @default 1,0,0 base tint", {
+      defaultValue: [0, 1, 0],
+    });
+    expect(c).toBe("// base tint @default 0,1,0");
   });
 
   it("uses @min/@max when only one bound is given", () => {

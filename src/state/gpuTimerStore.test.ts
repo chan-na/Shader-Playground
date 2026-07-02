@@ -32,6 +32,32 @@ describe("gpuTimerStore", () => {
     expect(snapshot().totalMs).toBeCloseTo(12, 5);
   });
 
+  it("setSamples applies a whole frame in one update, matching per-node EMA (L24)", () => {
+    const s = snapshot();
+    // Seed, then a second batch EMA-smooths each node like setSample would.
+    s.setSamples([
+      { nodeId: "a", ms: 3 },
+      { nodeId: "b", ms: 7 },
+    ]);
+    expect(snapshot().byNode.a).toBe(3);
+    expect(snapshot().byNode.b).toBe(7);
+    s.setSamples([
+      { nodeId: "a", ms: 13 }, // 3 + (13-3)*0.2 = 5
+      { nodeId: "b", ms: 2 }, // 7 + (2-7)*0.2 = 6
+    ]);
+    expect(snapshot().byNode.a).toBeCloseTo(5, 5);
+    expect(snapshot().byNode.b).toBeCloseTo(6, 5);
+    expect(snapshot().totalMs).toBeCloseTo(11, 5);
+  });
+
+  it("setSamples with an empty batch is a no-op that keeps identity (L24)", () => {
+    const s = snapshot();
+    s.setSample("a", 4);
+    const before = snapshot().byNode;
+    s.setSamples([]);
+    expect(snapshot().byNode).toBe(before);
+  });
+
   it("removeNode drops the entry and adjusts totalMs", () => {
     const s = snapshot();
     s.setSample("a", 2);

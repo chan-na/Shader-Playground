@@ -100,14 +100,14 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 
 ## 2. 아키텍처 설계
 
-레이어 분리, 노드/포트 모델, 컴파일·렌더 파이프라인, 카메라, 썸네일 서브시스템, 상태 스토어 구조, 에러 처리, 직렬화, 정적 HTML export 등 **현 구현(Phase 22)의 동작 설명은 [Architecture.md](./Architecture.md) 로 이전**되었다. 본 SPEC 의 노드 모델·연결 규칙·페이즈 결정은 그쪽 문서의 §2 (그래프 모델) / §3 (컴파일) / §4 (렌더 루프) 와 일치하도록 유지된다.
+레이어 분리, 노드/포트 모델, 컴파일·렌더 파이프라인, 카메라, 썸네일 서브시스템, 상태 스토어 구조, 에러 처리, 직렬화, 정적 HTML export 등 **현 구현(Phase 34)의 동작 설명은 [Architecture.md](./Architecture.md) 로 이전**되었다. 본 SPEC 의 노드 모델·연결 규칙·페이즈 결정은 그쪽 문서의 §2 (그래프 모델) / §3 (컴파일) / §4 (렌더 루프) 와 일치하도록 유지된다.
 
 핵심 SPEC 차원 결정만 다시 한 번 요약:
 
-- 노드 종류는 12 가지 — `Mesh / Image / Webcam / Video / Audio / Shader / Compute / Output / Param / Math / Swizzle / Combine`. Shader 와 Compute 의 입력 포트는 GLSL 의 `uniform` 선언으로부터 매번 다시 파싱되어 자동 생성된다. Webcam / Video / Audio 는 plan 외부 싱글톤 풀(`core/external/registry.ts`)이 lifecycle 을 관리하는 라이브 외부 텍스처 소스다.
+- 노드 종류는 13 가지 — `Mesh / Image / Webcam / Video / Audio / Shader / Compute / Output / Param / Math / Swizzle / Combine / Group`. Group 은 포트가 없는 순수 편집기 레이어 컨테이너(Phase 29)로, `ExecutionPlan` 에는 들어가지 않는다. Shader 와 Compute 의 입력 포트는 GLSL 의 `uniform` 선언으로부터 매번 다시 파싱되어 자동 생성된다. Webcam / Video / Audio 는 plan 외부 싱글톤 풀(`core/external/registry.ts`)이 lifecycle 을 관리하는 라이브 외부 텍스처 소스다.
 - ShaderNode 는 vertex + fragment GLSL 한 쌍을 함께 보유. 메시 입력이 없으면 빌트인 `fullscreen.vert` 가 자동 주입되고 사용자의 vertex 소스는 사용되지 않는다.
 - ComputeNode 는 vertex GLSL 한 개와 `transformFeedbackVaryings` 로 캡처할 출력 attribute 목록을 보유. fragment 단계는 `RASTERIZER_DISCARD` 로 비활성화되고, ping-pong 두 vbo 세트로 매 프레임 시뮬레이션 결과를 갱신한다. 출력은 `mesh` 포트 하나 — 다운스트림 ShaderNode 가 mesh 입력으로 받아 POINTS/LINES/TRIANGLES 중 하나로 그린다.
-- 포트 타입은 6 가지 — `mesh / texture / float / vec2 / vec3 / vec4`. 분기(1:N)는 허용, 합성(N:1)은 금지. Output 노드는 그래프당 0~4 개, 5 개 이상은 검증 단계에서 거부.
+- 포트 타입은 6 가지 — `mesh / texture / float / vec2 / vec3 / vec4`. 분기(1:N)와 서로 다른 핸들로 들어오는 합성(N:1 fan-in)은 허용, *동일 핸들* N:1 만 금지(Phase 18 N:1 합성 일반화). Output 노드는 그래프당 0~4 개, 5 개 이상은 검증 단계에서 거부.
 - 유틸 노드(Math/Swizzle/Combine)는 GL 패스를 만들지 않고 ShaderNode/ComputeNode 의 비-샘플러 uniform 입력을 CPU 측에서 매 프레임 평가해 덮어쓴다. fan-out 시 프레임당 1 회 메모이즈.
 - 모든 ShaderNode 카드는 자기 FBO 컬러 어태치먼트의 96×96 라이브 썸네일을 표시. 추가 렌더 패스 없이 PBO + `fenceSync` 비동기 readback 으로 가져오며, 10 Hz 스로틀 + IntersectionObserver 가시성 컬링을 적용. ComputeNode 는 FBO 가 없어 썸네일이 없고, 대신 카드에 vertex count/primitive 메타정보를 표시한다.
 
@@ -117,7 +117,7 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 
 ## 3. 디렉토리 구조
 
-전체 트리와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-22-기준) 로 이전되었다. 초안 SPEC 디렉토리와 실제 구현이 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 컴포넌트 분할 폐기, SidePanel 단일화, export 신설 등) 도 같은 문서의 §12.1 참조.
+전체 트리와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-34-기준) 로 이전되었다. 초안 SPEC 디렉토리와 실제 구현이 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 컴포넌트 분할 폐기, SidePanel 단일화, export 신설 등) 도 같은 문서의 §12.1 참조.
 
 ---
 

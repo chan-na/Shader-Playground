@@ -7,14 +7,11 @@ type RecorderStatus = "idle" | "recording";
 export interface RecorderState {
   status: RecorderStatus;
   startedAt: number | null;
-  /** Wall-clock ms elapsed in the current recording (updated by the RAF tick). */
-  elapsedMs: number;
   lastBlobUrl: string | null;
   error: string | null;
 
   start: (canvas: HTMLCanvasElement, fps?: number) => Promise<void>;
   stop: () => Promise<Blob | null>;
-  tick: () => void;
   clearLast: () => void;
 }
 
@@ -23,9 +20,18 @@ interface InternalRecorder {
   chunks: Blob[];
   startAt: number;
   mimeType: string;
+  /** The captureStream whose tracks must be stopped when recording ends. */
+  stream: MediaStream;
 }
 
 let _active: InternalRecorder | null = null;
+
+/** Resolve stop() even if MediaRecorder never fires onstop/onerror. */
+const STOP_TIMEOUT_MS = 5000;
+
+function stopTracks(stream: MediaStream): void {
+  for (const track of stream.getTracks()) track.stop();
+}
 
 function pickMimeType(): string | null {
   const candidates = [
@@ -52,7 +58,6 @@ function pickMimeType(): string | null {
 export const useRecorderStore = create<RecorderState>((set, get) => ({
   status: "idle",
   startedAt: null,
-  elapsedMs: 0,
   lastBlobUrl: null,
   error: null,
   start: async (canvas, fps = 30) => {
@@ -88,14 +93,17 @@ export const useRecorderStore = create<RecorderState>((set, get) => ({
         chunks,
         startAt: performance.now(),
         mimeType: mime,
+        stream,
       };
       set({
         status: "recording",
         startedAt: _active.startAt,
-        elapsedMs: 0,
         error: null,
       });
     } catch (err) {
+      // Construction failed after captureStream opened the tracks — release
+      // them so we don't leak a live canvas-capture track on every failure.
+      stopTracks(stream);
       const msg = (err as Error).message;
       set({ error: msg });
       toast.error(`녹화 시작 실패: ${msg}`);
@@ -106,6 +114,16 @@ export const useRecorderStore = create<RecorderState>((set, get) => ({
     _active = null;
     if (!active) return null;
     return new Promise<Blob | null>((resolve) => {
+      let settled = false;
+      const finish = (blob: Blob | null) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        // Always release the capture tracks so the canvas isn't left being
+        // recorded after the MediaRecorder has stopped.
+        stopTracks(active.stream);
+        resolve(blob);
+      };
       active.recorder.onstop = () => {
         const blob = new Blob(active.chunks, { type: active.mimeType });
         // Free previous URL if any.
@@ -113,19 +131,25 @@ export const useRecorderStore = create<RecorderState>((set, get) => ({
         if (prev) URL.revokeObjectURL(prev);
         const url = URL.createObjectURL(blob);
         set({ status: "idle", startedAt: null, lastBlobUrl: url });
-        resolve(blob);
+        finish(blob);
       };
+      active.recorder.onerror = () => {
+        set({ status: "idle", startedAt: null });
+        finish(null);
+      };
+      // Safety net: some browsers can fail to fire onstop (e.g. a stream that
+      // ended abnormally). Without this the promise would hang forever.
+      const timer = setTimeout(() => {
+        set({ status: "idle", startedAt: null });
+        finish(null);
+      }, STOP_TIMEOUT_MS);
       try {
         active.recorder.stop();
       } catch {
         set({ status: "idle", startedAt: null });
-        resolve(null);
+        finish(null);
       }
     });
-  },
-  tick: () => {
-    if (!_active) return;
-    set({ elapsedMs: performance.now() - _active.startAt });
   },
   clearLast: () => {
     const prev = get().lastBlobUrl;

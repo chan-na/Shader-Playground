@@ -102,6 +102,46 @@ describe("serializeProject / deserializeProject", () => {
     expect(serialized.positions.ghost).toBeUndefined();
   });
 
+  it("drops positions with malformed coordinates on load (L19)", () => {
+    const restored = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      graph: { nodes: [{ id: "a", kind: "output" }], edges: [] },
+      positions: {
+        a: { x: 10, y: 20 },
+        bad1: { x: Number.NaN, y: 0 },
+        bad2: { x: "5", y: 5 },
+        bad3: 42,
+      },
+    });
+    expect(restored.positions.a).toEqual({ x: 10, y: 20 });
+    expect(restored.positions.bad1).toBeUndefined();
+    expect(restored.positions.bad2).toBeUndefined();
+    expect(restored.positions.bad3).toBeUndefined();
+  });
+
+  it("keeps an acyclic parent chain of exactly MAX_DEPTH ancestors (L3)", () => {
+    const DEPTH = 64; // serialization.ts MAX_DEPTH
+    const nodes = Array.from({ length: DEPTH + 1 }, (_, i) => ({
+      id: `n${i}`,
+      kind: "mesh" as const,
+      primitive: "cube" as const,
+    }));
+    const parents: Record<string, string> = {};
+    for (let i = 1; i <= DEPTH; i++) parents[`n${i}`] = `n${i - 1}`;
+    const restored = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      graph: { nodes, edges: [] },
+      positions: {},
+      parents,
+    });
+    // The deepest link is exactly MAX_DEPTH ancestors up — previously dropped by
+    // the `depth < MAX_DEPTH` off-by-one; it must now survive.
+    expect(restored.parents[`n${DEPTH}`]).toBe(`n${DEPTH - 1}`);
+    expect(Object.keys(restored.parents).length).toBe(DEPTH);
+  });
+
   it("rejects null/non-object payloads", () => {
     expect(() => deserializeProject(null)).toThrow(/not an object/);
     expect(() => deserializeProject("string")).toThrow();

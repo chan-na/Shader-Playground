@@ -61,23 +61,35 @@ describe("buildExportedHtml", () => {
     expect(playerScript).not.toMatch(/kind\s*===\s*['"]group['"]/);
   });
 
-  it("escapes any </script> in shader source", () => {
+  it("escapes every < in shader source, incl. whitespace </script variants (M9)", () => {
     const sneaky: Graph = {
       nodes: [
         {
           id: "x",
           kind: "shader",
           vertexSource: "void main(){}",
-          // Closing-script in source MUST be escaped or it breaks the page.
-          fragmentSource: "// </script><script>alert(1)</script>",
+          // The HTML parser ends an inline script on </script followed by ANY
+          // of >, whitespace, /, or newline — all must be neutralised.
+          fragmentSource:
+            "// </script><s>a</s> </script ><img src=x onerror=alert(1)> </script\n<!-- x -->",
           uniformValues: {},
         },
       ],
       edges: [],
     };
     const html = buildExportedHtml(sneaky, {});
-    expect(html).not.toContain("</script><script>");
-    expect(html).toContain("<\\/script>");
+    // Isolate the injected project literal: `window.__SP_PROJECT = {...};`.
+    const projectLine = html
+      .split("window.__SP_PROJECT = ")[1]
+      ?.split("</script>")[0];
+    expect(projectLine).toBeTruthy();
+    // No raw `<` may survive in the embedded JSON — every one is <-escaped.
+    expect(projectLine).not.toContain("<");
+    expect(projectLine).toContain("\\u003c/script");
+    expect(projectLine).toContain("\\u003c!--");
+    // And the document as a whole never contains a real breakout sequence.
+    expect(html).not.toContain("</script><s>");
+    expect(html).not.toContain("</script >");
   });
 
   it("inlines a non-trivial standalone player script", () => {

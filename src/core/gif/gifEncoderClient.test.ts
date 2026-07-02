@@ -219,6 +219,38 @@ describe("GifEncoderClient", () => {
     ]);
   });
 
+  it("keeps reported progress monotonic across a worker→inline fallback (L11)", async () => {
+    const { c, w } = makeClient();
+    const done: number[] = [];
+    const frame = () => {
+      const rgba = new Uint8Array(2 * 2 * 4);
+      rgba.fill(255);
+      return { rgba, delayMs: 100 };
+    };
+    const p = c.encode({
+      width: 2,
+      height: 2,
+      maxColors: 256,
+      loop: true,
+      frames: [frame(), frame(), frame(), frame()],
+      onProgress: (d) => done.push(d),
+    });
+    const reqId = sentReqId(w, 0);
+    // Worker makes real headway…
+    w.reply({ type: "progress", reqId, done: 1, total: 4 });
+    w.reply({ type: "progress", reqId, done: 2, total: 4 });
+    // …then dies → inline fallback restarts the encode from frame 0.
+    w.fireError("crashed mid-encode");
+    await p;
+    // The inline restart reports 0,1,… but the guard suppresses anything below
+    // the worker's high-water mark, so progress never jumps backward.
+    expect(done.length).toBeGreaterThan(0);
+    for (let i = 1; i < done.length; i++) {
+      expect(done[i]!).toBeGreaterThanOrEqual(done[i - 1]!);
+    }
+    expect(Math.min(...done)).toBeGreaterThanOrEqual(1);
+  });
+
   it("ignores progress for an unknown reqId", async () => {
     const { c, w } = makeClient();
     const progress: number[] = [];

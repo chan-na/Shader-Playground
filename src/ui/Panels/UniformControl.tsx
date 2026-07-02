@@ -26,7 +26,7 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
           max={spec.max}
           step={step}
           value={num}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
         />
         <input
           type="number"
@@ -34,14 +34,18 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
           max={spec.max}
           step={step}
           value={num.toFixed(3)}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
         />
       </div>
     );
   }
 
   if (spec.control === "multi") {
-    const arr = Array.isArray(v) ? v : (spec.defaultValue as number[]);
+    const arr = Array.isArray(v)
+      ? v
+      : Array.isArray(spec.defaultValue)
+        ? spec.defaultValue
+        : [];
     const labels = ["x", "y", "z", "w"];
     return (
       <div>
@@ -58,7 +62,7 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
               value={component}
               onChange={(e) => {
                 const next = arr.slice();
-                next[i] = parseFloat(e.target.value);
+                next[i] = parseFloat(e.target.value) || 0;
                 onChange(next);
               }}
             />
@@ -68,7 +72,7 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
               value={component.toFixed(3)}
               onChange={(e) => {
                 const next = arr.slice();
-                next[i] = parseFloat(e.target.value);
+                next[i] = parseFloat(e.target.value) || 0;
                 onChange(next);
               }}
             />
@@ -79,7 +83,11 @@ export function UniformControl({ spec, value, onChange }: UniformControlProps) {
   }
 
   if (spec.control === "color") {
-    const arr = Array.isArray(v) ? v : (spec.defaultValue as number[]);
+    const arr = Array.isArray(v)
+      ? v
+      : Array.isArray(spec.defaultValue)
+        ? spec.defaultValue
+        : [];
     const r = Math.round(Math.max(0, Math.min(1, arr[0] ?? 0)) * 255);
     const g = Math.round(Math.max(0, Math.min(1, arr[1] ?? 0)) * 255);
     const b = Math.round(Math.max(0, Math.min(1, arr[2] ?? 0)) * 255);

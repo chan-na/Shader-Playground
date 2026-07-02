@@ -9,20 +9,32 @@ describe("timeStore", () => {
   });
 
   it("advances simTime when playing", () => {
-    useTimeStore.getState().advance(0.5);
-    expect(useTimeStore.getState().simTime).toBeCloseTo(0.5);
+    useTimeStore.getState().advance(0.05);
+    expect(useTimeStore.getState().simTime).toBeCloseTo(0.05);
   });
 
   it("does not advance when paused", () => {
     useTimeStore.getState().setPlaying(false);
-    useTimeStore.getState().advance(1.0);
+    useTimeStore.getState().advance(0.05);
     expect(useTimeStore.getState().simTime).toBe(0);
   });
 
   it("scales by speed", () => {
     useTimeStore.getState().setSpeed(2);
-    useTimeStore.getState().advance(0.5);
-    expect(useTimeStore.getState().simTime).toBeCloseTo(1.0);
+    useTimeStore.getState().advance(0.04);
+    expect(useTimeStore.getState().simTime).toBeCloseTo(0.08);
+  });
+
+  it("clamps a huge dt so a background-tab/GC stall doesn't jump time (L14)", () => {
+    // A 5-second stall must advance by at most the per-step cap (0.1s), not 5s.
+    useTimeStore.getState().advance(5);
+    expect(useTimeStore.getState().simTime).toBeCloseTo(0.1);
+  });
+
+  it("ignores negative dt (L14)", () => {
+    useTimeStore.getState().advance(0.05);
+    useTimeStore.getState().advance(-1);
+    expect(useTimeStore.getState().simTime).toBeCloseTo(0.05);
   });
 
   it("togglePlaying flips state", () => {

@@ -169,6 +169,28 @@ async function importFile(
   return null;
 }
 
+/**
+ * Collect the asset ids referenced by a freshly-loaded graph and hydrate the
+ * asset store from IndexedDB. Single entry point for every load path (JSON
+ * import, session/share restore) so cached custom meshes/images/videos/audio
+ * survive a reload instead of silently falling back to placeholders.
+ */
+export function hydrateGraphAssets(nodes: GraphNode[]): void {
+  const meshes: string[] = [];
+  const images: string[] = [];
+  const videos: string[] = [];
+  const audios: string[] = [];
+  for (const n of nodes) {
+    if (n.kind === "mesh" && n.assetId) meshes.push(n.assetId);
+    else if (n.kind === "image" && n.assetId) images.push(n.assetId);
+    else if (n.kind === "video" && n.assetId) videos.push(n.assetId);
+    else if (n.kind === "audio" && n.assetId) audios.push(n.assetId);
+  }
+  if (meshes.length || images.length || videos.length || audios.length) {
+    void hydrateAssetsFor({ meshes, images, videos, audios });
+  }
+}
+
 // Hydrate the asset store from IndexedDB for the assetIds referenced by a
 // freshly-loaded project graph. Missing IDs are silently skipped — the
 // MeshNode falls back to its primitive and the ImageNode shows "No image".

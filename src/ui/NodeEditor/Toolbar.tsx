@@ -5,7 +5,7 @@ import { downloadExportedHtml } from "../../export/htmlExport";
 import basicVert from "../../shaders/basic.vert?raw";
 import blendFrag from "../../shaders/templates/blend.frag?raw";
 import unlitFrag from "../../shaders/templates/unlit.frag?raw";
-import { hydrateAssetsFor, importFiles } from "../../state/assetActions";
+import { hydrateGraphAssets, importFiles } from "../../state/assetActions";
 import {
   CHAIN_DEMO_LAYOUT,
   createChainDemoGraph,
@@ -86,29 +86,7 @@ export function Toolbar() {
       const text = await file.text();
       const parsed = deserializeProject(JSON.parse(text));
       setGraph(parsed.graph, parsed.positions, parsed.parents);
-      const meshIds: string[] = [];
-      const imageIds: string[] = [];
-      const videoIds: string[] = [];
-      const audioIds: string[] = [];
-      for (const n of parsed.graph.nodes) {
-        if (n.kind === "mesh" && n.assetId) meshIds.push(n.assetId);
-        if (n.kind === "image" && n.assetId) imageIds.push(n.assetId);
-        if (n.kind === "video" && n.assetId) videoIds.push(n.assetId);
-        if (n.kind === "audio" && n.assetId) audioIds.push(n.assetId);
-      }
-      if (
-        meshIds.length ||
-        imageIds.length ||
-        videoIds.length ||
-        audioIds.length
-      ) {
-        void hydrateAssetsFor({
-          meshes: meshIds,
-          images: imageIds,
-          videos: videoIds,
-          audios: audioIds,
-        });
-      }
+      hydrateGraphAssets(parsed.graph.nodes);
       if (parsed.warnings.length) {
         console.warn("Project loaded with warnings:", parsed.warnings);
       }
@@ -153,7 +131,6 @@ export function Toolbar() {
   };
 
   const recorderStatus = useRecorderStore((r) => r.status);
-  const recorderUrl = useRecorderStore((r) => r.lastBlobUrl);
 
   const toggleRecord = async () => {
     const r = useRecorderStore.getState();
@@ -175,7 +152,6 @@ export function Toolbar() {
       }
     }
   };
-  void recorderUrl;
 
   const gifStatus = useGifRecorderStore((r) => r.status);
   const gifEncodeProgress = useGifRecorderStore((r) => r.encodeProgress);

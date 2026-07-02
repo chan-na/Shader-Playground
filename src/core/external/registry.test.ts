@@ -12,6 +12,7 @@ import {
   reconcileExternal,
   setAudioBlobResolver,
   setVideoBlobResolver,
+  updateExternalSources,
 } from "./registry";
 
 // All tests run against the module singleton — clean it up so order doesn't
@@ -454,5 +455,198 @@ describe("disposeAllExternal", () => {
     disposeAllExternal();
     expect(externalHandleCount()).toBe(0);
     expect(stopCalls).toEqual(["stopped"]);
+  });
+});
+
+describe("external texture lifecycle (M3/M5)", () => {
+  // Minimal WebGL2 stand-in: the external texture path only touches these
+  // methods, and the GL enum constants are passed through unread, so a partial
+  // fake is sufficient. A full WebGL2RenderingContext cannot be built in jsdom.
+  function makeFakeGl() {
+    let created = 0;
+    let deleted = 0;
+    const noop = () => {};
+    const gl = {
+      createTexture: () => {
+        created += 1;
+        return { __tex: created };
+      },
+      deleteTexture: () => {
+        deleted += 1;
+      },
+      bindTexture: noop,
+      texParameteri: noop,
+      pixelStorei: noop,
+      texImage2D: noop,
+      texSubImage2D: noop,
+    };
+    return {
+      gl: gl as unknown as WebGL2RenderingContext,
+      created: () => created,
+      deleted: () => deleted,
+    };
+  }
+
+  function fakeAudioContext() {
+    const analyser = {
+      fftSize: 0,
+      smoothingTimeConstant: 0,
+      frequencyBinCount: 16,
+      getByteFrequencyData: (arr: Uint8Array) => arr.fill(128),
+      disconnect: () => {},
+    };
+    return {
+      createAnalyser: () => analyser,
+      createMediaStreamSource: () => ({
+        connect: () => {},
+        disconnect: () => {},
+      }),
+      resume: () => Promise.resolve(),
+      close: () => Promise.resolve(),
+    } as unknown as AudioContext;
+  }
+
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  afterEach(() => {
+    __setAudioContextFactoryForTests(null);
+  });
+
+  async function readyMicAudio() {
+    __setAudioContextFactoryForTests(() => fakeAudioContext());
+    __setGetUserMediaForTests(() => Promise.resolve(fakeStream()));
+    reconcileExternal([
+      {
+        nodeId: "a1",
+        kind: "audio",
+        sourceKind: "mic",
+        assetId: null,
+        fftSize: 32,
+        smoothing: 0.8,
+        playing: true,
+        loop: false,
+      },
+    ]);
+    await flush();
+    expect(getExternalStatus("a1")?.ready).toBe(true);
+  }
+
+  it("creates exactly one GPU texture when a source is uploaded", async () => {
+    await readyMicAudio();
+    const fake = makeFakeGl();
+    updateExternalSources(fake.gl);
+    expect(fake.created()).toBe(1);
+    // Idempotent uploads reuse the texture (no per-frame create).
+    updateExternalSources(fake.gl);
+    expect(fake.created()).toBe(1);
+  });
+
+  it("deletes the texture on reconcile-remove via the stashed gl (M3)", async () => {
+    await readyMicAudio();
+    const fake = makeFakeGl();
+    updateExternalSources(fake.gl); // creates the texture + stashes gl
+    expect(fake.created()).toBe(1);
+
+    // reconcileExternal runs inside compile with no GL context in scope; the
+    // registry must delete the orphaned texture using the last-render gl.
+    reconcileExternal([]);
+    expect(fake.deleted()).toBe(fake.created());
+    expect(externalHandleCount()).toBe(0);
+  });
+
+  it("deletes the texture on disposeAllExternal(gl)", async () => {
+    await readyMicAudio();
+    const fake = makeFakeGl();
+    updateExternalSources(fake.gl);
+    expect(fake.created()).toBe(1);
+    disposeAllExternal(fake.gl);
+    expect(fake.deleted()).toBe(1);
+    expect(externalHandleCount()).toBe(0);
+  });
+});
+
+describe("audio file play toggled during decode (M4)", () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  afterEach(() => {
+    __setAudioContextFactoryForTests(null);
+    setAudioBlobResolver(null);
+  });
+
+  it("starts playback when Play is pressed while decodeAudioData is in flight", async () => {
+    let bufferSources = 0;
+    let resolveDecode: (buf: unknown) => void = () => {};
+    const analyser = {
+      fftSize: 0,
+      smoothingTimeConstant: 0,
+      frequencyBinCount: 16,
+      getByteFrequencyData: (arr: Uint8Array) => arr.fill(0),
+      disconnect: () => {},
+    };
+    const ctx = {
+      createAnalyser: () => analyser,
+      decodeAudioData: () =>
+        new Promise((res) => {
+          resolveDecode = res;
+        }),
+      createBufferSource: () => {
+        bufferSources += 1;
+        return {
+          buffer: null,
+          loop: false,
+          connect: () => {},
+          start: () => {},
+          stop: () => {},
+          disconnect: () => {},
+        };
+      },
+      resume: () => Promise.resolve(),
+      close: () => Promise.resolve(),
+      destination: {},
+    } as unknown as AudioContext;
+
+    __setAudioContextFactoryForTests(() => ctx);
+    setAudioBlobResolver(
+      () =>
+        ({
+          arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+        }) as unknown as Blob,
+    );
+
+    // Start paused, then flush until startAudioFile is suspended on decode.
+    reconcileExternal([
+      {
+        nodeId: "af1",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: "asset1",
+        fftSize: 32,
+        smoothing: 0.8,
+        playing: false,
+        loop: false,
+      },
+    ]);
+    await flush();
+    expect(bufferSources).toBe(0);
+
+    // User hits Play mid-decode: buffer is still null so this is a no-op now…
+    reconcileExternal([
+      {
+        nodeId: "af1",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: "asset1",
+        fftSize: 32,
+        smoothing: 0.8,
+        playing: true,
+        loop: false,
+      },
+    ]);
+    expect(bufferSources).toBe(0);
+
+    // …but once decode completes, the LIVE spec (playing:true) must start it.
+    resolveDecode({});
+    await flush();
+    expect(bufferSources).toBe(1);
   });
 });

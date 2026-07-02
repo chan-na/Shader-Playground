@@ -410,7 +410,7 @@ export function Viewport() {
           const samples = gpuTimer.poll(gl);
           if (samples.length) {
             const store = useGpuTimerStore.getState();
-            for (const s of samples) store.setSample(s.nodeId, s.ms);
+            store.setSamples(samples);
           }
         } catch (e) {
           // Poll failure (context lost or driver quirk) — drop this batch.

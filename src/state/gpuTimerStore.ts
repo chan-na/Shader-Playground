@@ -21,6 +21,8 @@ export interface GpuTimerState {
   setEnabled: (enabled: boolean) => void;
   toggleEnabled: () => void;
   setSample: (nodeId: string, ms: number) => void;
+  /** Apply a whole frame's worth of samples in one store update. */
+  setSamples: (samples: ReadonlyArray<{ nodeId: string; ms: number }>) => void;
   removeNode: (nodeId: string) => void;
   reset: () => void;
 }
@@ -65,6 +67,19 @@ export const useGpuTimerStore = create<GpuTimerState>((set) => ({
       const prev = s.byNode[nodeId];
       const next = prev === undefined ? ms : prev + (ms - prev) * EMA_ALPHA;
       const byNode = { ...s.byNode, [nodeId]: next };
+      return { ...s, byNode, totalMs: sumValues(byNode) };
+    }),
+  setSamples: (samples) =>
+    set((s) => {
+      if (samples.length === 0) return s;
+      // One clone + one sum + one subscriber notification per frame instead of
+      // one per node (the RAF loop drains N samples every frame).
+      const byNode = { ...s.byNode };
+      for (const { nodeId, ms } of samples) {
+        const prev = byNode[nodeId];
+        byNode[nodeId] =
+          prev === undefined ? ms : prev + (ms - prev) * EMA_ALPHA;
+      }
       return { ...s, byNode, totalMs: sumValues(byNode) };
     }),
   removeNode: (nodeId) =>

@@ -131,7 +131,6 @@ export function Toolbar() {
   };
 
   const recorderStatus = useRecorderStore((r) => r.status);
-  const recorderUrl = useRecorderStore((r) => r.lastBlobUrl);
 
   const toggleRecord = async () => {
     const r = useRecorderStore.getState();
@@ -153,7 +152,6 @@ export function Toolbar() {
       }
     }
   };
-  void recorderUrl;
 
   const gifStatus = useGifRecorderStore((r) => r.status);
   const gifEncodeProgress = useGifRecorderStore((r) => r.encodeProgress);

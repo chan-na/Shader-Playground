@@ -5,7 +5,6 @@ export interface StageTabsProps {
   onChange: (s: ShaderStage) => void;
   vertexHasError: boolean;
   fragmentHasError: boolean;
-  vertexDimmed?: boolean;
 }
 
 export function StageTabs({
@@ -13,7 +12,6 @@ export function StageTabs({
   onChange,
   vertexHasError,
   fragmentHasError,
-  vertexDimmed,
 }: StageTabsProps) {
   return (
     <div
@@ -26,13 +24,8 @@ export function StageTabs({
       <Tab
         active={active === "vertex"}
         hasError={vertexHasError}
-        dimmed={vertexDimmed ?? false}
         label="vertex"
         onClick={() => onChange("vertex")}
-        {...(vertexDimmed && {
-          title:
-            "Vertex shader is overridden by fullscreen quad (no mesh input)",
-        })}
       />
       <Tab
         active={active === "fragment"}
@@ -47,16 +40,13 @@ export function StageTabs({
 function Tab(props: {
   active: boolean;
   hasError: boolean;
-  dimmed?: boolean;
   label: string;
   onClick: () => void;
-  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={props.onClick}
-      title={props.title}
       data-testid={`stage-tab-${props.label}`}
       data-active={props.active}
       data-has-error={props.hasError}
@@ -66,7 +56,7 @@ function Tab(props: {
         borderBottom: props.active
           ? "2px solid #569cd6"
           : "2px solid transparent",
-        color: props.dimmed ? "#777" : props.active ? "#ddd" : "#aaa",
+        color: props.active ? "#ddd" : "#aaa",
         padding: "6px 14px",
         cursor: "pointer",
         fontSize: 11,

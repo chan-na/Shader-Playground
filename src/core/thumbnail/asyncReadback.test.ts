@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFakeGl } from "../gl/fakeGl";
 import { AsyncThumbnailReadback } from "./asyncReadback";
-import { downsampleToThumb } from "./readback";
 
 /**
  * WebGL2 stub for AsyncThumbnailReadback. The GPU-downsample path (program +
@@ -238,26 +237,5 @@ describe("AsyncThumbnailReadback", () => {
     expect(calls.filter((c) => c === "fenceSync").length).toBe(
       fencesBefore + 1,
     );
-  });
-});
-
-describe("downsampleToThumb", () => {
-  it("produces a thumb-sized ImageData", () => {
-    const w = 32;
-    const h = 32;
-    const src = new Uint8Array(w * h * 4);
-    for (let i = 0; i < src.length; i += 4) {
-      src[i] = 200;
-      src[i + 1] = 100;
-      src[i + 2] = 50;
-      src[i + 3] = 255;
-    }
-    const out = downsampleToThumb(src, w, h, 8);
-    expect(out.width).toBe(8);
-    expect(out.height).toBe(8);
-    // Pixel(0,0) should reflect the constant source color.
-    expect(out.data[0]).toBeGreaterThan(150);
-    expect(out.data[1]).toBeGreaterThan(50);
-    expect(out.data[3]).toBe(255);
   });
 });

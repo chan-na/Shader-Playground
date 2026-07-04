@@ -338,4 +338,64 @@ void main() {
       .poll(async () => readSp(page, (sp) => sp.history.getState().past.length))
       .toBe(before + 1);
   });
+
+  test("cross-stage rename keeps the cursor in place (no offset-0 collapse)", async ({
+    page,
+  }) => {
+    await page.evaluate(
+      async ({ v, f }) => {
+        const sp = window.__sp;
+        if (!sp) throw new Error("__sp not exposed");
+        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
+        if (!node) throw new Error("no shader node");
+        sp.selection.getState().select(node.id);
+        sp.graph
+          .getState()
+          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
+      },
+      { v: VERT, f: FRAG },
+    );
+    await page.getByTestId("stage-tab-fragment").click();
+
+    const content = page.locator(".cm-content").first();
+    await expect
+      .poll(async () => (await content.textContent())?.includes("u_amount"))
+      .toBe(true);
+
+    // Click the fragment-side use of u_amount inside main() — the cursor lands
+    // well past offset 0 (line 1).
+    const useToken = content.getByText("u_amount", { exact: true }).last();
+    await useToken.click();
+    const cursorBefore = await readSp(page, (sp) =>
+      sp.codeEditor.getCursorLine(),
+    );
+    expect(cursorBefore ?? 0).toBeGreaterThan(1);
+
+    page.once("dialog", (d) => {
+      void d.accept("u_strength");
+    });
+    await page.keyboard.press("F2");
+
+    // Wait for the cross-stage rewrite to land in the store.
+    await expect
+      .poll(async () =>
+        readSp(page, (sp) => {
+          const node = sp.graph
+            .getState()
+            .nodes.find((n) => n.kind === "shader");
+          const n = (node ?? {}) as { fragmentSource?: string };
+          return n.fragmentSource?.includes("u_strength") ?? false;
+        }),
+      )
+      .toBe(true);
+
+    // The rename mutates the doc AND commits to the store in one turn. The
+    // reload effect must recognize the editor already shows `source` and skip
+    // the full {from:0,to:len} replace — that dispatch carries no selection and
+    // would collapse the cursor to offset 0 (line 1). The cursor must stay on
+    // its original line. (M11)
+    await expect
+      .poll(() => readSp(page, (sp) => sp.codeEditor.getCursorLine()))
+      .toBe(cursorBefore);
+  });
 });

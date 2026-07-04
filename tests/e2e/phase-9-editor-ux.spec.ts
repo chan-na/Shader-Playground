@@ -70,10 +70,10 @@ test.describe("Phase 9 — editor UX", () => {
   });
 
   test("Cmd+Z undoes the last node addition", async ({ page }) => {
-    const startCount = await readSp(
-      page,
-      (sp) => sp.graph.getState().nodes.length,
+    const startIds = await readSp(page, (sp) =>
+      sp.graph.getState().nodes.map((n) => n.id),
     );
+    const startCount = startIds.length;
 
     await withSp(
       page,
@@ -91,6 +91,12 @@ test.describe("Phase 9 — editor UX", () => {
     await expect
       .poll(() => readSp(page, (sp) => sp.graph.getState().nodes.length))
       .toBe(startCount + 1);
+    // The node now present is exactly the one we asked for (C1).
+    expect(
+      await readSp(page, (sp) =>
+        sp.graph.getState().nodes.some((n) => n.id === "undo_target"),
+      ),
+    ).toBe(true);
 
     // On mac the shortcut is Meta+Z (Playwright maps Meta to Cmd on darwin).
     await page.locator("body").click({ position: { x: 5, y: 5 } });
@@ -99,6 +105,18 @@ test.describe("Phase 9 — editor UX", () => {
     await expect
       .poll(() => readSp(page, (sp) => sp.graph.getState().nodes.length))
       .toBe(startCount);
+    // Undo removed exactly that node and restored the original id set — a
+    // length-only check would still pass if undo dropped the wrong node. (C1)
+    await expect
+      .poll(() =>
+        readSp(page, (sp) =>
+          sp.graph
+            .getState()
+            .nodes.map((n) => n.id)
+            .sort(),
+        ),
+      )
+      .toEqual([...startIds].sort());
   });
 
   test("node click drives both selectionStore and the .selected DOM class", async ({

@@ -16,6 +16,14 @@ import { glslExtensions } from "./glslSetup";
 import { toCMDiagnostics } from "./lintAdapter";
 import { StageTabs } from "./StageTabs";
 
+/** Debounced source-commit; carries the edit's (node, stage) target so a later
+ * node/stage switch cannot misroute or drop the trailing call (L17). */
+type CommitTarget = { id: string | null; stage: "vertex" | "fragment" };
+type CommitFn = ((value: string, target: CommitTarget) => void) & {
+  cancel: () => void;
+  flush: () => void;
+};
+
 export function CodeEditor() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -25,6 +33,9 @@ export function CodeEditor() {
     id: null,
     stage: "fragment",
   });
+  // Holds the mount-time debounced commit so the reload effect can flush any
+  // pending edit before it replaces the doc on a node/stage switch (L17).
+  const commitRef = useRef<CommitFn | null>(null);
 
   const selectedId = useSelectionStore((s) => s.selectedNodeId);
   const stage = useEditorStore((s) => s.activeStage);
@@ -73,8 +84,8 @@ export function CodeEditor() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const commit = debounce((value: string) => {
-      const { id, stage: st } = ctxRef.current;
+    const commit = debounce((value: string, target: CommitTarget) => {
+      const { id, stage: st } = target;
       if (!id) return;
       const cur = useGraphStore.getState().nodes.find((n) => n.id === id);
       if (!cur) return;
@@ -124,10 +135,15 @@ export function CodeEditor() {
         });
     }, 150);
 
+    commitRef.current = commit;
+
     const updateListener = EditorView.updateListener.of((u) => {
       if (u.docChanged) {
         const text = u.state.doc.toString();
-        commit(text);
+        // Snapshot the edit's target now — if the user switches node/stage
+        // before the 50ms window fires, the trailing commit must still land on
+        // the document that was actually edited, not the one now on screen.
+        commit(text, { ...ctxRef.current });
         liveValidate(text);
       }
     });
@@ -144,6 +160,7 @@ export function CodeEditor() {
     return () => {
       commit.cancel();
       liveValidate.cancel();
+      commitRef.current = null;
       setCurrentView(null);
       view.destroy();
       viewRef.current = null;
@@ -165,6 +182,14 @@ export function CodeEditor() {
     const switching = loadedKeyRef.current !== key;
     const externalChange = source !== lastCommittedRef.current;
     if (!switching && !externalChange) return;
+    // On a real document switch, flush any pending debounced commit FIRST so
+    // the last <50ms of edits to the *outgoing* (node, stage) are written
+    // before we overwrite the editor. The commit captured its own target at
+    // type-time, so it lands on the correct node even though ctxRef has already
+    // advanced to the incoming document. Without this, the reload dispatch
+    // below re-triggers the commit debounce with the incoming text and clears
+    // the pending one, silently dropping those edits. (L17)
+    if (switching) commitRef.current?.flush();
     loadedKeyRef.current = key;
     lastCommittedRef.current = source;
     if (switching) setLiveDiags([]);

@@ -14,7 +14,7 @@ import type { GpuTimerPool } from "../gl/gpuTimer";
 import { drawMesh } from "../gl/mesh";
 import { setUniform } from "../gl/uniforms";
 import { resolveValueFor, type Value } from "../nodes/utility";
-import type { ComputePass, ExecutionPlan, Pass, ShaderPass } from "./compile";
+import type { ComputePass, ExecutionPlan, ShaderPass } from "./compile";
 import type { Graph, GraphNode } from "./types";
 import {
   snapshotUniformValue,
@@ -156,6 +156,7 @@ function bindSamplers(
   pass: ShaderPass,
   passByNode: Map<string, ShaderPass>,
   plan: ExecutionPlan,
+  ctx: FrameContext,
 ) {
   for (const s of pass.samplers) {
     let texture: WebGLTexture | null = null;
@@ -173,7 +174,24 @@ function bindSamplers(
         texture = getExternalTexture(s.sourceNodeId);
       }
     }
-    if (!texture) continue;
+    if (!texture) {
+      // No live texture. If the source is an internal render node
+      // (shader/compute), it failed to compile this frame — bind an opaque
+      // black placeholder so this unit doesn't sample whatever the previous
+      // draw left bound (a stale-texture ghost). External sources mid-
+      // acquisition (webcam/video/audio) and not-yet-loaded images are left
+      // unbound instead: forcing black for the frame or two before their first
+      // upload would be a more visible artifact than a brief stale frame. (L5)
+      const srcNode = ctx.graph?.nodes.find((n) => n.id === s.sourceNodeId);
+      if (
+        srcNode &&
+        (srcNode.kind === "shader" || srcNode.kind === "compute")
+      ) {
+        texture = ensureBlankTexture(gl);
+      } else {
+        continue;
+      }
+    }
     const loc = pass.program.uniforms[s.uniformName];
     if (loc === undefined) continue;
     setUniform(gl, loc ?? null, {
@@ -232,12 +250,9 @@ export function executePlan(
   canvasHeight: number,
   gpuTimer?: GpuTimerPool | null,
 ) {
-  const passByNode = new Map<string, Pass>();
-  for (const p of plan.passes) passByNode.set(p.nodeId, p);
-  const shaderPassByNode = new Map<string, ShaderPass>();
-  for (const p of plan.passes) {
-    if (p.kind === "shader") shaderPassByNode.set(p.nodeId, p);
-  }
+  // Node lookups are cached on the plan at compile time (L23) — rebuilding them
+  // every frame was pure allocation on the RAF hot path.
+  const { passByNode, shaderPassByNode } = plan;
 
   // One resolver cache per frame so fan-out utility nodes are evaluated once.
   const resolveCache = new Map<string, Value>();
@@ -268,7 +283,7 @@ export function executePlan(
     gl.useProgram(pass.program.program);
     bindSystemUniforms(gl, pass, ctx);
     bindUserUniforms(gl, pass, ctx, resolveCache);
-    bindSamplers(gl, pass, shaderPassByNode, plan);
+    bindSamplers(gl, pass, shaderPassByNode, plan, ctx);
     if (pass.meshComputeNodeId && pass.meshComputeVaos) {
       const cp = passByNode.get(pass.meshComputeNodeId);
       if (cp && cp.kind === "compute") {
@@ -352,22 +367,59 @@ interface CompositeState {
 
 let _composite: CompositeState | null = null;
 
+// A 1×1 opaque-black texture bound in place of a sampler source whose
+// shader/compute pass failed to compile (L5). Module-cached like the composite
+// pipeline and invalidated on context loss via resetComposite.
+let _blankTexture: WebGLTexture | null = null;
+
 /**
- * Drop the cached composite pipeline so the next `compositeOutputs` rebuilds it
- * against the current GL context. Must be called on WebGL context loss/restore:
- * WebGL reuses the same `gl` object across a loss, so keying the cache on it
- * would keep handing back the same dead program/VAO. An explicit reset is the
- * only correct invalidation. `gl` may be null (or a lost context) — the deletes
- * are then harmless no-ops and we still clear the JS reference.
+ * Drop this module's cached GL objects (composite pipeline + blank placeholder
+ * texture) so they are rebuilt against the current GL context. Must be called on
+ * WebGL context loss/restore: WebGL reuses the same `gl` object across a loss,
+ * so keying the cache on it would keep handing back dead handles. An explicit
+ * reset is the only correct invalidation. `gl` may be null (or a lost context) —
+ * the deletes are then harmless no-ops and we still clear the JS references.
  */
 export function resetComposite(gl: WebGL2RenderingContext | null): void {
-  if (!_composite) return;
-  if (gl) {
-    gl.deleteProgram(_composite.program);
-    gl.deleteVertexArray(_composite.vao);
-    gl.deleteBuffer(_composite.vbo);
+  if (_composite) {
+    if (gl) {
+      gl.deleteProgram(_composite.program);
+      gl.deleteVertexArray(_composite.vao);
+      gl.deleteBuffer(_composite.vbo);
+    }
+    _composite = null;
   }
-  _composite = null;
+  if (_blankTexture) {
+    if (gl) gl.deleteTexture(_blankTexture);
+    _blankTexture = null;
+  }
+}
+
+/**
+ * Lazily build (and cache) a 1×1 opaque-black texture. Bound to a sampler unit
+ * whose source render node failed to compile so the unit shows black instead of
+ * ghosting whatever texture the previous draw left bound there. (L5)
+ */
+function ensureBlankTexture(gl: WebGL2RenderingContext): WebGLTexture {
+  if (_blankTexture) return _blankTexture;
+  const tex = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    1,
+    1,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    new Uint8Array([0, 0, 0, 255]),
+  );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  _blankTexture = tex;
+  return _blankTexture;
 }
 
 function ensureComposite(gl: WebGL2RenderingContext): CompositeState {

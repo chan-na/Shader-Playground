@@ -66,6 +66,7 @@ const CONSTANTS = {
   TRANSFORM_FEEDBACK: 36386,
   TRANSFORM_FEEDBACK_BUFFER: 35982,
   SEPARATE_ATTRIBS: 35981,
+  RASTERIZER_DISCARD: 35977,
 } as const;
 
 let _counter = 0;
@@ -130,6 +131,8 @@ export function createFakeGl(opts: FakeGlOptions = {}): WebGL2RenderingContext {
     createTransformFeedback: handle,
     bindTransformFeedback: noop,
     bindBufferBase: noop,
+    beginTransformFeedback: noop,
+    endTransformFeedback: noop,
     deleteTransformFeedback: noop,
 
     // Texture

@@ -117,7 +117,7 @@ export interface ComputePass {
   read: "A" | "B";
 }
 
-export type Pass = ShaderPass | ComputePass;
+type Pass = ShaderPass | ComputePass;
 
 interface OutputBinding {
   outputNodeId: string;
@@ -126,6 +126,13 @@ interface OutputBinding {
 
 export interface ExecutionPlan {
   passes: Pass[];
+  /**
+   * Node-id → pass lookups, built once at compile time so the per-frame
+   * executor never rebuilds them on the RAF hot path. Stable for the plan's
+   * lifetime — a recompile yields a new plan with fresh maps. (L23)
+   */
+  passByNode: Map<string, Pass>;
+  shaderPassByNode: Map<string, ShaderPass>;
   imageTextures: Record<string, GLTexture>;
   /** One entry per Output node in document order. */
   outputs: OutputBinding[];
@@ -156,6 +163,8 @@ export interface CompileOptions {
 export function emptyPlan(width: number, height: number): ExecutionPlan {
   return {
     passes: [],
+    passByNode: new Map(),
+    shaderPassByNode: new Map(),
     imageTextures: {},
     outputs: [],
     outputNodeId: null,
@@ -215,6 +224,38 @@ function glPrimitiveOf(
   return gl.TRIANGLES;
 }
 
+/**
+ * Build a VAO that reads each attribute slot from its `side` VBO (A or B).
+ * Shared by the ComputePass ping-pong VAOs and the shader-side VAOs that draw a
+ * compute pass's captured output — the two only differ in where the slots come
+ * from. Returns null if the VAO can't be allocated. (L44)
+ */
+function buildVaoFromSlots(
+  gl: WebGL2RenderingContext,
+  program: CompiledProgram,
+  slots: ReadonlyArray<{
+    inName: string;
+    size: number;
+    vboA: WebGLBuffer;
+    vboB: WebGLBuffer;
+  }>,
+  side: "A" | "B",
+): WebGLVertexArrayObject | null {
+  const vao = gl.createVertexArray();
+  if (!vao) return null;
+  gl.bindVertexArray(vao);
+  for (const slot of slots) {
+    const loc = program.attributes[slot.inName];
+    if (loc === undefined || loc < 0) continue;
+    gl.bindBuffer(gl.ARRAY_BUFFER, side === "A" ? slot.vboA : slot.vboB);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, slot.size, gl.FLOAT, false, 0, 0);
+  }
+  gl.bindVertexArray(null);
+  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  return vao;
+}
+
 function buildComputePass(
   gl: WebGL2RenderingContext,
   node: ComputeGraphNode,
@@ -263,26 +304,11 @@ function buildComputePass(
   }
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-  // Capture `built.program` in a non-nullable local — closures lose the
-  // null narrowing from the early-return guard above.
+  // Capture `built.program` in a non-nullable local — documents the narrowing
+  // from the early-return guard above before handing it to the shared builder.
   const program = built.program;
-  const buildVao = (side: "A" | "B"): WebGLVertexArrayObject | null => {
-    const vao = gl.createVertexArray();
-    if (!vao) return null;
-    gl.bindVertexArray(vao);
-    for (const slot of slots) {
-      const loc = program.attributes[slot.inName];
-      if (loc === undefined || loc < 0) continue;
-      gl.bindBuffer(gl.ARRAY_BUFFER, side === "A" ? slot.vboA : slot.vboB);
-      gl.enableVertexAttribArray(loc);
-      gl.vertexAttribPointer(loc, slot.size, gl.FLOAT, false, 0, 0);
-    }
-    gl.bindVertexArray(null);
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    return vao;
-  };
-  const vaoA = buildVao("A");
-  const vaoB = buildVao("B");
+  const vaoA = buildVaoFromSlots(gl, program, slots, "A");
+  const vaoB = buildVaoFromSlots(gl, program, slots, "B");
   if (!vaoA || !vaoB) {
     for (const slot of slots) {
       gl.deleteBuffer(slot.vboA);
@@ -389,23 +415,8 @@ function buildShaderComputeVaos(
   program: CompiledProgram,
   computePass: ComputePass,
 ): [WebGLVertexArrayObject, WebGLVertexArrayObject] | null {
-  const makeVao = (side: "A" | "B"): WebGLVertexArrayObject | null => {
-    const vao = gl.createVertexArray();
-    if (!vao) return null;
-    gl.bindVertexArray(vao);
-    for (const slot of computePass.attributes) {
-      const loc = program.attributes[slot.inName];
-      if (loc === undefined || loc < 0) continue;
-      gl.bindBuffer(gl.ARRAY_BUFFER, side === "A" ? slot.vboA : slot.vboB);
-      gl.enableVertexAttribArray(loc);
-      gl.vertexAttribPointer(loc, slot.size, gl.FLOAT, false, 0, 0);
-    }
-    gl.bindVertexArray(null);
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    return vao;
-  };
-  const a = makeVao("A");
-  const b = makeVao("B");
+  const a = buildVaoFromSlots(gl, program, computePass.attributes, "A");
+  const b = buildVaoFromSlots(gl, program, computePass.attributes, "B");
   if (!a || !b) {
     if (a) gl.deleteVertexArray(a);
     if (b) gl.deleteVertexArray(b);
@@ -658,8 +669,17 @@ export function compileGraph(
     return { outputNodeId: o.id, sourceNodeId: edge?.source ?? null };
   });
 
+  // Cache the executor's per-frame lookups once (L23). `passByNode` already
+  // holds every pass from the build loop above; the shader-only view is derived.
+  const shaderPassByNode = new Map<string, ShaderPass>();
+  for (const p of passes) {
+    if (p.kind === "shader") shaderPassByNode.set(p.nodeId, p);
+  }
+
   return {
     passes,
+    passByNode,
+    shaderPassByNode,
     imageTextures,
     outputs,
     outputNodeId: outputs[0]?.outputNodeId ?? null,

@@ -190,6 +190,50 @@ uniform float u_after;
   });
 });
 
+describe("buildSymbolTable memoization (L25)", () => {
+  it("returns the same table instance for identical source (cache hit)", () => {
+    const src = `// L25-memo-hit
+uniform float u_time;
+void main() { float x = 0.0; }
+`;
+    const a = buildSymbolTable(src);
+    const b = buildSymbolTable(src);
+    // A cache hit hands back the very same object — the parse ran only once.
+    expect(b).toBe(a);
+  });
+
+  it("returns a distinct instance for a different source", () => {
+    const a = buildSymbolTable(`// L25-memo-distinct-a
+uniform float u_a;
+`);
+    const b = buildSymbolTable(`// L25-memo-distinct-b
+uniform float u_b;
+`);
+    expect(b).not.toBe(a);
+    expect(a.symbols.find((s) => s.name === "u_a")?.kind).toBe("uniform");
+    expect(b.symbols.find((s) => s.name === "u_b")?.kind).toBe("uniform");
+  });
+
+  it("re-parses (new instance, equal content) after LRU eviction", () => {
+    const base = `// L25-evict-base
+uniform vec3 u_base;
+void main() { float k = 1.0; }
+`;
+    const first = buildSymbolTable(base);
+    // Fill the cache past its cap (SYMBOL_TABLE_CACHE_MAX = 8) with distinct
+    // sources so `base` is evicted as the least-recently-used entry.
+    for (let i = 0; i < 10; i++) {
+      buildSymbolTable(`// L25-evict-filler-${i}
+uniform float u_f${i};
+`);
+    }
+    const reparsed = buildSymbolTable(base);
+    // Evicted → parsed fresh → a new object, but structurally identical.
+    expect(reparsed).not.toBe(first);
+    expect(reparsed.symbols).toEqual(first.symbols);
+  });
+});
+
 describe("parseFunctionParameters", () => {
   it("returns an empty list for `()` and `(void)`", () => {
     expect(parseFunctionParameters("")).toEqual([]);

@@ -205,8 +205,48 @@ function formatParameters(
   return params.map((p) => `${p.type} ${p.name}`).join(", ");
 }
 
+// Memoization (L25). `buildSymbolTable` is a pure function of `source`, but the
+// editor calls it on every hover / autocomplete / go-to-def / semantic-token /
+// reference query — frequently several times against the *same* unchanged
+// source between two edits (one cursor move fires hover + autocomplete +
+// reference lookups that each re-parsed the whole document). Cross-stage
+// reference resolution (`findReferencesAcrossStages`) parses two distinct
+// sources — vertex + fragment — within a single call, so a size-1 cache would
+// thrash; we keep a small LRU keyed by the source string.
+//
+// Safety: the returned SymbolTable and its GlslSymbol entries are read-only for
+// every consumer (`symbolsVisibleAt`/`resolveSymbol` filter+copy before
+// sorting; references/semanticTokens only read via those helpers). Sharing a
+// cached instance across callers is therefore safe — no consumer mutates it.
+const SYMBOL_TABLE_CACHE_MAX = 8;
+const symbolTableCache = new Map<string, SymbolTable>();
+
 /**
- * Build the per-source symbol table.
+ * Build the per-source symbol table, memoized by source string (small LRU).
+ * The parse itself lives in `parseSymbolTable`; this wrapper serves identical
+ * sources from cache and returns the *same* instance for a cache hit (see the
+ * read-only safety note above).
+ */
+export function buildSymbolTable(source: string): SymbolTable {
+  const cached = symbolTableCache.get(source);
+  if (cached !== undefined) {
+    // Mark most-recently-used: re-insert to move to the end of Map order.
+    symbolTableCache.delete(source);
+    symbolTableCache.set(source, cached);
+    return cached;
+  }
+  const table = parseSymbolTable(source);
+  symbolTableCache.set(source, table);
+  if (symbolTableCache.size > SYMBOL_TABLE_CACHE_MAX) {
+    // Evict least-recently-used: the first key in Map insertion order.
+    const oldest = symbolTableCache.keys().next().value;
+    if (oldest !== undefined) symbolTableCache.delete(oldest);
+  }
+  return table;
+}
+
+/**
+ * Parse a shader source into its symbol table (uncached).
  *
  * Algorithm sketch (line-oriented walker with brace-depth tracking):
  *   1. Strip block comments (replace with spaces, preserve newlines).
@@ -221,7 +261,7 @@ function formatParameters(
  *      `{` inside strings or comments doesn't confuse us (GLSL has no
  *      strings; comments are stripped before counting).
  */
-export function buildSymbolTable(source: string): SymbolTable {
+function parseSymbolTable(source: string): SymbolTable {
   const noBlock = stripBlockComments(source);
   const lines = noBlock.split(/\r?\n/);
   const symbols: GlslSymbol[] = [];

@@ -343,4 +343,80 @@ describe("encodeGif", () => {
     });
     expect(parseGif(bytes).images).toHaveLength(1);
   });
+
+  it("survives buffer growth + multi-sub-block payloads (large high-entropy frames)", () => {
+    // buildPalette histograms colors at 5-bit-per-channel (rgb555) precision,
+    // so only grid-aligned channels survive quantization exactly. Using 16
+    // distinct grid-aligned colors (≤256 → the lossless one-box-per-color
+    // branch) keeps the round-trip exact, so a byte the writer corrupts surfaces
+    // as a pixel mismatch rather than quantizer noise.
+    const grid = (k: number): number => ((k << 3) | (k >> 2)) & 0xff;
+    const COLORS = 16;
+    const paletteColors: Array<[number, number, number]> = [];
+    for (let i = 0; i < COLORS; i++) {
+      paletteColors.push([
+        grid(i * 2),
+        grid((i * 3 + 5) & 31),
+        grid((31 - i * 2) & 31),
+      ]);
+    }
+    // Deterministic per-pixel hash → no long runs, so LZW can't compress. Each
+    // frame's payload lands well past 255 bytes (many sub-blocks via
+    // writeSubBlocks/raw) and the whole stream outgrows ByteWriter's initial
+    // capacity (several doublings). A solid/gradient frame would compress to a
+    // handful of bytes and exercise neither path.
+    const W = 80;
+    const H = 80;
+    const patterned = (seed: number): Uint8Array => {
+      const out = new Uint8Array(W * H * 4);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          let h =
+            (Math.imul(x, 374761393) +
+              Math.imul(y, 668265263) +
+              Math.imul(seed, 2246822519)) >>>
+            0;
+          h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+          const c = paletteColors[h % COLORS]!;
+          const o = (y * W + x) * 4;
+          out[o] = c[0];
+          out[o + 1] = c[1];
+          out[o + 2] = c[2];
+          out[o + 3] = 255;
+        }
+      }
+      return out;
+    };
+    const sources = [patterned(1), patterned(2), patterned(3)];
+    const frames: GifFrame[] = sources.map((rgba) => ({ rgba, delayMs: 60 }));
+
+    const bytes = encodeGif({ width: W, height: H, frames });
+    // Clearly outgrew the writer's initial capacity → the doubling-grow path
+    // ran without corrupting earlier bytes.
+    expect(bytes.length).toBeGreaterThan(4096);
+
+    const gif = parseGif(bytes);
+    expect(gif.images).toHaveLength(3);
+    for (let f = 0; f < sources.length; f++) {
+      const img = gif.images[f]!;
+      const src = sources[f]!;
+      expect(img.indices).toHaveLength(W * H);
+      let allMatch = true;
+      for (let px = 0; px < W * H && allMatch; px++) {
+        const color = gif.palette[img.indices[px]!] ?? [-1, -1, -1];
+        if (
+          color[0] !== src[px * 4] ||
+          color[1] !== src[px * 4 + 1] ||
+          color[2] !== src[px * 4 + 2]
+        ) {
+          allMatch = false;
+        }
+      }
+      expect(allMatch).toBe(true);
+    }
+
+    // Re-encoding the same frames is byte-identical — guards against state
+    // leaking across the writer's reallocations.
+    expect(encodeGif({ width: W, height: H, frames })).toEqual(bytes);
+  });
 });

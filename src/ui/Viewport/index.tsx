@@ -14,6 +14,7 @@ import {
 } from "../../core/graph/compile";
 import { parseShaderInfoLog } from "../../core/graph/diagnostics";
 import { executePlan, resetComposite } from "../../core/graph/execute";
+import type { GraphNode } from "../../core/graph/types";
 import { AsyncThumbnailReadback } from "../../core/thumbnail/asyncReadback";
 import { snapshotAssets, useAssetStore } from "../../state/assetStore";
 import { useCameraStore } from "../../state/cameraStore";
@@ -115,6 +116,15 @@ export function Viewport() {
     let lastTimeRev = -1;
     let lastViewportRev = -1;
     let lastMouseRev = -1;
+    // Per-tick derived snapshots (node lookup + param map) rebuilt only when
+    // the graph's `nodes` array identity changes. Every store mutation that
+    // alters a node — structural (rev) or uniform/param (uniformRev) —
+    // produces a fresh `nodes` array via map/spread, so reference equality is
+    // a precise, never-stale cache key. (Keying on `rev` alone would miss
+    // param value edits, which bump only `uniformRev`.)
+    let cachedNodes: GraphNode[] | null = null;
+    let cachedNodeById = new Map<string, GraphNode>();
+    let cachedParams: Record<string, GraphNode> = {};
     let alive = true;
     let rafId = 0;
     let prev = performance.now();
@@ -316,8 +326,8 @@ export function Viewport() {
       }
 
       if (!needsRender) {
-        // Pump pending readback fences so thumbs issued before the pause
-        // eventually commit.
+        // Pump pending readback fences so thumbs issued before (or during) the
+        // pause eventually commit.
         try {
           for (const r of asyncReadback.poll(gl)) {
             thumbnailScheduler.commit(r.nodeId, r.image, now);
@@ -329,6 +339,23 @@ export function Viewport() {
             "thumbnail readback poll failed",
             normalizeError(e),
           );
+        }
+        // Fill in thumbnails for cards that still need a first capture — e.g.
+        // a node scrolled into view while paused (L16). Only forced/uncaptured
+        // nodes (pickForced), never throttle-driven, so once every visible card
+        // is captured this issues nothing and the loop stays idle. The readback
+        // downsamples the pass's already-rendered FBO into a separate thumb FBO;
+        // it neither re-executes the plan nor bumps renderTick, so the B2 idle
+        // guarantee (paused static graph stops *rendering*) is preserved.
+        const forced = thumbnailScheduler.pickForced();
+        for (const id of forced) {
+          const pass = plan.passes.find((p) => p.nodeId === id);
+          if (!pass || pass.kind !== "shader") continue;
+          try {
+            asyncReadback.request(gl, id, pass.fbo);
+          } catch {
+            // Request failure — scheduler entry stays forceNext so we retry.
+          }
         }
         rafId = requestAnimationFrame(tick);
         return;
@@ -346,9 +373,22 @@ export function Viewport() {
       // compute passes carry slider-driven uniformValues that get hot-patched
       // every frame without recompile.
       const graph = useGraphStore.getState();
-      // Build a node lookup once per tick; ids are unique so Map.get matches
-      // the prior `.find()` semantics while avoiding O(passes · nodes) scan.
-      const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
+      // Rebuild the node lookup and param snapshot only when the graph's
+      // `nodes` array identity changes (see the cachedNodes declaration). Both
+      // are pure functions of `graph.nodes`, so an unchanged reference means an
+      // identical result — skipping the O(nodes) Map/object construction every
+      // steady-state frame. The pass-patch loop below still runs each frame
+      // because `plan.passes` can be rebuilt (e.g. on resize) while
+      // `graph.nodes` stays put, and the new pass objects need re-patching.
+      if (graph.nodes !== cachedNodes) {
+        cachedNodes = graph.nodes;
+        cachedNodeById = new Map(graph.nodes.map((n) => [n.id, n]));
+        const nextParams: Record<string, GraphNode> = {};
+        for (const n of graph.nodes)
+          if (n.kind === "param") nextParams[n.id] = n;
+        cachedParams = nextParams;
+      }
+      const nodeById = cachedNodeById;
       for (const pass of plan.passes) {
         const node = nodeById.get(pass.nodeId);
         if (!node) continue;
@@ -362,9 +402,7 @@ export function Viewport() {
 
       const t = useTimeStore.getState().simTime;
       const bg = useViewportStore.getState().background;
-      // Build a snapshot of param nodes for the frame.
-      const params: Record<string, (typeof graph.nodes)[number]> = {};
-      for (const n of graph.nodes) if (n.kind === "param") params[n.id] = n;
+      const params = cachedParams;
       const timerEnabled = useGpuTimerStore.getState().enabled;
       executePlan(
         gl,

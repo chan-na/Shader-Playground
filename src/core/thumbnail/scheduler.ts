@@ -68,6 +68,23 @@ export class ThumbnailScheduler {
     return out;
   }
 
+  /**
+   * Visible nodes flagged `forceNext` — i.e. that need a *first* (or explicitly
+   * re-requested) capture, ignoring the throttle window entirely. Used by the
+   * paused render loop to fill in a thumbnail for a card scrolled into view
+   * while idle, without the 10Hz throttle re-issue `pickReady` would otherwise
+   * drive on static content (which would keep the loop doing readback work when
+   * it should stay idle). Once such a node is committed its `forceNext` clears,
+   * so a static idle graph issues no further readback.
+   */
+  pickForced(): string[] {
+    const out: string[] = [];
+    for (const [id, e] of this.entries) {
+      if (e.visible && e.forceNext) out.push(id);
+    }
+    return out;
+  }
+
   commit(nodeId: string, image: ImageData, now: number) {
     const e = this.entries.get(nodeId);
     if (!e) return;

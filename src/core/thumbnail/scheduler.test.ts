@@ -59,4 +59,36 @@ describe("ThumbnailScheduler", () => {
     stop();
     expect(s.pickReady(1000)).not.toContain("a");
   });
+
+  it("pickForced returns freshly-subscribed nodes, not throttle-elapsed ones", () => {
+    const s = new ThumbnailScheduler(10);
+    s.subscribe("a", () => {});
+    // A never-committed node is forced.
+    expect(s.pickForced()).toContain("a");
+    // After commit its forceNext clears — even long after the throttle window
+    // pickForced stays empty (unlike pickReady, which re-fires on throttle).
+    s.commit("a", fakeImage(), 0);
+    expect(s.pickForced()).not.toContain("a");
+    expect(s.pickReady(1000)).toContain("a");
+  });
+
+  it("pickForced skips hidden nodes and re-includes them once forced", () => {
+    const s = new ThumbnailScheduler(10);
+    s.subscribe("a", () => {});
+    // Scrolled out of view before ever being captured: still forced but hidden.
+    s.setVisibility("a", false);
+    expect(s.pickForced()).not.toContain("a");
+    // Scrolled back into view while still uncaptured — now eligible.
+    s.setVisibility("a", true);
+    expect(s.pickForced()).toContain("a");
+  });
+
+  it("pickForced re-includes a committed node after an explicit bump", () => {
+    const s = new ThumbnailScheduler(10);
+    s.subscribe("a", () => {});
+    s.commit("a", fakeImage(), 0);
+    expect(s.pickForced()).not.toContain("a");
+    s.bump("a");
+    expect(s.pickForced()).toContain("a");
+  });
 });

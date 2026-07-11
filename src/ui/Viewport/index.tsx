@@ -326,8 +326,8 @@ export function Viewport() {
       }
 
       if (!needsRender) {
-        // Pump pending readback fences so thumbs issued before the pause
-        // eventually commit.
+        // Pump pending readback fences so thumbs issued before (or during) the
+        // pause eventually commit.
         try {
           for (const r of asyncReadback.poll(gl)) {
             thumbnailScheduler.commit(r.nodeId, r.image, now);
@@ -339,6 +339,23 @@ export function Viewport() {
             "thumbnail readback poll failed",
             normalizeError(e),
           );
+        }
+        // Fill in thumbnails for cards that still need a first capture — e.g.
+        // a node scrolled into view while paused (L16). Only forced/uncaptured
+        // nodes (pickForced), never throttle-driven, so once every visible card
+        // is captured this issues nothing and the loop stays idle. The readback
+        // downsamples the pass's already-rendered FBO into a separate thumb FBO;
+        // it neither re-executes the plan nor bumps renderTick, so the B2 idle
+        // guarantee (paused static graph stops *rendering*) is preserved.
+        const forced = thumbnailScheduler.pickForced();
+        for (const id of forced) {
+          const pass = plan.passes.find((p) => p.nodeId === id);
+          if (!pass || pass.kind !== "shader") continue;
+          try {
+            asyncReadback.request(gl, id, pass.fbo);
+          } catch {
+            // Request failure — scheduler entry stays forceNext so we retry.
+          }
         }
         rafId = requestAnimationFrame(tick);
         return;

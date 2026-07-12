@@ -29,6 +29,7 @@ import { useSelectionStore } from "../../state/selectionStore";
 import { nextId } from "../../utils/id";
 import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
+import { createNodeDataCache } from "./rfNodeData";
 import { Toolbar } from "./Toolbar";
 
 /** Width/height approximation for non-group node cards when picking a target
@@ -53,6 +54,17 @@ export function NodeEditor() {
   const setSelectedIds = useSelectionStore((s) => s.setSelectedIds);
   const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds);
   const flowRef = useRef<ReactFlowInstance | null>(null);
+  // Per-node `data` wrappers, stable across renders so React Flow only
+  // re-renders the card whose graph node actually changed (see rfNodeData).
+  // Lazily created once and kept for the component's lifetime.
+  const nodeDataCacheRef = useRef<ReturnType<
+    typeof createNodeDataCache
+  > | null>(null);
+  let nodeDataFor = nodeDataCacheRef.current;
+  if (nodeDataFor === null) {
+    nodeDataFor = createNodeDataCache();
+    nodeDataCacheRef.current = nodeDataFor;
+  }
 
   // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear) so
   // small graph panels still show every node. Triggered by rev bumps, not by
@@ -88,7 +100,7 @@ export function NodeEditor() {
         id: n.id,
         type: n.kind,
         position: positions[n.id] ?? { x: 0, y: 0 },
-        data: { node: n },
+        data: nodeDataFor(n),
         // React Flow v12 controlled mode: highlight is driven by this flag,
         // not by RF's internal state. Sync from selectionStore so clicks,
         // shift-box selects, pane-clears, and programmatic selects all reach
@@ -117,7 +129,7 @@ export function NodeEditor() {
       }
       return rf;
     });
-  }, [graphNodes, positions, parents, selectedNodeIds]);
+  }, [graphNodes, positions, parents, selectedNodeIds, nodeDataFor]);
 
   const rfEdges: Edge[] = useMemo(
     () =>

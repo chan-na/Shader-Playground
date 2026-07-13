@@ -4,11 +4,21 @@ import type { AudioFftSize, AudioGraphNode } from "../../core/graph/types";
 import { AUDIO_FFT_SIZES } from "../../core/graph/types";
 import { useAssetStore } from "../../state/assetStore";
 import { useGraphStore } from "../../state/graphStore";
+import { SegmentedControl } from "../controls/SegmentedControl";
+import { SelectField } from "../controls/SelectField";
+import { Slider } from "../controls/Slider";
+import { Toggle } from "../controls/Toggle";
+import { StatusPill } from "./StatusPill";
 
 interface StatusSnapshot {
   ready: boolean;
   error: string | null;
 }
+
+const SOURCE_OPTIONS = [
+  { value: "mic", label: "Microphone", dataTestId: "audio-source-mic" },
+  { value: "file", label: "File", dataTestId: "audio-source-file" },
+];
 
 export function AudioInspector({ node }: { node: AudioGraphNode }) {
   const setAudioConfig = useGraphStore((s) => s.setAudioConfig);
@@ -32,71 +42,46 @@ export function AudioInspector({ node }: { node: AudioGraphNode }) {
     };
   }, [node.id]);
 
+  const assetSelectId = `audio-asset-${node.id}`;
+  const fftSelectId = `audio-fft-${node.id}`;
+
   return (
     <div className="inspector-section">
       <div className="inspector-label">Audio</div>
 
-      <div style={{ display: "flex", gap: 12, fontSize: 12, marginBottom: 8 }}>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            color: "#bbb",
+      <div style={{ marginBottom: 15 }}>
+        <SegmentedControl
+          options={SOURCE_OPTIONS}
+          value={node.sourceKind}
+          onChange={(v) => {
+            if (v === "mic" || v === "file") {
+              setAudioConfig(node.id, { sourceKind: v });
+            }
           }}
-        >
-          <input
-            type="radio"
-            name={`audio-source-${node.id}`}
-            checked={node.sourceKind === "mic"}
-            data-testid="audio-source-mic"
-            onChange={() => setAudioConfig(node.id, { sourceKind: "mic" })}
-          />
-          Microphone
-        </label>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            color: "#bbb",
-          }}
-        >
-          <input
-            type="radio"
-            name={`audio-source-${node.id}`}
-            checked={node.sourceKind === "file"}
-            data-testid="audio-source-file"
-            onChange={() => setAudioConfig(node.id, { sourceKind: "file" })}
-          />
-          File
-        </label>
+          ariaLabel="Audio source"
+        />
       </div>
 
       {node.sourceKind === "file" && (
-        <div style={{ fontSize: 12, marginBottom: 8 }}>
+        <div style={{ marginBottom: 15 }}>
           <label
-            htmlFor={`audio-asset-${node.id}`}
-            style={{ display: "block", color: "#bbb", marginBottom: 4 }}
+            htmlFor={assetSelectId}
+            style={{
+              display: "block",
+              fontSize: 11,
+              color: "var(--text-secondary)",
+              marginBottom: 8,
+            }}
           >
             Asset
           </label>
-          <select
-            id={`audio-asset-${node.id}`}
-            data-testid="audio-asset-select"
+          <SelectField
+            id={assetSelectId}
             value={node.assetId ?? ""}
             onChange={(e) =>
               setAudioConfig(node.id, { assetId: e.target.value || null })
             }
-            style={{
-              width: "100%",
-              background: "#1a1a1a",
-              color: "#ddd",
-              border: "1px solid #333",
-              padding: "4px 6px",
-              fontSize: 12,
-              borderRadius: 3,
-            }}
+            dataTestId="audio-asset-select"
           >
             <option value="">— no asset —</option>
             {audioList.map((a) => (
@@ -104,117 +89,119 @@ export function AudioInspector({ node }: { node: AudioGraphNode }) {
                 {a.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
       )}
 
-      <div style={{ fontSize: 12, marginBottom: 8 }}>
-        <label
-          htmlFor={`audio-fft-${node.id}`}
-          style={{ display: "block", color: "#bbb", marginBottom: 4 }}
-        >
-          FFT size
-        </label>
-        <select
-          id={`audio-fft-${node.id}`}
-          data-testid="audio-fft-select"
-          value={node.fftSize}
-          onChange={(e) =>
-            setAudioConfig(node.id, {
-              fftSize: Number(e.target.value) as AudioFftSize,
-            })
-          }
-          style={{
-            width: "100%",
-            background: "#1a1a1a",
-            color: "#ddd",
-            border: "1px solid #333",
-            padding: "4px 6px",
-            fontSize: 12,
-            borderRadius: 3,
-          }}
-        >
-          {AUDIO_FFT_SIZES.map((sz) => (
-            <option key={sz} value={sz}>
-              {sz} ({sz / 2} bins)
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div style={{ marginBottom: 8 }}>
-        <label
-          htmlFor={`audio-smoothing-${node.id}`}
-          style={{
-            display: "block",
-            color: "#bbb",
-            fontSize: 12,
-            marginBottom: 4,
-          }}
-        >
-          Smoothing · {node.smoothing.toFixed(2)}
-        </label>
-        <input
-          id={`audio-smoothing-${node.id}`}
-          data-testid="audio-smoothing"
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={node.smoothing}
-          onChange={(e) =>
-            setAudioConfig(node.id, {
-              smoothing: parseFloat(e.target.value),
-            })
-          }
-          style={{ width: "100%" }}
-        />
+      <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
+        <div style={{ flex: 1 }}>
+          <label
+            htmlFor={fftSelectId}
+            style={{
+              display: "block",
+              fontSize: 11,
+              color: "var(--text-secondary)",
+              marginBottom: 8,
+            }}
+          >
+            FFT size
+          </label>
+          <SelectField
+            id={fftSelectId}
+            value={node.fftSize}
+            onChange={(e) =>
+              setAudioConfig(node.id, {
+                fftSize: Number(e.target.value) as AudioFftSize,
+              })
+            }
+            dataTestId="audio-fft-select"
+          >
+            {AUDIO_FFT_SIZES.map((sz) => (
+              <option key={sz} value={sz}>
+                {sz} ({sz / 2} bins)
+              </option>
+            ))}
+          </SelectField>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--text-secondary)",
+              marginBottom: 8,
+            }}
+          >
+            Smoothing · {node.smoothing.toFixed(2)}
+          </div>
+          <Slider
+            value={node.smoothing}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(v) => setAudioConfig(node.id, { smoothing: v })}
+            ariaLabel="Smoothing"
+            dataTestId="audio-smoothing"
+          />
+        </div>
       </div>
 
       {node.sourceKind === "file" && (
         <div
-          style={{ display: "flex", gap: 12, fontSize: 12, marginBottom: 8 }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            marginBottom: 15,
+          }}
         >
-          <label
+          <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 4,
-              color: "#bbb",
+              justifyContent: "space-between",
             }}
           >
-            <input
-              type="checkbox"
+            <span style={{ fontSize: 11.5, color: "var(--text-bright-body)" }}>
+              Play
+            </span>
+            <Toggle
               checked={node.playing}
-              data-testid="audio-playing"
-              onChange={(e) =>
-                setAudioConfig(node.id, { playing: e.target.checked })
-              }
+              onChange={(next) => setAudioConfig(node.id, { playing: next })}
+              ariaLabel="Play"
+              dataTestId="audio-playing"
             />
-            Play
-          </label>
-          <label
+          </div>
+          <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 4,
-              color: "#bbb",
+              justifyContent: "space-between",
             }}
           >
-            <input
-              type="checkbox"
+            <span style={{ fontSize: 11.5, color: "var(--text-bright-body)" }}>
+              Loop
+            </span>
+            <Toggle
               checked={node.loop}
-              data-testid="audio-loop"
-              onChange={(e) =>
-                setAudioConfig(node.id, { loop: e.target.checked })
-              }
+              onChange={(next) => setAudioConfig(node.id, { loop: next })}
+              ariaLabel="Loop"
+              dataTestId="audio-loop"
             />
-            Loop
-          </label>
+          </div>
         </div>
       )}
 
-      <div style={{ color: "#888", fontSize: 11 }}>
+      <StatusPill
+        tone={
+          node.sourceKind === "file" && !node.assetId
+            ? "muted"
+            : status?.error
+              ? "error"
+              : status?.ready
+                ? "success"
+                : "muted"
+        }
+      >
         {node.sourceKind === "file" && !node.assetId
           ? "Import an audio file in the Asset browser first."
           : status?.error
@@ -222,7 +209,7 @@ export function AudioInspector({ node }: { node: AudioGraphNode }) {
             : status?.ready
               ? `live · ${node.fftSize / 2} bins`
               : "loading…"}
-      </div>
+      </StatusPill>
     </div>
   );
 }

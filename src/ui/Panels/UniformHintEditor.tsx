@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
 import { useState } from "react";
 import type { UniformHints, UniformSpec } from "../../core/graph/uniformParser";
+import "../controls/controls.css";
 
 export interface UniformHintEditorProps {
   spec: UniformSpec;
@@ -7,19 +9,8 @@ export interface UniformHintEditorProps {
   onClose: () => void;
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "3px 6px",
-  fontSize: 11,
-  background: "#1a1a1a",
-  color: "#ddd",
-  border: "1px solid #333",
-  borderRadius: 3,
-  boxSizing: "border-box",
-};
-
-const labelStyle: React.CSSProperties = {
-  color: "#888",
+const labelStyle: CSSProperties = {
+  color: "var(--text-muted)",
   fontSize: 10,
   display: "block",
   marginBottom: 2,
@@ -87,8 +78,11 @@ export function UniformHintEditor({
       style={{
         marginTop: 6,
         padding: 8,
-        background: "#161616",
-        border: "1px solid #333",
+        background: "var(--surface-panel)",
+        border: "1px solid var(--border-strong)",
+        // design/Side Panel.dc.html doesn't mock this popover explicitly;
+        // no tokens.radius entry matches 4, so it keeps the literal value
+        // (iconBox at 5 is the nearest named radius).
         borderRadius: 4,
       }}
     >
@@ -103,7 +97,7 @@ export function UniformHintEditor({
             type="number"
             value={min}
             onChange={(e) => setMin(e.target.value)}
-            style={inputStyle}
+            className="ctl-text ctl-text--sm"
           />
         </div>
         <div style={{ flex: 1 }}>
@@ -116,7 +110,7 @@ export function UniformHintEditor({
             type="number"
             value={max}
             onChange={(e) => setMax(e.target.value)}
-            style={inputStyle}
+            className="ctl-text ctl-text--sm"
           />
         </div>
         <div style={{ flex: 1 }}>
@@ -129,7 +123,7 @@ export function UniformHintEditor({
             type="number"
             value={step}
             onChange={(e) => setStep(e.target.value)}
-            style={inputStyle}
+            className="ctl-text ctl-text--sm"
           />
         </div>
       </div>
@@ -144,7 +138,7 @@ export function UniformHintEditor({
           type="text"
           value={def}
           onChange={(e) => setDef(e.target.value)}
-          style={inputStyle}
+          className="ctl-text ctl-text--sm"
         />
       </div>
 
@@ -158,7 +152,7 @@ export function UniformHintEditor({
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          style={inputStyle}
+          className="ctl-text ctl-text--sm"
         />
       </div>
 
@@ -174,15 +168,7 @@ export function UniformHintEditor({
           type="button"
           data-testid="uniform-hint-cancel"
           onClick={onClose}
-          style={{
-            padding: "3px 10px",
-            fontSize: 11,
-            background: "#222",
-            color: "#bbb",
-            border: "1px solid #333",
-            borderRadius: 3,
-            cursor: "pointer",
-          }}
+          className="ctl-btn ctl-btn--ghost"
         >
           Cancel
         </button>
@@ -190,15 +176,7 @@ export function UniformHintEditor({
           type="button"
           data-testid="uniform-hint-apply"
           onClick={apply}
-          style={{
-            padding: "3px 10px",
-            fontSize: 11,
-            background: "#2d5",
-            color: "#031",
-            border: "1px solid #2d5",
-            borderRadius: 3,
-            cursor: "pointer",
-          }}
+          className="ctl-btn ctl-btn--primary"
         >
           Apply
         </button>

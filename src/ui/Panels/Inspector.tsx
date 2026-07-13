@@ -18,8 +18,12 @@ import {
 } from "../../core/graph/uniformParser";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { tokens, withAlpha } from "../../theme";
+import { SelectField } from "../controls/SelectField";
+import { TextField } from "../controls/TextField";
 import { AudioInspector } from "./AudioInspector";
 import { GroupInspector } from "./GroupInspector";
+import { InspectorNodeHeader } from "./InspectorNodeHeader";
 import { ParamInspector } from "./ParamInspector";
 import { UniformControl } from "./UniformControl";
 import { UniformHintEditor } from "./UniformHintEditor";
@@ -102,17 +106,25 @@ export function Inspector({ embedded = false }: InspectorProps) {
         <div
           className="inspector-section"
           data-testid="multi-select-banner"
-          style={{ color: "#bbb", fontSize: 12 }}
+          style={{
+            background: "var(--surface-card)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-input)",
+            fontSize: 12,
+            color: "var(--text-bright-body)",
+          }}
         >
           <strong>{selectedCount} nodes selected</strong>
           {node && (
-            <span style={{ color: "#888" }}>
+            <span>
               {" "}
               · editing{" "}
-              <span style={{ fontFamily: "monospace" }}>{node.id}</span>
+              <span style={{ fontFamily: "var(--font-mono)" }}>{node.id}</span>
             </span>
           )}
-          <div style={{ color: "#666", fontSize: 11, marginTop: 4 }}>
+          <div
+            style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 4 }}
+          >
             화살표로 함께 이동, Delete로 함께 삭제. 아래 편집은 마지막으로
             선택한 노드에만 적용됩니다.
           </div>
@@ -122,27 +134,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
       {!node && <div className="inspector-empty">No node selected</div>}
       {node && (
         <>
-          <div className="inspector-section">
-            <div className="inspector-label">Node</div>
-            <div style={{ color: "#ddd", fontSize: 13 }}>
-              <div>
-                <strong>{node.kind}</strong> ·{" "}
-                <span style={{ color: "#888", fontFamily: "monospace" }}>
-                  {node.id}
-                </span>
-              </div>
-              {node.kind === "mesh" && (
-                <div style={{ color: "#888", fontSize: 11, marginTop: 4 }}>
-                  primitive: {node.primitive}
-                </div>
-              )}
-              {node.kind === "param" && (
-                <div style={{ color: "#888", fontSize: 11, marginTop: 4 }}>
-                  kind: {(node as ParamGraphNode).paramKind}
-                </div>
-              )}
-            </div>
-          </div>
+          <InspectorNodeHeader node={node} />
 
           {node.kind === "group" && (
             <GroupInspector node={node as GroupGraphNode} />
@@ -171,10 +163,40 @@ export function Inspector({ embedded = false }: InspectorProps) {
           {computeNode && (
             <div className="inspector-section">
               <div className="inspector-label">Compute</div>
-              <div style={{ color: "#bbb", fontSize: 11 }}>
-                count: {computeNode.count.toLocaleString()}
-                <br />
-                primitive: {computeNode.primitive}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  flexWrap: "wrap",
+                  marginBottom: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    color: "var(--text-secondary)",
+                    background: "var(--surface-card)",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: "var(--radius-icon-box)",
+                    padding: "2px 7px",
+                  }}
+                >
+                  count: {computeNode.count.toLocaleString()}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    color: "var(--text-secondary)",
+                    background: "var(--surface-card)",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: "var(--radius-icon-box)",
+                    padding: "2px 7px",
+                  }}
+                >
+                  primitive: {computeNode.primitive}
+                </span>
               </div>
               <div style={{ marginTop: 8 }}>
                 <div className="inspector-label" style={{ fontSize: 11 }}>
@@ -184,13 +206,13 @@ export function Inspector({ embedded = false }: InspectorProps) {
                   <div
                     key={a.outName}
                     style={{
-                      color: "#bbb",
-                      fontFamily: "monospace",
+                      color: "var(--text-bright-body)",
+                      fontFamily: "var(--font-mono)",
                       fontSize: 11,
                     }}
                   >
                     {a.inName} → {a.outName}{" "}
-                    <span style={{ color: "#666" }}>
+                    <span style={{ color: "var(--text-muted)" }}>
                       ({a.size}, seed={a.seed})
                     </span>
                   </div>
@@ -202,7 +224,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
           {shaderNode && (
             <div className="inspector-section">
               <div className="inspector-label">Render resolution</div>
-              <select
+              <SelectField
                 value={shaderNode.resolutionScale ?? 1}
                 onChange={(e) =>
                   setResolutionScale(
@@ -210,25 +232,21 @@ export function Inspector({ embedded = false }: InspectorProps) {
                     Number(e.target.value) as ResolutionScale,
                   )
                 }
-                data-testid="resolution-scale"
-                style={{
-                  width: "100%",
-                  padding: "4px 8px",
-                  fontSize: 12,
-                  background: "#1a1a1a",
-                  color: "#ddd",
-                  border: "1px solid #333",
-                  borderRadius: 3,
-                  boxSizing: "border-box",
-                }}
+                dataTestId="resolution-scale"
               >
                 {RESOLUTION_SCALES.map((s) => (
                   <option key={s} value={s}>
                     {s === 1 ? "1× (full)" : `${s}×`}
                   </option>
                 ))}
-              </select>
-              <div style={{ color: "#666", fontSize: 11, marginTop: 4 }}>
+              </SelectField>
+              <div
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: 11,
+                  marginTop: 4,
+                }}
+              >
                 이 패스의 FBO 해상도 배율 (다운샘플 체인용).
               </div>
             </div>
@@ -238,35 +256,78 @@ export function Inspector({ embedded = false }: InspectorProps) {
             <>
               {totalUniformCount > 0 && (
                 <div className="inspector-section">
-                  <input
+                  <TextField
                     type="search"
                     placeholder="Filter uniforms (name / label / type)"
                     value={uniformQuery}
                     onChange={(e) => setUniformQuery(e.target.value)}
-                    data-testid="uniform-search"
-                    style={{
-                      width: "100%",
-                      padding: "4px 8px",
-                      fontSize: 12,
-                      background: "#1a1a1a",
-                      color: "#ddd",
-                      border: "1px solid #333",
-                      borderRadius: 3,
-                      boxSizing: "border-box",
-                    }}
+                    dataTestId="uniform-search"
                   />
                 </div>
               )}
 
               <div className="inspector-section">
-                <div className="inspector-label">
-                  Uniforms{" "}
-                  {hasQuery
-                    ? `(${filteredVisible.length}/${visible.length})`
-                    : `(${visible.length})`}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 4,
+                  }}
+                >
+                  <div className="inspector-label" style={{ marginBottom: 0 }}>
+                    Uniforms{" "}
+                    {hasQuery
+                      ? `(${filteredVisible.length}/${visible.length})`
+                      : `(${visible.length})`}
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 8.5,
+                      color: "var(--accent-hover)",
+                      background: withAlpha(tokens.accent.default, 0.14),
+                      border: "1px solid var(--accent-muted)",
+                      // design/Side Panel.dc.html L79: border-radius:4px — no
+                      // tokens.radius entry matches (iconBox is the nearest
+                      // at 5), so this one-off badge keeps the literal value.
+                      borderRadius: 4,
+                      padding: "1px 5px",
+                    }}
+                  >
+                    AUTO
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    color: "var(--text-muted)",
+                    lineHeight: 1.5,
+                    marginBottom: 14,
+                  }}
+                >
+                  Generated from shader source. Annotate with{" "}
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      color: tokens.portFamily.scalar,
+                    }}
+                  >
+                    {"// @range"}
+                  </span>{" "}
+                  ·{" "}
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      color: tokens.portFamily.scalar,
+                    }}
+                  >
+                    @color
+                  </span>
+                  .
                 </div>
                 {visible.length === 0 && (
-                  <div style={{ color: "#777", fontSize: 12 }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: 12 }}>
                     Add a <code>uniform float</code> or{" "}
                     <code>uniform vec3</code> declaration in the shader to see
                     controls here.
@@ -283,15 +344,36 @@ export function Inspector({ embedded = false }: InspectorProps) {
                     <div
                       style={{
                         display: "flex",
+                        alignItems: "center",
                         justifyContent: "space-between",
-                        fontSize: 11,
+                        marginBottom: 7,
                       }}
                     >
-                      <span style={{ color: "#ccc", fontFamily: "monospace" }}>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 11.5,
+                          color: tokens.syntax.variable,
+                        }}
+                      >
                         {spec.label ?? spec.name}
                       </span>
-                      <span style={{ display: "flex", gap: 6 }}>
-                        <span style={{ color: "#666" }}>{spec.type}</span>
+                      <span
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 10,
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          {spec.type}
+                        </span>
                         <button
                           type="button"
                           title="범위·기본값·라벨 편집 (소스 주석에 기록)"
@@ -308,7 +390,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
                             lineHeight: 1,
                             background: "none",
                             border: "none",
-                            color: editingHint === spec.name ? "#2d5" : "#666",
+                            color:
+                              editingHint === spec.name
+                                ? "var(--accent-default)"
+                                : "var(--text-muted)",
                             cursor: "pointer",
                           }}
                         >
@@ -345,14 +430,23 @@ export function Inspector({ embedded = false }: InspectorProps) {
                       key={s.name}
                       style={{
                         fontSize: 12,
-                        color: "#bbb",
-                        fontFamily: "monospace",
+                        color: "var(--text-bright-body)",
+                        fontFamily: "var(--font-mono)",
                       }}
                     >
-                      {s.name} <span style={{ color: "#666" }}>({s.type})</span>
+                      {s.name}{" "}
+                      <span style={{ color: "var(--text-muted)" }}>
+                        ({s.type})
+                      </span>
                     </div>
                   ))}
-                  <div style={{ color: "#666", fontSize: 11, marginTop: 4 }}>
+                  <div
+                    style={{
+                      color: "var(--text-muted)",
+                      fontSize: 11,
+                      marginTop: 4,
+                    }}
+                  >
                     Connect via the node graph
                   </div>
                 </div>
@@ -363,7 +457,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
                   <div className="inspector-label">System uniforms (auto)</div>
                   <div
                     style={{
-                      color: "#999",
+                      color: "var(--text-secondary)",
                       fontSize: 11,
                       marginTop: 2,
                       marginBottom: 6,
@@ -380,19 +474,26 @@ export function Inspector({ embedded = false }: InspectorProps) {
                         key={s.name}
                         style={{
                           fontSize: 11,
-                          color: "#777",
+                          color: "var(--text-muted)",
                           marginBottom: 2,
                           lineHeight: 1.4,
                         }}
                         data-testid="system-uniform-row"
                         data-uniform-name={s.name}
                       >
-                        <span style={{ fontFamily: "monospace" }}>
+                        <span style={{ fontFamily: "var(--font-mono)" }}>
                           {s.name}{" "}
-                          <span style={{ color: "#555" }}>· {s.type}</span>
+                          <span style={{ color: "var(--text-disabled)" }}>
+                            · {s.type}
+                          </span>
                         </span>
                         {desc && (
-                          <span style={{ color: "#999", marginLeft: 6 }}>
+                          <span
+                            style={{
+                              color: "var(--text-secondary)",
+                              marginLeft: 6,
+                            }}
+                          >
                             — {desc}
                           </span>
                         )}
@@ -406,7 +507,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
                 <div
                   className="inspector-section"
                   data-testid="uniform-search-empty"
-                  style={{ color: "#777", fontSize: 12 }}
+                  style={{ color: "var(--text-muted)", fontSize: 12 }}
                 >
                   No uniforms match "{uniformQuery.trim()}".
                 </div>

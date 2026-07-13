@@ -199,15 +199,17 @@ textarea {
 }
 
 .inspector-section {
-  padding: 12px 14px;
+  /* design/Side Panel.dc.html L78 (Uniforms hero section padding). */
+  padding: 13px 14px;
   border-bottom: 1px solid var(--border-header-divider);
 }
 
 .inspector-label {
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.7px;
   margin-bottom: 6px;
   display: flex;
   justify-content: space-between;
@@ -220,30 +222,13 @@ textarea {
   margin: 6px 0;
 }
 
-.inspector-row > input[type="range"] {
-  flex: 1 1 auto;
-  accent-color: var(--accent-default);
-}
-
-.inspector-row > input[type="number"] {
-  width: 64px;
-  background: var(--surface-input);
-  border: 1px solid var(--border-strong);
-  color: var(--text-bright-body);
-  padding: 2px 4px;
-  border-radius: var(--radius-input);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-.inspector-row > input[type="color"] {
-  width: 40px;
-  height: 24px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-input);
-  border-radius: var(--radius-input);
-  cursor: pointer;
-}
+/* Note: .inspector-row previously carried raw `input[type="range"|"number"|
+ * "color"]` child skins for the inspectors' pre-M5 native inputs. M5-U1/U2/U3
+ * moved every one of those onto the shared controls library (Slider /
+ * NumberField / ColorField, controls.css), which ships its own `.ctl-*`
+ * classes one level further in (wrapped in the control's own root element,
+ * no longer a direct child of `.inspector-row`) — so those rules were
+ * removed rather than left dead. */
 
 .inspector-empty {
   color: var(--text-muted);
@@ -307,23 +292,23 @@ textarea {
 }
 
 /* ── Side-panel tabs (rendered inside DockPanelHeader's children slot,
-   Side Panel.dc.html L255) ───────────────────────────────────────── */
+   Side Panel.dc.html L47-49, M5-U5 reskin) ──────────────────────────── */
 .panel-tab {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   height: 34px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   padding: 0 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .panel-tab:hover {
-  color: var(--text-primary);
+  color: var(--text-bright-body);
 }
 .panel-tab--active {
   color: var(--text-primary);
@@ -334,20 +319,32 @@ textarea {
   font-family: var(--font-mono);
   background: var(--surface-hover);
   color: var(--text-primary);
-  border-radius: var(--radius-chip);
-  padding: 1px 6px;
+  /* design/Side Panel.dc.html L49: border-radius:8px — no tokens.radius
+     entry matches (chip is the nearest at 6); same one-off precedent as
+     AssetBrowser.tsx's asset tag / Inspector.tsx's AUTO badge. */
+  border-radius: 8px;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .panel-tab--active .panel-tab-badge {
   background: var(--accent-muted);
   color: var(--text-primary);
 }
-/* Red badge specifically for the problems tab when it has issues. */
+/* Red badge specifically for the problems tab when it has issues.
+   design/Side Panel.dc.html L49 uses #fff for this badge's text, but the
+   design's own text scale only defines text.primary/brightBody/secondary/
+   muted/disabled — text.primary (#e7eaee) is the closest in-system token,
+   so the badge foreground is derived from it rather than a raw #fff. */
 .panel-tab[data-variant="error"] .panel-tab-badge,
 .panel-tab--active[data-variant="error"] .panel-tab-badge {
   background: var(--error);
-  color: var(--surface-app-darker);
+  color: var(--text-primary);
 }
 
 /* ── Code editor stage tabs (rendered inside DockPanelHeader's children
@@ -388,47 +385,219 @@ textarea {
   box-shadow: 0 0 6px var(--error);
 }
 
-.problem-row {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--border-header-divider);
-  color: inherit;
-  font: inherit;
-  padding: 6px 4px;
-  cursor: pointer;
+/* ── Problems tab (Side Panel.dc.html L188-205, M5-U5 reskin) ────────── */
+.problems-chip-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
-.problem-row:hover {
-  background: var(--surface-hover);
-}
-
-.asset-row {
+.problems-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border-header-divider);
-}
-.asset-row:last-child {
-  border-bottom: none;
-}
-.asset-image-icon,
-.asset-mesh-icon {
-  width: 32px;
-  height: 32px;
+  gap: 6px;
+  padding: 4px 10px;
   background: var(--surface-card);
-  border-radius: 2px;
+  border: 1px solid var(--border-strong);
+  /* design/Side Panel.dc.html L192-194: border-radius:15px — no
+     tokens.radius entry matches (nearest neighbors are chip=6 and
+     panel=14); one-off, same precedent as assets-dropzone/AUTO badge. */
+  border-radius: 15px;
+  font-size: 11px;
+  color: var(--text-bright-body);
+}
+.problems-card {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  padding: 10px 11px;
+  margin: 0 0 8px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  /* design/Side Panel.dc.html L198: border-radius:8px — no tokens.radius
+     entry matches (button/input=7, panel=14); one-off, same precedent as
+     .panel-tab-badge above. border-left color/width is set inline per row
+     (severity color), overriding this shorthand's left side. */
+  border-radius: 8px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.problems-card:last-child {
+  margin-bottom: 0;
+}
+.problems-card:hover {
+  background: var(--surface-input);
+}
+.problems-card-icon {
+  font-size: 12px;
+  line-height: 1.35;
   flex-shrink: 0;
 }
-.asset-mesh-icon {
+.problems-card-body {
+  min-width: 0;
+}
+.problems-card-message {
+  font-size: 11.5px;
+  color: var(--text-primary);
+  line-height: 1.45;
+  word-break: break-word;
+}
+.problems-card-message--mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--error);
+}
+.problems-card-loc {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.problems-card-jump {
+  color: var(--accent-hover);
+}
+
+/* ── Assets tab (Side Panel.dc.html L173-186, M5-U4) ─────────────── */
+.assets-dropzone {
+  width: 100%;
+  height: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: 1.5px dashed var(--border-strong);
+  /* radius value (9) matches --radius-overlay's scale step; no dedicated
+     "card" radius token exists between chip(6)/button(7) and nodeCard(11). */
+  border-radius: var(--radius-overlay);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.assets-dropzone:hover {
+  border-color: var(--accent-muted);
+  color: var(--text-secondary);
+}
+.assets-dropzone-icon {
+  font-size: 18px;
+}
+.assets-dropzone-label {
+  font-size: 11px;
+}
+
+.assets-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.assets-card {
+  border-radius: var(--radius-overlay);
+  overflow: hidden;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+}
+
+.assets-card-thumb {
+  height: 82px;
+  position: relative;
+  background: var(--surface-input);
+}
+
+/* Shared placeholder backdrop for meshes (no live preview available) and
+   for images/videos/audio before/without decoded pixel data. */
+.assets-card-gradient {
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     135deg,
     var(--surface-hover) 0%,
     var(--surface-card) 100%
   );
-  border: 1px solid var(--border-strong);
+}
+
+.assets-card-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.assets-card-tag {
+  position: absolute;
+  left: 7px;
+  top: 6px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  /* design/Side Panel.dc.html L180: border-radius:4px — no tokens.radius
+     entry matches (iconBox is the nearest at 5); same one-off precedent as
+     Inspector.tsx's AUTO badge. color/background/border come from
+     tokens.portFamily.resource via inline style (AssetBrowser.tsx). */
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.assets-card-footer {
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.assets-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.assets-card-name {
+  font-size: 11px;
+  color: var(--text-bright-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assets-card-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.assets-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.assets-card-add,
+.assets-card-forget {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 1;
+  display: flex;
+}
+
+.assets-card-add {
+  color: var(--accent-hover);
+  font-size: 13px;
+}
+
+.assets-card-forget {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.assets-card-forget:hover {
+  color: var(--error);
 }
 
 /* ── App toolbar (App Shell.dc.html L30-80, M1-U3) ───────────────── */

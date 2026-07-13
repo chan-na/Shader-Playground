@@ -9,6 +9,9 @@ import type {
 import { isValidSwizzleMask } from "../../core/nodes/utility";
 import { useGraphStore } from "../../state/graphStore";
 import { assertNever } from "../../utils/assertNever";
+import { NumberField } from "../controls/NumberField";
+import { SelectField } from "../controls/SelectField";
+import { TextField } from "../controls/TextField";
 
 const MATH_OPS: MathOp[] = [
   "add",
@@ -53,48 +56,53 @@ function MathInspector({ node }: { node: MathGraphNode }) {
   return (
     <div className="inspector-section">
       <div className="inspector-label">Math operator</div>
-      <select
+      <SelectField
         value={node.op}
         onChange={(e) =>
           setMathConfig(node.id, { op: e.target.value as MathOp })
         }
-        style={{ width: "100%" }}
       >
         {MATH_OPS.map((op) => (
           <option key={op} value={op}>
             {op}
           </option>
         ))}
-      </select>
+      </SelectField>
       <div className="inspector-row" style={{ marginTop: 8 }}>
-        <span style={{ width: 12, color: "#888", fontFamily: "monospace" }}>
+        <span
+          style={{
+            width: 12,
+            color: "var(--text-muted)",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
           a
         </span>
-        <input
-          type="number"
-          step={0.01}
+        <NumberField
           value={node.a}
-          onChange={(e) =>
-            setMathConfig(node.id, { a: parseFloat(e.target.value) || 0 })
-          }
+          step={0.01}
+          onChange={(v) => setMathConfig(node.id, { a: v })}
         />
       </div>
       {!isUnary && (
         <div className="inspector-row">
-          <span style={{ width: 12, color: "#888", fontFamily: "monospace" }}>
+          <span
+            style={{
+              width: 12,
+              color: "var(--text-muted)",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
             b
           </span>
-          <input
-            type="number"
-            step={0.01}
+          <NumberField
             value={node.b}
-            onChange={(e) =>
-              setMathConfig(node.id, { b: parseFloat(e.target.value) || 0 })
-            }
+            step={0.01}
+            onChange={(v) => setMathConfig(node.id, { b: v })}
           />
         </div>
       )}
-      <div style={{ color: "#666", fontSize: 11, marginTop: 4 }}>
+      <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 4 }}>
         Default values used when no input edge is connected.
       </div>
     </div>
@@ -107,8 +115,8 @@ function SwizzleInspector({ node }: { node: SwizzleGraphNode }) {
   return (
     <div className="inspector-section">
       <div className="inspector-label">Swizzle mask</div>
-      <input
-        type="text"
+      <TextField
+        mono
         value={node.mask}
         onChange={(e) =>
           setSwizzleMask(
@@ -118,11 +126,10 @@ function SwizzleInspector({ node }: { node: SwizzleGraphNode }) {
         }
         placeholder="xyz"
         maxLength={4}
-        style={{ width: "100%", fontFamily: "monospace" }}
       />
       <div
         style={{
-          color: valid ? "#666" : "#ff8484",
+          color: valid ? "var(--text-muted)" : "var(--error)",
           fontSize: 11,
           marginTop: 4,
         }}
@@ -141,37 +148,41 @@ function CombineInspector({ node }: { node: CombineGraphNode }) {
   return (
     <div className="inspector-section">
       <div className="inspector-label">Combine arity</div>
-      <select
+      <SelectField
         value={node.arity}
         onChange={(e) =>
           setCombineConfig(node.id, {
             arity: Number(e.target.value) as CombineArity,
           })
         }
-        style={{ width: "100%" }}
       >
         <option value={2}>2 → vec2</option>
         <option value={3}>3 → vec3</option>
         <option value={4}>4 → vec4</option>
-      </select>
+      </SelectField>
       {channels.slice(0, node.arity).map((c, i) => (
         <div className="inspector-row" key={c} style={{ marginTop: 6 }}>
-          <span style={{ width: 12, color: "#888", fontFamily: "monospace" }}>
+          <span
+            style={{
+              width: 12,
+              color: "var(--text-muted)",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
             {c}
           </span>
-          <input
-            type="number"
+          <NumberField
+            value={node.values[i] ?? 0}
             step={0.01}
-            value={node.values[i]}
-            onChange={(e) => {
+            onChange={(v) => {
               const next: [number, number, number, number] = [...node.values];
-              next[i] = parseFloat(e.target.value) || 0;
+              next[i] = v;
               setCombineConfig(node.id, { values: next });
             }}
           />
         </div>
       ))}
-      <div style={{ color: "#666", fontSize: 11, marginTop: 4 }}>
+      <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 4 }}>
         Component defaults used when no input edge is connected.
       </div>
     </div>

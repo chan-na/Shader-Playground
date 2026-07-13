@@ -3,8 +3,13 @@ import { directChildren } from "../../core/graph/parents";
 import type { GroupGraphNode } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { tokens, withAlpha } from "../../theme";
+import { TextField } from "../controls/TextField";
 
-const DEFAULT_TINT = "#5b6a7a";
+// Matches GroupNodeView.tsx's own DEFAULT_TINT (the node card's fallback
+// swatch when `node.color` is unset) so the Inspector and the graph card
+// never disagree on what an untinted group looks like.
+const DEFAULT_TINT = tokens.nodeCategory.container;
 
 /**
  * Editor pane for a group node. Surfaces label/color editing and the two
@@ -23,6 +28,8 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
     (s) => directChildren(node.id, s.nodes, s.parents).length,
   );
 
+  const tint = node.color ?? DEFAULT_TINT;
+
   return (
     <div
       className="inspector-section"
@@ -31,123 +38,87 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
     >
       <div className="inspector-label">Group</div>
 
-      <label
-        style={{ color: "#aaa", fontSize: 11, display: "block", marginTop: 4 }}
-      >
-        Label
-        <input
-          type="text"
+      <div style={{ marginBottom: 15 }}>
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--text-secondary)",
+            marginBottom: 7,
+          }}
+        >
+          Label
+        </div>
+        <TextField
           value={node.label}
           onChange={(e) => setGroupLabel(node.id, e.target.value)}
           maxLength={256}
-          data-testid="group-label-input"
-          style={{
-            width: "100%",
-            marginTop: 4,
-            padding: "4px 8px",
-            fontSize: 12,
-            background: "#1a1a1a",
-            color: "#ddd",
-            border: "1px solid #333",
-            borderRadius: 3,
-            boxSizing: "border-box",
-          }}
+          dataTestId="group-label-input"
         />
-      </label>
+      </div>
 
-      <label
-        style={{
-          color: "#aaa",
-          fontSize: 11,
-          display: "block",
-          marginTop: 8,
-          marginBottom: 8,
-        }}
-      >
-        Tint
+      <div style={{ marginBottom: 15 }}>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            marginTop: 4,
+            fontSize: 11,
+            color: "var(--text-secondary)",
+            marginBottom: 8,
           }}
         >
-          <input
-            type="color"
-            value={node.color ?? DEFAULT_TINT}
-            onChange={(e) => setGroupColor(node.id, e.target.value)}
-            data-testid="group-color-input"
-            style={{
-              width: 36,
-              height: 24,
-              border: "1px solid #333",
-              borderRadius: 3,
-              background: "#1a1a1a",
-              padding: 0,
-            }}
-          />
+          Tint
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <span
+            className="ctl-color-swatch"
+            style={{ width: 26, height: 26, background: tint }}
+          >
+            <input
+              type="color"
+              className="ctl-color-input"
+              value={tint}
+              aria-label="Group tint"
+              data-testid="group-color-input"
+              onChange={(e) => setGroupColor(node.id, e.target.value)}
+            />
+          </span>
           {node.color !== undefined && (
             <button
               type="button"
+              className="ctl-btn ctl-btn--ghost"
               onClick={() => setGroupColor(node.id, undefined)}
-              style={{
-                fontSize: 11,
-                padding: "2px 8px",
-                background: "transparent",
-                color: "#888",
-                border: "1px solid #333",
-                borderRadius: 3,
-                cursor: "pointer",
-              }}
             >
               Reset
             </button>
           )}
         </div>
-      </label>
+      </div>
 
-      <div style={{ color: "#777", fontSize: 11, marginBottom: 8 }}>
+      <div
+        style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 8 }}
+      >
         {childCount === 0
           ? "No children. Drag nodes onto the group to assign."
           : `${childCount} direct child${childCount === 1 ? "" : "ren"}`}
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 6 }}>
         <button
           type="button"
+          className="ctl-btn ctl-btn--secondary"
+          style={{ flex: 1 }}
           onClick={() => {
             removeGroup(node.id, "release-children");
             select(null);
           }}
           data-testid="group-ungroup"
-          style={{
-            flex: 1,
-            padding: "6px 10px",
-            background: "transparent",
-            color: "#cfc",
-            border: "1px solid #344",
-            borderRadius: 3,
-            fontSize: 12,
-            cursor: "pointer",
-          }}
         >
           Ungroup (keep children)
         </button>
         <button
           type="button"
+          className="ctl-btn ctl-btn--danger"
+          style={{ flex: 1 }}
           onClick={() => setConfirmingDelete(true)}
           data-testid="group-delete-cascade"
-          style={{
-            flex: 1,
-            padding: "6px 10px",
-            background: "transparent",
-            color: "#fbb",
-            border: "1px solid #533",
-            borderRadius: 3,
-            fontSize: 12,
-            cursor: "pointer",
-          }}
         >
           Delete with children…
         </button>
@@ -159,10 +130,10 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
           style={{
             marginTop: 10,
             padding: 8,
-            background: "#2a1f1f",
-            border: "1px solid #533",
-            borderRadius: 3,
-            color: "#fdd",
+            background: withAlpha(tokens.semantic.error, 0.08),
+            border: `1px solid ${withAlpha(tokens.semantic.error, 0.25)}`,
+            borderRadius: 7,
+            color: "var(--text-primary)",
             fontSize: 12,
           }}
         >
@@ -174,38 +145,27 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
             <button
               type="button"
+              className="ctl-btn"
+              style={{
+                flex: 1,
+                background: withAlpha(tokens.semantic.error, 0.25),
+                border: `1px solid ${withAlpha(tokens.semantic.error, 0.4)}`,
+                color: "var(--text-primary)",
+              }}
               onClick={() => {
                 removeGroup(node.id, "delete-children");
                 select(null);
                 setConfirmingDelete(false);
               }}
               data-testid="group-delete-confirm-ok"
-              style={{
-                flex: 1,
-                padding: "4px 8px",
-                background: "#5c2a2a",
-                color: "#fee",
-                border: "1px solid #844",
-                borderRadius: 3,
-                fontSize: 12,
-                cursor: "pointer",
-              }}
             >
               Delete all
             </button>
             <button
               type="button"
+              className="ctl-btn ctl-btn--ghost"
+              style={{ flex: 1 }}
               onClick={() => setConfirmingDelete(false)}
-              style={{
-                flex: 1,
-                padding: "4px 8px",
-                background: "transparent",
-                color: "#aaa",
-                border: "1px solid #444",
-                borderRadius: 3,
-                fontSize: 12,
-                cursor: "pointer",
-              }}
             >
               Cancel
             </button>

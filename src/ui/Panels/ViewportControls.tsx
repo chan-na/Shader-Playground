@@ -1,20 +1,7 @@
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useViewportStore } from "../../state/viewportStore";
-
-function rgbToHex(rgb: [number, number, number]) {
-  const c = (v: number) =>
-    Math.round(Math.max(0, Math.min(1, v)) * 255)
-      .toString(16)
-      .padStart(2, "0");
-  return `#${c(rgb[0])}${c(rgb[1])}${c(rgb[2])}`;
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  return [r, g, b];
-}
+import { ColorField } from "../controls/ColorField";
+import { Toggle } from "../controls/Toggle";
 
 export function ViewportControls() {
   const background = useViewportStore((s) => s.background);
@@ -28,44 +15,36 @@ export function ViewportControls() {
     <div className="inspector-section">
       <div className="inspector-label">Viewport</div>
       <div className="inspector-row">
-        <span style={{ width: 56, color: "#888", fontSize: 11 }}>
+        <span style={{ width: 56, color: "var(--text-muted)", fontSize: 11 }}>
           Background
         </span>
-        <input
-          type="color"
-          value={rgbToHex(background)}
-          onChange={(e) => setBackground(hexToRgb(e.target.value))}
-          data-testid="bg-color"
+        <ColorField
+          rgb={background}
+          onChange={(next) =>
+            setBackground([next[0] ?? 0, next[1] ?? 0, next[2] ?? 0])
+          }
+          dataTestId="bg-color"
         />
-        <span style={{ color: "#888", fontFamily: "monospace", fontSize: 11 }}>
-          {background.map((x) => x.toFixed(2)).join(", ")}
-        </span>
       </div>
       <div className="inspector-row">
-        <span style={{ width: 56, color: "#888", fontSize: 11 }}>
+        <span style={{ width: 56, color: "var(--text-muted)", fontSize: 11 }}>
           GPU timer
         </span>
         {gpuSupported ? (
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              color: "#aaa",
-              fontSize: 11,
-            }}
-          >
-            <input
-              type="checkbox"
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Toggle
               checked={gpuEnabled}
               onChange={toggleGpu}
-              data-testid="gpu-timer-toggle"
+              ariaLabel="GPU timer"
+              dataTestId="gpu-timer-toggle"
             />
-            {gpuEnabled ? "on" : "off"}
-          </label>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              {gpuEnabled ? "on" : "off"}
+            </span>
+          </div>
         ) : (
           <span
-            style={{ color: "#666", fontSize: 11 }}
+            style={{ color: "var(--text-muted)", fontSize: 11 }}
             data-testid="gpu-timer-unsupported"
           >
             unavailable

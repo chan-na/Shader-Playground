@@ -49,6 +49,9 @@ describe("ViewportControls", () => {
     render(<ViewportControls />);
     const toggle = screen.getByTestId("gpu-timer-toggle");
     expect(toggle).not.toBeNull();
-    expect((toggle as HTMLInputElement).checked).toBe(true);
+    // GPU timer switched from a native checkbox to the shared Toggle
+    // (role=switch button, M5-U3) — aria-checked is the accessible +
+    // testable equivalent of the old .checked property.
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
   });
 });

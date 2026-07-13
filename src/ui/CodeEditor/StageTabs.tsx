@@ -18,13 +18,15 @@ export function StageTabs({
       <Tab
         active={active === "vertex"}
         hasError={vertexHasError}
-        label="vertex"
+        stage="vertex"
+        label="vertex.glsl"
         onClick={() => onChange("vertex")}
       />
       <Tab
         active={active === "fragment"}
         hasError={fragmentHasError}
-        label="fragment"
+        stage="fragment"
+        label="fragment.glsl"
         onClick={() => onChange("fragment")}
       />
     </div>
@@ -34,6 +36,7 @@ export function StageTabs({
 function Tab(props: {
   active: boolean;
   hasError: boolean;
+  stage: ShaderStage;
   label: string;
   onClick: () => void;
 }) {
@@ -41,7 +44,7 @@ function Tab(props: {
     <button
       type="button"
       onClick={props.onClick}
-      data-testid={`stage-tab-${props.label}`}
+      data-testid={`stage-tab-${props.stage}`}
       data-active={props.active}
       data-has-error={props.hasError}
       className={props.active ? "stage-tab stage-tab--active" : "stage-tab"}

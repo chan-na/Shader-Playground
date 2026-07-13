@@ -8,9 +8,9 @@ import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
-import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { debounce } from "../../utils/debounce";
+import { DockPanelHeader } from "../DockPanelHeader";
 import { setCurrentView } from "./currentView";
 import { glslExtensions } from "./glslSetup";
 import { toCMDiagnostics } from "./lintAdapter";
@@ -42,7 +42,6 @@ export function CodeEditor() {
   const setStage = useEditorStore((s) => s.setStage);
   const jumpRequest = useEditorStore((s) => s.jumpRequest);
   const clearJump = useEditorStore((s) => s.clearJump);
-  const fps = useRendererStore((s) => s.stats.fps);
 
   const firstShaderId = useGraphStore(
     (s) => s.nodes.find((n) => n.kind === "shader")?.id ?? null,
@@ -262,15 +261,20 @@ export function CodeEditor() {
 
   return (
     <div className="panel panel--code">
-      <div className="panel-header">
-        Code · {fps} fps {effectiveId ? `· ${effectiveId}` : ""}
-      </div>
-      <StageTabs
-        active={stage}
-        onChange={setStage}
-        vertexHasError={vertexHasError}
-        fragmentHasError={fragmentHasError}
-      />
+      <DockPanelHeader panelId="codeEditor" meta="GLSL · ES 3.0">
+        <StageTabs
+          active={stage}
+          onChange={setStage}
+          vertexHasError={vertexHasError}
+          fragmentHasError={fragmentHasError}
+        />
+        {effectiveId && (
+          <>
+            <span className="dock-header-divider" aria-hidden="true" />
+            <span className="dock-header-node-id">{effectiveId}</span>
+          </>
+        )}
+      </DockPanelHeader>
       <div className="panel-body">
         <div
           ref={containerRef}

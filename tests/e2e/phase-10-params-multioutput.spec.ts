@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { expectCanvasRendered } from "./helpers/canvas";
+import {
+  expectCanvasCellRendered,
+  expectCanvasRendered,
+  splitCellToImageRect,
+} from "./helpers/canvas";
 import {
   bootApp,
   setGraph,
@@ -171,20 +175,51 @@ test.describe("Phase 10 — parameters & multi-output", () => {
     );
 
     const canvas = page.getByTestId("viewport-canvas");
-    const stats = await expectCanvasRendered(canvas, { ratio: 0.15 });
-    // 3 outputs of different colors should produce non-trivial spread.
-    expect(stats.spread).toBeGreaterThan(40);
+    // Coarse whole-canvas smoke check first (cheap, just "did anything
+    // render yet") — the real regression guard is the per-cell sampling
+    // below, so this doesn't need to be strict.
+    await expectCanvasRendered(canvas, { ratio: 0.05 });
 
-    // Verify the split-layout reports 3 cells. We re-import the helper from
-    // the running app to assert against the production implementation.
-    const cells = await page.evaluate(async () => {
+    // Sample each split-view cell independently instead of a single global
+    // ratio. The App Shell's 48px AppToolbar (M1-U3) shrank the viewport's
+    // available height, which lowers a whole-canvas ratio for every 3-way
+    // split render — a global ratio only weakly signals a regression, since
+    // dropping one cell entirely out of 3 just nudges the aggregate down
+    // instead of clearly failing. Sampling each cell on its own catches that
+    // cell going blank directly: measured 0.15625 per cell with all 3
+    // rendering (deterministic across runs — a static sphere silhouette, not
+    // a timing-sensitive frame), vs. ~0 for a cell that fails to draw, so a
+    // 0.10 per-cell threshold (same order as the single-viewport check in
+    // Phase 1-2) keeps a wide, stable margin on both sides. We use the
+    // canvas's real backing-store resolution (not a fixture size) so cell
+    // geometry matches what's actually on screen.
+    const { height, cells } = await page.evaluate(async () => {
       // @ts-expect-error - dev-mode dynamic path
       const mod = await import("/src/core/graph/execute.ts");
-      return (
-        mod.splitLayout as (n: number, w: number, h: number) => unknown[]
-      )(3, 800, 600);
+      const cv = document.querySelector(
+        '[data-testid="viewport-canvas"]',
+      ) as HTMLCanvasElement;
+      const w = cv.width;
+      const h = cv.height;
+      const splitLayout = mod.splitLayout as (
+        n: number,
+        width: number,
+        height: number,
+      ) => Array<{ x: number; y: number; w: number; h: number }>;
+      return { height: h, cells: splitLayout(3, w, h) };
     });
     expect(cells).toHaveLength(3);
+
+    for (const cell of cells) {
+      const rect = splitCellToImageRect(cell, height);
+      const stats = await expectCanvasCellRendered(canvas, rect, {
+        ratio: 0.1,
+      });
+      // Each cell shows one of the 3 differently-colored spheres — a
+      // tightly-cropped per-cell sample should still show real color
+      // variation, not just a stray pixel.
+      expect(stats.spread).toBeGreaterThan(20);
+    }
   });
 
   test("Adding a 5th Output is rejected by validateGraph", async ({ page }) => {

@@ -18,6 +18,7 @@ import noiseFrag from "../../shaders/templates/noise.frag?raw";
 import tonemapFrag from "../../shaders/templates/tonemap.frag?raw";
 import unlitFrag from "../../shaders/templates/unlit.frag?raw";
 import uvDebugFrag from "../../shaders/templates/uvDebug.frag?raw";
+import { useCommandPaletteStore } from "../../state/commandPaletteStore";
 import {
   CHAIN_DEMO_LAYOUT,
   createChainDemoGraph,
@@ -413,7 +414,8 @@ function buildCommands(): Command[] {
 }
 
 export function CommandPalette() {
-  const [open, setOpen] = useState(false);
+  const open = useCommandPaletteStore((s) => s.open);
+  const setOpen = useCommandPaletteStore((s) => s.setOpen);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -424,11 +426,11 @@ export function CommandPalette() {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((v) => !v);
+        useCommandPaletteStore.getState().toggle();
         setQuery("");
         setActive(0);
       } else if (e.key === "Escape" && open) {
-        setOpen(false);
+        useCommandPaletteStore.getState().setOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);

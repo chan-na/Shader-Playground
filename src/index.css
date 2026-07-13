@@ -30,21 +30,15 @@ textarea {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-columns: 1.1fr 2fr 0.9fr;
-  grid-template-rows: 1.2fr 1fr 22px;
-  grid-template-areas:
-    "graph     viewport   inspector"
-    "graph     code       inspector"
-    "statusbar statusbar  statusbar";
-  gap: 1px;
-  background: var(--border-header-divider);
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   width: 100vw;
+  background: var(--surface-app-darker);
 }
 
 .statusbar {
-  grid-area: statusbar;
+  flex-shrink: 0;
 }
 
 .panel {
@@ -56,17 +50,156 @@ textarea {
   overflow: hidden;
 }
 
-.panel--graph {
-  grid-area: graph;
+/* ── Docking shell layout (App Shell.dc.html) ────────────────────── */
+.shell-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
-.panel--viewport {
-  grid-area: viewport;
+.shell-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
-.panel--code {
-  grid-area: code;
+.shell-left {
+  display: flex;
+  min-width: 0;
+  border-right: 1px solid var(--border-default);
 }
-.panel--inspector {
-  grid-area: inspector;
+.shell-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.shell-right-top,
+.shell-right-bottom {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.shell-code {
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  min-height: 0;
+}
+.shell-left > .panel,
+.shell-right-top > .panel,
+.shell-right-bottom > .panel,
+.shell-code > .panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ── Splitter (resize handle between docked panels) ──────────────── */
+/* <hr> carries an implicit ARIA role of "separator" — reset its UA
+   defaults (inset border, block margin) since it's reused as a drag handle. */
+.splitter {
+  flex: 0 0 5px;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: var(--border-default);
+  outline: none;
+}
+.splitter:hover,
+.splitter:focus-visible {
+  background: var(--accent-muted);
+}
+.splitter--vertical {
+  cursor: col-resize;
+}
+.splitter--horizontal {
+  cursor: row-resize;
+}
+
+/* ── Panel collapse/maximize slots (layoutStore-driven, App.tsx) ─────
+   A collapsed slot keeps its panel mounted (WebGL/CodeMirror survive) but
+   hides everything below the dock header. A maximized slot's siblings +
+   adjoining splitters are hidden outright via shell-slot--hidden. */
+.shell-slot--collapsed .panel > :not(.dock-header) {
+  display: none;
+}
+.shell-slot--hidden {
+  display: none;
+}
+
+/* ── Dock panel header (common to all 4 docked panels, App Shell.dc.html
+   L88-95): grab dots → label/tabs → meta badge → spacer → maximize/collapse. */
+.dock-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--surface-docking-header);
+  border-bottom: 1px solid var(--border-header-divider);
+  user-select: none;
+}
+.dock-header-grab {
+  color: var(--text-disabled);
+  font-size: 13px;
+  letter-spacing: 1px;
+  cursor: grab;
+}
+.dock-header-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.dock-header-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-icon-box);
+  padding: 1px 6px;
+}
+.dock-header-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-default);
+}
+.dock-header-node-id {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.dock-header-spacer {
+  flex: 1;
+}
+.dock-header-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px;
+}
+.dock-header-btn:hover {
+  color: var(--text-bright-body);
+}
+
+/* ── Width-collapsed rail (DockPanelHeader collapsedRail, M1-U2 fix) ─────
+   shell-left/Node Editor is the one docked slot that collapses to a 34px
+   *width* strip instead of a 34px *height* strip (App.tsx shellLeftFlex).
+   Left as a horizontal row, the header's spacer + maximize/collapse buttons
+   would be pushed past the 34px strip and clipped by the panel's
+   overflow:hidden — unclickable by a real pointer even though the DOM node
+   is technically present. Stack the header vertically instead so the
+   restore button stays inside the strip's own bounds. */
+.dock-header--rail {
+  flex-direction: column;
+  flex: 1 1 auto;
+  height: auto;
+  padding: 10px 0;
+  gap: 8px;
 }
 
 .inspector-section {
@@ -177,22 +310,18 @@ textarea {
   cursor: default;
 }
 
-/* ── Side-panel tabs ────────────────────────────────────────────── */
-.panel-tabs {
-  display: flex;
-  background: var(--surface-docking-header);
-  border-bottom: 1px solid var(--border-header-divider);
-  flex-shrink: 0;
-}
+/* ── Side-panel tabs (rendered inside DockPanelHeader's children slot,
+   Side Panel.dc.html L255) ───────────────────────────────────────── */
 .panel-tab {
   background: transparent;
   border: none;
+  border-bottom: 2px solid transparent;
+  height: 34px;
   color: var(--text-secondary);
-  padding: 6px 12px;
+  padding: 0 12px;
   cursor: pointer;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -202,15 +331,16 @@ textarea {
 }
 .panel-tab--active {
   color: var(--text-primary);
-  background: var(--surface-panel);
+  font-weight: 600;
   border-bottom: 2px solid var(--accent-default);
 }
 .panel-tab-badge {
+  font-family: var(--font-mono);
   background: var(--surface-hover);
   color: var(--text-primary);
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   padding: 1px 6px;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
 }
 .panel-tab--active .panel-tab-badge {
@@ -222,6 +352,39 @@ textarea {
 .panel-tab--active[data-variant="error"] .panel-tab-badge {
   background: var(--error);
   color: var(--surface-app-darker);
+}
+
+/* ── Code editor stage tabs (rendered inside DockPanelHeader's children
+   slot, Code Editor.dc.html L360-370) ────────────────────────────── */
+.stage-tabs {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+.stage-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.stage-tab--active {
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.stage-tab-error-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--error);
+  box-shadow: 0 0 6px var(--error);
 }
 
 .problem-row {
@@ -265,6 +428,180 @@ textarea {
     var(--surface-card) 100%
   );
   border: 1px solid var(--border-strong);
+}
+
+/* ── App toolbar (App Shell.dc.html L30-80, M1-U3) ───────────────── */
+.app-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--border-default);
+}
+.tb-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-default);
+  flex-shrink: 0;
+}
+.tb-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-right: 4px;
+  flex-shrink: 0;
+}
+.tb-brand-word {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+}
+.tb-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tb-spacer {
+  flex: 1;
+}
+.tb-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-button);
+  color: var(--text-bright-body);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-btn:hover {
+  background: var(--surface-input);
+  border-color: var(--border-stronger);
+}
+.tb-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tb-btn:disabled:hover {
+  background: var(--surface-card);
+  border-color: var(--border-default);
+}
+.tb-btn--muted {
+  color: var(--text-secondary);
+}
+.tb-btn--primary {
+  background: var(--accent-default);
+  border: none;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.tb-btn--primary:hover {
+  background: var(--accent-hover);
+}
+.tb-caret {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+.tb-tile {
+  width: 15px;
+  height: 15px;
+  border-radius: var(--radius-icon-box);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.tb-menu {
+  position: relative;
+}
+.tb-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 190px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-button);
+  box-shadow: var(--shadow-node-card);
+  padding: 4px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tb-menu-item {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-chip);
+  color: var(--text-bright-body);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.tb-menu-item:hover {
+  background: var(--surface-hover);
+}
+.tb-menu-divider {
+  height: 1px;
+  background: var(--border-default);
+  margin: 4px 2px;
+}
+.tb-undo-group {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-button);
+  padding: 2px;
+}
+.tb-undo-btn {
+  width: 28px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  border-radius: var(--radius-icon-box);
+  cursor: pointer;
+  font-size: 14px;
+}
+.tb-undo-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.tb-undo-btn:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+.tb-kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-app);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-icon-box);
+  padding: 1px 5px;
+  margin-left: 6px;
+}
+.tb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
 /* ── Command Palette ────────────────────────────────────────────── */
@@ -354,4 +691,50 @@ textarea {
   border-top: 1px solid var(--border-default);
   color: var(--text-muted);
   font-size: 11px;
+}
+
+/* ── Status bar (App Shell.dc.html L401-410, M1-U4) ──────────────── */
+.statusbar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--surface-docking-header);
+  border-top: 1px solid var(--border-header-divider);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+.statusbar-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.statusbar-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.statusbar-muted {
+  color: var(--text-muted);
+}
+.statusbar-error {
+  color: var(--error);
+}
+.statusbar-spacer {
+  flex: 1;
+}
+.statusbar-diag {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 1px 8px;
+}
+.statusbar-diag[aria-pressed="true"] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }

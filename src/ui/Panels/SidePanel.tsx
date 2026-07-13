@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAssetStore } from "../../state/assetStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useRendererStore } from "../../state/rendererStore";
+import { DockPanelHeader } from "../DockPanelHeader";
 import { AssetBrowser } from "./AssetBrowser";
 import { Inspector } from "./Inspector";
 import { ProblemsPanel } from "./ProblemsPanel";
@@ -25,7 +26,7 @@ export function SidePanel() {
 
   return (
     <div className="panel panel--inspector" data-testid="side-panel">
-      <div className="panel-tabs">
+      <DockPanelHeader panelId="sidePanel">
         <button
           type="button"
           className={
@@ -61,7 +62,7 @@ export function SidePanel() {
           Problems
           {total > 0 && <span className="panel-tab-badge">{total}</span>}
         </button>
-      </div>
+      </DockPanelHeader>
       {tab === "inspector" && <InspectorBody />}
       {tab === "assets" && <AssetBrowser />}
       {tab === "problems" && <ProblemsPanel />}

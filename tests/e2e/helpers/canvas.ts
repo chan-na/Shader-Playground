@@ -14,6 +14,19 @@ export interface PixelStats {
 }
 
 /**
+ * A sub-rectangle of the canvas in backing-store pixel space, top-down
+ * (0,0 = top-left of the rendered image) — i.e. the same orientation
+ * `drawImage`/screen readers use, *not* WebGL's bottom-left-origin viewport
+ * space. See `splitCellToImageRect` for converting `splitLayout()` cells.
+ */
+export interface CanvasRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
  * Snapshot the canvas via a 2D sampling context (cheap downsample). We don't
  * grab the full canvas — SwiftShader on CI is slow and exact pixels are not
  * the assertion. We just want "did anything draw?" / "is the frame uniform?"
@@ -23,8 +36,11 @@ export interface PixelStats {
  * `requestAnimationFrame` callbacks — the inner rAF fires immediately after
  * the next draw, while the buffer is still valid.
  */
-export async function readCanvasStats(canvas: Locator): Promise<PixelStats> {
-  return canvas.evaluate(async (c) => {
+export async function readCanvasStats(
+  canvas: Locator,
+  rect?: CanvasRect,
+): Promise<PixelStats> {
+  return canvas.evaluate(async (c, rect) => {
     const cv = c as HTMLCanvasElement;
     const W = 32;
     const H = 32;
@@ -36,7 +52,11 @@ export async function readCanvasStats(canvas: Locator): Promise<PixelStats> {
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          ctx.drawImage(cv, 0, 0, W, H);
+          if (rect) {
+            ctx.drawImage(cv, rect.x, rect.y, rect.w, rect.h, 0, 0, W, H);
+          } else {
+            ctx.drawImage(cv, 0, 0, W, H);
+          }
           resolve();
         });
       });
@@ -83,7 +103,7 @@ export async function readCanvasStats(canvas: Locator): Promise<PixelStats> {
       },
       spread: Math.max(rMax - rMin, gMax - gMin, bMax - bMin),
     };
-  });
+  }, rect);
 }
 
 /** Poll until at least `ratio` (default 5%) of sampled pixels are non-zero. */
@@ -103,6 +123,55 @@ export async function expectCanvasRendered(
         timeout: opts.timeout ?? 10_000,
         intervals: [100, 200, 500, 1000],
         message: `canvas remained mostly empty (need ratio >= ${ratio})`,
+      },
+    )
+    .toBeGreaterThanOrEqual(ratio);
+  if (!last) throw new Error("poll never populated stats");
+  return last;
+}
+
+/**
+ * Converts a `splitLayout()` cell (WebGL viewport space: origin bottom-left,
+ * y-up) into the top-down image-space rect `readCanvasStats`/`drawImage`
+ * expect. `canvasHeight` must be the same backing-store height the cell was
+ * computed against.
+ */
+export function splitCellToImageRect(
+  cell: { x: number; y: number; w: number; h: number },
+  canvasHeight: number,
+): CanvasRect {
+  return {
+    x: cell.x,
+    y: canvasHeight - (cell.y + cell.h),
+    w: cell.w,
+    h: cell.h,
+  };
+}
+
+/**
+ * Like `expectCanvasRendered`, but polls a single sub-rectangle of the
+ * canvas (see `splitCellToImageRect`) instead of the whole image. A
+ * multi-output split view dilutes a global ratio check — one missing cell
+ * out of N barely nudges it — whereas sampling each cell independently
+ * catches that specific cell going blank directly.
+ */
+export async function expectCanvasCellRendered(
+  canvas: Locator,
+  rect: CanvasRect,
+  opts: { ratio?: number; timeout?: number } = {},
+): Promise<PixelStats> {
+  const ratio = opts.ratio ?? 0.05;
+  let last: PixelStats | null = null;
+  await expect
+    .poll(
+      async () => {
+        last = await readCanvasStats(canvas, rect);
+        return last.nonZero / last.total;
+      },
+      {
+        timeout: opts.timeout ?? 10_000,
+        intervals: [100, 200, 500, 1000],
+        message: `canvas cell ${JSON.stringify(rect)} remained mostly empty (need ratio >= ${ratio})`,
       },
     )
     .toBeGreaterThanOrEqual(ratio);

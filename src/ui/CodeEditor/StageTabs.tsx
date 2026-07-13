@@ -14,13 +14,7 @@ export function StageTabs({
   fragmentHasError,
 }: StageTabsProps) {
   return (
-    <div
-      style={{
-        display: "flex",
-        borderBottom: "1px solid #1a1a1a",
-        background: "#252526",
-      }}
-    >
+    <div className="stage-tabs">
       <Tab
         active={active === "vertex"}
         hasError={vertexHasError}
@@ -50,35 +44,10 @@ function Tab(props: {
       data-testid={`stage-tab-${props.label}`}
       data-active={props.active}
       data-has-error={props.hasError}
-      style={{
-        background: props.active ? "#1e1e1e" : "transparent",
-        border: "none",
-        borderBottom: props.active
-          ? "2px solid #569cd6"
-          : "2px solid transparent",
-        color: props.active ? "#ddd" : "#aaa",
-        padding: "6px 14px",
-        cursor: "pointer",
-        fontSize: 11,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        position: "relative",
-      }}
+      className={props.active ? "stage-tab stage-tab--active" : "stage-tab"}
     >
       {props.label}
-      {props.hasError && (
-        <span
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: "#f48771",
-          }}
-        />
-      )}
+      {props.hasError && <span className="stage-tab-error-dot" />}
     </button>
   );
 }

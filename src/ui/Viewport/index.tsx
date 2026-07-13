@@ -31,6 +31,16 @@ import { thumbnailScheduler } from "../../state/thumbnailScheduler";
 import { useTimeStore } from "../../state/timeStore";
 import { useViewportStore } from "../../state/viewportStore";
 import { log, normalizeError } from "../../utils/log";
+import { DockPanelHeader } from "../DockPanelHeader";
+
+/** Output 노드 개수 → Viewport 헤더 메타 배지 텍스트("1 · single" 등, App
+ *  Shell.dc.html L215). 분할 구현 전이라도 배지는 현재 그래프 상태를 반영한다. */
+function splitLabel(outputCount: number): string {
+  if (outputCount <= 1) return "single";
+  if (outputCount === 2) return "split";
+  if (outputCount === 3) return "triple";
+  return "quad";
+}
 
 export function Viewport() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -40,6 +50,9 @@ export function Viewport() {
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
   const setGlInfo = useRendererStore((s) => s.setGlInfo);
+  const outputCount = useGraphStore(
+    (s) => s.nodes.filter((n) => n.kind === "output").length,
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -516,7 +529,11 @@ export function Viewport() {
 
   return (
     <div className="panel panel--viewport">
-      <div className="panel-header">Viewport</div>
+      <DockPanelHeader
+        panelId="viewport"
+        label="Viewport"
+        meta={`${outputCount} · ${splitLabel(outputCount)}`}
+      />
       <div className="panel-body">
         <canvas
           ref={canvasRef}

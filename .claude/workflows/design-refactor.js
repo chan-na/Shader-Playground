@@ -30,7 +30,18 @@ const MAX_QA_ROUNDS = 2 // 하위 모델 시도 횟수 (초과 시 fable이 직�
 const MAX_VERIFY_ROUNDS = 3
 const MAX_GATE_ROUNDS = 4
 
-const A = args || {}
+// args가 JSON 문자열로 전달되는 경우 방어 (문자열이면 파싱 실패 시 무시)
+const A = (() => {
+  if (!args) return {}
+  if (typeof args === "string") {
+    try {
+      return JSON.parse(args)
+    } catch {
+      return {}
+    }
+  }
+  return args
+})()
 const BRANCH = A.branch || "design/handoff-v1"
 const ONLY = Array.isArray(A.only) ? A.only : null
 const ALLOW_SPEC_UPDATES = A.allowSpecUpdates === true

@@ -27,10 +27,10 @@ import { importFiles } from "../../state/assetActions";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { nextId } from "../../utils/id";
+import { DockPanelHeader } from "../DockPanelHeader";
 import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
 import { createNodeDataCache } from "./rfNodeData";
-import { Toolbar } from "./Toolbar";
 
 /** Width/height approximation for non-group node cards when picking a target
  *  group on drag-stop. The real measurements come from the DOM but we don't
@@ -344,8 +344,12 @@ export function NodeEditor() {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the toolbar Import button
     <div className="panel panel--graph" onDragOver={onDragOver} onDrop={onDrop}>
-      <div className="panel-header">Node Graph</div>
-      <Toolbar />
+      <DockPanelHeader
+        panelId="nodeEditor"
+        label="Node Editor"
+        meta={`${graphNodes.length}N · ${graphEdges.length}E`}
+        collapsedRail
+      />
       <div className="panel-body" style={{ background: "#1a1a1a" }}>
         <ReactFlow
           nodes={rfNodes}

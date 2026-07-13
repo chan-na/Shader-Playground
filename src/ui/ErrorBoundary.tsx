@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { tokens } from "../theme";
 import { exportLogText, log, normalizeError } from "../utils/log";
 
 interface ErrorBoundaryProps {
@@ -52,14 +53,16 @@ export class ErrorBoundary extends Component<
           alignItems: "center",
           justifyContent: "center",
           gap: 12,
-          background: "#1e1e1e",
-          color: "#ddd",
+          background: tokens.surface.panel,
+          color: tokens.text.brightBody,
           fontFamily: "system-ui, sans-serif",
           zIndex: 9998,
         }}
       >
         <div style={{ fontSize: 15, fontWeight: 600 }}>문제가 발생했습니다</div>
-        <div style={{ fontSize: 12, color: "#aaa", maxWidth: 420 }}>
+        <div
+          style={{ fontSize: 12, color: tokens.text.secondary, maxWidth: 420 }}
+        >
           예기치 못한 오류로 화면을 표시할 수 없습니다. 새로고침하거나 진단
           정보를 복사해 보고해 주세요.
         </div>
@@ -70,9 +73,9 @@ export class ErrorBoundary extends Component<
             onClick={this.handleCopy}
             style={{
               background: "transparent",
-              color: "#bbb",
-              border: "1px solid #444",
-              borderRadius: 4,
+              color: tokens.text.brightBody,
+              border: `1px solid ${tokens.border.stronger}`,
+              borderRadius: tokens.radius.button,
               padding: "6px 12px",
               cursor: "pointer",
               fontSize: 12,
@@ -85,10 +88,10 @@ export class ErrorBoundary extends Component<
             data-testid="error-boundary-reload"
             onClick={this.handleReload}
             style={{
-              background: "#0e639c",
-              color: "#fff",
-              border: "1px solid #1177bb",
-              borderRadius: 4,
+              background: tokens.accent.active,
+              color: tokens.text.primary,
+              border: `1px solid ${tokens.accent.default}`,
+              borderRadius: tokens.radius.button,
               padding: "6px 12px",
               cursor: "pointer",
               fontSize: 12,

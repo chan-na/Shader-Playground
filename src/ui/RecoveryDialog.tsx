@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import { tokens } from "../theme";
 
 const RECOVERY_TITLE_ID = "recovery-dialog-title";
 
@@ -46,10 +47,10 @@ export function RecoveryDialog({
     >
       <div
         style={{
-          background: "#1e1e1e",
-          color: "#ddd",
-          border: "1px solid #333",
-          borderRadius: 8,
+          background: tokens.surface.panel,
+          color: tokens.text.brightBody,
+          border: `1px solid ${tokens.border.strong}`,
+          borderRadius: tokens.radius.panel,
           padding: "20px 22px",
           maxWidth: 380,
           boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
@@ -62,7 +63,13 @@ export function RecoveryDialog({
         >
           이전 작업을 복구할까요?
         </div>
-        <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: tokens.text.secondary,
+            marginBottom: 16,
+          }}
+        >
           저장된 자동 백업이 있습니다 · 노드 {nodeCount}개 · {savedAt}
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -72,9 +79,9 @@ export function RecoveryDialog({
             onClick={onDiscard}
             style={{
               background: "transparent",
-              color: "#bbb",
-              border: "1px solid #444",
-              borderRadius: 4,
+              color: tokens.text.brightBody,
+              border: `1px solid ${tokens.border.stronger}`,
+              borderRadius: tokens.radius.button,
               padding: "6px 12px",
               cursor: "pointer",
               fontSize: 12,
@@ -88,10 +95,10 @@ export function RecoveryDialog({
             data-testid="recovery-restore"
             onClick={onRestore}
             style={{
-              background: "#0e639c",
-              color: "#fff",
-              border: "1px solid #1177bb",
-              borderRadius: 4,
+              background: tokens.accent.active,
+              color: tokens.text.primary,
+              border: `1px solid ${tokens.accent.default}`,
+              borderRadius: tokens.radius.button,
               padding: "6px 12px",
               cursor: "pointer",
               fontSize: 12,

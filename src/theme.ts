@@ -5,8 +5,8 @@
  * 디자인을 바꾸면 여기서 바꾸고, README·컴포넌트는 이 값을 "참조"만 한다.
  * (README에는 hex를 복붙하지 말 것 — drift의 원인.)
  *
- * 재구현 시 이 파일을 src/theme.ts 로 옮기고, 필요하면 :root CSS 변수로도
- * 파생(예: --surface-panel: #131519). 아래 cssVars() 참고.
+ * 이 파일이 src/theme.ts 이며, main.tsx가 부트 시 cssVars()를 :root에
+ * 주입해 CSS 변수로도 파생한다(예: --surface-panel: #131519). 아래 cssVars() 참고.
  *
  * 버전: v1 · 2026-07-13
  */
@@ -157,10 +157,35 @@ export function cssVars(): string {
     ...Object.entries(t.accent).map(([k, v]) => `--accent-${kebab(k)}: ${v};`),
     ...Object.entries(t.text).map(([k, v]) => `--text-${kebab(k)}: ${v};`),
     ...Object.entries(t.semantic).map(([k, v]) => `--${k}: ${v};`),
+    ...Object.entries(t.nodeCategory).map(
+      ([k, v]) => `--node-cat-${kebab(k)}: ${v};`,
+    ),
+    ...Object.entries(t.portFamily).map(
+      ([k, v]) => `--port-${kebab(k)}: ${v};`,
+    ),
+    `--font-ui: ${t.font.ui};`,
+    `--font-mono: ${t.font.mono};`,
+    ...Object.entries(t.radius).map(
+      ([k, v]) => `--radius-${kebab(k)}: ${v}px;`,
+    ),
+    // portOutputGlow는 함수(famHex 인자를 받는 팩토리)이므로 CSS 변수로
+    // 방출할 수 없다 — 문자열 값만 flatMap으로 걸러낸다 (as 캐스팅 금지).
+    ...Object.entries(t.shadow).flatMap(([k, v]) =>
+      typeof v === "string" ? [`--shadow-${kebab(k)}: ${v};`] : [],
+    ),
+    `--motion-duration-min: ${t.motion.durationMs.min}ms;`,
+    `--motion-duration-max: ${t.motion.durationMs.max}ms;`,
+    `--motion-easing: ${t.motion.easing};`,
   ].join("\n");
 }
 function kebab(s: string) {
   return s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 }
 
-export type Tokens = typeof tokens;
+/** "#rrggbb" → "rgba(r, g, b, a)". 디자인의 rgba(<token hex>, α) 파생 패턴 전용 (README §nodeCategory 그라디언트 등). 6자리 hex만 지원. */
+export function withAlpha(hex: string, alpha: number): string {
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}

@@ -1,3 +1,10 @@
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-sans/700.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
+import "@fontsource/jetbrains-mono/600.css";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
@@ -33,6 +40,7 @@ import { useRendererStore } from "./state/rendererStore";
 import { useSelectionStore } from "./state/selectionStore";
 import { useTimeStore } from "./state/timeStore";
 import { useViewportStore } from "./state/viewportStore";
+import { cssVars } from "./theme";
 import { log, normalizeError } from "./utils/log";
 
 // 전역 안전망: 잡히지 않은 에러/거부를 로거에 기록 (Debugging-Plan P2).
@@ -47,6 +55,13 @@ window.addEventListener("unhandledrejection", (e) => {
     reason: normalizeError(e.reason),
   });
 });
+
+// 디자인 토큰(src/theme.ts 단일 출처)을 :root CSS 변수로 파생 주입.
+// index.css 및 컴포넌트 CSS는 var(--*)만 참조한다 (M0).
+const themeStyle = document.createElement("style");
+themeStyle.id = "sp-theme-vars";
+themeStyle.textContent = `:root {\n${cssVars()}\n}`;
+document.head.appendChild(themeStyle);
 
 // Wire the external registry's video blob lookup to the in-memory asset
 // store. Kept here (not in the registry or store) so neither layer needs to

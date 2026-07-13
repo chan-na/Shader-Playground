@@ -1,4 +1,5 @@
 import type { Toast, ToastKind } from "../state/toastStore";
+import { tokens, withAlpha } from "../theme";
 
 const ICON_BY_KIND: Record<ToastKind, string> = {
   info: "ℹ",
@@ -8,10 +9,22 @@ const ICON_BY_KIND: Record<ToastKind, string> = {
 };
 
 const COLOR_BY_KIND: Record<ToastKind, { bg: string; border: string }> = {
-  info: { bg: "#1e2a38", border: "#3a5a78" },
-  success: { bg: "#1e3823", border: "#3a7848" },
-  warning: { bg: "#3a2e1a", border: "#7a5e2a" },
-  error: { bg: "#3a1a1a", border: "#7a3a3a" },
+  info: {
+    bg: withAlpha(tokens.semantic.info, 0.14),
+    border: withAlpha(tokens.semantic.info, 0.45),
+  },
+  success: {
+    bg: withAlpha(tokens.semantic.success, 0.14),
+    border: withAlpha(tokens.semantic.success, 0.45),
+  },
+  warning: {
+    bg: withAlpha(tokens.semantic.warning, 0.14),
+    border: withAlpha(tokens.semantic.warning, 0.45),
+  },
+  error: {
+    bg: withAlpha(tokens.semantic.error, 0.14),
+    border: withAlpha(tokens.semantic.error, 0.45),
+  },
 };
 
 export interface ToastRowProps {
@@ -28,12 +41,12 @@ export function ToastRow({ toast: t, onDismiss }: ToastRowProps) {
       data-kind={t.kind}
       style={{
         background: c.bg,
-        color: "#ddd",
+        color: tokens.text.brightBody,
         border: `1px solid ${c.border}`,
-        borderRadius: 4,
+        borderRadius: tokens.radius.chip,
         padding: "8px 10px",
         fontSize: 12,
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: tokens.font.ui,
         display: "flex",
         gap: 8,
         alignItems: "flex-start",
@@ -56,7 +69,7 @@ export function ToastRow({ toast: t, onDismiss }: ToastRowProps) {
         aria-label="Dismiss notification"
         style={{
           background: "transparent",
-          color: "#888",
+          color: tokens.text.secondary,
           border: "none",
           padding: 0,
           cursor: "pointer",

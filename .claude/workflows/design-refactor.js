@@ -58,6 +58,11 @@ const CONSTRAINTS = `
 - 순환 의존성 0건: store끼리 직접 상호 import 금지, 공통 의존은 별도 모듈로.
 - 커버리지 임계(lines 50 / functions 47 / branches 42 / statements 50) 하락 금지 — 신규 로직에 *.test.ts(x) 동반.
 - 게이트 설정 파일(tsconfig/biome.json/knip.json/vitest.config.ts/playwright 스펙) 완화 금지. test.skip/fixme 금지.
+- ${
+  ALLOW_SPEC_UPDATES
+    ? "tests/e2e/** 스펙 수정은 사용자가 사전 승인함 — 단, 새 디자인 값/경로를 단언하는 방향만 허용 (expect 삭제·완화·skip 금지). 수정했다면 summary에 파일·사유를 반드시 명시."
+    : "tests/e2e/** 수정 절대 금지 — 스펙 갱신이 필요하다고 판단되면 수정하지 말고 status:'blocked' + questions로 반환하라 (사용자 승인 필요 사항)."
+}
 - 색·radius·shadow·모션 값은 src/theme.ts의 tokens.* 또는 파생된 var(--*)만 사용. 컴포넌트에 raw hex 직접 쓰기 금지.
 - 커밋하지 마라 — 커밋은 워크플로우가 별도 단계에서 수행한다.
 - 마무리 전 자가 검증: npx tsc --noEmit, 그리고 수정 파일에 npx biome check --write 를 돌려 통과시켜라.`

@@ -33,16 +33,63 @@ import {
 } from "../../state/demoGraph";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { tokens, withAlpha } from "../../theme";
 import { nextId } from "../../utils/id";
-import { nextActive, prevActive, rankCommands } from "./helpers";
+import {
+  type CommandKind,
+  cycleModePrefix,
+  type FuzzySegment,
+  fuzzySegments,
+  groupCommands,
+  nextActive,
+  parseMode,
+  prevActive,
+  rankCommands,
+} from "./helpers";
+
+/** tokens.nodeCategory의 키 — node kind 커맨드의 아이콘 틴트를 고른다. */
+type NodeIconCategory = keyof typeof tokens.nodeCategory;
 
 interface Command {
   id: string;
-  category: string;
+  kind: CommandKind;
+  glyph: string;
   label: string;
   keywords: string;
+  /** kind === "node"일 때만 의미 있음 — 아이콘 색 계열(source/process/…). */
+  iconCategory?: NodeIconCategory;
+  sub?: string;
+  keys?: string[];
   run: () => void;
 }
+
+/** design/Command Palette.dc.html data() L195-211의 유니코드 글리프. */
+const GLYPH = {
+  mesh: "▣",
+  image: "▤",
+  webcam: "◉",
+  video: "▷",
+  audio: "♪",
+  shader: "◆",
+  compute: "⚙",
+  output: "◎",
+  paramFloat: "∙",
+  paramVec3: "∷",
+  paramColor: "●",
+  paramTime: "◷",
+  math: "∑",
+  swizzle: "⇄",
+  combine: "⊞",
+  group: "▢",
+  clearGraph: "⌧",
+} as const;
+
+const PARAM_GLYPH: Record<ParamKind, string> = {
+  float: GLYPH.paramFloat,
+  color: GLYPH.paramColor,
+  vec3: GLYPH.paramVec3,
+  time: GLYPH.paramTime,
+};
 
 const PRIMITIVES: MeshGraphNode["primitive"][] = [
   "cube",
@@ -69,7 +116,9 @@ function buildCommands(): Command[] {
   for (const p of PRIMITIVES) {
     cmds.push({
       id: `add-mesh-${p}`,
-      category: "Node",
+      kind: "node",
+      glyph: GLYPH.mesh,
+      iconCategory: "source",
       label: `Add Mesh: ${p}`,
       keywords: `add node mesh ${p} primitive geometry`,
       run: () => addMesh(p),
@@ -78,7 +127,9 @@ function buildCommands(): Command[] {
 
   cmds.push({
     id: "add-image",
-    category: "Node",
+    kind: "node",
+    glyph: GLYPH.image,
+    iconCategory: "source",
     label: "Add Image node",
     keywords: "add node image texture",
     run: () => {
@@ -90,7 +141,9 @@ function buildCommands(): Command[] {
 
   cmds.push({
     id: "add-webcam",
-    category: "Node",
+    kind: "node",
+    glyph: GLYPH.webcam,
+    iconCategory: "source",
     label: "Add Webcam (live camera)",
     keywords: "add node webcam camera live video texture media stream",
     run: () => {
@@ -102,7 +155,9 @@ function buildCommands(): Command[] {
 
   cmds.push({
     id: "add-video",
-    category: "Node",
+    kind: "node",
+    glyph: GLYPH.video,
+    iconCategory: "source",
     label: "Add Video (mp4/webm asset)",
     keywords: "add node video mp4 webm asset movie clip file texture",
     run: () => {
@@ -124,7 +179,9 @@ function buildCommands(): Command[] {
 
   cmds.push({
     id: "add-audio",
-    category: "Node",
+    kind: "node",
+    glyph: GLYPH.audio,
+    iconCategory: "source",
     label: "Add Audio (mic/file FFT texture)",
     keywords:
       "add node audio mic microphone fft frequency spectrum file mp3 wav",
@@ -160,7 +217,9 @@ function buildCommands(): Command[] {
   for (const tpl of shaderTemplates) {
     cmds.push({
       id: `add-shader-${tpl.name.toLowerCase()}`,
-      category: "Node",
+      kind: "node",
+      glyph: GLYPH.shader,
+      iconCategory: "process",
       label: `Add Shader: ${tpl.name}`,
       keywords: `add node shader ${tpl.name} fragment glsl`,
       run: () => {
@@ -180,7 +239,9 @@ function buildCommands(): Command[] {
 
   cmds.push({
     id: "add-output",
-    category: "Node",
+    kind: "node",
+    glyph: GLYPH.output,
+    iconCategory: "output",
     label: "Add Output node",
     keywords: "add node output canvas display split viewport",
     run: () => {
@@ -197,7 +258,9 @@ function buildCommands(): Command[] {
   cmds.push(
     {
       id: "add-compute-particle",
-      category: "Node",
+      kind: "node",
+      glyph: GLYPH.compute,
+      iconCategory: "process",
       label: "Add Compute: Particle (POINTS)",
       keywords:
         "add node compute transform feedback particle points simulation",
@@ -231,7 +294,9 @@ function buildCommands(): Command[] {
     },
     {
       id: "add-compute-empty",
-      category: "Node",
+      kind: "node",
+      glyph: GLYPH.compute,
+      iconCategory: "process",
       label: "Add Compute (empty)",
       keywords: "add node compute transform feedback empty blank",
       run: () => {
@@ -262,7 +327,9 @@ function buildCommands(): Command[] {
   for (const k of paramKinds) {
     cmds.push({
       id: `add-param-${k}`,
-      category: "Node",
+      kind: "node",
+      glyph: PARAM_GLYPH[k],
+      iconCategory: "value",
       label: `Add Parameter: ${k}`,
       keywords: `add node parameter param ${k}`,
       run: () => {
@@ -297,7 +364,9 @@ function buildCommands(): Command[] {
   for (const op of mathOps) {
     cmds.push({
       id: `add-math-${op}`,
-      category: "Node",
+      kind: "node",
+      glyph: GLYPH.math,
+      iconCategory: "value",
       label: `Add Math: ${op}`,
       keywords: `add node math ${op} utility scalar arithmetic`,
       run: () => {
@@ -312,7 +381,9 @@ function buildCommands(): Command[] {
   for (const mask of swizzleMasks) {
     cmds.push({
       id: `add-swizzle-${mask}`,
-      category: "Node",
+      kind: "node",
+      glyph: GLYPH.swizzle,
+      iconCategory: "value",
       label: `Add Swizzle: .${mask}`,
       keywords: `add node swizzle vec decompose ${mask} utility`,
       run: () => {
@@ -327,7 +398,9 @@ function buildCommands(): Command[] {
   for (const arity of combineArities) {
     cmds.push({
       id: `add-combine-${arity}`,
-      category: "Node",
+      kind: "node",
+      glyph: GLYPH.combine,
+      iconCategory: "value",
       label: `Add Combine: Float×${arity} → vec${arity}`,
       keywords: `add node combine vec ${arity} compose utility`,
       run: () => {
@@ -344,7 +417,9 @@ function buildCommands(): Command[] {
   cmds.push(
     {
       id: "add-group",
-      category: "Node",
+      kind: "node",
+      glyph: GLYPH.group,
+      iconCategory: "container",
       label: "Add Group (empty container)",
       keywords: "add node group container box section comment",
       run: () => {
@@ -356,9 +431,12 @@ function buildCommands(): Command[] {
     },
     {
       id: "group-selected",
-      category: "Graph",
-      label: "Group selected nodes (Cmd/Ctrl+G)",
-      keywords: "group wrap selection nodes container box",
+      kind: "command",
+      glyph: GLYPH.group,
+      label: "Group selected nodes",
+      sub: "wrap 2+ selected nodes in a container",
+      keys: ["⌘G"],
+      keywords: "group wrap selection nodes container box cmd ctrl g",
       run: () => {
         const sel = useSelectionStore.getState().selectedNodeIds;
         if (sel.length < 2) return;
@@ -368,49 +446,92 @@ function buildCommands(): Command[] {
     },
     {
       id: "preset-sphere",
-      category: "Preset",
+      kind: "preset",
+      glyph: GLYPH.image,
       label: "Load preset: Sphere",
+      sub: "3 nodes · sphere + unlit shader",
       keywords: "preset demo sphere",
       run: () => setGraph(createDemoGraph(), DEMO_LAYOUT),
     },
     {
       id: "preset-torus",
-      category: "Preset",
+      kind: "preset",
+      glyph: GLYPH.image,
       label: "Load preset: Torus UV",
+      sub: "3 nodes · torus + UV debug",
       keywords: "preset demo torus uv",
       run: () => setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT),
     },
     {
       id: "preset-chain",
-      category: "Preset",
+      kind: "preset",
+      glyph: GLYPH.image,
       label: "Load preset: Chain (noise → blur → tonemap)",
+      sub: "4 nodes · noise → blur → tonemap",
       keywords: "preset demo chain noise blur tonemap",
       run: () => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT),
     },
     {
       id: "preset-split",
-      category: "Preset",
+      kind: "preset",
+      glyph: GLYPH.image,
       label: "Load preset: Split viewport (3 outputs)",
+      sub: "6 nodes · 3-way split viewport",
       keywords: "preset demo split viewport multi output",
       run: () => setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT),
     },
     {
       id: "preset-particle",
-      category: "Preset",
+      kind: "preset",
+      glyph: GLYPH.image,
       label: "Load preset: Particle compute (Transform Feedback)",
+      sub: "3 nodes · 1024-point compute sim",
       keywords: "preset demo particle compute transform feedback simulation",
       run: () => setGraph(createParticleDemoGraph(), PARTICLE_DEMO_LAYOUT),
     },
     {
       id: "graph-clear",
-      category: "Graph",
+      kind: "command",
+      glyph: GLYPH.clearGraph,
       label: "Clear graph",
+      sub: "remove all nodes",
       keywords: "clear empty reset",
       run: () => reset(),
     },
   );
 
   return cmds;
+}
+
+/** node kind 커맨드의 아이콘 박스 색 계열 → CSS 클래스 접미사. */
+function iconVariant(cmd: Command): string {
+  if (cmd.kind === "preset") return "preset";
+  if (cmd.kind === "command") return "command";
+  return cmd.iconCategory ?? "container";
+}
+
+const TAG_LABEL: Record<CommandKind, string> = {
+  node: "NODE",
+  command: "CMD",
+  preset: "PRESET",
+};
+
+/**
+ * fuzzySegments()의 결과에 React key를 붙인다. 세그먼트는 label을 처음부터
+ * 끝까지 빈틈없이 나눈 것이므로, 지금까지 소비한 글자 수(누적 offset)가
+ * 라벨 안에서의 위치를 나타내는 안정적인 키가 된다 — 루프 인덱스 자체를
+ * key로 쓰는 것과 달리 세그먼트의 내용(길이)에서 유도된 값이다.
+ */
+function keyedSegments(
+  label: string,
+  term: string,
+): Array<FuzzySegment & { key: number }> {
+  let offset = 0;
+  return fuzzySegments(label, term).map((seg) => {
+    const key = offset;
+    offset += seg.text.length;
+    return { ...seg, key };
+  });
 }
 
 export function CommandPalette() {
@@ -445,10 +566,21 @@ export function CommandPalette() {
   }, [open]);
 
   const commands = useMemo(() => buildCommands(), []);
-  const ranked = useMemo(
-    () => rankCommands(commands, query),
-    [commands, query],
+  const { mode, term } = parseMode(query);
+  const pool = useMemo(
+    () => (mode === "all" ? commands : commands.filter((c) => c.kind === mode)),
+    [commands, mode],
   );
+  const ranked = useMemo(() => rankCommands(pool, term), [pool, term]);
+  const groups = useMemo(() => groupCommands(ranked), [ranked]);
+  const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
+  let flatIndex = 0;
+  const renderGroups = groups.map((g) => ({
+    title: g.title,
+    count: g.items.length,
+    rows: g.items.map((cmd) => ({ cmd, index: flatIndex++ })),
+  }));
+  const displayTerm = query.replace(/^[@>/]/, "");
 
   if (!open) return null;
 
@@ -456,6 +588,8 @@ export function CommandPalette() {
     cmd.run();
     setOpen(false);
   };
+
+  const resultCount = `${flat.length} ${flat.length === 1 ? "result" : "results"}`;
 
   return (
     <div
@@ -467,53 +601,152 @@ export function CommandPalette() {
       aria-modal="true"
       data-testid="command-palette"
     >
-      <div className="cmdk-modal">
-        <input
-          ref={inputRef}
-          className="cmdk-input"
-          placeholder="Search nodes, presets, commands…"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setActive(0);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown") {
-              e.preventDefault();
-              setActive((a) => nextActive(a, ranked.length));
-            } else if (e.key === "ArrowUp") {
-              e.preventDefault();
-              setActive(prevActive);
-            } else if (e.key === "Enter") {
-              e.preventDefault();
-              const cmd = ranked[active];
-              if (cmd) run(cmd);
-            }
-          }}
-        />
-        <div className="cmdk-list">
-          {ranked.length === 0 && <div className="cmdk-empty">No matches</div>}
-          {ranked.map((cmd, i) => (
-            <button
-              type="button"
-              key={cmd.id}
-              tabIndex={-1}
-              className={
-                i === active ? "cmdk-row cmdk-row--active" : "cmdk-row"
+      <div
+        className="cmdk-modal"
+        style={{
+          boxShadow: `var(--shadow-modal), 0 0 40px ${withAlpha(tokens.accent.default, 0.08)}`,
+        }}
+      >
+        <div className="cmdk-search">
+          <span className="cmdk-search-icon">⌕</span>
+          {mode !== "all" && (
+            <span className={`cmdk-mode-chip cmdk-mode-chip--${mode}`}>
+              {mode === "node"
+                ? "@ nodes"
+                : mode === "command"
+                  ? "> commands"
+                  : "/ presets"}
+            </span>
+          )}
+          <input
+            ref={inputRef}
+            className="cmdk-input"
+            placeholder="Search nodes, commands, presets…"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActive(0);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setActive((a) => nextActive(a, flat.length));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setActive(prevActive);
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                const cmd = flat[active];
+                if (cmd) run(cmd);
+              } else if (e.key === "Tab") {
+                e.preventDefault();
+                setQuery(cycleModePrefix(query));
+                setActive(0);
               }
-              onMouseEnter={() => setActive(i)}
-              onClick={() => run(cmd)}
-            >
-              <span className="cmdk-cat">{cmd.category}</span>
-              <span className="cmdk-label">{cmd.label}</span>
-            </button>
-          ))}
+            }}
+          />
+          <span className="cmdk-esc-chip">esc</span>
         </div>
+
+        <div className="cmdk-results">
+          {flat.length === 0 ? (
+            <div className="cmdk-empty">
+              <div className="cmdk-empty-icon">⌕</div>
+              <div className="cmdk-empty-text">
+                No matches for “<strong>{displayTerm}</strong>”
+              </div>
+            </div>
+          ) : (
+            renderGroups.map((g) => (
+              <div key={g.title}>
+                <div className="cmdk-group-header">
+                  <span className="cmdk-group-title">{g.title}</span>
+                  <span className="cmdk-group-count">{g.count}</span>
+                </div>
+                {g.rows.map(({ cmd, index }) => (
+                  <button
+                    type="button"
+                    key={cmd.id}
+                    tabIndex={-1}
+                    className={
+                      index === active
+                        ? "cmdk-row cmdk-row--active"
+                        : "cmdk-row"
+                    }
+                    onMouseEnter={() => setActive(index)}
+                    onClick={() => run(cmd)}
+                  >
+                    <span
+                      className={`cmdk-icon cmdk-icon--${iconVariant(cmd)}`}
+                    >
+                      {cmd.glyph}
+                    </span>
+                    <span className="cmdk-main">
+                      <span className="cmdk-label">
+                        {keyedSegments(cmd.label, term).map((seg) => (
+                          <span
+                            key={seg.key}
+                            className={seg.hit ? "cmdk-seg--hit" : undefined}
+                          >
+                            {seg.text}
+                          </span>
+                        ))}
+                      </span>
+                      {cmd.sub && <span className="cmdk-sub">{cmd.sub}</span>}
+                    </span>
+                    <span
+                      className={`cmdk-tag${cmd.kind === "preset" ? " cmdk-tag--preset" : ""}`}
+                    >
+                      {TAG_LABEL[cmd.kind]}
+                    </span>
+                    <span className="cmdk-trailing">
+                      {index === active && (
+                        <span className="cmdk-enter-glyph">↵</span>
+                      )}
+                      {cmd.keys?.map((k) => (
+                        <span key={k} className="cmdk-key-chip">
+                          {k}
+                        </span>
+                      ))}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+
         <div className="cmdk-hint">
-          <span>↑↓ navigate</span>
-          <span>↵ run</span>
-          <span>Esc close</span>
+          <span className="cmdk-hint-item">
+            <span className="cmdk-hint-key">↑↓</span>navigate
+          </span>
+          <span className="cmdk-hint-item">
+            <span className="cmdk-hint-key">↵</span>select
+          </span>
+          <span className="cmdk-hint-item">
+            <span className="cmdk-hint-key">tab</span>next mode
+          </span>
+          <span className="cmdk-hint-spacer" />
+          <span>{resultCount}</span>
         </div>
+      </div>
+
+      <div className="cmdk-legend">
+        <span>Type to fuzzy-search, or prefix:</span>
+        <span className="cmdk-legend-item">
+          <span className="cmdk-legend-chip cmdk-legend-chip--node">@</span>
+          nodes
+        </span>
+        <span className="cmdk-legend-item">
+          <span className="cmdk-legend-chip cmdk-legend-chip--command">
+            &gt;
+          </span>
+          commands
+        </span>
+        <span className="cmdk-legend-item">
+          <span className="cmdk-legend-chip cmdk-legend-chip--preset">/</span>
+          presets
+        </span>
       </div>
     </div>
   );

@@ -774,93 +774,326 @@ textarea {
   flex-shrink: 0;
 }
 
-/* ── Command Palette ────────────────────────────────────────────── */
+/* ── Command Palette (design/Command Palette.dc.html) ─────────────
+ * Shared with HelpModal.tsx (.cmdk-overlay / .cmdk-modal / .cmdk-hint) —
+ * HelpModal supplies its own .help-modal width/box override, everything
+ * else here (scrim, modal chrome, footer) is intentionally generic so both
+ * dialogs pick it up. */
 .cmdk-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: color-mix(in srgb, var(--surface-app-darker) 62%, transparent);
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 12vh;
+  flex-direction: column;
+  align-items: center;
   z-index: 9999;
 }
 .cmdk-modal {
-  width: 560px;
+  width: 624px;
   max-width: 92vw;
+  margin-top: 104px;
   background: var(--surface-panel);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--border-stronger);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-modal);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-.cmdk-input {
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 15px;
-  padding: 12px 14px;
-  outline: none;
+.cmdk-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 18px;
   border-bottom: 1px solid var(--border-default);
 }
-.cmdk-list {
-  max-height: 50vh;
+.cmdk-search-icon {
+  flex-shrink: 0;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.cmdk-mode-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-chip);
+  padding: 3px 8px;
+}
+.cmdk-mode-chip--node {
+  color: var(--port-scalar);
+  background: color-mix(in srgb, var(--port-scalar) 10%, transparent);
+  border-color: color-mix(in srgb, var(--port-scalar) 35%, transparent);
+}
+.cmdk-mode-chip--command {
+  color: var(--accent-default);
+  background: color-mix(in srgb, var(--accent-default) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-default) 35%, transparent);
+}
+.cmdk-mode-chip--preset {
+  color: var(--port-vector);
+  background: color-mix(in srgb, var(--port-vector) 10%, transparent);
+  border-color: color-mix(in srgb, var(--port-vector) 35%, transparent);
+}
+.cmdk-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  caret-color: var(--accent-default);
+  padding: 2px 0;
+}
+.cmdk-input::placeholder {
+  color: var(--text-muted);
+}
+.cmdk-esc-chip {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-app);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-icon-box);
+  padding: 2px 7px;
+}
+.cmdk-results {
+  max-height: 436px;
   overflow-y: auto;
+  padding: 6px;
+}
+.cmdk-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 5px;
+}
+.cmdk-group-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cmdk-group-count {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-disabled);
 }
 .cmdk-row {
   display: flex;
   width: 100%;
   align-items: center;
   gap: 12px;
-  padding: 8px 14px;
+  padding: 9px 11px;
   background: transparent;
   border: none;
+  border-radius: var(--radius-overlay);
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  font-size: 13px;
 }
 .cmdk-row--active {
-  background: var(--accent-muted);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-default) 13%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--accent-default) 40%, transparent);
 }
-.cmdk-cat {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-  background: var(--surface-input);
-  padding: 2px 6px;
-  border-radius: 3px;
-  min-width: 60px;
-  text-align: center;
+.cmdk-icon {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
-.cmdk-row--active .cmdk-cat {
-  color: var(--text-primary);
+.cmdk-icon--source {
+  background: color-mix(in srgb, var(--node-cat-source) 16%, transparent);
+  border-color: var(--node-cat-source);
+  color: var(--node-cat-source);
+}
+.cmdk-icon--process {
+  background: color-mix(in srgb, var(--node-cat-process) 16%, transparent);
+  border-color: var(--node-cat-process);
+  color: var(--node-cat-process);
+}
+.cmdk-icon--output {
+  background: color-mix(in srgb, var(--node-cat-output) 16%, transparent);
+  border-color: var(--node-cat-output);
+  color: var(--node-cat-output);
+}
+.cmdk-icon--value {
+  background: color-mix(in srgb, var(--node-cat-value) 16%, transparent);
+  border-color: var(--node-cat-value);
+  color: var(--node-cat-value);
+}
+.cmdk-icon--container {
+  background: color-mix(in srgb, var(--node-cat-container) 16%, transparent);
+  border-color: var(--node-cat-container);
+  color: var(--node-cat-container);
+}
+.cmdk-icon--command {
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+.cmdk-icon--preset {
+  background: color-mix(in srgb, var(--port-vector) 14%, transparent);
+  border-color: color-mix(in srgb, var(--port-vector) 40%, transparent);
+  color: var(--port-vector);
+}
+.cmdk-main {
+  flex: 1;
+  min-width: 0;
 }
 .cmdk-label {
-  flex: 1;
-  color: var(--text-bright-body);
-}
-.cmdk-row--active .cmdk-label {
+  display: block;
+  font-size: 13.5px;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmdk-seg--hit {
+  color: var(--accent-hover);
+  font-weight: 700;
+}
+.cmdk-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmdk-tag {
+  flex-shrink: 0;
+  min-width: 52px;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-icon-box);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--surface-card);
+}
+.cmdk-tag--preset {
+  color: var(--port-vector);
+  background: color-mix(in srgb, var(--port-vector) 10%, transparent);
+}
+.cmdk-trailing {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 56px;
+}
+.cmdk-enter-glyph {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-hover);
+}
+.cmdk-key-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--surface-rail);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-icon-box);
+  padding: 1px 6px;
 }
 .cmdk-empty {
-  padding: 18px;
-  color: var(--text-muted);
-  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 34px 20px 30px;
   text-align: center;
+}
+.cmdk-empty-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-node-card);
+  color: var(--text-disabled);
+  font-size: 18px;
+}
+.cmdk-empty-text {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+.cmdk-empty-text strong {
+  color: var(--text-primary);
+  font-weight: 400;
 }
 .cmdk-hint {
   display: flex;
-  gap: 14px;
-  padding: 6px 14px;
+  align-items: center;
+  gap: 16px;
+  padding: 9px 16px;
   border-top: 1px solid var(--border-default);
+  background: var(--surface-docking-header);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.cmdk-hint-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.cmdk-hint-key {
+  color: var(--text-secondary);
+}
+.cmdk-hint-spacer {
+  flex: 1;
+}
+.cmdk-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
   color: var(--text-muted);
   font-size: 11px;
+}
+.cmdk-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cmdk-legend-chip {
+  font-family: var(--font-mono);
+  background: var(--surface-rail);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-icon-box);
+  padding: 1px 6px;
+}
+.cmdk-legend-chip--node {
+  color: var(--port-scalar);
+}
+.cmdk-legend-chip--command {
+  color: var(--accent-default);
+}
+.cmdk-legend-chip--preset {
+  color: var(--port-vector);
 }
 
 /* ── Status bar (App Shell.dc.html L401-410, M1-U4) ──────────────── */
@@ -1286,4 +1519,1100 @@ textarea {
   .vp-empty-hint {
     padding: 3px 12px;
   }
+}
+
+/* ── Welcome overlay (Welcome.dc.html L87-145, M6-U2) ──────────────
+   NodeEditor mounts this only while the graph is empty (0 nodes), as a
+   ReactFlow sibling inside .panel-body (already position:relative) — same
+   slot as the selection-count-badge. No spBreathe-style looping animation on
+   the brand halo (design uses one) — CLAUDE.md's "상시 애니메이션 금지" policy
+   replaces it with a static glow.
+
+   pointer-events:auto on the root (not :none — see verifier note below): at
+   the reference 1440×900 / code-dock-open layout the panel is only ~555px
+   tall against .welcome-content's ~932px, so the overlay's own overflow:auto
+   is load-bearing — mouse wheel has to actually scroll *this* element, not
+   fall through to ReactFlow's pane underneath and get consumed as a zoom
+   gesture. The one thing that costs is passthrough canvas-pan/drag-select
+   over the overlay's empty margins, which is moot: the graph is empty (0
+   nodes) whenever this is mounted, so there is nothing behind it to pan
+   toward. File-drop is unaffected either way — .panel--graph's onDrop sits
+   on a shared ancestor of both this overlay and the ReactFlow pane, so the
+   dragover/drop bubbles to it regardless of which one hit-tests first.
+
+   .welcome-content uses `margin: auto` instead of the parent centering via
+   align-items/justify-content — the classic overflow-safe centering swap.
+   align-items:center still centers a smaller-than-container box, but once
+   the box overflows (as above) it clips the "before" half unreachably (a
+   flex/overflow browser quirk: centered overflow can only be scrolled into
+   on the "after" side). `margin: auto` centers the same way when it fits,
+   and collapses to 0 on overflow so scrolling from 0 reaches every pixel of
+   content in both directions. */
+.welcome-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  display: flex;
+  pointer-events: auto;
+  z-index: 10;
+}
+.welcome-glow {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent-default) 10%, transparent),
+    transparent 68%
+  );
+}
+.welcome-content {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  margin: auto;
+  padding: 44px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.welcome-brand-wrap {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  margin-bottom: 22px;
+  flex-shrink: 0;
+}
+.welcome-brand-halo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent-default) 28%, transparent),
+    transparent 70%
+  );
+}
+.welcome-brand-mark {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  border-radius: 21px;
+  background: linear-gradient(
+    155deg,
+    var(--accent-default),
+    var(--accent-active)
+  );
+}
+.welcome-brand-square {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  width: 39px;
+  height: 39px;
+  border-radius: 12px;
+}
+.welcome-brand-dot {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface-app);
+}
+.welcome-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--accent-default);
+  margin-bottom: 12px;
+}
+.welcome-title {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  line-height: 1.25;
+  text-align: center;
+  margin: 0 0 10px;
+  max-width: 520px;
+  color: var(--text-primary);
+}
+.welcome-lead {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0 0 30px;
+  max-width: 440px;
+}
+.welcome-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+}
+.welcome-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card-lg);
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  transition:
+    border-color var(--motion-duration-max) var(--motion-easing),
+    transform var(--motion-duration-max) var(--motion-easing);
+}
+.welcome-card:hover {
+  border-color: var(--border-stronger);
+  transform: translateY(-1px);
+}
+.welcome-card--selected {
+  background: color-mix(
+    in srgb,
+    var(--accent-default) 6%,
+    var(--surface-panel)
+  );
+  border-color: var(--accent-default);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent-default) 45%, transparent),
+    0 8px 24px color-mix(in srgb, var(--accent-default) 14%, transparent);
+}
+.welcome-card-thumb {
+  height: 96px;
+  position: relative;
+  border-bottom: 1px solid var(--surface-app);
+  overflow: hidden;
+}
+.welcome-card-thumb--sphere {
+  background: radial-gradient(
+    circle at 32% 30%,
+    var(--accent-hover) 0%,
+    var(--accent-active) 45%,
+    color-mix(in srgb, var(--accent-active) 30%, transparent) 100%
+  );
+}
+.welcome-card-thumb--torus {
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--node-cat-value) 95%, transparent) 0%,
+    color-mix(in srgb, var(--node-cat-value) 45%, transparent) 45%,
+    var(--surface-app) 100%
+  );
+}
+.welcome-card-thumb--chain {
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--port-resource) 85%, transparent) 0%,
+    var(--surface-app) 100%
+  );
+}
+.welcome-card-thumb--particle {
+  background:
+    radial-gradient(1.4px 1.4px at 20% 30%, var(--port-vector) 99%, transparent),
+    radial-gradient(1.6px 1.6px at 62% 24%, var(--port-scalar) 99%, transparent),
+    radial-gradient(1.2px 1.2px at 78% 62%, var(--port-matrix) 99%, transparent),
+    radial-gradient(
+      1.8px 1.8px at 40% 70%,
+      var(--port-resource) 99%,
+      transparent
+    ),
+    radial-gradient(1.3px 1.3px at 30% 52%, var(--port-vector) 99%, transparent),
+    radial-gradient(1.5px 1.5px at 86% 38%, var(--port-scalar) 99%, transparent),
+    radial-gradient(
+      1.2px 1.2px at 54% 82%,
+      var(--port-resource) 99%,
+      transparent
+    ),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--accent-active) 30%, transparent),
+      var(--surface-app)
+    );
+}
+.welcome-card-chip {
+  position: absolute;
+  left: 10px;
+  top: 9px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  border-radius: var(--radius-icon-box);
+  padding: 2px 6px;
+}
+.welcome-card-check {
+  position: absolute;
+  right: 10px;
+  top: 9px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-default);
+  color: var(--text-primary);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px
+    color-mix(in srgb, var(--accent-default) 50%, transparent);
+}
+.welcome-card-body {
+  padding: 12px 14px 14px;
+}
+.welcome-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+.welcome-card-desc {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.welcome-card-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.welcome-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  background: var(--surface-node-card-solid);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-icon-box);
+  padding: 2px 7px;
+}
+.welcome-card-tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.welcome-card-tag-dot--source {
+  background: var(--node-cat-source);
+}
+.welcome-card-tag-dot--process {
+  background: var(--node-cat-process);
+}
+.welcome-card-tag-dot--output {
+  background: var(--node-cat-output);
+}
+.welcome-card-tag-dot--value {
+  background: var(--node-cat-value);
+}
+.welcome-card-tag-dot--container {
+  background: var(--node-cat-container);
+}
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 26px;
+}
+.welcome-create {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 40px;
+  padding: 0 20px;
+  background: var(--accent-default);
+  border: none;
+  border-radius: var(--radius-overlay);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.welcome-create:hover {
+  background: var(--accent-hover);
+}
+.welcome-create-kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border-radius: var(--radius-icon-box);
+  padding: 2px 6px;
+}
+.welcome-blank {
+  height: 40px;
+  padding: 0 16px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-overlay);
+  color: var(--text-bright-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.welcome-blank:hover {
+  background: var(--surface-card);
+  border-color: var(--border-stronger);
+}
+.welcome-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 22px;
+  font-size: 12px;
+}
+.welcome-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.welcome-link:hover {
+  color: var(--text-primary);
+}
+.welcome-link-icon {
+  font-size: 13px;
+}
+.welcome-link-dot {
+  color: var(--border-strong);
+}
+
+/* ── Export & Share dialog (design/Export & Share.dc.html, M6-U3) ──
+ * Its own overlay/modal (not .cmdk-overlay/.cmdk-modal) — different size
+ * (880×600 vs 624px-wide command palette) and a lower z-index so the
+ * command palette always wins if both were somehow open at once. */
+.es-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--surface-app-darker) 62%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9500;
+}
+@keyframes es-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.es-modal {
+  width: 880px;
+  max-width: 92vw;
+  height: 600px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  animation: es-dialog-in 0.18s var(--motion-easing);
+}
+.es-header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  height: 60px;
+  flex-shrink: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-docking-header);
+}
+.es-header-icon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  background: color-mix(in srgb, var(--accent-default) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-default) 35%, transparent);
+  color: var(--accent-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+.es-header-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+.es-header-subtitle {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.es-header-spacer {
+  flex: 1;
+}
+.es-close {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+.es-close:hover {
+  background: var(--surface-input);
+  color: var(--text-primary);
+}
+.es-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.es-rail {
+  width: 236px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-rail);
+  overflow-y: auto;
+  padding: 16px 12px;
+}
+.es-rail-group {
+  margin-bottom: 18px;
+}
+.es-rail-group-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 8px;
+  margin-bottom: 8px;
+}
+.es-rail-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.es-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: var(--radius-overlay);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-bright-body);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.es-rail-item--active {
+  background: color-mix(in srgb, var(--accent-default) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent-default) 32%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.es-rail-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+.es-rail-icon--gif {
+  background: color-mix(in srgb, var(--warning) 13%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  color: var(--warning);
+}
+.es-rail-icon--webm {
+  background: color-mix(in srgb, var(--port-resource) 13%, transparent);
+  border-color: color-mix(in srgb, var(--port-resource) 35%, transparent);
+  color: var(--port-resource);
+}
+.es-rail-icon--html {
+  background: color-mix(in srgb, var(--accent-default) 13%, transparent);
+  border-color: color-mix(in srgb, var(--accent-default) 35%, transparent);
+  color: var(--accent-default);
+}
+.es-rail-icon--link {
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  color: var(--success);
+}
+.es-rail-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.es-rail-name {
+  font-size: 12.5px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.es-rail-meta {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.es-rail-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-default);
+  box-shadow: 0 0 6px var(--accent-default);
+}
+.es-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-y: auto;
+}
+.es-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px;
+}
+.es-panel--center {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.es-panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.es-panel-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 18px;
+  max-width: 480px;
+}
+.es-file-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-node-card);
+  background: var(--surface-card);
+}
+.es-file-tile {
+  width: 46px;
+  height: 56px;
+  flex-shrink: 0;
+  /* No tokens.radius entry matches 8 (button/input=7, overlay=9 are the
+   * neighbors) — literal value, same policy as controls.css's
+   * .ctl-segmented border-radius. */
+  border-radius: 8px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--accent-hover);
+}
+.es-file-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.es-file-card-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.es-info-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-node-card);
+  background: var(--surface-card);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.es-info-chip {
+  display: inline-block;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-hover);
+  background: var(--surface-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  padding: 4px 8px;
+}
+.es-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-docking-header);
+}
+.es-footer-hint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.es-footer-spacer {
+  flex: 1;
+}
+.es-btn-cancel {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-overlay);
+  border: 1px solid var(--border-stronger);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.es-btn-cancel:hover {
+  background: var(--surface-card);
+  color: var(--text-primary);
+}
+.es-btn-secondary {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: var(--radius-overlay);
+  border: 1px solid var(--border-stronger);
+  background: var(--surface-input);
+  color: var(--text-bright-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.es-btn-secondary:hover {
+  background: var(--surface-hover);
+}
+.es-btn-primary {
+  height: 36px;
+  padding: 0 20px;
+  border-radius: var(--radius-overlay);
+  border: none;
+  background: var(--accent-default);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  /* design/Export & Share.dc.html L284/L295 — inset highlight is a plain
+   * white channel with no brand/semantic token (same policy as
+   * controls.css's .ctl-slider-input thumb shadow: literal rgba() for
+   * non-token structural highlights, not a "raw brand hex"). */
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset;
+}
+.es-btn-primary:hover {
+  background: var(--accent-hover);
+}
+.es-done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 22px 30px;
+  text-align: center;
+  animation: es-dialog-in 0.2s var(--motion-easing);
+}
+.es-done-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.es-done-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  margin-bottom: 8px;
+}
+.es-done-msg {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 360px;
+  margin-bottom: 22px;
+}
+.es-done-url-row {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.es-done-url {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  background: var(--surface-app);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-overlay);
+  padding: 0 12px;
+  height: 40px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-hover);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.es-copy-btn {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-overlay);
+  border: 1px solid var(--accent-default);
+  background: var(--accent-default);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.es-copy-btn--copied {
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  color: var(--success);
+}
+.es-done-file-card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-node-card);
+  background: var(--surface-card);
+  margin-bottom: 16px;
+  text-align: left;
+}
+.es-done-file-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-overlay);
+  background: color-mix(in srgb, var(--accent-default) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-default) 35%, transparent);
+  color: var(--accent-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+}
+.es-done-file-main {
+  flex: 1;
+  min-width: 0;
+}
+.es-done-file-name {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.es-done-file-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.es-done-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ── Export & Share · Record configure/recording/encoding (GIF/WebM, M6-U4)
+ * design/Export & Share.dc.html L100-144 (configure), L214-234 (recording),
+ * L238-251 (encoding). Segmented/slider/toggle controls are ui/controls —
+ * only the layout scaffolding + est chip/progress bar/ring/REC chip below
+ * are new. */
+.es-rec-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.es-rec-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.es-rec-codec {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.es-rec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+}
+.es-rec-field--wide {
+  grid-column: 1 / -1;
+}
+.es-rec-field-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  margin-bottom: 7px;
+}
+.es-rec-duration-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.es-rec-duration-row .es-rec-field-label {
+  margin-bottom: 0;
+}
+.es-rec-duration-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+}
+.es-rec-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.es-rec-toggle-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-bright-body);
+}
+.es-rec-est-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.es-rec-est-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.es-rec-est-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--surface-app-darker) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border-radius: var(--radius-chip);
+  padding: 3px 8px;
+}
+.es-rec-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 18px;
+  max-width: 480px;
+}
+
+/* Recording (L214-234) */
+@keyframes es-rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.es-rec-live-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.es-rec-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--error);
+  box-shadow: 0 0 8px var(--error);
+  animation: es-rec-pulse 1s infinite;
+}
+.es-rec-live-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.es-rec-counter {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.es-rec-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  border-radius: var(--radius-node-card);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
+  background: radial-gradient(
+    circle at 50% 42%,
+    var(--surface-card),
+    var(--surface-app) 80%
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--error) 25%, transparent),
+    0 0 24px color-mix(in srgb, var(--error) 15%, transparent);
+  margin-bottom: 20px;
+}
+.es-rec-preview-badge {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--error) 85%, transparent);
+  border-radius: var(--radius-chip);
+  padding: 3px 9px;
+}
+.es-rec-preview-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  animation: es-rec-pulse 1s infinite;
+}
+.es-rec-elapsed-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.es-rec-elapsed {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.es-rec-elapsed-total {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.es-rec-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-input);
+  overflow: hidden;
+}
+.es-rec-progress-fill {
+  height: 100%;
+  background: var(--error);
+  border-radius: 3px;
+  transition: width 0.06s linear;
+}
+
+/* Encoding (L238-251, GIF only) */
+.es-enc-ring {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 24px;
+}
+.es-enc-ring svg {
+  width: 96px;
+  height: 96px;
+  transform: rotate(-90deg);
+}
+.es-enc-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.es-enc-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.es-enc-sub {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* Done · record file card tints (extends .es-done-file-icon from M6-U3) */
+.es-done-file-icon--gif {
+  background: color-mix(in srgb, var(--warning) 13%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  color: var(--warning);
+}
+.es-done-file-icon--webm {
+  background: color-mix(in srgb, var(--port-resource) 13%, transparent);
+  border-color: color-mix(in srgb, var(--port-resource) 35%, transparent);
+  color: var(--port-resource);
 }

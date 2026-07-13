@@ -127,6 +127,11 @@ export const tokens = {
     // 뷰포트 빈 상태 중앙 아이콘 박스(64×64) — Viewport.dc.html L52:
     // border-radius 16.
     emptyStateIcon: 16,
+    // Welcome 화면 스타터 카드 — Welcome.dc.html L107: border-radius 12.
+    cardLg: 12,
+    // Export & Share 모달 바깥 테두리 — design/Export & Share.dc.html L60:
+    // border-radius 16 (Command Palette는 기존 radius.panel=14를 그대로 씀).
+    modal: 16,
   },
 
   // ── Shadow ──────────────────────────────────────────────────────────
@@ -147,6 +152,10 @@ export const tokens = {
     // 뷰포트 하단 플로팅 트랜스포트 바 — design/Viewport.dc.html L107:
     // box-shadow: 0 10px 30px rgba(0,0,0,0.55).
     overlayBar: "0 10px 30px rgba(0,0,0,0.55)",
+    // 모달(Command Palette / Export & Share) 공용 베이스 그림자. 각 화면은
+    // 여기에 자기만의 글로우(예: accent alpha)를 덧붙인다 — design/Command
+    // Palette.dc.html L78 · design/Export & Share.dc.html L60.
+    modal: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.4)",
   },
 
   // ── Motion ──────────────────────────────────────────────────────────

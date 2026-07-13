@@ -29,6 +29,7 @@ import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
 import { nextId } from "../../utils/id";
 import { DockPanelHeader } from "../DockPanelHeader";
+import { WelcomeOverlay } from "../WelcomeOverlay";
 import { ConnectionLine } from "./ConnectionLine";
 import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
 import { HelpModal } from "./HelpModal";
@@ -447,6 +448,7 @@ export function NodeEditor() {
           />
           <ZoomControls />
         </ReactFlow>
+        {graphNodes.length === 0 && <WelcomeOverlay />}
         {selectedNodeIds.length > 1 && (
           <div
             data-testid="selection-count-badge"

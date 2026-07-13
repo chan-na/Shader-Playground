@@ -6,6 +6,7 @@ import { BootstrapGate } from "./ui/BootstrapGate";
 import { CodeEditor } from "./ui/CodeEditor";
 import { CommandPalette } from "./ui/CommandPalette";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
+import { ExportShareDialog } from "./ui/ExportShare/ExportShareDialog";
 import { KeyboardShortcuts } from "./ui/KeyboardShortcuts";
 import { NodeEditor } from "./ui/NodeEditor";
 import { DiagnosticsPanel } from "./ui/Panels/DiagnosticsPanel";
@@ -184,6 +185,7 @@ export function App() {
         <StatusBar />
       </div>
       <CommandPalette />
+      <ExportShareDialog />
       <KeyboardShortcuts />
       <BootstrapGate />
       <Toasts />

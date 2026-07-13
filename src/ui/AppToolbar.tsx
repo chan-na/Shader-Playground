@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { GraphNode, ParamKind } from "../core/graph/types";
 import { MAX_OUTPUTS } from "../core/graph/validate";
-import { downloadExportedHtml } from "../export/htmlExport";
 import basicVert from "../shaders/basic.vert?raw";
 import blendFrag from "../shaders/templates/blend.frag?raw";
 import unlitFrag from "../shaders/templates/unlit.frag?raw";
@@ -17,12 +16,12 @@ import {
   SPLIT_DEMO_LAYOUT,
   TORUS_DEMO_LAYOUT,
 } from "../state/demoGraph";
+import { useExportShareStore } from "../state/exportShareStore";
 import { useGifRecorderStore } from "../state/gifRecorder";
 import { redoGraph, undoGraph, useGraphStore } from "../state/graphStore";
 import { useHistoryStore } from "../state/historyStore";
 import { useRecorderStore } from "../state/recorder";
 import { deserializeProject, serializeProject } from "../state/serialization";
-import { encodeShareUrl } from "../state/shareUrl";
 import { toast } from "../state/toastStore";
 import { tokens, withAlpha } from "../theme";
 import { nextId } from "../utils/id";
@@ -206,25 +205,6 @@ export function AppToolbar() {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }, "image/png");
-  };
-
-  const shareUrl = async () => {
-    const s = useGraphStore.getState();
-    const url = await encodeShareUrl(
-      { nodes: s.nodes, edges: s.edges },
-      s.positions,
-    );
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success(`Share URL 복사됨 · ${url.length} chars`);
-    } catch {
-      window.prompt("Copy this share URL:", url);
-    }
-  };
-
-  const exportHtml = () => {
-    const s = useGraphStore.getState();
-    downloadExportedHtml({ nodes: s.nodes, edges: s.edges }, s.positions);
   };
 
   const recorderStatus = useRecorderStore((r) => r.status);
@@ -744,18 +724,18 @@ export function AppToolbar() {
       <button
         type="button"
         className="tb-btn"
-        onClick={shareUrl}
-        title="Copy a shareable URL to clipboard"
-        aria-label="Copy shareable URL to clipboard"
+        onClick={() => useExportShareStore.getState().openWith("link")}
+        title="Open export & share dialog (share link)"
+        aria-label="Open export & share dialog (share link)"
       >
         Share
       </button>
       <button
         type="button"
         className="tb-btn tb-btn--primary"
-        onClick={exportHtml}
-        title="Download a self-contained HTML file"
-        aria-label="Download as self-contained HTML"
+        onClick={() => useExportShareStore.getState().openWith("html")}
+        title="Open export & share dialog (standalone HTML)"
+        aria-label="Open export & share dialog (standalone HTML)"
       >
         Export HTML
       </button>

@@ -14,14 +14,14 @@
 export const tokens = {
   // ── Surface (elevation, 어두운 → 밝은) ──────────────────────────────
   surface: {
-    appDarker: "#08090b",      // 앱 최외곽 배경
-    app: "#0b0c0e",            // 캔버스 / 뷰포트 바탕
-    panel: "#131519",          // 패널 본체
-    card: "#1a1d22",           // 카드 · 버튼 기본
-    input: "#22262c",          // 입력 필드
-    hover: "#2a2f36",          // 호버
-    dockingHeader: "#101216",  // 도킹 패널 헤더
-    rail: "#0f1114",           // 좌측 레일
+    appDarker: "#08090b", // 앱 최외곽 배경
+    app: "#0b0c0e", // 캔버스 / 뷰포트 바탕
+    panel: "#131519", // 패널 본체
+    card: "#1a1d22", // 카드 · 버튼 기본
+    input: "#22262c", // 입력 필드
+    hover: "#2a2f36", // 호버
+    dockingHeader: "#101216", // 도킹 패널 헤더
+    rail: "#0f1114", // 좌측 레일
     nodeCard: "linear-gradient(180deg,#1e2126,#16181c)", // 노드 카드 본체
   },
 
@@ -31,7 +31,7 @@ export const tokens = {
     strong: "#2b3037",
     stronger: "#3a414a",
     headerDivider: "#17191e",
-    node: "#0b0c0e",           // 노드 카드 외곽
+    node: "#0b0c0e", // 노드 카드 외곽
   },
 
   // ── Accent (브랜드 블루) ─────────────────────────────────────────────
@@ -62,26 +62,29 @@ export const tokens = {
   // ── Node categories (노드 카드 헤더/아이콘) ──────────────────────────
   // 헤더 그라디언트: linear-gradient(180deg, rgba(<hex>,0.22~0.30), rgba(<hex>,0.08~0.12))
   nodeCategory: {
-    source: "#4bbf89",     // Mesh · Image · Webcam · Video · Audio
-    process: "#3d9bff",    // Shader · Compute
-    output: "#e05c93",     // Output
-    value: "#d4a53c",      // Param · Math · Swizzle · Combine
-    container: "#77828f",  // Group
+    source: "#4bbf89", // Mesh · Image · Webcam · Video · Audio
+    process: "#3d9bff", // Shader · Compute
+    output: "#e05c93", // Output
+    value: "#d4a53c", // Param · Math · Swizzle · Combine
+    container: "#77828f", // Group
   },
 
   // ── Port type families ★ (형태=방향, 색=타입 패밀리) ─────────────────
   // 6종 포트를 4패밀리로 그룹핑. input = hollow ring, output = solid disc.
   portFamily: {
-    resource: "#a06bff",   // mesh, texture
-    scalar: "#7ed957",     // float
-    vector: "#f0b429",     // vec2, vec3, vec4
-    matrix: "#2dd4bf",     // mat (예약)
+    resource: "#a06bff", // mesh, texture
+    scalar: "#7ed957", // float
+    vector: "#f0b429", // vec2, vec3, vec4
+    matrix: "#2dd4bf", // mat (예약)
   },
   // 브리프 6종 → 패밀리 매핑 (색맹 대응 위해 형태도 함께 인코딩)
   portTypeToFamily: {
-    mesh: "resource", texture: "resource",
+    mesh: "resource",
+    texture: "resource",
     float: "scalar",
-    vec2: "vector", vec3: "vector", vec4: "vector",
+    vec2: "vector",
+    vec3: "vector",
+    vec4: "vector",
   } as const,
 
   // ── Code syntax (CodeMirror 6 HighlightStyle) ───────────────────────
@@ -97,8 +100,8 @@ export const tokens = {
 
   // ── Typography ──────────────────────────────────────────────────────
   font: {
-    ui: "'IBM Plex Sans', system-ui, sans-serif",     // 400/500/600/700
-    mono: "'JetBrains Mono', monospace",               // 400/500/600
+    ui: "'IBM Plex Sans', system-ui, sans-serif", // 400/500/600/700
+    mono: "'JetBrains Mono', monospace", // 400/500/600
   },
   // 대표 사이즈(px): 배지 8-11 · 본문 11-13 · 화면 제목 14-15
   // 패널 헤더 라벨: 대문자 + letterSpacing 0.8~0.9px
@@ -117,7 +120,8 @@ export const tokens = {
   shadow: {
     nodeCard: "0 8px 20px rgba(0,0,0,0.5)",
     nodeCardHero: "0 12px 30px rgba(0,0,0,0.6)",
-    selectRing: "0 0 0 1.5px rgba(61,155,255,0.75), 0 0 18px rgba(61,155,255,0.4)",
+    selectRing:
+      "0 0 0 1.5px rgba(61,155,255,0.75), 0 0 18px rgba(61,155,255,0.4)",
     errorRing: "0 0 0 1.5px rgba(240,85,92,0.7), 0 0 18px rgba(240,85,92,0.35)",
     portOutputGlow: (famHex: string) => `0 0 7px ${famHex}aa`,
   },
@@ -146,13 +150,17 @@ export const PORT_DIAMETER = { card: 11, hero: 13 } as const;
 export function cssVars(): string {
   const t = tokens;
   return [
-    ...Object.entries(t.surface).map(([k, v]) => `--surface-${kebab(k)}: ${v};`),
+    ...Object.entries(t.surface).map(
+      ([k, v]) => `--surface-${kebab(k)}: ${v};`,
+    ),
     ...Object.entries(t.border).map(([k, v]) => `--border-${kebab(k)}: ${v};`),
     ...Object.entries(t.accent).map(([k, v]) => `--accent-${kebab(k)}: ${v};`),
     ...Object.entries(t.text).map(([k, v]) => `--text-${kebab(k)}: ${v};`),
     ...Object.entries(t.semantic).map(([k, v]) => `--${k}: ${v};`),
   ].join("\n");
 }
-function kebab(s: string) { return s.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase()); }
+function kebab(s: string) {
+  return s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+}
 
 export type Tokens = typeof tokens;

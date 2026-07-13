@@ -2,26 +2,59 @@ import type { NodeProps } from "@xyflow/react";
 import { useMemo } from "react";
 import type { ComputeGraphNode } from "../../../core/graph/types";
 import { NODE_META } from "../../../core/nodes/registry";
+import { useDiagnosticsStore } from "../../../state/diagnosticsStore";
+import { countNodeDiagnostics, ErrorBadge } from "./ErrorBadge";
 import { GpuTimerChip } from "./GpuTimerChip";
+import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_STRIDE, PORT_TOP_PAD, PortHandle } from "./PortHandle";
+
+/** label mono 10px muted / value mono 11px primary, space-between — mirrors
+ * design/Node Editor.dc.html L221-225's particles/dispatch/buffer rows. */
+function ComputeKvRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="node-card__kv-row">
+      <span className="node-card__kv-label">{label}</span>
+      <span className="node-card__kv-value">{value}</span>
+    </div>
+  );
+}
 
 export function ComputeNodeView({ id, data }: NodeProps) {
   const node = data.node as ComputeGraphNode;
+  const errorCount = useDiagnosticsStore((s) =>
+    countNodeDiagnostics(s.byNode[id]),
+  );
 
   const inputs = useMemo(() => NODE_META.compute.inputs(node), [node]);
 
   return (
-    <div className="node-card" style={{ position: "relative", minWidth: 184 }}>
-      <div className="node-card__header node-card__header--compute">
-        Compute · {node.primitive}
-      </div>
-      <GpuTimerChip nodeId={id} />
+    <div
+      className={`node-card${errorCount > 0 ? " node-card--error" : ""}`}
+      style={{ position: "relative", minWidth: 184 }}
+    >
+      <NodeCardHeader
+        kind="compute"
+        title="Compute"
+        {...(errorCount > 0 ? { tone: "error" as const } : {})}
+        meta={
+          errorCount > 0 ? (
+            <ErrorBadge nodeId={id} />
+          ) : (
+            <GpuTimerChip nodeId={id} />
+          )
+        }
+      />
       <div
         className="node-card__body"
         style={{ paddingLeft: 22, paddingRight: 22 }}
       >
-        <div className="node-card__meta" style={{ fontSize: 10 }}>
-          {node.count.toLocaleString()} verts · {node.attributes.length} attr
+        <div className="node-card__kv-list">
+          <ComputeKvRow label="primitive" value={node.primitive} />
+          <ComputeKvRow label="verts" value={node.count.toLocaleString()} />
+          <ComputeKvRow
+            label="attrs"
+            value={node.attributes.length.toString()}
+          />
         </div>
       </div>
       {inputs.map((p, i) => (

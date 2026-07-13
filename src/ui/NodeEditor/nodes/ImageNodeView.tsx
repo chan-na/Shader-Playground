@@ -2,10 +2,11 @@ import type { NodeProps } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import type { ImageGraphNode } from "../../../core/graph/types";
 import { useAssetStore } from "../../../state/assetStore";
+import { tokens } from "../../../theme";
+import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
-const THUMB_W = 96;
-const THUMB_H = 64;
+const THUMB_SIZE = 96;
 
 export function ImageNodeView({ id, data }: NodeProps) {
   const node = data.node as ImageGraphNode;
@@ -27,21 +28,30 @@ export function ImageNodeView({ id, data }: NodeProps) {
 
   return (
     <div className="node-card" style={{ position: "relative" }}>
-      <div className="node-card__header node-card__header--image">
-        Image{asset ? ` · ${truncate(asset.name, 14)}` : ""}
-      </div>
+      <NodeCardHeader
+        kind="image"
+        title="Image"
+        meta={
+          asset ? (
+            <span className="node-card__meta">{truncate(asset.name, 14)}</span>
+          ) : undefined
+        }
+      />
       <div className="node-card__body" style={{ paddingRight: 22 }}>
         {asset?.bitmap ? (
           <canvas
             ref={canvasRef}
-            width={THUMB_W}
-            height={THUMB_H}
+            width={THUMB_SIZE}
+            height={THUMB_SIZE}
             style={{
-              width: THUMB_W,
-              height: THUMB_H,
+              width: THUMB_SIZE,
+              height: THUMB_SIZE,
               display: "block",
               imageRendering: "pixelated",
-              borderRadius: 3,
+              borderRadius: tokens.radius.input,
+              background: "var(--surface-app)",
+              border: "1px solid var(--border-node)",
+              boxShadow: "var(--shadow-thumbnail-inset)",
             }}
           />
         ) : (

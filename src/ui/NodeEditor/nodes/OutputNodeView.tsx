@@ -1,9 +1,10 @@
+import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 export function OutputNodeView() {
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 132 }}>
-      <div className="node-card__header node-card__header--output">Output</div>
+      <NodeCardHeader kind="output" title="Output" />
       <div className="node-card__body" style={{ paddingLeft: 22 }}>
         <div className="node-card__meta">→ Canvas</div>
       </div>

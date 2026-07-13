@@ -1,5 +1,8 @@
 import { Handle, Position } from "@xyflow/react";
+import type { CSSProperties } from "react";
 import type { PortSpec } from "../../../core/nodes/registry";
+import { PORT_DIAMETER, tokens } from "../../../theme";
+import { portFamilyHex } from "../nodeTheme";
 
 interface PortHandleProps {
   port: PortSpec;
@@ -19,14 +22,35 @@ interface PortHandleProps {
  */
 export function PortHandle({ port, side, top, hideLabel }: PortHandleProps) {
   const isIn = side === "in";
+  const fam = portFamilyHex(port.type);
+  // 형태(방향) × 색(타입 패밀리) 이중 인코딩 — design/Node Editor.dc.html
+  // L156-157(Math in ring/out disc), L81(Mesh out), L190-193(Fresnel).
+  const shapeStyle: CSSProperties = isIn
+    ? {
+        // input = hollow ring: 패밀리색 테두리 + 카드 배경색 내부.
+        border: `2.5px solid ${fam}`,
+        background: "var(--surface-node-card-solid)",
+      }
+    : {
+        // output = solid disc: 패밀리색 채움 + 카드 배경색 테두리 + 발광.
+        background: fam,
+        border: "2px solid var(--surface-node-card-solid)",
+        boxShadow: tokens.shadow.portOutputGlow(fam),
+      };
   return (
     <>
       <Handle
         id={port.name}
         type={isIn ? "target" : "source"}
         position={isIn ? Position.Left : Position.Right}
-        className={`handle-${port.type}`}
-        style={{ top }}
+        className={`handle-${port.type} port-handle port-handle--${side}`}
+        style={{
+          top,
+          width: PORT_DIAMETER.card,
+          height: PORT_DIAMETER.card,
+          borderRadius: "50%",
+          ...shapeStyle,
+        }}
       />
       {hideLabel ? null : (
         <span

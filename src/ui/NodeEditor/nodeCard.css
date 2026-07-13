@@ -1,101 +1,48 @@
-/* ─── UE Blueprint-style node tokens ──────────────────────────────
- * Heavy drop shadow + rounded body + gradient header per node kind.
- * Header gradients are dim enough to keep text legible in the dark
- * editor, but saturated enough to read as category badges at a glance.
- * Handle colors track the GraphPort data type (mesh/texture/float/vecN).
+/* ─── Node card shell ──────────────────────────────────────────────
+ * Card chrome (background/border/radius/shadow) is fully tokenized —
+ * design/README.md §Design Tokens / src/theme.ts is the single source.
+ * Per-category header gradients + the icon-box glyph live in
+ * NodeCardHeader.tsx (inline styles, since the gradient's stop color is
+ * computed per node kind via categoryHexFor + withAlpha) — this file only
+ * owns the generic card body, ports, and form-control chrome.
  */
 
 .node-card {
   position: relative;
-  background: linear-gradient(180deg, #2a2a2e 0%, #1c1c1f 100%);
-  border: 1px solid rgba(0, 0, 0, 0.65);
-  border-radius: 10px;
+  background: var(--surface-node-card);
+  border: 1px solid var(--border-node);
+  border-radius: var(--radius-node-card);
+  font-family: var(--font-ui);
   font-size: 11px;
-  color: #e6e6ea;
+  color: var(--text-primary);
   min-width: 148px;
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.55),
-    0 2px 4px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow-node-card);
+}
+
+/* Error ring goes first so a higher-specificity `.selected` rule (below)
+ * always wins when a node is both selected and erroring — mirrors
+ * design/Node Editor.dc.html L366-369's `shadowFor()`, which checks
+ * `s.sel === id` before ever falling back to the error shadow. */
+.node-card--error {
+  box-shadow: var(--shadow-error-ring), var(--shadow-node-card);
 }
 
 .react-flow__node.selected .node-card {
-  border-color: #ffa64d;
-  box-shadow:
-    0 0 0 2px #ffa64d,
-    0 0 14px 2px rgba(255, 166, 77, 0.45),
-    0 10px 24px rgba(0, 0, 0, 0.55);
+  border-color: var(--accent-default);
+  box-shadow: var(--shadow-select-ring), var(--shadow-node-card-hero);
 }
 
-/* Strip the wrapping rectangle that React Flow draws around a multi-node
- * selection. The individual .selected halo above already indicates the
- * active set clearly; the element is kept in the DOM so that group drag
- * (which dispatches from this rect) still works. */
-.react-flow__nodesselection-rect {
-  background: transparent;
-  border: none;
-  outline: none;
-  box-shadow: none;
-}
-
-/* ─── Header (title bar) ──────────────────────────────────────── */
-.node-card__header {
-  padding: 7px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  color: #fff;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.45);
-  border-top-left-radius: 9px;
-  border-top-right-radius: 9px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(180deg, #4a4a52 0%, #2f2f36 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-/* Source / asset categories */
-.node-card__header--mesh {
-  background: linear-gradient(180deg, #3f8a64 0%, #265c43 100%);
-}
-.node-card__header--image {
-  background: linear-gradient(180deg, #b9622c 0%, #7b3e16 100%);
-}
-.node-card__header--webcam {
-  background: linear-gradient(180deg, #b8413f 0%, #7a2826 100%);
-}
-.node-card__header--video {
-  background: linear-gradient(180deg, #9e3da6 0%, #6a2470 100%);
-}
-.node-card__header--audio {
-  background: linear-gradient(180deg, #2c8aa6 0%, #1b5a6e 100%);
-}
-
-/* Processing categories */
-.node-card__header--shader {
-  background: linear-gradient(180deg, #356ea8 0%, #1f4474 100%);
-}
-.node-card__header--compute {
-  background: linear-gradient(180deg, #2c9882 0%, #1a6253 100%);
-}
-
-/* Terminal / variable / utility */
-.node-card__header--output {
-  background: linear-gradient(180deg, #a4324b 0%, #6d1f32 100%);
-}
-.node-card__header--param {
-  background: linear-gradient(180deg, #b08930 0%, #7a5d1c 100%);
-}
-.node-card__header--math {
-  background: linear-gradient(180deg, #c19a2e 0%, #82691b 100%);
-}
-.node-card__header--swizzle {
-  background: linear-gradient(180deg, #c5874c 0%, #855626 100%);
-}
-.node-card__header--combine {
-  background: linear-gradient(180deg, #948f30 0%, #61601c 100%);
+/* Multi-select marquee: both the wrapping rect React Flow draws around a
+ * committed multi-node selection AND the live box-select drag rect share
+ * this dashed accent style (design/Node Editor.dc.html L275). Do NOT set
+ * pointer-events here — .react-flow__nodesselection-rect is the element
+ * group-drag dispatches from, so killing pointer-events would break
+ * dragging a multi-selection. */
+.react-flow__nodesselection-rect,
+.react-flow__selection {
+  border: 1.5px dashed var(--accent-default);
+  background: color-mix(in srgb, var(--accent-default) 6%, transparent);
+  border-radius: var(--radius-chip);
 }
 
 /* ─── Body ─────────────────────────────────────────────────────── */
@@ -107,37 +54,65 @@
 }
 
 .node-card__meta {
-  font-family:
-    ui-monospace,
-    SF Mono,
-    Menlo,
-    monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
-  color: #8a8a90;
+  color: var(--text-secondary);
   padding: 0 2px;
 }
 
-/* GPU timing chip — surfaces per-pass milliseconds on shader/compute cards. */
+/* Key-value rows (Compute node body) — label mono/muted, value mono/primary,
+ * space-between. design/Node Editor.dc.html L221-225. */
+.node-card__kv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.node-card__kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.node-card__kv-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.node-card__kv-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+/* GPU timing chip — rendered inside the header's meta slot (see
+ * GpuTimerChip.tsx for color/border/background, all inline since they mix
+ * withAlpha() with a token hex). This rule only owns layout. */
 .node-card__gpu-ms {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  font-family:
-    ui-monospace,
-    SF Mono,
-    Menlo,
-    monospace;
-  font-size: 9.5px;
-  font-weight: 600;
-  color: #f4d774;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(244, 215, 116, 0.35);
-  border-radius: 6px;
-  padding: 1px 5px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Error count pill — replaces the GPU timer chip in the header meta slot
+ * once a shader/compute node has diagnostics (ErrorBadge.tsx). Unlike the
+ * timer chip, every value here is a fixed token (no per-node computed hex),
+ * so it's a plain CSS class rather than inline styles.
+ * design/Node Editor.dc.html L201. */
+.node-card__error-badge {
+  display: inline-flex;
+  align-items: center;
   line-height: 1.2;
   pointer-events: none;
-  letter-spacing: 0.2px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--surface-app);
+  background: var(--error);
+  border-radius: var(--radius-button);
+  padding: 1px 6px;
 }
 
 .node-card__placeholder {
@@ -146,31 +121,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #141416;
-  border-radius: 4px;
-  color: #5a5a60;
+  background: var(--surface-app);
+  border: 1px solid var(--border-node);
+  border-radius: var(--radius-input);
+  color: var(--text-muted);
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  border: 1px solid rgba(0, 0, 0, 0.5);
 }
 
 /* ─── Port labels (next to handles) ───────────────────────────── */
 .node-card__port-label {
   position: absolute;
   font-size: 10px;
-  color: #cfcfd4;
-  font-family:
-    ui-monospace,
-    SF Mono,
-    Menlo,
-    monospace;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
   pointer-events: none;
   max-width: 84px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
   letter-spacing: 0.2px;
 }
 
@@ -184,24 +154,17 @@
   text-align: right;
 }
 
-/* ─── Handles (data pins) ─────────────────────────────────────── */
+/* ─── Handles (data pins) ─────────────────────────────────────────
+ * 형태(방향) × 색(타입 패밀리) 이중 인코딩. 색/테두리/그림자는 PortHandle.tsx가
+ * 포트별로 인라인 스타일(portFamilyHex + tokens.shadow.portOutputGlow)로
+ * 채워 넣는다 — 여기는 트랜지션과 지오메트리만 담당한다. */
 .react-flow__handle {
-  width: 11px;
-  height: 11px;
-  border: 2px solid #0e0e10;
-  background: #8a8a90;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 2px 3px rgba(0, 0, 0, 0.55);
   transition:
-    transform 90ms ease-out,
-    box-shadow 90ms ease-out;
+    transform var(--motion-duration-min) var(--motion-easing),
+    box-shadow var(--motion-duration-min) var(--motion-easing);
 }
 .react-flow__handle:hover {
   transform: translate(0, -50%) scale(1.25);
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.18),
-    0 0 8px rgba(255, 255, 255, 0.25);
 }
 .react-flow__handle.react-flow__handle-left:hover {
   transform: translate(-50%, -50%) scale(1.25);
@@ -210,44 +173,57 @@
   transform: translate(50%, -50%) scale(1.25);
 }
 
-.react-flow__handle.handle-mesh {
-  background: #58c98c;
+/* 포트 지오메트리 (theme.ts 포트 지오메트리 주석 / README §포트 지오메트리):
+ * input x = node.left, output x = node.left + node.width. React Flow v12의
+ * 기본 `.react-flow__handle-left { left: 0 }` / `-right { right: 0 }` +
+ * `transform: translate(∓50%, -50%)`가 지름과 무관하게 핸들 중심을 정확히
+ * 카드 모서리에 정렬하므로 여기서 추가 offset을 주지 않는다. (이전에 있던
+ * -5.5px 오버레이는 RF 기본 translate와 이중으로 겹쳐 중심이 ~4.5px 바깥으로
+ * 빠지는 회귀였다 — dc.html의 -6px는 transform 없는 정적 HTML 기준이라
+ * 그대로 옮기면 안 된다.) */
+
+/* Light drag feedback: a compatible target handle gets a soft accent ring
+ * while a connection is being dragged toward it. React Flow itself toggles
+ * `.connectingto` + `.valid` on the handle based on `isValidConnection` — no
+ * app state needed. The full fan-out highlight/dim pass across every
+ * compatible/incompatible port (design/README.md §Interactions "호환 입력
+ * 포트 하이라이트") is scoped to the Motion milestone; this is the
+ * lightweight per-handle version. */
+.react-flow__handle.connectingto.valid {
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--accent-default) 40%, transparent);
 }
-.react-flow__handle.handle-texture {
-  background: #d65fa6;
+
+/* ─── Connection drag line (design/Node Editor.dc.html L19, L64) ─────────
+ * Dashed, family-colored line rendered only while a port drag is in
+ * progress (ConnectionLine.tsx) — not an idle/ambient animation, so it's
+ * exempt from the "no idle animation" rule (see theme.ts §motion). */
+@keyframes sp-edge-dash {
+  to {
+    stroke-dashoffset: -14;
+  }
 }
-.react-flow__handle.handle-float {
-  background: #b6e36b;
-}
-.react-flow__handle.handle-vec2,
-.react-flow__handle.handle-vec3,
-.react-flow__handle.handle-vec4 {
-  background: #ffcc33;
+.sp-connection-line {
+  animation: sp-edge-dash 0.6s linear infinite;
 }
 
 /* ─── Inline editable value displays ──────────────────────────── */
 .node-card__param-value {
-  font-family:
-    ui-monospace,
-    SF Mono,
-    Menlo,
-    monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: #e6e6ea;
-  background: #131316;
+  color: var(--text-primary);
+  background: var(--surface-input);
   padding: 4px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   text-align: center;
-  border: 1px solid rgba(0, 0, 0, 0.5);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-default);
 }
 
 .node-card__param-swatch {
   width: 100%;
   height: 24px;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--border-node);
   cursor: pointer;
 }
 
@@ -258,13 +234,9 @@
   gap: 6px;
 }
 .node-card__field-label {
-  font-family:
-    ui-monospace,
-    SF Mono,
-    Menlo,
-    monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
-  color: #9a9aa0;
+  color: var(--text-muted);
   min-width: 14px;
 }
 
@@ -274,28 +246,21 @@
  */
 .node-card__input {
   flex: 1;
-  background: #131316;
-  border: 1px solid rgba(0, 0, 0, 0.55);
-  color: #e6e6ea;
-  font-family:
-    ui-monospace,
-    SF Mono,
-    Menlo,
-    monospace;
+  background: var(--surface-input);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 3px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .node-card__input:focus {
   outline: none;
-  border-color: #4a90d6;
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.4),
-    0 0 0 2px rgba(74, 144, 214, 0.35);
+  border-color: var(--accent-default);
+  box-shadow: 0 0 0 2px var(--accent-muted);
 }
 .node-card__input::-webkit-outer-spin-button,
 .node-card__input::-webkit-inner-spin-button {
@@ -311,8 +276,8 @@
   width: 28px;
   height: 22px;
   background: transparent;
-  border: 1px solid rgba(0, 0, 0, 0.5);
-  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-chip);
   padding: 0;
   cursor: pointer;
 }
@@ -321,22 +286,21 @@
 }
 .node-card__color-input::-webkit-color-swatch {
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-chip);
 }
 
 .node-card__select {
-  background: #131316;
-  border: 1px solid rgba(0, 0, 0, 0.55);
-  color: #e6e6ea;
+  background: var(--surface-input);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   font-size: 10px;
   padding: 3px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   width: 100%;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .node-card__select:focus {
   outline: none;
-  border-color: #4a90d6;
+  border-color: var(--accent-default);
 }
 
 /* Row of inline inputs (e.g. xyz components of a vec3 param). */
@@ -349,6 +313,15 @@
   padding: 3px 2px;
 }
 
+/* ─── Zoom controls (bottom-left canvas overlay) ──────────────────
+ * design/Node Editor.dc.html L296-302. Chrome (background/border/radius/
+ * padding) is set inline in ZoomControls.tsx since it mixes withAlpha()
+ * with a token hex; this file only owns the hover state React can't express
+ * via inline styles. */
+.sp-zoom-controls button:hover {
+  background: var(--surface-hover);
+}
+
 /* ── Help modal ─────────────────────────────────────────────────── */
 .help-modal {
   width: 640px;
@@ -359,23 +332,23 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  border-bottom: 1px solid #2c2c2c;
+  border-bottom: 1px solid var(--border-strong);
   font-size: 13px;
-  color: #f0f0f0;
+  color: var(--text-primary);
   font-weight: 600;
 }
 .help-modal__close {
   background: transparent;
   border: none;
-  color: #969696;
+  color: var(--text-secondary);
   font-size: 14px;
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-chip);
 }
 .help-modal__close:hover {
-  background: #2d2d30;
-  color: #f0f0f0;
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 .help-modal__body {
   max-height: 60vh;
@@ -389,7 +362,7 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #888;
+  color: var(--text-muted);
   margin: 4px 0 6px;
   font-weight: 600;
 }
@@ -407,20 +380,16 @@
   display: contents;
 }
 .help-modal__keys {
-  font-family:
-    ui-monospace,
-    SF Mono,
-    Menlo,
-    monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: #ddd;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3d;
-  border-radius: 3px;
+  color: var(--text-bright-body);
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
   padding: 2px 6px;
   white-space: nowrap;
 }
 .help-modal__desc {
-  color: #ccc;
+  color: var(--text-secondary);
   font-size: 12px;
 }

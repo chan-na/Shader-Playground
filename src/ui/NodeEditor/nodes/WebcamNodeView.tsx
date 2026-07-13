@@ -5,6 +5,7 @@ import {
   getExternalStream,
 } from "../../../core/external/registry";
 import type { WebcamGraphNode } from "../../../core/graph/types";
+import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 const PREVIEW_W = 96;
@@ -61,7 +62,7 @@ export function WebcamNodeView({ id, data }: NodeProps) {
       data-testid="webcam-node"
       style={{ position: "relative" }}
     >
-      <div className="node-card__header node-card__header--webcam">Webcam</div>
+      <NodeCardHeader kind="webcam" title="Webcam" />
       <div className="node-card__body" style={{ paddingRight: 22 }}>
         {status.error ? (
           <div className="node-card__placeholder" title={status.error}>

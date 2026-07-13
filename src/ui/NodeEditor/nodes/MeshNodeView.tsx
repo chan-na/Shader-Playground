@@ -6,6 +6,7 @@ import {
 import type { MeshGraphNode } from "../../../core/graph/types";
 import { useAssetStore } from "../../../state/assetStore";
 import { useGraphStore } from "../../../state/graphStore";
+import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 export function MeshNodeView({ id, data }: NodeProps) {
@@ -32,9 +33,11 @@ export function MeshNodeView({ id, data }: NodeProps) {
 
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 168 }}>
-      <div className="node-card__header node-card__header--mesh">
-        Mesh · {label}
-      </div>
+      <NodeCardHeader
+        kind="mesh"
+        title="Mesh"
+        meta={<span className="node-card__meta">{label}</span>}
+      />
       <div
         className="node-card__body"
         style={{ paddingLeft: 14, paddingRight: 22 }}

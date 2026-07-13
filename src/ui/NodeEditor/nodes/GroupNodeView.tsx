@@ -4,8 +4,9 @@ import { directChildren } from "../../../core/graph/parents";
 import type { GroupGraphNode } from "../../../core/graph/types";
 import { GROUP_COLLAPSED_HEIGHT } from "../../../core/graph/types";
 import { useGraphStore } from "../../../state/graphStore";
+import { tokens, withAlpha } from "../../../theme";
 
-const DEFAULT_TINT = "#5b6a7a";
+const DEFAULT_TINT = tokens.nodeCategory.container;
 
 /**
  * Pure visual container — no GLSL, no ports. Children draw on top because
@@ -14,6 +15,14 @@ const DEFAULT_TINT = "#5b6a7a";
  * how plain node drags work. The header carries a collapse toggle and
  * double-click-to-rename; collapsing hides every descendant (handled in
  * NodeEditor via `hasCollapsedAncestor`) and shrinks the card to the header.
+ *
+ * Style source: design/Node Editor.dc.html L110-117. The mock floats the
+ * label pill *above* the frame (`top:-30px`), but this view keeps the pill
+ * flush with the frame's own top edge instead: moving it outside would
+ * shrink the box React Flow uses for hit-testing/dragging and shift the
+ * header away from the `[data-group-id] [data-testid=...]` coordinates
+ * phase-30's e2e specs interact with. Only the chrome (colors, radius,
+ * swatch) follows the design — the box model is unchanged.
  */
 export function GroupNodeView({ id, data, selected }: NodeProps) {
   const node = data.node as GroupGraphNode;
@@ -62,9 +71,9 @@ export function GroupNodeView({ id, data, selected }: NodeProps) {
       style={{
         width: node.width,
         height: collapsed ? GROUP_COLLAPSED_HEIGHT : node.height,
-        background: `${tint}1f`, // ~12% alpha hex appended
-        border: `1px solid ${selected ? tint : `${tint}80`}`,
-        borderRadius: 6,
+        background: withAlpha(tint, 0.05),
+        border: `1.5px dashed ${withAlpha(tint, 0.55)}`,
+        borderRadius: tokens.radius.nodeCard,
         position: "relative",
         boxSizing: "border-box",
         pointerEvents: "all",
@@ -84,20 +93,18 @@ export function GroupNodeView({ id, data, selected }: NodeProps) {
         }}
       />
       <div
-        className="node-card__header node-card__header--group"
+        className="node-card__header"
         data-testid="group-label"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 6,
-          background: `${tint}55`,
-          color: "#eee",
+          background: "var(--surface-card)",
           padding: "4px 10px",
-          fontSize: 12,
-          fontWeight: 600,
-          borderTopLeftRadius: 5,
-          borderTopRightRadius: 5,
-          borderBottom: collapsed ? "none" : `1px solid ${tint}80`,
+          borderTopLeftRadius: tokens.radius.button,
+          borderTopRightRadius: tokens.radius.button,
+          border: `1px solid ${tint}`,
+          borderBottom: collapsed ? "none" : `1px solid ${tint}`,
           // Group header is the only click target — children draw above the
           // body, so clicks elsewhere fall through to them.
         }}
@@ -122,7 +129,7 @@ export function GroupNodeView({ id, data, selected }: NodeProps) {
             padding: 0,
             background: "transparent",
             border: "none",
-            color: "#eee",
+            color: "var(--text-secondary)",
             cursor: "pointer",
             fontSize: 10,
             lineHeight: 1,
@@ -130,6 +137,16 @@ export function GroupNodeView({ id, data, selected }: NodeProps) {
         >
           {collapsed ? "▸" : "▾"}
         </button>
+        <span
+          aria-hidden="true"
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 2,
+            background: tint,
+            flexShrink: 0,
+          }}
+        />
         {editing ? (
           <input
             type="text"
@@ -155,12 +172,12 @@ export function GroupNodeView({ id, data, selected }: NodeProps) {
               flex: 1,
               minWidth: 0,
               padding: "1px 4px",
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: 600,
-              background: "#1a1a1a",
-              color: "#ddd",
-              border: "1px solid #444",
-              borderRadius: 3,
+              background: "var(--surface-input)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-strong)",
+              borderRadius: tokens.radius.chip,
             }}
           />
         ) : (
@@ -200,19 +217,27 @@ export function GroupNodeView({ id, data, selected }: NodeProps) {
               whiteSpace: "nowrap",
               background: "transparent",
               border: "none",
-              color: "inherit",
-              font: "inherit",
+              color: "var(--text-bright-body)",
+              fontSize: 11,
+              fontWeight: 600,
               padding: 0,
               cursor: "text",
             }}
           >
             {node.label}
-            {collapsed && childCount > 0 && (
-              <span style={{ marginLeft: 6, color: "#bbb", fontWeight: 400 }}>
-                ({childCount})
-              </span>
-            )}
           </button>
+        )}
+        {!editing && collapsed && childCount > 0 && (
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 8.5,
+              color: "var(--text-muted)",
+              flexShrink: 0,
+            }}
+          >
+            {childCount}
+          </span>
         )}
       </div>
     </div>

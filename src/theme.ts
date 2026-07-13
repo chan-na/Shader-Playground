@@ -23,6 +23,11 @@ export const tokens = {
     dockingHeader: "#101216", // 도킹 패널 헤더
     rail: "#0f1114", // 좌측 레일
     nodeCard: "linear-gradient(180deg,#1e2126,#16181c)", // 노드 카드 본체
+    // surface.nodeCard 그라디언트의 종점 단색. 포트 링 내부(input hollow ring
+    // background) · 포트 디스크 테두리(output solid disc border) · 헤더 하단
+    // 보더 참조용 — design/Node Editor.dc.html의 모든 핸들이 이 값을
+    // border/background로 사용한다.
+    nodeCardSolid: "#16181c",
   },
 
   // ── Border ──────────────────────────────────────────────────────────
@@ -114,6 +119,9 @@ export const tokens = {
     chip: 6,
     iconBox: 5,
     panel: 14,
+    // 캔버스 부유 오버레이(미니맵/줌 컨트롤) — Node Editor.dc.html 미니맵
+    // radius 9 · 줌 컨트롤 radius 8의 대표값.
+    overlay: 9,
   },
 
   // ── Shadow ──────────────────────────────────────────────────────────
@@ -124,6 +132,9 @@ export const tokens = {
       "0 0 0 1.5px rgba(61,155,255,0.75), 0 0 18px rgba(61,155,255,0.4)",
     errorRing: "0 0 0 1.5px rgba(240,85,92,0.7), 0 0 18px rgba(240,85,92,0.35)",
     portOutputGlow: (famHex: string) => `0 0 7px ${famHex}aa`,
+    // 노드 카드 썸네일(Shader/Image 96px 프리뷰) 안쪽 그림자.
+    // design/Node Editor.dc.html L188: box-shadow: inset 0 1px 4px rgba(0,0,0,0.5).
+    thumbnailInset: "inset 0 1px 4px rgba(0,0,0,0.5)",
   },
 
   // ── Motion ──────────────────────────────────────────────────────────

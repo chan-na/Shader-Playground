@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { THUMB_SIZE } from "../../core/thumbnail/readback";
 import { thumbnailScheduler } from "../../state/thumbnailScheduler";
+import { tokens } from "../../theme";
 
 export interface NodeThumbnailProps {
   nodeId: string;
@@ -50,9 +51,11 @@ export function NodeThumbnail({
         width,
         height,
         display: "block",
-        background: "#0a0a0a",
         imageRendering: "pixelated",
-        borderRadius: 3,
+        borderRadius: tokens.radius.input,
+        background: "var(--surface-app)",
+        border: "1px solid var(--border-node)",
+        boxShadow: "var(--shadow-thumbnail-inset)",
       }}
     />
   );

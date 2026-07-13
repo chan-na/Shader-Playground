@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #08090b; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+  ::selection { background: rgba(61,155,255,0.3); }
+  .sp-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+  .sp-scroll::-webkit-scrollbar-thumb { background: #2b3037; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+  .sp-scroll::-webkit-scrollbar-track { background: transparent; }
+  @keyframes spPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes spBlink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+  a { color: #57a9ff; } a:hover { color: #7dbcff; }
+</style>
+</helmet>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;background:#08090b;color:#e7eaee;overflow:hidden;font-size:13px;position:relative;">
+
+  <!-- ════ TOP TOOLBAR ════ -->
+  <div style="display:flex;align-items:center;gap:14px;height:48px;flex-shrink:0;padding:0 12px;background:#131519;border-bottom:1px solid #20242a;">
+    <!-- brand -->
+    <div style="display:flex;align-items:center;gap:9px;padding-right:4px;">
+      <div style="position:relative;width:26px;height:26px;border-radius:7px;background:linear-gradient(155deg,#3d9bff,#2b6fe0);box-shadow:0 2px 8px rgba(61,155,255,0.35),inset 0 1px 0 rgba(255,255,255,0.25);flex-shrink:0;">
+        <div style="position:absolute;left:6px;top:6px;width:13px;height:13px;border-radius:4px;border:1.6px solid rgba(255,255,255,0.92);"></div>
+        <div style="position:absolute;right:3px;top:50%;transform:translateY(-50%);width:6px;height:6px;border-radius:50%;background:#0b0c0e;border:1.4px solid rgba(255,255,255,0.95);"></div>
+      </div>
+      <div style="font-size:14px;font-weight:600;letter-spacing:-0.3px;"><span style="color:#e7eaee;">Shader</span><span style="color:#3d9bff;">Playground</span></div>
+    </div>
+
+    <div style="width:1px;height:24px;background:#20242a;"></div>
+
+    <!-- node add palette -->
+    <div style="display:flex;align-items:center;gap:4px;">
+      <sc-for list="{{ addBtns }}" as="b" hint-placeholder-count="5">
+        <button style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#c4cad2;font-size:12px;font-weight:500;cursor:pointer;" style-hover="background:#22262c;border-color:#3a414a;">
+          <span style="width:15px;height:15px;border-radius:4px;background:{{ b.tile }};border:1px solid {{ b.hex }};display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:{{ b.hex }};">{{ b.glyph }}</span>{{ b.name }}
+        </button>
+      </sc-for>
+      <button style="height:30px;padding:0 9px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#9aa2ac;font-size:12px;cursor:pointer;" style-hover="background:#22262c;">＋ More</button>
+    </div>
+
+    <div style="width:1px;height:24px;background:#20242a;"></div>
+
+    <!-- presets -->
+    <button style="display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#c4cad2;font-size:12px;font-weight:500;cursor:pointer;" style-hover="background:#22262c;">Presets<span style="color:#565e68;font-size:9px;">▾</span></button>
+
+    <div style="flex:1;"></div>
+
+    <!-- undo / redo -->
+    <div style="display:flex;gap:2px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;padding:2px;">
+      <button style="width:28px;height:26px;background:transparent;border:none;color:#9aa2ac;border-radius:5px;cursor:pointer;font-size:14px;" style-hover="background:#22262c;color:#e7eaee;">↶</button>
+      <button style="width:28px;height:26px;background:transparent;border:none;color:#565e68;border-radius:5px;cursor:default;font-size:14px;">↷</button>
+    </div>
+
+    <!-- record -->
+    <button onClick="{{ toggleRec }}" style="display:flex;align-items:center;gap:7px;height:30px;padding:0 12px;background:{{ recBg }};border:1px solid {{ recBorder }};border-radius:7px;color:{{ recColor }};font-size:12px;font-weight:500;cursor:pointer;">
+      <span style="width:8px;height:8px;border-radius:2px;background:{{ recDot }};box-shadow:{{ recGlow }};"></span>{{ recLabel }}
+    </button>
+    <button style="display:flex;align-items:center;gap:7px;height:30px;padding:0 12px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#c4cad2;font-size:12px;font-weight:500;cursor:pointer;" style-hover="background:#22262c;"><span style="width:7px;height:7px;border-radius:50%;border:1.5px solid #9aa2ac;"></span>GIF</button>
+
+    <div style="width:1px;height:24px;background:#20242a;"></div>
+
+    <button style="height:30px;padding:0 12px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#c4cad2;font-size:12px;font-weight:500;cursor:pointer;" style-hover="background:#22262c;">Share</button>
+    <button style="height:30px;padding:0 12px;background:#3d9bff;border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 1px 0 rgba(255,255,255,0.15) inset;" style-hover="background:#57a9ff;">Export HTML</button>
+
+    <div style="width:1px;height:24px;background:#20242a;"></div>
+
+    <button onClick="{{ openPalette }}" style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#9aa2ac;font-size:12px;cursor:pointer;" style-hover="background:#22262c;">Search<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;background:#0b0c0e;border:1px solid #2b3037;border-radius:4px;padding:1px 5px;">⌘K</span></button>
+    <button style="width:30px;height:30px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#9aa2ac;font-size:13px;cursor:pointer;" style-hover="background:#22262c;">?</button>
+  </div>
+
+  <!-- ════ BODY ════ -->
+  <div style="flex:1;display:flex;min-height:0;">
+
+    <!-- ═══ LEFT: NODE EDITOR ═══ -->
+    <div style="flex:1.42;display:flex;flex-direction:column;min-width:0;border-right:1px solid #20242a;background:#0b0c0e;">
+      <!-- panel header (docking) -->
+      <div style="display:flex;align-items:center;gap:10px;height:34px;flex-shrink:0;padding:0 12px;background:#101216;border-bottom:1px solid #17191e;">
+        <span style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;">⣿</span>
+        <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Node Editor</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;background:#1a1d22;border:1px solid #20242a;border-radius:4px;padding:1px 6px;">5N · 4E</span>
+        <div style="flex:1;"></div>
+        <span style="font-size:11px;color:#656d78;cursor:pointer;" style-hover="color:#c4cad2;">⤢</span>
+        <span style="font-size:13px;color:#656d78;cursor:pointer;" style-hover="color:#c4cad2;">⌄</span>
+      </div>
+
+      <!-- canvas -->
+      <div style="flex:1;position:relative;overflow:hidden;background-color:#0b0c0e;background-image:radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px);background-size:22px 22px;">
+
+        <!-- edges -->
+        <svg viewBox="0 0 780 620" style="position:absolute;left:0;top:0;width:780px;height:620px;pointer-events:none;overflow:visible;">
+          <path d="M190 111.5 C 245 111.5, 245 219.5, 300 219.5" stroke="#a06bff" stroke-width="2.5" fill="none"/>
+          <path d="M190 303.5 C 245 303.5, 245 249.5, 300 249.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
+          <path d="M190 457.5 C 250 457.5, 240 279.5, 300 279.5" stroke="#7ed957" stroke-width="2.5" fill="none"/>
+          <path d="M500 249.5 C 550 249.5, 550 255.5, 600 255.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
+        </svg>
+
+        <!-- Mesh node (source) -->
+        <div style="position:absolute;left:40px;top:66px;width:150px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,0.5);">
+          <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(75,191,137,0.22),rgba(75,191,137,0.08));border-radius:9px 9px 0 0;">
+            <div style="width:15px;height:15px;border-radius:4px;background:rgba(75,191,137,0.2);border:1px solid #4bbf89;display:flex;align-items:center;justify-content:center;font-size:10px;color:#6fd6a3;">▣</div>
+            <div style="font-size:11.5px;font-weight:600;color:#fff;">Mesh</div>
+          </div>
+          <div style="padding:8px 11px;display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;">sphere</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#a06bff;">mesh</span>
+          </div>
+          <div style="position:absolute;right:-6px;top:40px;width:11px;height:11px;border-radius:50%;background:#a06bff;border:2px solid #16181c;box-shadow:0 0 7px rgba(160,107,255,0.6);"></div>
+        </div>
+
+        <!-- Param Color node -->
+        <div style="position:absolute;left:40px;top:258px;width:150px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,0.5);">
+          <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(212,165,60,0.22),rgba(212,165,60,0.08));border-radius:9px 9px 0 0;">
+            <div style="width:15px;height:15px;border-radius:4px;background:rgba(212,165,60,0.2);border:1px solid #d4a53c;display:flex;align-items:center;justify-content:center;font-size:11px;color:#e2ba57;">∙</div>
+            <div style="font-size:11.5px;font-weight:600;color:#fff;">Color</div>
+          </div>
+          <div style="padding:8px 11px;display:flex;align-items:center;gap:8px;">
+            <div style="width:20px;height:20px;border-radius:5px;background:#3d9bff;border:1px solid #0b0c0e;"></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;flex:1;">#3D9BFF</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#f0b429;">vec3</span>
+          </div>
+          <div style="position:absolute;right:-6px;top:40px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 7px rgba(240,180,41,0.6);"></div>
+        </div>
+
+        <!-- Time node -->
+        <div style="position:absolute;left:40px;top:412px;width:150px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,0.5);">
+          <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(212,165,60,0.22),rgba(212,165,60,0.08));border-radius:9px 9px 0 0;">
+            <div style="width:15px;height:15px;border-radius:4px;background:rgba(212,165,60,0.2);border:1px solid #d4a53c;display:flex;align-items:center;justify-content:center;font-size:10px;color:#e2ba57;">◷</div>
+            <div style="font-size:11.5px;font-weight:600;color:#fff;">Time</div>
+          </div>
+          <div style="padding:8px 11px;display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;">u_time</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7ed957;">float</span>
+          </div>
+          <div style="position:absolute;right:-6px;top:40px;width:11px;height:11px;border-radius:50%;background:#7ed957;border:2px solid #16181c;box-shadow:0 0 7px rgba(126,217,87,0.6);"></div>
+        </div>
+
+        <!-- Shader node (selected) -->
+        <div style="position:absolute;left:300px;top:150px;width:200px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;border-radius:11px;box-shadow:0 14px 32px rgba(0,0,0,0.6),0 0 0 1.5px rgba(61,155,255,0.7),0 0 18px rgba(61,155,255,0.35);">
+          <div style="display:flex;align-items:center;gap:7px;padding:8px 12px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(61,155,255,0.3),rgba(61,155,255,0.12));border-radius:10px 10px 0 0;">
+            <div style="width:16px;height:16px;border-radius:5px;background:rgba(61,155,255,0.25);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#7dbcff;">◆</div>
+            <div style="font-size:12px;font-weight:600;color:#fff;">Fresnel</div>
+            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#f4d774;background:rgba(0,0,0,0.5);border:1px solid rgba(244,215,116,0.35);border-radius:5px;padding:1px 5px;">0.31ms</span>
+          </div>
+          <div style="padding:11px;">
+            <div style="width:100%;height:104px;border-radius:7px;background:radial-gradient(circle at 42% 34%,#8fc7ff 0%,#3d9bff 34%,#1a3d7a 68%,#0a1730 100%);border:1px solid #0b0c0e;box-shadow:inset 0 1px 4px rgba(0,0,0,0.5);position:relative;overflow:hidden;">
+              <div style="position:absolute;inset:0;background:radial-gradient(circle at 42% 34%,transparent 40%,rgba(61,155,255,0.4) 72%,transparent 74%);"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#565e68;">
+              <span>frag · 24 lines</span><span style="color:#f0b429;">→ vec4</span>
+            </div>
+          </div>
+          <!-- input sockets (hollow, colored by type) -->
+          <div style="position:absolute;left:-6px;top:64px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;"></div>
+          <div style="position:absolute;left:-6px;top:94px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
+          <div style="position:absolute;left:-6px;top:124px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
+          <!-- output plug -->
+          <div style="position:absolute;right:-6px;top:94px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 8px rgba(240,180,41,0.65);"></div>
+        </div>
+
+        <!-- Output node -->
+        <div style="position:absolute;left:600px;top:206px;width:150px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,0.5);">
+          <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(224,92,147,0.24),rgba(224,92,147,0.08));border-radius:9px 9px 0 0;">
+            <div style="width:15px;height:15px;border-radius:4px;background:rgba(224,92,147,0.2);border:1px solid #e05c93;display:flex;align-items:center;justify-content:center;font-size:10px;color:#ee7fac;">◎</div>
+            <div style="font-size:11.5px;font-weight:600;color:#fff;">Output</div>
+            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#565e68;">1/4</span>
+          </div>
+          <div style="padding:8px 11px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;">→ viewport A</span>
+          </div>
+          <div style="position:absolute;left:-6px;top:44px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
+        </div>
+
+        <!-- minimap -->
+        <sc-if value="{{ showMap }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;right:12px;bottom:12px;width:150px;height:104px;background:rgba(11,12,14,0.85);border:1px solid #20242a;border-radius:8px;overflow:hidden;backdrop-filter:blur(4px);">
+          <div style="position:absolute;left:12px;top:16px;width:22px;height:13px;border-radius:2px;background:#4bbf89;opacity:0.75;"></div>
+          <div style="position:absolute;left:14px;top:42px;width:22px;height:13px;border-radius:2px;background:#d4a53c;opacity:0.75;"></div>
+          <div style="position:absolute;left:14px;top:66px;width:22px;height:13px;border-radius:2px;background:#d4a53c;opacity:0.75;"></div>
+          <div style="position:absolute;left:60px;top:34px;width:30px;height:20px;border-radius:2px;background:#3d9bff;opacity:0.85;"></div>
+          <div style="position:absolute;left:112px;top:40px;width:20px;height:12px;border-radius:2px;background:#e05c93;opacity:0.75;"></div>
+          <div style="position:absolute;left:6px;top:10px;width:110px;height:78px;border:1.5px solid rgba(61,155,255,0.55);border-radius:3px;background:rgba(61,155,255,0.06);"></div>
+        </div>
+        </sc-if>
+
+        <!-- zoom controls -->
+        <div style="position:absolute;left:12px;bottom:12px;display:flex;gap:3px;background:rgba(19,21,25,0.9);border:1px solid #20242a;border-radius:8px;padding:3px;backdrop-filter:blur(4px);">
+          <button style="width:26px;height:26px;background:transparent;border:none;color:#c4cad2;border-radius:5px;cursor:pointer;font-size:15px;" style-hover="background:#22262c;">−</button>
+          <div style="min-width:42px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;">100%</div>
+          <button style="width:26px;height:26px;background:transparent;border:none;color:#c4cad2;border-radius:5px;cursor:pointer;font-size:15px;" style-hover="background:#22262c;">+</button>
+          <div style="width:1px;background:#20242a;margin:3px 2px;"></div>
+          <button style="padding:0 9px;height:26px;background:transparent;border:none;color:#9aa2ac;border-radius:5px;cursor:pointer;font-size:10.5px;font-family:'JetBrains Mono',monospace;" style-hover="background:#22262c;">fit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ RIGHT COLUMN ═══ -->
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+
+      <!-- Viewport -->
+      <div style="flex:1.25;display:flex;flex-direction:column;min-height:0;border-bottom:1px solid #20242a;background:#0b0c0e;">
+        <div style="display:flex;align-items:center;gap:10px;height:34px;flex-shrink:0;padding:0 12px;background:#101216;border-bottom:1px solid #17191e;">
+          <span style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;">⣿</span>
+          <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Viewport</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;">1 · single</span>
+          <div style="flex:1;"></div>
+          <span style="font-size:12px;color:#656d78;cursor:pointer;" style-hover="color:#c4cad2;">⊞</span>
+          <span style="font-size:12px;color:#656d78;cursor:pointer;" style-hover="color:#c4cad2;">⤢</span>
+        </div>
+        <div style="flex:1;position:relative;min-height:0;overflow:hidden;background:radial-gradient(circle at 50% 42%,#12325e 0%,#0c1c38 38%,#080a10 78%);">
+          <!-- rendered result -->
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+            <div style="width:230px;height:230px;border-radius:50%;background:radial-gradient(circle at 40% 32%,#bcdcff 0%,#4ba3ff 26%,#2b6fe0 52%,#12336b 78%,#08152e 100%);box-shadow:0 0 70px rgba(61,155,255,0.45),inset -18px -22px 60px rgba(0,0,0,0.55);position:relative;">
+              <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 40% 32%,transparent 55%,rgba(125,188,255,0.55) 82%,transparent 88%);"></div>
+            </div>
+          </div>
+          <!-- viewport controls overlay bar -->
+          <div style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:rgba(11,12,14,0.82);border:1px solid #20242a;border-radius:11px;padding:8px 14px;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+            <button onClick="{{ togglePlay }}" style="width:30px;height:30px;border-radius:8px;background:#3d9bff;border:none;color:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ playGlyph }}</button>
+            <div style="display:flex;align-items:center;gap:9px;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#e7eaee;width:38px;">{{ timeLabel }}</span>
+              <div style="width:180px;height:4px;border-radius:2px;background:#2b3037;position:relative;">
+                <div style="position:absolute;left:0;top:0;height:100%;width:{{ scrubPct }};background:#3d9bff;border-radius:2px;"></div>
+                <div style="position:absolute;left:{{ scrubPct }};top:50%;transform:translate(-50%,-50%);width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.5);"></div>
+              </div>
+            </div>
+            <div style="width:1px;height:18px;background:#2b3037;"></div>
+            <button onClick="{{ cycleSpeed }}" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;background:#22262c;border:1px solid #3a414a;border-radius:6px;padding:4px 9px;cursor:pointer;min-width:38px;">{{ speedLabel }}</button>
+            <button style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa2ac;background:transparent;border:none;cursor:pointer;padding:4px 6px;" style-hover="color:#e7eaee;">reset</button>
+          </div>
+          <!-- FOV badge top-right -->
+          <div style="position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;background:rgba(11,12,14,0.8);border:1px solid #20242a;border-radius:6px;padding:3px 8px;backdrop-filter:blur(4px);">FOV 55°</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#34d399;background:rgba(11,12,14,0.8);border:1px solid #20242a;border-radius:6px;padding:3px 8px;backdrop-filter:blur(4px);">60 FPS</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Side Panel -->
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;background:#131519;">
+        <!-- tabs header -->
+        <div style="display:flex;align-items:center;gap:2px;height:34px;flex-shrink:0;padding:0 8px 0 12px;background:#101216;border-bottom:1px solid #17191e;">
+          <span style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;margin-right:6px;">⣿</span>
+          <sc-for list="{{ sideTabs }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.select }}" style="display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;background:transparent;border:none;border-bottom:2px solid {{ t.underline }};color:{{ t.color }};font-size:12px;font-weight:{{ t.weight }};cursor:pointer;">{{ t.name }}<sc-if value="{{ t.badge }}" hint-placeholder-val="{{ true }}"><span style="font-size:9.5px;font-weight:700;color:{{ t.badgeColor }};background:{{ t.badgeBg }};border-radius:7px;padding:0 5px;font-family:'JetBrains Mono',monospace;">{{ t.badge }}</span></sc-if></button>
+          </sc-for>
+          <div style="flex:1;"></div>
+          <span style="font-size:13px;color:#656d78;cursor:pointer;padding:0 4px;" style-hover="color:#c4cad2;">⌄</span>
+        </div>
+
+        <!-- content -->
+        <div class="sp-scroll" style="flex:1;overflow-y:auto;min-height:0;">
+
+          <!-- INSPECTOR -->
+          <sc-if value="{{ isInspector }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:14px 14px 20px;">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px;">
+              <div style="width:22px;height:22px;border-radius:6px;background:rgba(61,155,255,0.25);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-size:12px;color:#7dbcff;">◆</div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#e7eaee;line-height:1.1;">Fresnel</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#656d78;">Shader · shader-3</div>
+              </div>
+              <span style="margin-left:auto;font-size:9.5px;font-weight:600;color:#34d399;background:rgba(52,211,153,0.13);border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:2px 8px;">compiled</span>
+            </div>
+
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;margin-bottom:12px;">Uniforms</div>
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <!-- float slider -->
+              <div>
+                <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;">u_intensity</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#e7eaee;">{{ intLabel }}</span>
+                </div>
+                <input type="range" min="0" max="2" step="0.01" value="{{ intVal }}" onInput="{{ onInt }}" style="width:100%;accent-color:#3d9bff;height:4px;"/>
+              </div>
+              <!-- color -->
+              <div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;margin-bottom:7px;">u_baseColor <span style="color:#f0b429;">vec3</span></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div style="width:30px;height:26px;border-radius:6px;background:#3d9bff;border:1px solid #3a414a;cursor:pointer;flex-shrink:0;"></div>
+                  <input type="text" value="#3D9BFF" readonly style="flex:1;background:#22262c;border:1px solid #3a414a;color:#e7eaee;font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 8px;border-radius:6px;"/>
+                </div>
+              </div>
+              <!-- vec3 rim offset -->
+              <div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;margin-bottom:7px;">u_rimOffset <span style="color:#f0b429;">vec3</span></div>
+                <div style="display:flex;gap:8px;">
+                  <div style="flex:1;display:flex;align-items:center;gap:6px;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#f0555c;">x</span><input type="range" min="-1" max="1" step="0.01" value="0.3" style="flex:1;accent-color:#f0555c;height:3px;"/></div>
+                  <div style="flex:1;display:flex;align-items:center;gap:6px;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#34d399;">y</span><input type="range" min="-1" max="1" step="0.01" value="-0.2" style="flex:1;accent-color:#34d399;height:3px;"/></div>
+                  <div style="flex:1;display:flex;align-items:center;gap:6px;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#3d9bff;">z</span><input type="range" min="-1" max="1" step="0.01" value="0.8" style="flex:1;accent-color:#3d9bff;height:3px;"/></div>
+                </div>
+              </div>
+              <!-- bool toggle -->
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;flex:1;">u_wireframe <span style="color:#7ed957;">bool</span></span>
+                <div onClick="{{ toggleWire }}" style="width:38px;height:21px;border-radius:11px;background:{{ wireBg }};position:relative;cursor:pointer;transition:background 0.15s;flex-shrink:0;"><div style="position:absolute;top:2px;left:{{ wireLeft }};width:17px;height:17px;border-radius:50%;background:#fff;transition:left 0.15s;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div></div>
+              </div>
+              <!-- select -->
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;flex:1;">primitive</span>
+                <select style="width:110px;background:#22262c;border:1px solid #3a414a;color:#e7eaee;font-size:11.5px;padding:5px 8px;border-radius:6px;"><option>Sphere</option><option>Cube</option><option>Torus</option></select>
+              </div>
+            </div>
+          </div>
+          </sc-if>
+
+          <!-- ASSETS -->
+          <sc-if value="{{ isAssets }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <span style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;">6 assets</span>
+              <button style="font-size:11px;color:#7dbcff;background:rgba(61,155,255,0.12);border:1px solid rgba(61,155,255,0.3);border-radius:6px;padding:4px 10px;cursor:pointer;">＋ Import</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <sc-for list="{{ assets }}" as="a" hint-placeholder-count="6">
+                <div style="border:1px solid #20242a;border-radius:9px;overflow:hidden;background:#1a1d22;cursor:pointer;" style-hover="border-color:#3a414a;">
+                  <div style="height:70px;background:{{ a.bg }};"></div>
+                  <div style="padding:7px 9px;display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-size:11px;color:#c4cad2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ a.name }}</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#565e68;">{{ a.tag }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <!-- PROBLEMS -->
+          <sc-if value="{{ isProblems }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:8px 0;">
+            <sc-for list="{{ problems }}" as="p" hint-placeholder-count="3">
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid #17191e;cursor:pointer;" style-hover="background:#1a1d22;">
+                <div style="width:14px;height:14px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;color:{{ p.hex }};font-size:12px;">{{ p.icon }}</div>
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:12px;color:#e7eaee;line-height:1.4;">{{ p.msg }}</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;margin-top:2px;">{{ p.loc }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ CODE EDITOR (bottom dock) ════ -->
+  <div style="height:{{ codeH }};flex-shrink:0;display:flex;flex-direction:column;background:#0d0f12;border-top:1px solid #20242a;transition:height 0.18s cubic-bezier(.2,.7,.3,1);overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:2px;height:34px;flex-shrink:0;padding:0 8px 0 12px;background:#101216;border-bottom:1px solid #17191e;">
+      <span style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;margin-right:8px;">⣿</span>
+      <sc-for list="{{ codeTabs }}" as="c" hint-placeholder-count="2">
+        <button onClick="{{ c.select }}" style="display:flex;align-items:center;gap:7px;height:34px;padding:0 13px;background:{{ c.bg }};border:none;color:{{ c.color }};font-size:12px;font-weight:{{ c.weight }};cursor:pointer;font-family:'JetBrains Mono',monospace;">{{ c.name }}<sc-if value="{{ c.err }}" hint-placeholder-val="{{ true }}"><span style="width:6px;height:6px;border-radius:50%;background:#f0555c;box-shadow:0 0 6px #f0555c;"></span></sc-if></button>
+      </sc-for>
+      <div style="width:1px;height:16px;background:#20242a;margin:0 8px;"></div>
+      <span style="font-size:11px;color:#656d78;">Fresnel</span>
+      <div style="flex:1;"></div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;">GLSL · ES 3.0</span>
+      <button onClick="{{ toggleCode }}" style="font-size:13px;color:#656d78;background:transparent;border:none;cursor:pointer;padding:0 6px;" style-hover="color:#c4cad2;">{{ codeChevron }}</button>
+    </div>
+
+    <div class="sp-scroll" style="flex:1;overflow:auto;min-height:0;display:flex;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;">
+      <!-- gutter -->
+      <div style="flex-shrink:0;padding:10px 12px 10px 14px;text-align:right;color:#3c434c;user-select:none;background:#0b0c0e;border-right:1px solid #17191e;">
+        <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div style="color:#f0555c;">8</div><div>9</div><div>10</div><div>11</div><div>12</div>
+      </div>
+      <!-- code -->
+      <pre style="margin:0;padding:10px 16px;flex:1;white-space:pre;"><span style="color:#c586c0;">#version</span> <span style="color:#b5cea8;">300</span> es
+<span style="color:#c586c0;">precision</span> <span style="color:#4ec9b0;">highp</span> <span style="color:#4ec9b0;">float</span>;
+
+<span style="color:#c586c0;">uniform</span> <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">u_intensity</span>; <span style="color:#6a737d;">// 0..2</span>
+<span style="color:#c586c0;">uniform</span> <span style="color:#4ec9b0;">vec3</span>  <span style="color:#9cdcfe;">u_baseColor</span>;
+<span style="color:#c586c0;">in</span> <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">v_normal</span>;
+<span style="color:#c586c0;">out</span> <span style="color:#4ec9b0;">vec4</span> <span style="color:#9cdcfe;">fragColor</span>;
+<span style="color:#c586c0;">void</span> <span style="color:#dcdcaa;">main</span>() {
+  <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">fresnel</span> = <span style="color:#dcdcaa;">pow</span>(<span style="color:#b5cea8;">1.0</span> - <span style="color:#dcdcaa;">dot</span>(<span style="color:#9cdcfe;">N</span>, <span style="color:#9cdcfe;">V</span>)<span style="text-decoration:wavy underline #f0555c;text-underline-offset:3px;">, u_intensty)</span>; <span style="color:#6a737d;">// typo</span>
+  <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">col</span> = <span style="color:#9cdcfe;">u_baseColor</span> * <span style="color:#9cdcfe;">fresnel</span>;
+  <span style="color:#9cdcfe;">fragColor</span> = <span style="color:#4ec9b0;">vec4</span>(<span style="color:#9cdcfe;">col</span>, <span style="color:#b5cea8;">1.0</span>);
+}</pre>
+    </div>
+    <!-- inline error strip -->
+    <div style="flex-shrink:0;display:flex;align-items:center;gap:9px;padding:6px 14px;background:rgba(240,85,92,0.08);border-top:1px solid rgba(240,85,92,0.25);">
+      <span style="color:#f0555c;font-size:12px;">✕</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f5a0a4;">line 8:37</span>
+      <span style="font-size:11.5px;color:#e7eaee;">'u_intensty' : undeclared identifier</span>
+      <span style="font-size:11px;color:#656d78;margin-left:8px;">— did you mean <span style="color:#7dbcff;">u_intensity</span>?</span>
+    </div>
+  </div>
+
+  <!-- ════ STATUS BAR ════ -->
+  <div style="display:flex;align-items:center;gap:16px;height:26px;flex-shrink:0;padding:0 12px;background:#101216;border-top:1px solid #17191e;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;">
+    <span style="display:flex;align-items:center;gap:6px;color:#34d399;"><span style="width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;"></span>GL ready</span>
+    <span>60 FPS</span>
+    <span>3 draws</span>
+    <span>0.94ms GPU</span>
+    <span style="color:#656d78;">5N · 4E</span>
+    <div style="flex:1;"></div>
+    <span style="color:#f0555c;">⚠ 1 error</span>
+    <span style="color:#656d78;cursor:pointer;">Diagnostics</span>
+  </div>
+
+  <!-- ════ COMMAND PALETTE overlay ════ -->
+  <sc-if value="{{ paletteOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closePalette }}" style="position:absolute;inset:0;background:rgba(8,9,11,0.6);backdrop-filter:blur(2px);display:flex;align-items:flex-start;justify-content:center;padding-top:120px;z-index:50;">
+    <div onClick="{{ stop }}" style="width:520px;background:#131519;border:1px solid #3a414a;border-radius:12px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.7);">
+      <div style="display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid #20242a;">
+        <span style="color:#565e68;font-size:15px;">⌕</span>
+        <span style="font-size:15px;color:#e7eaee;">add shad</span>
+        <span style="width:1.5px;height:17px;background:#3d9bff;animation:spBlink 1s infinite;"></span>
+      </div>
+      <div style="padding:6px;">
+        <div style="display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:8px;background:rgba(61,155,255,0.14);">
+          <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#7dbcff;background:rgba(61,155,255,0.18);padding:2px 6px;border-radius:4px;min-width:54px;text-align:center;font-weight:600;">node</span>
+          <span style="flex:1;font-size:13px;color:#fff;">Add <strong>Shad</strong>er node</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#7dbcff;">↵</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:8px;">
+          <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#8f97a1;background:#22262c;padding:2px 6px;border-radius:4px;min-width:54px;text-align:center;font-weight:600;">preset</span>
+          <span style="flex:1;font-size:13px;color:#c4cad2;">Load <strong>Shad</strong>ertoy raymarcher</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:8px;">
+          <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#8f97a1;background:#22262c;padding:2px 6px;border-radius:4px;min-width:54px;text-align:center;font-weight:600;">compute</span>
+          <span style="flex:1;font-size:13px;color:#c4cad2;">Add <strong>Shad</strong>ow-pass compute</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;padding:8px 16px;border-top:1px solid #20242a;color:#565e68;font-size:10.5px;font-family:'JetBrains Mono',monospace;"><span>↑↓ navigate</span><span>↵ select</span><span>esc close</span></div>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;showMinimap&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Node Editor&quot;},&quot;showThumbnails&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Node Editor&quot;},&quot;gpuBadges&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Overlays&quot;}}">
+class Component extends DCLogic {
+  state = { play: true, t: 0.62, speed: 1, side: "inspector", code: "fragment", intensity: 1.35, wire: false, palette: false, codeOpen: true };
+
+  renderVals() {
+    const s = this.state;
+
+    const addBtns = [
+      { name: "Mesh", glyph: "\u25A3", hex: "#4bbf89", tile: "rgba(75,191,137,0.16)" },
+      { name: "Image", glyph: "\u25A4", hex: "#4bbf89", tile: "rgba(75,191,137,0.16)" },
+      { name: "Shader", glyph: "\u25C6", hex: "#3d9bff", tile: "rgba(61,155,255,0.16)" },
+      { name: "Output", glyph: "\u25CE", hex: "#e05c93", tile: "rgba(224,92,147,0.16)" },
+    ];
+
+    const mkSide = (key, name, badge, variant) => {
+      const active = s.side === key;
+      return {
+        name, badge,
+        select: () => this.setState({ side: key }),
+        underline: active ? "#3d9bff" : "transparent",
+        color: active ? "#e7eaee" : "#9aa2ac",
+        weight: active ? 600 : 500,
+        badgeBg: variant === "error" ? "#f0555c" : "#2b3037",
+        badgeColor: variant === "error" ? "#0b0c0e" : "#c4cad2",
+      };
+    };
+    const sideTabs = [
+      mkSide("inspector", "Inspector", null),
+      mkSide("assets", "Assets", "6"),
+      mkSide("problems", "Problems", "1", "error"),
+    ];
+
+    const mkCode = (key, name, err) => {
+      const active = s.code === key;
+      return {
+        name, err,
+        select: () => this.setState({ code: key }),
+        bg: active ? "#0d0f12" : "transparent",
+        color: active ? "#e7eaee" : "#8f97a1",
+        weight: active ? 600 : 400,
+      };
+    };
+    const codeTabs = [ mkCode("vertex", "vertex", false), mkCode("fragment", "fragment", true) ];
+
+    const assets = [
+      { name: "sphere.obj", tag: "MESH", bg: "linear-gradient(135deg,#2a3340,#1a2028)" },
+      { name: "noise.png", tag: "TEX", bg: "repeating-linear-gradient(45deg,#2b2f36 0 6px,#22262c 6px 12px)" },
+      { name: "grad.png", tag: "TEX", bg: "linear-gradient(135deg,#e05c93,#3d9bff)" },
+      { name: "env.hdr", tag: "CUBE", bg: "radial-gradient(circle at 50% 40%,#4ba3ff,#12336b)" },
+      { name: "clip.mp4", tag: "VIDEO", bg: "linear-gradient(135deg,#1a2028,#2a3340)" },
+      { name: "beat.wav", tag: "AUDIO", bg: "repeating-linear-gradient(90deg,#d4a53c 0 2px,#1a1d22 2px 7px)" },
+    ];
+
+    const problems = [
+      { icon: "\u2715", hex: "#f0555c", msg: "'u_intensty' : undeclared identifier", loc: "Fresnel · fragment · line 8" },
+      { icon: "\u26A0", hex: "#f5b13d", msg: "unused varying 'v_uv' will be optimized out", loc: "Fresnel · vertex · line 12" },
+      { icon: "\u2139", hex: "#3d9bff", msg: "shader recompiled in 4.2ms", loc: "Blend · fragment" },
+    ];
+
+    const play = s.play;
+    const speeds = [0.5, 1, 2, 4];
+    return {
+      addBtns, sideTabs, codeTabs, assets, problems,
+      showMap: this.props.showMinimap ?? true,
+
+      isInspector: s.side === "inspector",
+      isAssets: s.side === "assets",
+      isProblems: s.side === "problems",
+
+      togglePlay: () => this.setState({ play: !play }),
+      playGlyph: play ? "\u2016" : "\u25B6",
+      timeLabel: s.t.toFixed(2) + "s",
+      scrubPct: Math.round(s.t / 4 * 100) + "%",
+      cycleSpeed: () => { const i = speeds.indexOf(s.speed); this.setState({ speed: speeds[(i + 1) % speeds.length] }); },
+      speedLabel: s.speed + "\u00D7",
+
+      intVal: s.intensity,
+      intLabel: s.intensity.toFixed(2),
+      onInt: (e) => this.setState({ intensity: parseFloat(e.target.value) }),
+      toggleWire: () => this.setState({ wire: !s.wire }),
+      wireBg: s.wire ? "#3d9bff" : "#2b3037",
+      wireLeft: s.wire ? "19px" : "2px",
+
+      recBg: play ? "#1a1d22" : "#1a1d22",
+      recBorder: "#20242a",
+      recColor: "#c4cad2",
+      recDot: "#f0555c",
+      recGlow: "0 0 6px rgba(240,85,92,0.6)",
+      recLabel: "Record",
+      toggleRec: () => {},
+
+      codeH: s.codeOpen ? "232px" : "34px",
+      codeChevron: s.codeOpen ? "\u2304" : "\u2303",
+      toggleCode: () => this.setState({ codeOpen: !s.codeOpen }),
+
+      paletteOpen: s.palette,
+      openPalette: () => this.setState({ palette: true }),
+      closePalette: () => this.setState({ palette: false }),
+      stop: (e) => e.stopPropagation(),
+    };
+  }
+}
+</script>
+</body>
+</html>

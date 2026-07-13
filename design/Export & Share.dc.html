@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #08090b; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+  ::selection { background: rgba(61,155,255,0.3); }
+  .es-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+  .es-scroll::-webkit-scrollbar-thumb { background: #2b3037; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+  .es-scroll::-webkit-scrollbar-track { background: transparent; }
+  @keyframes esRec { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @keyframes esScan { 0% { transform: translateX(-100%); } 100% { transform: translateX(220%); } }
+  @keyframes esUp { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
+  @keyframes esToast { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  a { color: #57a9ff; } a:hover { color: #7dbcff; }
+</style>
+</helmet>
+<div style="width:1440px;height:900px;position:relative;background:#08090b;color:#e7eaee;overflow:hidden;font-size:13px;">
+
+  <!-- ════ BLURRED APP-SHELL BACKDROP ════ -->
+  <sc-if value="{{ showBackdrop }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;inset:0;filter:blur(3px) saturate(0.85);opacity:0.55;pointer-events:none;">
+    <div style="width:100%;height:100%;display:flex;flex-direction:column;">
+      <div style="height:48px;flex-shrink:0;background:#131519;border-bottom:1px solid #20242a;display:flex;align-items:center;gap:12px;padding:0 14px;">
+        <div style="width:24px;height:24px;border-radius:7px;background:linear-gradient(155deg,#3d9bff,#2b6fe0);"></div>
+        <div style="width:120px;height:12px;border-radius:4px;background:#22262c;"></div>
+        <div style="flex:1;"></div>
+        <div style="width:70px;height:28px;border-radius:7px;background:#1a1d22;"></div>
+        <div style="width:96px;height:28px;border-radius:7px;background:#2b6fe0;"></div>
+      </div>
+      <div style="flex:1;display:flex;min-height:0;">
+        <div style="flex:1.4;background:#0b0c0e;background-image:radial-gradient(rgba(255,255,255,0.05) 1px,transparent 1px);background-size:22px 22px;border-right:1px solid #20242a;position:relative;">
+          <div style="position:absolute;left:60px;top:120px;width:150px;height:70px;border-radius:10px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;"></div>
+          <div style="position:absolute;left:340px;top:210px;width:200px;height:170px;border-radius:11px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid rgba(61,155,255,0.5);"></div>
+          <div style="position:absolute;left:620px;top:250px;width:150px;height:66px;border-radius:10px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;"></div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <div style="flex:1.25;background:radial-gradient(circle at 50% 42%,#12325e 0%,#0c1c38 40%,#080a10 80%);"></div>
+          <div style="flex:1;background:#131519;border-top:1px solid #20242a;"></div>
+        </div>
+      </div>
+      <div style="height:232px;flex-shrink:0;background:#0d0f12;border-top:1px solid #20242a;"></div>
+    </div>
+  </div>
+  </sc-if>
+  <div style="position:absolute;inset:0;background:rgba(8,9,11,0.62);backdrop-filter:blur(1.5px);"></div>
+
+  <!-- ════ MODAL ════ -->
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:880px;height:600px;display:flex;flex-direction:column;background:#131519;border:1px solid #2b3037;border-radius:16px;box-shadow:0 40px 100px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);overflow:hidden;animation:esUp 0.18s cubic-bezier(.2,.7,.3,1);">
+
+    <!-- header -->
+    <div style="display:flex;align-items:center;gap:13px;height:60px;flex-shrink:0;padding:0 20px;border-bottom:1px solid #20242a;background:#101216;">
+      <div style="width:30px;height:30px;border-radius:8px;background:rgba(61,155,255,0.14);border:1px solid rgba(61,155,255,0.35);display:flex;align-items:center;justify-content:center;color:#7dbcff;font-size:15px;">⤴</div>
+      <div>
+        <div style="font-size:15px;font-weight:600;letter-spacing:-0.2px;line-height:1.1;">Export &amp; Share</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;margin-top:2px;">Fresnel · 5 nodes · 1440×810 viewport</div>
+      </div>
+      <div style="flex:1;"></div>
+      <button style="width:30px;height:30px;border-radius:8px;background:#1a1d22;border:1px solid #20242a;color:#9aa2ac;font-size:14px;cursor:pointer;" style-hover="background:#22262c;color:#e7eaee;">✕</button>
+    </div>
+
+    <div style="flex:1;display:flex;min-height:0;">
+
+      <!-- ═══ LEFT RAIL: TARGETS ═══ -->
+      <div class="es-scroll" style="width:236px;flex-shrink:0;border-right:1px solid #20242a;background:#0f1114;overflow-y:auto;padding:16px 12px;">
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+          <div style="margin-bottom:18px;">
+            <div style="font-size:9.5px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:#565e68;padding:0 8px;margin-bottom:8px;">{{ g.label }}</div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+                <button onClick="{{ it.select }}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:9px 10px;border-radius:9px;background:{{ it.bg }};border:1px solid {{ it.border }};cursor:pointer;">
+                  <span style="width:26px;height:26px;flex-shrink:0;border-radius:7px;background:{{ it.iconBg }};border:1px solid {{ it.iconBorder }};display:flex;align-items:center;justify-content:center;font-size:13px;color:{{ it.iconColor }};">{{ it.glyph }}</span>
+                  <span style="min-width:0;flex:1;">
+                    <span style="display:block;font-size:12.5px;font-weight:{{ it.weight }};color:{{ it.color }};line-height:1.2;">{{ it.name }}</span>
+                    <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#656d78;margin-top:1px;">{{ it.meta }}</span>
+                  </span>
+                  <sc-if value="{{ it.active }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:50%;background:#3d9bff;box-shadow:0 0 6px #3d9bff;flex-shrink:0;"></span></sc-if>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- ═══ MAIN AREA ═══ -->
+      <div class="es-scroll" style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative;overflow-y:auto;">
+
+        <!-- ── CONFIGURE · RECORD ── -->
+        <sc-if value="{{ cfgRecord }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;display:flex;flex-direction:column;padding:22px 24px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-size:15px;font-weight:600;">{{ recTitle }}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;">{{ recCodec }}</div>
+          </div>
+          <!-- preview -->
+          <div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:11px;overflow:hidden;border:1px solid #20242a;background:radial-gradient(circle at 50% 42%,#12325e 0%,#0c1c38 40%,#080a10 82%);margin-bottom:18px;flex-shrink:0;">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+              <div style="width:180px;height:180px;border-radius:50%;background:radial-gradient(circle at 40% 32%,#bcdcff 0%,#4ba3ff 26%,#2b6fe0 52%,#12336b 78%,#08152e 100%);box-shadow:0 0 60px rgba(61,155,255,0.4),inset -14px -18px 46px rgba(0,0,0,0.55);"></div>
+            </div>
+            <div style="position:absolute;left:12px;top:12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;background:rgba(11,12,14,0.8);border:1px solid #20242a;border-radius:6px;padding:3px 8px;">{{ recRes }}</div>
+            <div style="position:absolute;right:12px;top:12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#34d399;background:rgba(11,12,14,0.8);border:1px solid #20242a;border-radius:6px;padding:3px 8px;">{{ recFps }} fps</div>
+          </div>
+          <!-- settings -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;">
+            <div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;margin-bottom:7px;">Resolution</div>
+              <div style="display:flex;gap:4px;background:#1a1d22;border:1px solid #20242a;border-radius:8px;padding:3px;">
+                <sc-for list="{{ resOpts }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.select }}" style="flex:1;padding:6px 0;border:none;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;background:{{ r.bg }};color:{{ r.color }};">{{ r.name }}</button></sc-for>
+              </div>
+            </div>
+            <div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;margin-bottom:7px;">Frame rate</div>
+              <div style="display:flex;gap:4px;background:#1a1d22;border:1px solid #20242a;border-radius:8px;padding:3px;">
+                <sc-for list="{{ fpsOpts }}" as="f" hint-placeholder-count="3"><button onClick="{{ f.select }}" style="flex:1;padding:6px 0;border:none;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;background:{{ f.bg }};color:{{ f.color }};">{{ f.name }}</button></sc-for>
+              </div>
+            </div>
+            <div style="grid-column:1 / -1;">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;">Duration</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e7eaee;">{{ durLabel }}</span>
+              </div>
+              <input type="range" min="1" max="10" step="0.5" value="{{ duration }}" onInput="{{ onDuration }}" style="width:100%;accent-color:#3d9bff;height:4px;"/>
+            </div>
+            <div style="display:flex;align-items:center;gap:11px;">
+              <div onClick="{{ toggleLoop }}" style="width:38px;height:21px;border-radius:11px;background:{{ loopBg }};position:relative;cursor:pointer;transition:background 0.14s;flex-shrink:0;"><div style="position:absolute;top:2px;left:{{ loopLeft }};width:17px;height:17px;border-radius:50%;background:#fff;transition:left 0.14s;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div></div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;">Seamless loop</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;">est.</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e2ba57;background:rgba(0,0,0,0.4);border:1px solid rgba(244,215,116,0.28);border-radius:6px;padding:3px 8px;">{{ estSize }}</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ── CONFIGURE · CODE ── -->
+        <sc-if value="{{ cfgCode }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;padding:22px 24px;">
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Code snippet</div>
+          <div style="font-size:12px;color:#8f97a1;margin-bottom:16px;line-height:1.5;">Copy the compiled graph as a self-contained module. Uniforms are wired as exported params.</div>
+          <div style="display:flex;gap:4px;background:#1a1d22;border:1px solid #20242a;border-radius:8px;padding:3px;width:fit-content;margin-bottom:14px;">
+            <sc-for list="{{ langOpts }}" as="l" hint-placeholder-count="3"><button onClick="{{ l.select }}" style="padding:6px 14px;border:none;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11.5px;cursor:pointer;background:{{ l.bg }};color:{{ l.color }};">{{ l.name }}</button></sc-for>
+          </div>
+          <div style="flex:1;min-height:0;border:1px solid #20242a;border-radius:10px;background:#0b0c0e;overflow:auto;" class="es-scroll">
+            <pre style="margin:0;padding:16px 18px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.75;">{{ codeBlock }}</pre>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ── CONFIGURE · HTML ── -->
+        <sc-if value="{{ cfgHtml }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;padding:22px 24px;">
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Standalone HTML</div>
+          <div style="font-size:12px;color:#8f97a1;margin-bottom:18px;line-height:1.5;">One file, no dependencies — runs the WebGL2 render loop straight from a browser.</div>
+          <div style="display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #20242a;border-radius:11px;background:#1a1d22;margin-bottom:18px;">
+            <div style="width:46px;height:56px;border-radius:8px;background:linear-gradient(160deg,#1e2126,#101216);border:1px solid #2b3037;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#7dbcff;flex-shrink:0;">HTML</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#e7eaee;">shader-playground.html</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;margin-top:3px;">{{ htmlSize }} · WebGL2 · ES 3.0</div>
+            </div>
+          </div>
+          <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;margin-bottom:12px;">Include</div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ htmlOpts }}" as="o" hint-placeholder-count="3">
+              <div onClick="{{ o.toggle }}" style="display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:9px;cursor:pointer;background:{{ o.bg }};" style-hover="background:#1a1d22;">
+                <span style="width:18px;height:18px;flex-shrink:0;border-radius:5px;border:1.5px solid {{ o.boxBorder }};background:{{ o.boxBg }};display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;">{{ o.check }}</span>
+                <span style="flex:1;min-width:0;"><span style="display:block;font-size:12.5px;color:#e7eaee;">{{ o.name }}</span><span style="display:block;font-size:11px;color:#656d78;margin-top:1px;">{{ o.desc }}</span></span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;">{{ o.tag }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ── CONFIGURE · LINK ── -->
+        <sc-if value="{{ cfgLink }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;padding:22px 24px;">
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Share link</div>
+          <div style="font-size:12px;color:#8f97a1;margin-bottom:18px;line-height:1.5;">Publish a live, editable copy of the graph. Recipients open it in the browser — no install.</div>
+          <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;margin-bottom:10px;">Visibility</div>
+          <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:20px;">
+            <sc-for list="{{ visOpts }}" as="v" hint-placeholder-count="3">
+              <div onClick="{{ v.select }}" style="display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:9px;cursor:pointer;background:{{ v.bg }};border:1px solid {{ v.border }};">
+                <span style="width:16px;height:16px;flex-shrink:0;border-radius:50%;border:1.5px solid {{ v.dotBorder }};display:flex;align-items:center;justify-content:center;"><span style="width:8px;height:8px;border-radius:50%;background:{{ v.dotBg }};"></span></span>
+                <span style="width:22px;text-align:center;color:{{ v.iconColor }};font-size:13px;flex-shrink:0;">{{ v.glyph }}</span>
+                <span style="flex:1;min-width:0;"><span style="display:block;font-size:12.5px;font-weight:500;color:#e7eaee;">{{ v.name }}</span><span style="display:block;font-size:11px;color:#656d78;margin-top:1px;">{{ v.desc }}</span></span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;margin-bottom:10px;">Permissions</div>
+          <div style="display:flex;gap:10px;">
+            <div onClick="{{ toggleFork }}" style="flex:1;display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;border:1px solid {{ forkBorder }};background:{{ forkBg }};cursor:pointer;">
+              <span style="width:8px;height:8px;border-radius:50%;background:{{ forkDot }};flex-shrink:0;"></span><span style="font-size:12px;color:#e7eaee;">Allow fork &amp; remix</span>
+            </div>
+            <div onClick="{{ toggleEmbed }}" style="flex:1;display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;border:1px solid {{ embedBorder }};background:{{ embedBg }};cursor:pointer;">
+              <span style="width:8px;height:8px;border-radius:50%;background:{{ embedDot }};flex-shrink:0;"></span><span style="font-size:12px;color:#e7eaee;">Provide embed code</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ── RECORDING ── -->
+        <sc-if value="{{ isRecording }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;padding:22px 24px;">
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px;">
+            <span style="width:9px;height:9px;border-radius:2px;background:#f0555c;box-shadow:0 0 8px #f0555c;animation:esRec 1s infinite;"></span>
+            <span style="font-size:15px;font-weight:600;">Recording…</span>
+            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;">{{ recFrames }} frames captured</span>
+          </div>
+          <div style="position:relative;width:100%;aspect-ratio:16/9;border-radius:11px;overflow:hidden;border:1px solid rgba(240,85,92,0.4);background:radial-gradient(circle at 50% 42%,#12325e 0%,#0c1c38 40%,#080a10 82%);margin-bottom:20px;box-shadow:0 0 0 1px rgba(240,85,92,0.25),0 0 24px rgba(240,85,92,0.15);">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+              <div style="width:180px;height:180px;border-radius:50%;background:radial-gradient(circle at 40% 32%,#bcdcff 0%,#4ba3ff 26%,#2b6fe0 52%,#12336b 78%,#08152e 100%);box-shadow:0 0 60px rgba(61,155,255,0.4),inset -14px -18px 46px rgba(0,0,0,0.55);"></div>
+            </div>
+            <div style="position:absolute;left:12px;top:12px;display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#fff;background:rgba(240,85,92,0.85);border-radius:6px;padding:3px 9px;"><span style="width:6px;height:6px;border-radius:50%;background:#fff;animation:esRec 1s infinite;"></span>REC</div>
+          </div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#e7eaee;">{{ recElapsed }}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#656d78;">{{ durLabel }}</span>
+          </div>
+          <div style="width:100%;height:6px;border-radius:3px;background:#22262c;overflow:hidden;">
+            <div style="height:100%;width:{{ recPct }};background:linear-gradient(90deg,#f0555c,#f5757b);border-radius:3px;transition:width 0.06s linear;"></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ── ENCODING ── -->
+        <sc-if value="{{ isEncoding }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px 24px;text-align:center;">
+          <div style="position:relative;width:96px;height:96px;margin-bottom:24px;">
+            <svg viewBox="0 0 96 96" style="width:96px;height:96px;transform:rotate(-90deg);">
+              <circle cx="48" cy="48" r="42" fill="none" stroke="#22262c" stroke-width="7"/>
+              <circle cx="48" cy="48" r="42" fill="none" stroke="#3d9bff" stroke-width="7" stroke-linecap="round" stroke-dasharray="{{ encDash }}" style="transition:stroke-dasharray 0.08s linear;"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:600;color:#e7eaee;">{{ encPct }}</div>
+          </div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px;">{{ encTitle }}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8f97a1;margin-bottom:4px;">{{ encStage }}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;">{{ encEta }}</div>
+        </div>
+        </sc-if>
+
+        <!-- ── DONE ── -->
+        <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px 30px;text-align:center;animation:esUp 0.2s cubic-bezier(.2,.7,.3,1);">
+          <div style="width:56px;height:56px;border-radius:50%;background:rgba(52,211,153,0.13);border:1px solid rgba(52,211,153,0.4);display:flex;align-items:center;justify-content:center;color:#34d399;font-size:26px;margin-bottom:18px;box-shadow:0 0 24px rgba(52,211,153,0.2);">✓</div>
+          <div style="font-size:17px;font-weight:600;letter-spacing:-0.2px;margin-bottom:8px;">{{ doneTitle }}</div>
+          <div style="font-size:12.5px;color:#8f97a1;margin-bottom:22px;max-width:360px;line-height:1.5;">{{ doneMsg }}</div>
+
+          <!-- link URL row -->
+          <sc-if value="{{ doneLink }}" hint-placeholder-val="{{ false }}">
+          <div style="width:100%;max-width:420px;display:flex;gap:8px;margin-bottom:14px;">
+            <div style="flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:#0b0c0e;border:1px solid #2b3037;border-radius:9px;padding:0 12px;height:40px;">
+              <span style="color:#565e68;font-size:12px;flex-shrink:0;">🔗</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7dbcff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ shareUrl }}</span>
+            </div>
+            <button onClick="{{ copyLink }}" style="flex-shrink:0;height:40px;padding:0 16px;border-radius:9px;border:1px solid {{ copyBorder }};background:{{ copyBg }};color:{{ copyColor }};font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;">{{ copyLabel }}</button>
+          </div>
+          </sc-if>
+
+          <!-- file card (record/html) -->
+          <sc-if value="{{ doneFile }}" hint-placeholder-val="{{ false }}">
+          <div style="width:100%;max-width:420px;display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid #20242a;border-radius:11px;background:#1a1d22;margin-bottom:16px;text-align:left;">
+            <div style="width:40px;height:40px;border-radius:9px;background:{{ fileIconBg }};border:1px solid {{ fileIconBorder }};display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:{{ fileIconColor }};flex-shrink:0;">{{ fileExt }}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#e7eaee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ fileName }}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;margin-top:3px;">{{ fileMeta }}</div>
+            </div>
+          </div>
+          </sc-if>
+
+          <div style="display:flex;gap:10px;">
+            <button onClick="{{ reset }}" style="height:38px;padding:0 18px;border-radius:9px;border:1px solid #3a414a;background:#22262c;color:#c4cad2;font-size:12.5px;font-weight:500;cursor:pointer;" style-hover="background:#2a2f36;">Export again</button>
+            <button onClick="{{ primaryDone }}" style="height:38px;padding:0 20px;border-radius:9px;border:none;background:#3d9bff;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 1px 0 rgba(255,255,255,0.15) inset;" style-hover="background:#57a9ff;">{{ doneCta }}</button>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ── FOOTER (configure only) ── -->
+        <sc-if value="{{ showFooter }}" hint-placeholder-val="{{ true }}">
+        <div style="flex-shrink:0;display:flex;align-items:center;gap:12px;padding:14px 24px;border-top:1px solid #20242a;background:#101216;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;">{{ footerHint }}</span>
+          <div style="flex:1;"></div>
+          <button style="height:36px;padding:0 16px;border-radius:9px;border:1px solid #3a414a;background:transparent;color:#9aa2ac;font-size:12.5px;font-weight:500;cursor:pointer;" style-hover="color:#e7eaee;background:#1a1d22;">Cancel</button>
+          <button onClick="{{ startAction }}" style="height:36px;padding:0 20px;border-radius:9px;border:none;background:#3d9bff;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 1px 0 rgba(255,255,255,0.15) inset;" style-hover="background:#57a9ff;"><span style="font-size:13px;">{{ primaryGlyph }}</span>{{ primaryLabel }}</button>
+        </div>
+        </sc-if>
+
+        <!-- ── FOOTER (in-progress: stop/cancel) ── -->
+        <sc-if value="{{ showBusyFooter }}" hint-placeholder-val="{{ false }}">
+        <div style="flex-shrink:0;display:flex;align-items:center;gap:12px;padding:14px 24px;border-top:1px solid #20242a;background:#101216;">
+          <div style="flex:1;"></div>
+          <button onClick="{{ reset }}" style="height:36px;padding:0 18px;border-radius:9px;border:1px solid #3a414a;background:#22262c;color:#c4cad2;font-size:12.5px;font-weight:500;cursor:pointer;" style-hover="background:#2a2f36;">{{ busyBtn }}</button>
+        </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ PROGRESS TOAST ════ -->
+  <sc-if value="{{ toastShow }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;right:22px;bottom:22px;display:flex;align-items:center;gap:12px;min-width:280px;background:#1a1d22;border:1px solid #20242a;border-left:3px solid {{ toastHex }};border-radius:11px;padding:12px 15px;box-shadow:0 16px 40px rgba(0,0,0,0.6);animation:esToast 0.2s cubic-bezier(.2,.7,.3,1);">
+    <div style="width:8px;height:8px;border-radius:50%;background:{{ toastHex }};box-shadow:0 0 8px {{ toastHex }};flex-shrink:0;{{ toastPulse }}"></div>
+    <div style="min-width:0;flex:1;">
+      <div style="font-size:12.5px;font-weight:600;color:#e7eaee;">{{ toastTitle }}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;margin-top:2px;">{{ toastMsg }}</div>
+    </div>
+    <div style="color:#565e68;font-size:13px;cursor:pointer;flex-shrink:0;">✕</div>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;target&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;gif&quot;,&quot;options&quot;:[&quot;gif&quot;,&quot;mp4&quot;,&quot;webm&quot;,&quot;code&quot;,&quot;html&quot;,&quot;link&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Export&quot;},&quot;phase&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;configure&quot;,&quot;options&quot;:[&quot;configure&quot;,&quot;recording&quot;,&quot;encoding&quot;,&quot;done&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Export&quot;},&quot;showBackdrop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Scene&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const phase = props.phase || "configure";
+    this.state = {
+      target: props.target || "gif",
+      phase,
+      res: "1080p", fps: 30, duration: 4, loop: true,
+      lang: "glsl",
+      htmlInc: { assets: true, autoplay: true, minify: false },
+      vis: "unlisted", fork: true, embed: false,
+      recT: phase === "recording" ? 2.3 : 0,
+      progress: phase === "encoding" ? 68 : (phase === "done" ? 100 : 0),
+      copied: false,
+    };
+  }
+
+  componentDidUpdate(prev) {
+    if (prev.phase !== this.props.phase && this.props.phase && this.props.phase !== this.state.phase) {
+      this.stopTimer();
+      const p = this.props.phase;
+      this.setState({ phase: p, recT: p === "recording" ? 2.3 : 0, progress: p === "encoding" ? 68 : (p === "done" ? 100 : 0) });
+    }
+    if (prev.target !== this.props.target && this.props.target && this.props.target !== this.state.target) {
+      this.setState({ target: this.props.target });
+    }
+  }
+  componentWillUnmount() { this.stopTimer(); }
+  stopTimer() { if (this._t) { clearInterval(this._t); this._t = null; } }
+
+  isRecord(t) { return t === "gif" || t === "mp4" || t === "webm"; }
+
+  startAction() {
+    const t = this.state.target;
+    if (this.isRecord(t)) { this.setState({ phase: "recording", recT: 0, progress: 0 }); this.runRecord(); }
+    else if (t === "link") { this.setState({ phase: "done" }); }
+    else { this.setState({ phase: "encoding", progress: 0 }); this.runEncode(); }
+  }
+  runRecord() {
+    this.stopTimer();
+    this._t = setInterval(() => {
+      this.setState(s => {
+        const recT = s.recT + 0.08;
+        if (recT >= s.duration) { this.stopTimer(); setTimeout(() => this.runEncode(), 120); return { recT: s.duration }; }
+        return { recT };
+      });
+    }, 55);
+  }
+  runEncode() {
+    this.stopTimer();
+    this.setState({ phase: "encoding", progress: 0 });
+    this._t = setInterval(() => {
+      this.setState(s => {
+        const progress = s.progress + 2.4;
+        if (progress >= 100) { this.stopTimer(); return { progress: 100, phase: "done" }; }
+        return { progress };
+      });
+    }, 55);
+  }
+  reset() { this.stopTimer(); this.setState({ phase: "configure", recT: 0, progress: 0, copied: false }); }
+  copyLink() {
+    try { navigator.clipboard && navigator.clipboard.writeText(this._shareUrl); } catch (e) {}
+    this.setState({ copied: true });
+    clearTimeout(this._copyT); this._copyT = setTimeout(() => this.setState({ copied: false }), 1800);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const t = s.target;
+    const rec = this.isRecord(t);
+    const ph = s.phase;
+    const targetName = { gif: "GIF", mp4: "MP4", webm: "WebM", code: "Code snippet", html: "Standalone HTML", link: "Share link" }[t];
+
+    // ── left rail ──
+    const mkItem = (key, name, meta, glyph, iconColor, iconBg, iconBorder) => {
+      const active = t === key;
+      return {
+        name, meta, glyph, active,
+        select: () => { this.stopTimer(); this.setState({ target: key, phase: "configure", recT: 0, progress: 0, copied: false }); },
+        bg: active ? "rgba(61,155,255,0.12)" : "transparent",
+        border: active ? "rgba(61,155,255,0.32)" : "transparent",
+        color: active ? "#e7eaee" : "#c4cad2",
+        weight: active ? 600 : 500,
+        iconColor, iconBg, iconBorder,
+      };
+    };
+    const groups = [
+      { label: "Record", items: [
+        mkItem("gif", "Animated GIF", "loop · ≤256 col", "◱", "#f5b13d", "rgba(245,177,61,0.13)", "rgba(245,177,61,0.35)"),
+        mkItem("mp4", "MP4 video", "H.264 · yuv420p", "▶", "#e05c93", "rgba(224,92,147,0.13)", "rgba(224,92,147,0.35)"),
+        mkItem("webm", "WebM video", "VP9 · alpha", "◈", "#a06bff", "rgba(160,107,255,0.13)", "rgba(160,107,255,0.35)"),
+      ]},
+      { label: "Export", items: [
+        mkItem("code", "Code snippet", "GLSL · JS · React", "</>", "#7ed957", "rgba(126,217,87,0.13)", "rgba(126,217,87,0.35)"),
+        mkItem("html", "Standalone HTML", "single file", "▤", "#3d9bff", "rgba(61,155,255,0.13)", "rgba(61,155,255,0.35)"),
+      ]},
+      { label: "Share", items: [
+        mkItem("link", "Share link", "live · editable", "⤴", "#34d399", "rgba(52,211,153,0.13)", "rgba(52,211,153,0.35)"),
+      ]},
+    ];
+
+    // ── record config ──
+    const resMap = { "720p": "1280×720", "1080p": "1920×1080", "4K": "3840×2160" };
+    const mkSeg = (val, cur, setter) => ({
+      name: val, select: () => setter(val),
+      bg: cur === val ? "#3d9bff" : "transparent",
+      color: cur === val ? "#fff" : "#9aa2ac",
+    });
+    const resOpts = ["720p", "1080p", "4K"].map(v => mkSeg(v, s.res, x => this.setState({ res: x })));
+    const fpsOpts = [24, 30, 60].map(v => ({
+      name: v + "", select: () => this.setState({ fps: v }),
+      bg: s.fps === v ? "#3d9bff" : "transparent", color: s.fps === v ? "#fff" : "#9aa2ac",
+    }));
+    // size estimate
+    const rf = { "720p": 1, "1080p": 2.1, "4K": 7.2 }[s.res];
+    const base = t === "gif" ? 3.4 : (t === "mp4" ? 0.9 : 1.2);
+    const estMB = (base * rf * (s.fps / 30) * (s.duration / 4)).toFixed(1);
+    const estSize = t === "gif" ? estMB + " MB" : estMB + " MB";
+    const recCodec = { gif: "≤256 color palette · dithered", mp4: "H.264 · yuv420p · CRF 20", webm: "VP9 · alpha channel" }[t];
+
+    // ── code ──
+    const mkLang = (key, name) => ({ name, select: () => this.setState({ lang: key }),
+      bg: s.lang === key ? "#22262c" : "transparent", color: s.lang === key ? "#e7eaee" : "#8f97a1" });
+    const langOpts = [mkLang("glsl", "GLSL"), mkLang("js", "JS embed"), mkLang("react", "React")];
+    const C = { k: "#c586c0", ty: "#4ec9b0", v: "#9cdcfe", fn: "#dcdcaa", n: "#b5cea8", c: "#6a737d", s: "#ce9178" };
+    const el = React.createElement;
+    const sp = (col, txt) => el("span", { style: { color: col } }, txt);
+    let codeLines;
+    if (s.lang === "glsl") {
+      codeLines = [
+        [sp(C.k, "#version"), " ", sp(C.n, "300"), " es\n"],
+        [sp(C.k, "precision"), " ", sp(C.ty, "highp"), " ", sp(C.ty, "float"), ";\n\n"],
+        [sp(C.k, "uniform"), " ", sp(C.ty, "float"), " ", sp(C.v, "u_intensity"), ";\n"],
+        [sp(C.k, "uniform"), " ", sp(C.ty, "vec3"), "  ", sp(C.v, "u_baseColor"), ";\n"],
+        [sp(C.k, "out"), " ", sp(C.ty, "vec4"), " ", sp(C.v, "fragColor"), ";\n\n"],
+        [sp(C.k, "void"), " ", sp(C.fn, "main"), "() {\n"],
+        ["  ", sp(C.ty, "float"), " ", sp(C.v, "f"), " = ", sp(C.fn, "pow"), "(", sp(C.n, "1.0"), " - ", sp(C.fn, "dot"), "(", sp(C.v, "N"), ", ", sp(C.v, "V"), "), ", sp(C.v, "u_intensity"), ");\n"],
+        ["  ", sp(C.v, "fragColor"), " = ", sp(C.ty, "vec4"), "(", sp(C.v, "u_baseColor"), " * ", sp(C.v, "f"), ", ", sp(C.n, "1.0"), ");\n"],
+        ["}"],
+      ];
+    } else if (s.lang === "js") {
+      codeLines = [
+        [sp(C.k, "import"), " { ", sp(C.v, "ShaderGraph"), " } ", sp(C.k, "from"), " ", sp(C.s, "'@shaderplayground/runtime'"), ";\n\n"],
+        [sp(C.k, "const"), " ", sp(C.v, "gl"), " = ", sp(C.v, "canvas"), ".", sp(C.fn, "getContext"), "(", sp(C.s, "'webgl2'"), ");\n"],
+        [sp(C.k, "const"), " ", sp(C.v, "graph"), " = ", sp(C.k, "new"), " ", sp(C.fn, "ShaderGraph"), "(", sp(C.v, "gl"), ", ", sp(C.v, "fresnelDef"), ");\n\n"],
+        [sp(C.v, "graph"), ".", sp(C.fn, "setUniform"), "(", sp(C.s, "'u_intensity'"), ", ", sp(C.n, "1.35"), ");\n"],
+        [sp(C.v, "graph"), ".", sp(C.fn, "play"), "();  ", sp(C.c, "// starts the render loop"), "\n"],
+      ];
+    } else {
+      codeLines = [
+        [sp(C.k, "import"), " { ", sp(C.v, "ShaderView"), " } ", sp(C.k, "from"), " ", sp(C.s, "'@shaderplayground/react'"), ";\n\n"],
+        [sp(C.k, "export function"), " ", sp(C.fn, "Fresnel"), "() {\n"],
+        ["  ", sp(C.k, "return"), " (\n"],
+        ["    ", sp(C.c, "<ShaderView"), "\n"],
+        ["      ", sp(C.v, "graph"), "=", sp(C.s, "{fresnelDef}"), "\n"],
+        ["      ", sp(C.v, "uniforms"), "=", sp(C.s, "{{ u_intensity: 1.35 }}"), " ", sp(C.c, "/>"), "\n"],
+        ["  );\n"],
+        ["}"],
+      ];
+    }
+    const codeBlock = el(React.Fragment, null, ...codeLines.map((ln, i) => el("span", { key: i }, ...ln)));
+
+    // ── html includes ──
+    const mkInc = (key, name, desc, tag) => {
+      const on = s.htmlInc[key];
+      return {
+        name, desc, tag,
+        toggle: () => this.setState(st => ({ htmlInc: { ...st.htmlInc, [key]: !st.htmlInc[key] } })),
+        bg: on ? "rgba(61,155,255,0.06)" : "transparent",
+        boxBg: on ? "#3d9bff" : "transparent",
+        boxBorder: on ? "#3d9bff" : "#3a414a",
+        check: on ? "✓" : "",
+      };
+    };
+    const htmlOpts = [
+      mkInc("assets", "Inline assets", "Embed textures & meshes as base64", "+38 KB"),
+      mkInc("autoplay", "Autoplay loop", "Start rendering on page load", ""),
+      mkInc("minify", "Minify output", "Strip whitespace & comments", "−12 KB"),
+    ];
+
+    // ── share visibility ──
+    const mkVis = (key, name, desc, glyph, iconColor) => {
+      const on = s.vis === key;
+      return {
+        name, desc, glyph, iconColor,
+        select: () => this.setState({ vis: key }),
+        bg: on ? "rgba(61,155,255,0.08)" : "transparent",
+        border: on ? "rgba(61,155,255,0.3)" : "#20242a",
+        dotBorder: on ? "#3d9bff" : "#3a414a",
+        dotBg: on ? "#3d9bff" : "transparent",
+      };
+    };
+    const visOpts = [
+      mkVis("unlisted", "Unlisted", "Anyone with the link can view", "🔗", "#9aa2ac"),
+      mkVis("public", "Public", "Listed in the community gallery", "◉", "#34d399"),
+      mkVis("private", "Private", "Only you and invited collaborators", "🔒", "#f5b13d"),
+    ];
+
+    // ── phase flags ──
+    const isConfigure = ph === "configure";
+    const isRecording = ph === "recording";
+    const isEncoding = ph === "encoding";
+    const isDone = ph === "done";
+
+    // recording
+    const recPct = Math.min(100, Math.round(s.recT / s.duration * 100)) + "%";
+    const recFrames = Math.round(s.recT * s.fps);
+
+    // encoding
+    const encP = Math.min(100, Math.round(s.progress));
+    const circ = 2 * Math.PI * 42;
+    const encDash = (circ * encP / 100).toFixed(1) + " " + circ.toFixed(1);
+    const encTitle = rec ? "Encoding " + targetName + "…" : "Building HTML…";
+    const encStage = !rec ? "bundling runtime + inlining assets"
+      : (encP < 40 ? "quantizing color palette" : (encP < 80 ? "compressing frames" : "writing container"));
+    const remain = Math.max(0.1, (100 - encP) / 100 * (rec ? 5.2 : 1.4)).toFixed(1);
+
+    // done
+    this._shareUrl = "shpg.io/s/" + (t === "link" ? "fresnel-7Kq2" : "fresnel");
+    const doneLink = isDone && t === "link";
+    const doneFile = isDone && !doneLink;
+    let doneTitle, doneMsg, doneCta, fileExt, fileName, fileMeta, fileIconBg, fileIconBorder, fileIconColor;
+    if (t === "link") {
+      doneTitle = "Link is live"; doneMsg = "A live, editable copy of your graph is published. Share it anywhere.";
+      doneCta = "Open in new tab";
+    } else if (t === "code") {
+      doneTitle = "Copied to clipboard"; doneMsg = "Paste the " + (s.lang === "glsl" ? "GLSL" : s.lang === "js" ? "JS" : "React") + " snippet into your project.";
+      doneCta = "Done"; doneFileOverride = true;
+    } else if (t === "html") {
+      doneTitle = "HTML exported"; doneMsg = "Your standalone file downloaded. Open it in any browser — no server needed.";
+      doneCta = "Reveal in folder";
+      fileExt = "HTML"; fileName = "shader-playground.html"; fileMeta = htmlSizeCalc(s) + " · WebGL2 · self-contained";
+      fileIconBg = "rgba(61,155,255,0.13)"; fileIconBorder = "rgba(61,155,255,0.35)"; fileIconColor = "#7dbcff";
+    } else {
+      const ext = t.toUpperCase();
+      doneTitle = ext + " exported"; doneMsg = "Your " + s.duration + "s clip rendered at " + resMap[s.res] + " · " + s.fps + " fps.";
+      doneCta = "Save to disk";
+      fileExt = ext; fileName = "fresnel-loop." + t; fileMeta = estSize + " · " + resMap[s.res] + " · " + s.duration + "s";
+      const c = { gif: ["rgba(245,177,61,0.13)", "rgba(245,177,61,0.35)", "#e2ba57"], mp4: ["rgba(224,92,147,0.13)", "rgba(224,92,147,0.35)", "#ee7fac"], webm: ["rgba(160,107,255,0.13)", "rgba(160,107,255,0.35)", "#b48bff"] }[t];
+      fileIconBg = c[0]; fileIconBorder = c[1]; fileIconColor = c[2];
+    }
+    // code done shows no file card, only clipboard
+    var doneFileOverride;
+    const doneFileFinal = doneFile && t !== "code";
+
+    // toast
+    let toastShow = false, toastHex = "#3d9bff", toastTitle = "", toastMsg = "", toastPulse = "";
+    if (isRecording) { toastShow = true; toastHex = "#f0555c"; toastTitle = "Recording " + targetName; toastMsg = s.recT.toFixed(1) + "s / " + s.duration.toFixed(1) + "s · " + recFrames + " frames"; toastPulse = "animation:esRec 1s infinite;"; }
+    else if (isEncoding) { toastShow = true; toastHex = "#f5b13d"; toastTitle = (rec ? "Encoding " : "Building ") + targetName; toastMsg = encP + "% · " + remain + "s remaining"; toastPulse = "animation:esRec 1.2s infinite;"; }
+    else if (isDone) {
+      toastShow = true; toastHex = "#34d399";
+      if (t === "link") { toastTitle = "Link created"; toastMsg = "unlisted · ready to share"; }
+      else if (t === "code") { toastTitle = "Snippet copied"; toastMsg = (s.lang === "glsl" ? "GLSL" : s.lang) + " · clipboard"; }
+      else if (t === "html") { toastTitle = "Exported."; toastMsg = "shader-playground.html · " + htmlSizeCalc(s); }
+      else { toastTitle = "Exported."; toastMsg = "fresnel-loop." + t + " · " + estSize; }
+    }
+
+    // footers
+    const primaryLabel = { gif: "Start recording", mp4: "Start recording", webm: "Start recording", code: "Copy snippet", html: "Download HTML", link: "Create link" }[t];
+    const primaryGlyph = rec ? "●" : (t === "code" ? "⧉" : (t === "html" ? "↓" : "⤴"));
+    const footerHint = rec ? (s.duration + "s · " + resMap[s.res] + " · " + s.fps + " fps") : (t === "code" ? "compiled from 5 nodes" : (t === "html" ? htmlSizeCalc(s) + " estimated" : "revoke anytime from settings"));
+
+    return {
+      showBackdrop: this.props.showBackdrop ?? true,
+      groups, resOpts, fpsOpts, langOpts, codeBlock, htmlOpts, visOpts,
+
+      cfgRecord: isConfigure && rec,
+      cfgCode: isConfigure && t === "code",
+      cfgHtml: isConfigure && t === "html",
+      cfgLink: isConfigure && t === "link",
+      isRecording, isEncoding, isDone,
+
+      recTitle: "Record " + targetName, recCodec,
+      recRes: resMap[s.res], recFps: s.fps,
+      durLabel: s.duration.toFixed(1) + "s",
+      duration: s.duration,
+      onDuration: (e) => this.setState({ duration: parseFloat(e.target.value) }),
+      loopBg: s.loop ? "#3d9bff" : "#2b3037", loopLeft: s.loop ? "19px" : "2px",
+      toggleLoop: () => this.setState({ loop: !s.loop }),
+      estSize,
+
+      htmlSize: htmlSizeCalc(s),
+
+      forkBg: s.fork ? "rgba(61,155,255,0.1)" : "#1a1d22", forkBorder: s.fork ? "rgba(61,155,255,0.3)" : "#20242a", forkDot: s.fork ? "#3d9bff" : "#565e68",
+      toggleFork: () => this.setState({ fork: !s.fork }),
+      embedBg: s.embed ? "rgba(61,155,255,0.1)" : "#1a1d22", embedBorder: s.embed ? "rgba(61,155,255,0.3)" : "#20242a", embedDot: s.embed ? "#3d9bff" : "#565e68",
+      toggleEmbed: () => this.setState({ embed: !s.embed }),
+
+      recPct, recFrames, recElapsed: s.recT.toFixed(1) + "s",
+
+      encPct: encP + "%", encDash, encTitle, encStage, encEta: remain + "s remaining",
+
+      doneTitle, doneMsg, doneCta, doneLink, doneFile: doneFileFinal,
+      shareUrl: this._shareUrl,
+      fileExt, fileName, fileMeta, fileIconBg, fileIconBorder, fileIconColor,
+      copyLink: () => this.copyLink(),
+      copyLabel: s.copied ? "Copied ✓" : "Copy",
+      copyBg: s.copied ? "rgba(52,211,153,0.13)" : "#3d9bff",
+      copyBorder: s.copied ? "rgba(52,211,153,0.4)" : "#3d9bff",
+      copyColor: s.copied ? "#34d399" : "#fff",
+      reset: () => this.reset(),
+      primaryDone: () => this.reset(),
+
+      showFooter: isConfigure,
+      startAction: () => this.startAction(),
+      primaryLabel, primaryGlyph, footerHint,
+
+      showBusyFooter: isRecording || isEncoding,
+      busyBtn: isRecording ? "Stop & encode" : "Cancel",
+
+      toastShow, toastHex, toastTitle, toastMsg, toastPulse,
+    };
+  }
+}
+
+function htmlSizeCalc(s) {
+  let kb = 46;
+  if (s.htmlInc.assets) kb += 38;
+  if (s.htmlInc.minify) kb -= 12;
+  return kb + " KB";
+}
+</script>
+</body>
+</html>

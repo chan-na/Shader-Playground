@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #08090b; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+  ::selection { background: rgba(61,155,255,0.3); }
+  .ss-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+  .ss-scroll::-webkit-scrollbar-thumb { background: #2b3037; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+  .ss-scroll::-webkit-scrollbar-track { background: transparent; }
+  @keyframes ssSpin { to { transform: rotate(360deg); } }
+  @keyframes ssRec { 0%,100% { opacity: 1; } 50% { opacity: 0.28; } }
+  @keyframes ssBlink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+  @keyframes ssShimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
+  @keyframes ssBreathe { 0%,100% { opacity: 0.45; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
+  @keyframes ssPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  a { color: #57a9ff; } a:hover { color: #7dbcff; }
+</style>
+</helmet>
+<div style="width:1440px;height:900px;display:flex;background:#08090b;color:#e7eaee;overflow:hidden;font-size:13px;">
+
+  <!-- ══════════ LEFT SWITCHER RAIL ══════════ -->
+  <sc-if value="{{ showRail }}" hint-placeholder-val="{{ true }}">
+  <div class="ss-scroll" style="width:238px;flex-shrink:0;background:#0f1114;border-right:1px solid #17191e;display:flex;flex-direction:column;overflow-y:auto;">
+    <div style="padding:20px 18px 16px;border-bottom:1px solid #17191e;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#3d9bff;margin-bottom:6px;">System states</div>
+      <div style="font-size:12px;color:#8f97a1;line-height:1.5;">Empty · loading · permission · error screens, shown inside the real app chrome.</div>
+    </div>
+    <div style="padding:12px 12px 20px;display:flex;flex-direction:column;gap:16px;">
+      <sc-for list="{{ railGroups }}" as="g" hint-placeholder-count="4">
+        <div>
+          <div style="font-size:9.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#565e68;padding:0 8px 8px;">{{ g.title }}</div>
+          <div style="display:flex;flex-direction:column;gap:3px;">
+            <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+              <div onClick="{{ it.select }}" style="display:flex;align-items:center;gap:11px;padding:8px 9px;border-radius:9px;cursor:pointer;background:{{ it.bg }};border:1px solid {{ it.border }};transition:background 0.12s;">
+                <span style="width:26px;height:26px;flex-shrink:0;border-radius:7px;background:{{ it.tileBg }};border:1px solid {{ it.tileBorder }};display:flex;align-items:center;justify-content:center;font-size:13px;color:{{ it.glyphColor }};">{{ it.glyph }}</span>
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:12.5px;font-weight:{{ it.weight }};color:{{ it.labelColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ it.label }}</div>
+                </div>
+                <sc-if value="{{ it.active }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:50%;background:#3d9bff;box-shadow:0 0 7px #3d9bff;flex-shrink:0;"></span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top:auto;padding:14px 18px;border-top:1px solid #17191e;font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;line-height:1.7;">
+      <div>state · <span style="color:#9aa2ac;">{{ stateKey }}</span></div>
+      <div>chrome · <span style="color:#9aa2ac;">shared</span></div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ══════════ APP WINDOW ══════════ -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative;background:#08090b;">
+
+    <!-- ── toolbar ── -->
+    <sc-if value="{{ showToolbar }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:center;gap:12px;height:44px;flex-shrink:0;padding:0 12px;background:#131519;border-bottom:1px solid #20242a;">
+      <div style="display:flex;align-items:center;gap:9px;">
+        <div style="position:relative;width:24px;height:24px;border-radius:7px;background:linear-gradient(155deg,#3d9bff,#2b6fe0);box-shadow:0 2px 8px rgba(61,155,255,0.35),inset 0 1px 0 rgba(255,255,255,0.25);flex-shrink:0;">
+          <div style="position:absolute;left:6px;top:6px;width:12px;height:12px;border-radius:4px;border:1.5px solid rgba(255,255,255,0.92);"></div>
+          <div style="position:absolute;right:3px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:#0b0c0e;border:1.3px solid rgba(255,255,255,0.95);"></div>
+        </div>
+        <div style="font-size:13.5px;font-weight:600;letter-spacing:-0.3px;"><span style="color:#e7eaee;">Shader</span><span style="color:#3d9bff;">Playground</span></div>
+      </div>
+      <div style="width:1px;height:22px;background:#20242a;"></div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8f97a1;">untitled-project</span>
+      <div style="flex:1;"></div>
+      <button style="height:29px;padding:0 11px;background:#131519;border:1px solid #1c2026;border-radius:7px;color:{{ shareColor }};font-size:12px;font-weight:500;cursor:{{ actCursor }};">Share</button>
+      <button style="height:29px;padding:0 12px;background:{{ exportBg }};border:none;border-radius:7px;font-size:12px;font-weight:600;color:{{ exportColor }};cursor:{{ actCursor }};">Export HTML</button>
+      <div style="width:1px;height:22px;background:#20242a;"></div>
+      <button style="display:flex;align-items:center;gap:6px;height:29px;padding:0 10px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#9aa2ac;font-size:12px;cursor:pointer;">Search<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;background:#0b0c0e;border:1px solid #2b3037;border-radius:4px;padding:1px 5px;">⌘K</span></button>
+    </div>
+    </sc-if>
+
+    <!-- ── body ── -->
+    <div style="flex:1;display:flex;min-height:0;">
+
+      <!-- ═══ NODE EDITOR ═══ -->
+      <div style="flex:1.5;display:flex;flex-direction:column;min-width:0;border-right:1px solid #20242a;background:#0b0c0e;">
+        <div style="display:flex;align-items:center;gap:10px;height:34px;flex-shrink:0;padding:0 12px;background:#101216;border-bottom:1px solid #17191e;">
+          <span style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;">⣿</span>
+          <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Node Editor</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;background:#1a1d22;border:1px solid #20242a;border-radius:4px;padding:1px 6px;">{{ graphCount }}</span>
+          <div style="flex:1;"></div>
+          <span style="font-size:11px;color:#454c55;">{{ graphNote }}</span>
+        </div>
+
+        <div class="ss-scroll" style="flex:1;position:relative;overflow:auto;background-color:#0b0c0e;background-image:radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px);background-size:22px 22px;">
+
+          <!-- graph: EMPTY -->
+          <sc-if value="{{ graphEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+              <div style="position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(61,155,255,0.09),transparent 68%);pointer-events:none;"></div>
+              <div style="position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px;max-width:360px;">
+                <div style="position:relative;margin-bottom:20px;">
+                  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:92px;height:92px;border-radius:50%;background:radial-gradient(circle,rgba(61,155,255,0.24),transparent 70%);animation:ssBreathe 3.4s ease-in-out infinite;"></div>
+                  <div style="position:relative;width:56px;height:56px;border-radius:15px;background:#131519;border:1px dashed #2b3037;display:flex;align-items:center;justify-content:center;font-size:22px;color:#3d9bff;">◆</div>
+                </div>
+                <div style="font-size:17px;font-weight:600;letter-spacing:-0.3px;margin-bottom:8px;">Your graph is empty</div>
+                <div style="font-size:12.5px;line-height:1.6;color:#8f97a1;margin-bottom:22px;">Add a source, wire it into a shader, and connect an output. Press <span style="font-family:'JetBrains Mono',monospace;color:#c4cad2;">⌘K</span> to add any node.</div>
+                <div style="display:flex;gap:10px;">
+                  <button style="display:flex;align-items:center;gap:8px;height:36px;padding:0 16px;background:#3d9bff;border:none;border-radius:9px;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(61,155,255,0.3);"><span style="font-size:14px;">+</span>Add node<span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(255,255,255,0.18);border-radius:4px;padding:1px 5px;">⌘K</span></button>
+                  <button style="height:36px;padding:0 14px;background:transparent;border:1px solid #2b3037;border-radius:9px;color:#c4cad2;font-size:12.5px;font-weight:500;cursor:pointer;">Load a preset</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- graph: SKELETON -->
+          <sc-if value="{{ graphSkeleton }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;padding:52px 0 0 60px;">
+              <sc-for list="{{ skeletonNodes }}" as="n" hint-placeholder-count="3">
+                <div style="position:absolute;left:{{ n.left }};top:{{ n.top }};width:150px;border-radius:11px;background:#131519;border:1px solid #1c2026;overflow:hidden;">
+                  <div style="height:30px;background:linear-gradient(90deg,#16181c 25%,#1c2026 50%,#16181c 75%);background-size:420px 100%;animation:ssShimmer 1.3s linear infinite;border-bottom:1px solid #0b0c0e;"></div>
+                  <div style="padding:12px;"><div style="height:56px;border-radius:6px;background:linear-gradient(90deg,#131519 25%,#191c21 50%,#131519 75%);background-size:420px 100%;animation:ssShimmer 1.3s linear infinite;"></div></div>
+                </div>
+              </sc-for>
+              <div style="position:absolute;left:14px;bottom:16px;display:flex;align-items:center;gap:9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;"><span style="width:14px;height:14px;border-radius:50%;border:2px solid #2b3037;border-top-color:#3d9bff;animation:ssSpin 0.7s linear infinite;"></span>Restoring graph…</div>
+            </div>
+          </sc-if>
+
+          <!-- graph: LIVE MINI-GRAPH -->
+          <sc-if value="{{ graphLive }}" hint-placeholder-val="{{ true }}">
+            <div style="position:absolute;left:0;top:0;width:760px;height:540px;">
+              <svg width="760" height="540" style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none;">
+                <sc-for list="{{ edges }}" as="e" hint-placeholder-count="3">
+                  <path d="{{ e.d }}" fill="none" stroke="{{ e.stroke }}" stroke-width="2.5" stroke-dasharray="{{ e.dash }}" stroke-linecap="round" opacity="{{ e.opacity }}"></path>
+                </sc-for>
+              </svg>
+              <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="4">
+                <div style="position:absolute;left:{{ n.left }};top:{{ n.top }};width:{{ n.w }};background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;border-radius:11px;box-shadow:{{ n.shadow }};">
+                  <div style="display:flex;align-items:center;gap:7px;padding:7px 10px;border-top-left-radius:10px;border-top-right-radius:10px;border-bottom:1px solid #0b0c0e;background:{{ n.headerBg }};">
+                    <div style="width:15px;height:15px;border-radius:5px;background:{{ n.tileBg }};border:1px solid {{ n.cat }};display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:{{ n.cat }};">{{ n.glyph }}</div>
+                    <div style="font-size:11px;font-weight:600;color:#fff;">{{ n.title }}</div>
+                    <sc-if value="{{ n.badge }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;color:{{ n.badgeColor }};background:{{ n.badgeBg }};border:1px solid {{ n.badgeBorder }};border-radius:5px;padding:1px 5px;">{{ n.badge }}</span></sc-if>
+                  </div>
+                  <div style="padding:9px;">
+                    <div style="height:{{ n.previewH }};border-radius:6px;background:{{ n.preview }};border:1px solid #0b0c0e;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;color:{{ n.previewTextColor }};">{{ n.previewText }}</div>
+                  </div>
+                  <sc-for list="{{ n.inputs }}" as="p" hint-placeholder-count="1">
+                    <div style="position:absolute;left:-6px;top:{{ p.top }};width:12px;height:12px;border-radius:50%;border:2.5px solid {{ p.color }};background:#16181c;"></div>
+                  </sc-for>
+                  <sc-if value="{{ n.hasOut }}" hint-placeholder-val="{{ true }}">
+                    <div style="position:absolute;right:-6px;top:{{ n.outTop }};width:12px;height:12px;border-radius:50%;background:{{ n.outColor }};border:2px solid #16181c;box-shadow:{{ n.outGlow }};opacity:{{ n.outOpacity }};"></div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <!-- ═══ RIGHT COLUMN ═══ -->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+
+        <!-- Viewport -->
+        <div style="flex:1.3;display:flex;flex-direction:column;min-height:0;border-bottom:1px solid #20242a;background:#0b0c0e;">
+          <div style="display:flex;align-items:center;gap:10px;height:34px;flex-shrink:0;padding:0 12px;background:#101216;border-bottom:1px solid #17191e;">
+            <span style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;">⣿</span>
+            <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Viewport</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:{{ vpNoteColor }};">{{ vpNote }}</span>
+          </div>
+          <div style="flex:1;position:relative;min-height:0;overflow:hidden;background:radial-gradient(circle at 50% 42%,#0e1116 0%,#0a0c10 60%,#08090b 100%);">
+
+            <!-- viewport: EMPTY -->
+            <sc-if value="{{ vpEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+                <div style="width:54px;height:54px;border-radius:14px;background:#131519;border:1px dashed #2b3037;display:flex;align-items:center;justify-content:center;font-size:22px;color:#454c55;">◎</div>
+                <div style="text-align:center;max-width:300px;">
+                  <div style="font-size:14px;font-weight:600;color:#c4cad2;margin-bottom:5px;">No Output connected</div>
+                  <div style="font-size:11.5px;line-height:1.6;color:#656d78;">Wire a shader into an <span style="color:#ee7fac;">Output</span> node and its render shows up here.</div>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- viewport: LOADING -->
+            <sc-if value="{{ vpLoading }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;">
+                <div style="position:relative;width:52px;height:52px;">
+                  <div style="position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(61,155,255,0),#3d9bff);animation:ssSpin 0.85s linear infinite;-webkit-mask:radial-gradient(circle,transparent 60%,#000 61%);mask:radial-gradient(circle,transparent 60%,#000 61%);"></div>
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;color:#57a9ff;">◆</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:13.5px;font-weight:600;color:#c4cad2;margin-bottom:4px;">Linking GPU program…</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;">compiling 3 shaders · uploading textures</div>
+                </div>
+                <div style="width:280px;">
+                  <div style="height:5px;border-radius:3px;background:#1a1d22;overflow:hidden;"><div style="width:64%;height:100%;background:linear-gradient(90deg,#2b6fe0,#3d9bff);border-radius:3px;"></div></div>
+                  <div style="display:flex;justify-content:space-between;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#565e68;"><span>64%</span><span>~1.2s</span></div>
+                </div>
+                <div style="width:280px;display:flex;flex-direction:column;gap:6px;">
+                  <sc-for list="{{ assetRows }}" as="a" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:9px;padding:6px 10px;background:rgba(19,21,25,0.7);border:1px solid #20242a;border-radius:8px;">
+                      <span style="width:8px;height:8px;border-radius:50%;background:{{ a.dot }};box-shadow:0 0 6px {{ a.dot }};flex-shrink:0;"></span>
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#c4cad2;flex:1;">{{ a.name }}</span>
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:{{ a.statusColor }};">{{ a.status }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- viewport: COMPILE ERROR -->
+            <sc-if value="{{ vpError }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,rgba(240,85,92,0.14),transparent 62%);"></div>
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+                <div style="width:50px;height:50px;border-radius:14px;background:rgba(240,85,92,0.14);border:1px solid rgba(240,85,92,0.45);display:flex;align-items:center;justify-content:center;font-size:22px;color:#f0555c;">⚠</div>
+                <div style="text-align:center;">
+                  <div style="font-size:14.5px;font-weight:600;color:#f2888d;margin-bottom:4px;">Shader failed to compile</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa2ac;">Fresnel · fragment stage · <span style="color:#f0555c;">2 errors</span></div>
+                </div>
+                <div style="width:340px;background:#0b0c0e;border:1px solid #2b1418;border-radius:10px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,0.55);">
+                  <div style="display:flex;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7;">
+                    <div style="padding:10px 0;background:#0e0f12;color:#454c55;text-align:right;user-select:none;">
+                      <div style="padding:0 10px;">12</div><div style="padding:0 10px;">13</div><div style="padding:0 10px;background:rgba(240,85,92,0.16);color:#f0555c;">14</div><div style="padding:0 10px;">15</div>
+                    </div>
+                    <div style="padding:10px 12px;flex:1;overflow:hidden;">
+                      <div><span style="color:#c586c0;">vec3</span> <span style="color:#9cdcfe;">n</span> = <span style="color:#dcdcaa;">normalize</span>(<span style="color:#9cdcfe;">v_normal</span>);</div>
+                      <div><span style="color:#c586c0;">vec3</span> <span style="color:#9cdcfe;">v</span> = <span style="color:#dcdcaa;">normalize</span>(<span style="color:#9cdcfe;">u_cam</span>);</div>
+                      <div style="background:rgba(240,85,92,0.14);margin:0 -12px;padding:0 12px;"><span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">f</span> = <span style="color:#dcdcaa;">pow</span>(<span style="color:#b5cea8;">1.0</span> - <span style="color:#dcdcaa;">dot</span>(<span style="color:#9cdcfe;">n</span>, <span style="color:#9cdcfe;">v_uv</span>), <span style="color:#9cdcfe;">u_pow</span>);</div>
+                      <div><span style="color:#dcdcaa;">gl_FragColor</span> = <span style="color:#4ec9b0;">vec4</span>(<span style="color:#9cdcfe;">f</span>);</div>
+                    </div>
+                  </div>
+                  <div style="border-top:1px solid #2b1418;padding:8px 12px;background:#120b0c;font-family:'JetBrains Mono',monospace;font-size:10px;color:#f2888d;">ERROR: 0:14 'v_uv' : undeclared identifier</div>
+                </div>
+                <div style="display:flex;gap:10px;">
+                  <button style="height:34px;padding:0 15px;background:#f0555c;border:none;border-radius:8px;color:#0b0c0e;font-size:12px;font-weight:600;cursor:pointer;">Jump to line 14</button>
+                  <button style="height:34px;padding:0 13px;background:transparent;border:1px solid #3a2a2c;border-radius:8px;color:#c4cad2;font-size:12px;font-weight:500;cursor:pointer;">Copy log</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- viewport: WEBCAM PERMISSION -->
+            <sc-if value="{{ vpWebcam }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:0;right:0;top:12px;display:flex;justify-content:center;z-index:3;">
+                <div style="display:flex;align-items:center;gap:10px;background:#131519;border:1px solid #2b3037;border-radius:10px;padding:8px 12px;box-shadow:0 10px 28px rgba(0,0,0,0.6);max-width:400px;">
+                  <span style="width:20px;height:20px;border-radius:6px;background:rgba(61,155,255,0.14);border:1px solid #2b6fe0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#57a9ff;flex-shrink:0;">◉</span>
+                  <span style="font-size:11.5px;color:#c4cad2;flex:1;"><span style="font-family:'JetBrains Mono',monospace;color:#9aa2ac;">shaderplayground.app</span> wants to use your camera</span>
+                  <button style="height:26px;padding:0 11px;background:#3d9bff;border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:600;cursor:pointer;">Allow</button>
+                  <button style="height:26px;padding:0 10px;background:transparent;border:1px solid #2b3037;border-radius:6px;color:#9aa2ac;font-size:11px;cursor:pointer;">Block</button>
+                </div>
+              </div>
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+                <div style="width:60px;height:60px;border-radius:16px;background:#131519;border:1px solid #2b3037;display:flex;align-items:center;justify-content:center;font-size:26px;color:#57a9ff;position:relative;">◉<span style="position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:50%;background:#f5b13d;border:2px solid #0b0c0e;display:flex;align-items:center;justify-content:center;font-size:10px;color:#0b0c0e;font-weight:700;">!</span></div>
+                <div style="text-align:center;max-width:320px;">
+                  <div style="font-size:14.5px;font-weight:600;color:#e7eaee;margin-bottom:6px;">Allow camera access</div>
+                  <div style="font-size:12px;line-height:1.6;color:#8f97a1;">The <span style="color:#8fd6b4;">Webcam</span> source captures live video to feed your shader. Nothing is uploaded — frames stay on your GPU.</div>
+                </div>
+                <div style="display:flex;gap:10px;">
+                  <button style="height:36px;padding:0 18px;background:#3d9bff;border:none;border-radius:9px;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(61,155,255,0.3);">Enable camera</button>
+                  <button style="height:36px;padding:0 14px;background:transparent;border:1px solid #2b3037;border-radius:9px;color:#c4cad2;font-size:12.5px;font-weight:500;cursor:pointer;">Not now</button>
+                </div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;">↳ manage in browser site settings anytime</div>
+              </div>
+            </sc-if>
+
+            <!-- viewport: AUDIO PERMISSION -->
+            <sc-if value="{{ vpAudio }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:0;right:0;top:12px;display:flex;justify-content:center;z-index:3;">
+                <div style="display:flex;align-items:center;gap:10px;background:#131519;border:1px solid #2b3037;border-radius:10px;padding:8px 12px;box-shadow:0 10px 28px rgba(0,0,0,0.6);max-width:400px;">
+                  <span style="width:20px;height:20px;border-radius:6px;background:rgba(75,191,137,0.14);border:1px solid #2f9e6e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6fe3b8;flex-shrink:0;">∿</span>
+                  <span style="font-size:11.5px;color:#c4cad2;flex:1;"><span style="font-family:'JetBrains Mono',monospace;color:#9aa2ac;">shaderplayground.app</span> wants to use your microphone</span>
+                  <button style="height:26px;padding:0 11px;background:#3d9bff;border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:600;cursor:pointer;">Allow</button>
+                  <button style="height:26px;padding:0 10px;background:transparent;border:1px solid #2b3037;border-radius:6px;color:#9aa2ac;font-size:11px;cursor:pointer;">Block</button>
+                </div>
+              </div>
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+                <div style="width:60px;height:60px;border-radius:16px;background:#131519;border:1px solid #2b3037;display:flex;align-items:center;justify-content:center;font-size:26px;color:#6fe3b8;position:relative;">∿<span style="position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:50%;background:#f5b13d;border:2px solid #0b0c0e;display:flex;align-items:center;justify-content:center;font-size:10px;color:#0b0c0e;font-weight:700;">!</span></div>
+                <div style="text-align:center;max-width:320px;">
+                  <div style="font-size:14.5px;font-weight:600;color:#e7eaee;margin-bottom:6px;">Allow microphone access</div>
+                  <div style="font-size:12px;line-height:1.6;color:#8f97a1;">The <span style="color:#8fd6b4;">Audio</span> source runs an FFT on your mic so the shader can react to sound. Audio is analysed locally in real time.</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;height:26px;">
+                  <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+                    <span style="width:4px;height:{{ b.h }};border-radius:2px;background:#2f9e6e;opacity:0.5;"></span>
+                  </sc-for>
+                </div>
+                <div style="display:flex;gap:10px;">
+                  <button style="height:36px;padding:0 18px;background:#3d9bff;border:none;border-radius:9px;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(61,155,255,0.3);">Enable microphone</button>
+                  <button style="height:36px;padding:0 14px;background:transparent;border:1px solid #2b3037;border-radius:9px;color:#c4cad2;font-size:12.5px;font-weight:500;cursor:pointer;">Not now</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- FPS badge (context) -->
+            <sc-if value="{{ showFps }}" hint-placeholder-val="{{ false }}">
+              <span style="position:absolute;right:12px;top:12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:{{ fpsColor }};background:rgba(11,12,14,0.8);border:1px solid #20242a;border-radius:6px;padding:3px 8px;">{{ fpsLabel }}</span>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- Side Panel -->
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0;background:#131519;">
+          <div style="display:flex;align-items:center;gap:2px;height:34px;flex-shrink:0;padding:0 8px 0 12px;background:#101216;border-bottom:1px solid #17191e;">
+            <span style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;margin-right:6px;">⣿</span>
+            <button style="height:34px;padding:0 12px;background:transparent;border:none;border-bottom:2px solid {{ tabInspector }};color:{{ tabInspectorColor }};font-size:12px;font-weight:{{ tabInspectorWeight }};cursor:pointer;">Inspector</button>
+            <button style="height:34px;padding:0 12px;background:transparent;border:none;border-bottom:2px solid transparent;color:#9aa2ac;font-size:12px;font-weight:500;cursor:pointer;">Assets</button>
+            <button style="height:34px;padding:0 12px;background:transparent;border:none;border-bottom:2px solid {{ tabProblems }};color:{{ tabProblemsColor }};font-size:12px;font-weight:{{ tabProblemsWeight }};cursor:pointer;display:flex;align-items:center;gap:6px;">Problems<sc-if value="{{ problemsBadge }}" hint-placeholder-val="{{ false }}"><span style="font-size:9.5px;font-weight:700;color:#0b0c0e;background:#f0555c;border-radius:7px;padding:0px 6px;font-family:'JetBrains Mono',monospace;">{{ problemsBadge }}</span></sc-if></button>
+          </div>
+
+          <div class="ss-scroll" style="flex:1;min-height:0;overflow-y:auto;">
+
+            <!-- panel: PROBLEMS -->
+            <sc-if value="{{ panelProblems }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:10px;display:flex;flex-direction:column;gap:6px;">
+                <sc-for list="{{ diagnostics }}" as="d" hint-placeholder-count="3">
+                  <div style="display:flex;gap:10px;padding:10px 11px;background:#1a1d22;border:1px solid #20242a;border-left:3px solid {{ d.hex }};border-radius:8px;">
+                    <span style="width:16px;height:16px;flex-shrink:0;border-radius:5px;background:{{ d.tileBg }};color:{{ d.hex }};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-top:1px;">{{ d.icon }}</span>
+                    <div style="min-width:0;flex:1;">
+                      <div style="font-size:12px;color:#e7eaee;line-height:1.45;">{{ d.msg }}</div>
+                      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;margin-top:3px;">{{ d.loc }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <!-- panel: SKELETON -->
+            <sc-if value="{{ panelSkeleton }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+                <sc-for list="{{ skelRows }}" as="r" hint-placeholder-count="4">
+                  <div>
+                    <div style="height:9px;width:{{ r.labelW }};border-radius:4px;background:linear-gradient(90deg,#16181c 25%,#20242a 50%,#16181c 75%);background-size:420px 100%;animation:ssShimmer 1.3s linear infinite;margin-bottom:9px;"></div>
+                    <div style="height:26px;border-radius:7px;background:linear-gradient(90deg,#131519 25%,#191c21 50%,#131519 75%);background-size:420px 100%;animation:ssShimmer 1.3s linear infinite;"></div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <!-- panel: INSPECTOR (permission context) -->
+            <sc-if value="{{ panelInspector }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:12px;">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(245,177,61,0.1);border:1px solid rgba(245,177,61,0.3);border-radius:9px;margin-bottom:14px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:#f5b13d;box-shadow:0 0 7px #f5b13d;animation:ssPulse 1.4s ease-in-out infinite;flex-shrink:0;"></span>
+                  <span style="font-size:11.5px;color:#f5c778;line-height:1.4;">{{ inspectorWarn }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;">
+                  <span style="width:22px;height:22px;border-radius:6px;background:rgba(75,191,137,0.14);border:1px solid #2f9e6e;display:flex;align-items:center;justify-content:center;font-size:12px;color:#6fe3b8;">{{ inspectorGlyph }}</span>
+                  <span style="font-size:13px;font-weight:600;color:#e7eaee;">{{ inspectorTitle }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:12px;opacity:0.55;">
+                  <sc-for list="{{ inspectorFields }}" as="f" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa2ac;width:74px;">{{ f.key }}</span>
+                      <div style="flex:1;height:28px;background:#22262c;border:1px solid #2b3037;border-radius:6px;display:flex;align-items:center;padding:0 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;">{{ f.val }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- panel: EMPTY -->
+            <sc-if value="{{ panelEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;">
+                <div style="width:38px;height:38px;border-radius:9px;border:1px solid #22262c;background:#16181c;display:flex;align-items:center;justify-content:center;color:#454c55;font-size:15px;">◆</div>
+                <div style="text-align:center;">
+                  <div style="font-size:12.5px;font-weight:600;color:#9aa2ac;margin-bottom:3px;">Nothing selected</div>
+                  <div style="font-size:11.5px;color:#656d78;line-height:1.5;max-width:200px;">Select a node to edit its uniforms.</div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── status bar ── -->
+    <div style="display:flex;align-items:center;gap:16px;height:26px;flex-shrink:0;padding:0 12px;background:#101216;border-top:1px solid #17191e;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;">
+      <span style="display:flex;align-items:center;gap:6px;color:{{ statusColor }};"><span style="width:7px;height:7px;border-radius:50%;background:{{ statusColor }};box-shadow:0 0 6px {{ statusColor }};"></span>{{ statusText }}</span>
+      <span style="color:#656d78;">{{ statusMeta1 }}</span>
+      <span style="color:#656d78;">{{ statusMeta2 }}</span>
+      <div style="flex:1;"></div>
+      <span style="color:{{ statusRightColor }};">{{ statusRight }}</span>
+    </div>
+
+    <!-- ══ GPU UNSUPPORTED — full app scrim ══ -->
+    <sc-if value="{{ gpuBlock }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:60;background:rgba(6,7,9,0.72);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;">
+        <div style="width:440px;background:#131519;border:1px solid #2b3037;border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.7);">
+          <div style="padding:26px 26px 20px;border-bottom:1px solid #20242a;">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+              <div style="width:48px;height:48px;border-radius:13px;background:rgba(240,85,92,0.13);border:1px solid rgba(240,85,92,0.4);display:flex;align-items:center;justify-content:center;font-size:22px;color:#f0555c;flex-shrink:0;">⊘</div>
+              <div>
+                <div style="font-size:16px;font-weight:600;letter-spacing:-0.3px;color:#e7eaee;">WebGL2 is not available</div>
+                <div style="font-size:11.5px;color:#8f97a1;margin-top:2px;">ShaderPlayground needs a WebGL2 rendering context to run.</div>
+              </div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.75;background:#0b0c0e;border:1px solid #20242a;border-radius:9px;padding:11px 13px;color:#8f97a1;">
+              <div>context&nbsp;&nbsp;&nbsp;: <span style="color:#f0555c;">null</span></div>
+              <div>renderer&nbsp;: <span style="color:#656d78;">unavailable</span></div>
+              <div>webgl2&nbsp;&nbsp;&nbsp;: <span style="color:#f0555c;">unsupported</span></div>
+            </div>
+          </div>
+          <div style="padding:20px 26px 22px;">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;margin-bottom:12px;">Try this</div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:22px;">
+              <sc-for list="{{ gpuTips }}" as="t" hint-placeholder-count="3">
+                <div style="display:flex;align-items:flex-start;gap:11px;">
+                  <span style="width:20px;height:20px;border-radius:6px;background:rgba(61,155,255,0.14);border:1px solid #2b6fe0;color:#57a9ff;font-family:'JetBrains Mono',monospace;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">{{ t.n }}</span>
+                  <span style="font-size:12px;color:#c4cad2;line-height:1.5;">{{ t.text }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <button style="flex:1;height:38px;background:#3d9bff;border:none;border-radius:9px;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(61,155,255,0.3);">Retry detection</button>
+              <a href="#" style="font-size:12px;color:#9aa2ac;text-decoration:none;">Troubleshooting ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;empty-graph&quot;,&quot;empty-viewport&quot;,&quot;loading&quot;,&quot;perm-webcam&quot;,&quot;perm-audio&quot;,&quot;compile-error&quot;,&quot;gpu-unsupported&quot;],&quot;default&quot;:&quot;compile-error&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;State&quot;},&quot;showRail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;},&quot;showToolbar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;}}">
+class Component extends DCLogic {
+  state = { sel: "compile-error" };
+
+  renderVals() {
+    const sel = this.props.state ?? this.state.sel;
+    const set = (k) => () => this.setState({ sel: k });
+
+    // ── rail groups ──
+    const items = [
+      { group: "Empty", key: "empty-graph", label: "Empty graph", glyph: "◆" },
+      { group: "Empty", key: "empty-viewport", label: "Empty viewport", glyph: "◎" },
+      { group: "Loading", key: "loading", label: "Asset loading", glyph: "◐" },
+      { group: "Permission", key: "perm-webcam", label: "Camera access", glyph: "◉" },
+      { group: "Permission", key: "perm-audio", label: "Microphone access", glyph: "∿" },
+      { group: "Error", key: "compile-error", label: "Compile error", glyph: "⚠" },
+      { group: "Error", key: "gpu-unsupported", label: "WebGL2 unavailable", glyph: "⊘" },
+    ];
+    const catColor = { "Empty": "#77828f", "Loading": "#3d9bff", "Permission": "#f5b13d", "Error": "#f0555c" };
+    const groupNames = ["Empty", "Loading", "Permission", "Error"];
+    const railGroups = groupNames.map(gn => ({
+      title: gn,
+      items: items.filter(i => i.group === gn).map(i => {
+        const on = sel === i.key;
+        const c = catColor[gn];
+        return {
+          label: i.label, glyph: i.glyph, active: on, select: set(i.key),
+          bg: on ? "#171b21" : "transparent",
+          border: on ? "#2b3037" : "transparent",
+          tileBg: on ? c + "22" : "#16181c",
+          tileBorder: on ? c : "#22262c",
+          glyphColor: on ? c : "#656d78",
+          labelColor: on ? "#e7eaee" : "#9aa2ac",
+          weight: on ? 600 : 500,
+        };
+      }),
+    }));
+
+    // ── mini graph nodes/edges (live) ──
+    const isWebcam = sel === "perm-webcam";
+    const isAudio = sel === "perm-audio";
+    const isErr = sel === "compile-error";
+
+    const warnBadge = { badge: "⚠ blocked", badgeColor: "#f5c778", badgeBg: "rgba(245,177,61,0.14)", badgeBorder: "rgba(245,177,61,0.4)" };
+    const errBadge = { badge: "error", badgeColor: "#f2888d", badgeBg: "rgba(240,85,92,0.14)", badgeBorder: "rgba(240,85,92,0.45)" };
+
+    const nodes = [
+      {
+        left: "60px", top: "60px", w: "150px", cat: "#4bbf89", glyph: "◉", title: "Webcam",
+        headerBg: "linear-gradient(180deg,rgba(75,191,137,0.24),rgba(75,191,137,0.09))",
+        tileBg: "rgba(75,191,137,0.2)", previewH: "50px",
+        preview: isWebcam ? "repeating-linear-gradient(45deg,#16181c 0 6px,#191c21 6px 12px)" : "linear-gradient(135deg,#2a3a34,#16211d)",
+        previewText: isWebcam ? "no signal" : "1280×720", previewTextColor: isWebcam ? "#8f97a1" : "rgba(255,255,255,0.5)",
+        inputs: [], hasOut: true, outTop: "58px", outColor: "#a06bff",
+        outGlow: isWebcam ? "none" : "0 0 8px rgba(160,107,255,0.6)", outOpacity: isWebcam ? "0.4" : "1",
+        shadow: isWebcam ? "0 8px 22px rgba(0,0,0,0.5),0 0 0 1.5px #f5b13d,0 0 14px rgba(245,177,61,0.3)" : "0 8px 22px rgba(0,0,0,0.45)",
+        ...(isWebcam ? warnBadge : { badge: null }),
+      },
+      {
+        left: "60px", top: "300px", w: "150px", cat: "#4bbf89", glyph: "∿", title: "Audio",
+        headerBg: "linear-gradient(180deg,rgba(75,191,137,0.24),rgba(75,191,137,0.09))",
+        tileBg: "rgba(75,191,137,0.2)", previewH: "50px",
+        preview: isAudio ? "repeating-linear-gradient(45deg,#16181c 0 6px,#191c21 6px 12px)" : "linear-gradient(90deg,#16211d,#2a3a34,#16211d)",
+        previewText: isAudio ? "muted" : "FFT 512", previewTextColor: isAudio ? "#8f97a1" : "rgba(255,255,255,0.5)",
+        inputs: [], hasOut: true, outTop: "58px", outColor: "#7ed957",
+        outGlow: isAudio ? "none" : "0 0 8px rgba(126,217,87,0.6)", outOpacity: isAudio ? "0.4" : "1",
+        shadow: isAudio ? "0 8px 22px rgba(0,0,0,0.5),0 0 0 1.5px #f5b13d,0 0 14px rgba(245,177,61,0.3)" : "0 8px 22px rgba(0,0,0,0.45)",
+        ...(isAudio ? warnBadge : { badge: null }),
+      },
+      {
+        left: "320px", top: "150px", w: "170px", cat: "#3d9bff", glyph: "◆", title: "Fresnel",
+        headerBg: "linear-gradient(180deg,rgba(61,155,255,0.28),rgba(61,155,255,0.12))",
+        tileBg: "rgba(61,155,255,0.22)", previewH: "80px",
+        preview: isErr ? "repeating-linear-gradient(45deg,rgba(240,85,92,0.12) 0 8px,rgba(240,85,92,0.04) 8px 16px)" : "radial-gradient(circle at 40% 35%,#7dbcff 0%,#2b6fe0 42%,#0b1a3a 100%)",
+        previewText: isErr ? "compile failed" : "", previewTextColor: "#f2888d",
+        inputs: [{ top: "54px", color: "#a06bff" }, { top: "84px", color: "#7ed957" }],
+        hasOut: true, outTop: "73px", outColor: "#f0b429",
+        outGlow: isErr ? "none" : "0 0 8px rgba(240,180,41,0.6)", outOpacity: isErr ? "0.4" : "1",
+        shadow: isErr ? "0 12px 28px rgba(0,0,0,0.55),0 0 0 1.5px #f0555c,0 0 16px rgba(240,85,92,0.35)" : "0 12px 28px rgba(0,0,0,0.55),0 0 0 1px rgba(61,155,255,0.5),0 0 14px rgba(61,155,255,0.25)",
+        ...(isErr ? errBadge : { badge: null }),
+      },
+      {
+        left: "580px", top: "175px", w: "140px", cat: "#e05c93", glyph: "◎", title: "Output",
+        headerBg: "linear-gradient(180deg,rgba(224,92,147,0.24),rgba(224,92,147,0.1))",
+        tileBg: "rgba(224,92,147,0.2)", previewH: "50px",
+        preview: isErr ? "#0e0f12" : "radial-gradient(circle at 45% 40%,#7dbcff,#2b6fe0 60%,#0b1a3a)",
+        previewText: isErr ? "—" : "", previewTextColor: "#565e68",
+        inputs: [{ top: "58px", color: "#f0b429" }], hasOut: false, outTop: "0",
+        outColor: "#f0b429", outGlow: "none", outOpacity: "1",
+        shadow: "0 8px 22px rgba(0,0,0,0.45)", badge: null,
+      },
+    ];
+
+    const edges = [
+      { d: "M210 124 C 265 124, 265 210, 320 210", stroke: "#a06bff", dash: isWebcam ? "5 6" : "0", opacity: isWebcam ? "0.55" : "0.9" },
+      { d: "M210 364 C 265 364, 265 240, 320 240", stroke: "#7ed957", dash: isAudio ? "5 6" : "0", opacity: isAudio ? "0.55" : "0.9" },
+      { d: "M490 229 C 535 229, 535 239, 580 239", stroke: isErr ? "#f0555c" : "#f0b429", dash: isErr ? "5 6" : "0", opacity: isErr ? "0.6" : "0.9" },
+    ];
+
+    const skeletonNodes = [
+      { left: "40px", top: "40px" }, { left: "270px", top: "120px" }, { left: "500px", top: "70px" },
+    ];
+
+    // ── loading assets ──
+    const assetRows = [
+      { name: "noise.png", status: "loaded", dot: "#34d399", statusColor: "#34d399" },
+      { name: "envmap.hdr", status: "loaded", dot: "#34d399", statusColor: "#34d399" },
+      { name: "gradient.png", status: "42%", dot: "#3d9bff", statusColor: "#57a9ff" },
+    ];
+    const bars = ["10px", "18px", "8px", "22px", "14px", "20px", "9px"].map(h => ({ h }));
+
+    // ── diagnostics (compile error) ──
+    const diagnostics = [
+      { icon: "✕", hex: "#f0555c", tileBg: "rgba(240,85,92,0.14)", msg: "'v_uv' : undeclared identifier", loc: "Fresnel · frag · line 14:33" },
+      { icon: "✕", hex: "#f0555c", tileBg: "rgba(240,85,92,0.14)", msg: "'pow' : no matching overloaded function found", loc: "Fresnel · frag · line 14:11" },
+      { icon: "!", hex: "#f5b13d", tileBg: "rgba(245,177,61,0.14)", msg: "unused uniform 'u_seed'", loc: "Fresnel · frag · line 8:15" },
+    ];
+
+    const skelRows = [
+      { labelW: "60px" }, { labelW: "44px" }, { labelW: "72px" }, { labelW: "52px" },
+    ];
+
+    // ── inspector (permission) ──
+    const inspCfg = isWebcam
+      ? { warn: "Awaiting camera permission — parameters lock until access is granted.", glyph: "◉", title: "Webcam source",
+          fields: [{ key: "device", val: "default cam" }, { key: "resolution", val: "1280 × 720" }, { key: "fps", val: "30" }] }
+      : { warn: "Awaiting microphone permission — parameters lock until access is granted.", glyph: "∿", title: "Audio source",
+          fields: [{ key: "device", val: "default mic" }, { key: "fftSize", val: "512" }, { key: "smoothing", val: "0.80" }] };
+
+    const gpuTips = [
+      { n: "1", text: "Enable hardware acceleration in your browser settings, then reload." },
+      { n: "2", text: "Update your graphics drivers — WebGL2 needs a modern GPU." },
+      { n: "3", text: "Try a current Chrome, Edge or Firefox build." },
+    ];
+
+    // ── per-state chrome config ──
+    const cfg = {
+      "empty-graph":    { graph: "empty",    vp: "empty",   panel: "empty",     count: "0N · 0E", gNote: "empty graph", vpNote: "no output", statusC: "#34d399", statusT: "GL ready", m1: "0 nodes", m2: "—", right: "Tip: press ⌘K to add anything", rightC: "#656d78", fps: false },
+      "empty-viewport": { graph: "live",     vp: "empty",   panel: "empty",     count: "4N · 3E", gNote: "no output node", vpNote: "no output", statusC: "#f5b13d", statusT: "No render target", m1: "4 nodes", m2: "0 draws", right: "Add an Output node to render", rightC: "#f5b13d", fps: false },
+      "loading":        { graph: "skeleton", vp: "loading", panel: "skeleton",  count: "···", gNote: "restoring", vpNote: "compiling", statusC: "#f5b13d", statusT: "Compiling…", m1: "linking", m2: "3 shaders", right: "Uploading assets 64%", rightC: "#57a9ff", fps: false },
+      "perm-webcam":    { graph: "live",     vp: "webcam",  panel: "inspector", count: "4N · 3E", gNote: "webcam blocked", vpNote: "awaiting camera", statusC: "#f5b13d", statusT: "Awaiting camera", m1: "4 nodes", m2: "1 blocked", right: "Grant access to start capture", rightC: "#f5b13d", fps: false },
+      "perm-audio":     { graph: "live",     vp: "audio",   panel: "inspector", count: "4N · 3E", gNote: "audio blocked", vpNote: "awaiting mic", statusC: "#f5b13d", statusT: "Awaiting mic", m1: "4 nodes", m2: "1 blocked", right: "Grant access to start FFT", rightC: "#f5b13d", fps: false },
+      "compile-error":  { graph: "live",     vp: "error",   panel: "problems",  count: "4N · 3E", gNote: "1 node failing", vpNote: "compile failed", statusC: "#f0555c", statusT: "1 error", m1: "compile failed", m2: "Fresnel", right: "2 errors · 1 warning", rightC: "#f0555c", fps: false },
+      "gpu-unsupported":{ graph: "live",     vp: "empty",   panel: "empty",     count: "—", gNote: "offline", vpNote: "renderer offline", statusC: "#f0555c", statusT: "WebGL2 unavailable", m1: "renderer offline", m2: "0 fps", right: "GPU context failed", rightC: "#f0555c", fps: false },
+    }[sel] || {};
+
+    const disabledAction = sel === "gpu-unsupported" || sel === "compile-error";
+
+    return {
+      showRail: this.props.showRail ?? true,
+      showToolbar: this.props.showToolbar ?? true,
+      stateKey: sel,
+      railGroups,
+
+      // toolbar action states
+      shareColor: disabledAction ? "#454c55" : "#c4cad2",
+      exportBg: disabledAction ? "#16202e" : "#3d9bff",
+      exportColor: disabledAction ? "#5f7488" : "#fff",
+      actCursor: disabledAction ? "not-allowed" : "pointer",
+
+      // node editor
+      graphCount: cfg.count, graphNote: cfg.gNote,
+      graphEmpty: cfg.graph === "empty",
+      graphSkeleton: cfg.graph === "skeleton",
+      graphLive: cfg.graph === "live",
+      nodes, edges, skeletonNodes,
+
+      // viewport
+      vpNote: cfg.vpNote,
+      vpNoteColor: (cfg.vpNote || "").match(/fail|offline|awaiting/) ? "#f5b13d" : "#454c55",
+      vpEmpty: cfg.vp === "empty",
+      vpLoading: cfg.vp === "loading",
+      vpError: cfg.vp === "error",
+      vpWebcam: cfg.vp === "webcam",
+      vpAudio: cfg.vp === "audio",
+      assetRows, bars,
+      showFps: cfg.fps, fpsLabel: "60 FPS", fpsColor: "#34d399",
+
+      // side panel
+      panelProblems: cfg.panel === "problems",
+      panelSkeleton: cfg.panel === "skeleton",
+      panelInspector: cfg.panel === "inspector",
+      panelEmpty: cfg.panel === "empty",
+      diagnostics, skelRows,
+      problemsBadge: cfg.panel === "problems" ? "2" : null,
+      tabInspector: cfg.panel === "inspector" ? "#3d9bff" : "transparent",
+      tabInspectorColor: cfg.panel === "inspector" ? "#e7eaee" : "#9aa2ac",
+      tabInspectorWeight: cfg.panel === "inspector" ? 600 : 500,
+      tabProblems: cfg.panel === "problems" ? "#f0555c" : "transparent",
+      tabProblemsColor: cfg.panel === "problems" ? "#f2888d" : "#9aa2ac",
+      tabProblemsWeight: cfg.panel === "problems" ? 600 : 500,
+      inspectorWarn: inspCfg.warn, inspectorGlyph: inspCfg.glyph, inspectorTitle: inspCfg.title, inspectorFields: inspCfg.fields,
+
+      // status bar
+      statusColor: cfg.statusC, statusText: cfg.statusT, statusMeta1: cfg.m1, statusMeta2: cfg.m2,
+      statusRight: cfg.right, statusRightColor: cfg.rightC,
+
+      // gpu block
+      gpuBlock: sel === "gpu-unsupported",
+      gpuTips,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -738,3 +738,382 @@ textarea {
   background: var(--surface-hover);
   color: var(--text-primary);
 }
+
+/* ── Viewport pane overlay (Viewport.dc.html L65-87, M3-U2) ───────── */
+.vp-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.vp-pane {
+  position: absolute;
+  overflow: hidden;
+}
+.vp-pane-label {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vp-pane-chip {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.vp-pane-name {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.vp-pane-ms {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 7px;
+}
+.vp-pane-res {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+.vp-divider {
+  position: absolute;
+  background: var(--border-header-divider);
+}
+
+/* ── Viewport transport bar (Viewport.dc.html L107-135, M3-U3) ──
+   The dc mock is authored against a 1320px-wide canvas, where the bar's
+   natural (unconstrained) content width comfortably fits. Real docked
+   layouts give the viewport panel far less width (the default 3-column
+   split leaves ~590px), so the bar must actively shrink instead of just
+   overflowing .panel-body's `overflow: hidden` — an overflowing bar clips
+   its own play/reset buttons and, worse, leaves their hit targets sitting
+   over the NodeEditor pane next door (unclickable).
+   `width` is pinned to the design's natural total (734px, measured with
+   every child at its full design size: all fixed-size children + both
+   sliders at their design widths, 14px gaps ×6, 15px×2 padding, 1px×2
+   border ≈ 731px, +3px margin for cross-platform font-metric drift)
+   rather than left to the browser's own auto/max-content sizing —
+   `<input type="range">` reports a fixed UA default width as its intrinsic
+   contribution for that computation regardless of the `max-width` below,
+   which silently undersized every flex ancestor (bar included) even with
+   ample room. Pinning the ceiling ourselves keeps the sliders at their
+   full 196/96px design width whenever there's room, and
+   `calc(100% - 24px)` takes over to force the shrink (absorbed by the
+   sliders, see `.vp-transport-scrub`/`-fov` below) once the panel is
+   narrower than the bar's natural size. */
+.vp-transport {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(734px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-transport-bar);
+  padding: 9px 15px;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-overlay-bar);
+  z-index: 6;
+}
+.vp-transport-play {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-overlay);
+  background: var(--accent-default);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.vp-transport-play:hover {
+  background: var(--accent-hover);
+}
+.vp-transport-reset-time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.vp-transport-reset-time:hover {
+  color: var(--text-primary);
+}
+.vp-transport-time {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Explicit basis + floor, both measured (label ~38 + gap10 + value46 +
+     gap10 + scrub), so `.vp-transport`'s outer shrink pass has real numbers
+     to distribute instead of inferring them from this nested flex box's own
+     content — that inference left it sitting near its natural width instead
+     of yielding to `.vp-transport-scrub`'s min-width, defeating the shrink
+     below. min-width uses the scrub's own 56px floor in place of its 196px
+     design width. */
+  flex: 0 1 300px;
+  min-width: 160px;
+}
+.vp-transport-label {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.vp-transport-value {
+  width: 46px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+}
+.vp-transport-speed {
+  flex-shrink: 0;
+  min-width: 42px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-stronger);
+  border-radius: var(--radius-button);
+  background: var(--surface-input);
+  color: var(--text-bright-body);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+.vp-transport-speed:hover {
+  border-color: var(--accent-default);
+}
+.vp-transport-divider {
+  width: 1px;
+  height: 22px;
+  flex-shrink: 0;
+  background: var(--border-strong);
+}
+.vp-transport-fov-group {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  /* Same reasoning as `.vp-transport-time` above: label(~19) + gap9 + FOV
+     slider(96) + gap9 + value(34) for the basis; the FOV slider's own 32px
+     floor in place of 96 for the min-width. */
+  flex: 0 1 167px;
+  min-width: 105px;
+}
+.vp-transport-fov-value {
+  width: 34px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-bright-body);
+}
+.vp-transport-reset-cam {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.vp-transport-reset-cam:hover {
+  color: var(--text-primary);
+}
+/* Scrub + FOV range inputs: native track/thumb custom styling. The design's
+   blue "filled" portion of the track is a from-scratch scrub re-render we
+   deliberately skip here (native <input type="range"> has no fill pseudo);
+   accent-color approximates it in browsers that honor it, degrading
+   gracefully to the plain track color otherwise. */
+.vp-transport-scrub,
+.vp-transport-fov {
+  height: 5px;
+  /* Chromium's UA stylesheet gives `input[type="range"]` a default 2px
+     left/right margin, which — being part of the flex item's outer/margin
+     box — silently ate 4px off the slider's resolved width on every layout
+     below, so it never quite reached its own `max-width`. */
+  margin: 0;
+  background: transparent;
+  accent-color: var(--accent-default);
+  cursor: pointer;
+}
+/* Design widths (196px scrub, 96px FOV, Viewport.dc.html L114/L127) are the
+   ceiling, not a fixed size — `flex` lets each slider give up its own track
+   width first when the bar has to shrink (see `.vp-transport` above),
+   before anything else in the bar is asked to compress. `min-width` keeps
+   enough track for the thumb to stay a usable drag target at the narrowest
+   panel size the docking layout allows. */
+.vp-transport-scrub {
+  flex: 1 1 60px;
+  min-width: 56px;
+  max-width: 196px;
+}
+.vp-transport-fov {
+  flex: 1 1 40px;
+  min-width: 32px;
+  max-width: 96px;
+}
+.vp-transport-scrub::-webkit-slider-runnable-track,
+.vp-transport-fov::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border-strong);
+}
+.vp-transport-scrub::-webkit-slider-thumb,
+.vp-transport-fov::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  margin-top: -3.5px;
+}
+
+/* ── Viewport empty state (Viewport.dc.html L49-63, M3-U4) ──
+   The dc mock is authored against an ~816px-tall viewport canvas; the
+   default docked layout gives the real viewport panel only ~290px, so the
+   full-size layout below (icon 64px, 22px gaps, roomy hint cards) both
+   overflows vertically (getting compressed by the flex column's default
+   shrink, most visibly squashing the icon) and — since the floating
+   transport bar sits at a fixed 16px+~52px zone at the very bottom —
+   overlaps the last one or two onboarding hints. `.panel-body` becomes a
+   size container so the `@container` block further down can swap in a
+   compact layout once the panel is too short for the full design spacing,
+   and `padding-bottom` reserves the transport bar's own footprint so the
+   hints never sit behind it even before that swap kicks in. */
+.panel--viewport .panel-body {
+  container-type: size;
+  container-name: vp-body;
+}
+.vp-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  /* Transport bar footprint: 16px bottom offset + ~52px bar height. */
+  padding: 0 16px 68px;
+  background: var(--surface-app);
+  pointer-events: none;
+}
+.vp-empty-icon {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--radius-empty-state-icon);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: var(--text-disabled);
+}
+.vp-empty-text {
+  flex-shrink: 0;
+  text-align: center;
+  max-width: 380px;
+}
+.vp-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-bright-body);
+  margin-bottom: 6px;
+}
+.vp-empty-body {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.vp-empty-body-accent {
+  color: var(--text-secondary);
+}
+.vp-empty-hints {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 8px;
+  width: 300px;
+}
+.vp-empty-hint {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-overlay);
+}
+.vp-empty-hint-chip {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--accent-active);
+  color: var(--accent-hover);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vp-empty-hint-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.vp-empty-hint-key {
+  font-family: var(--font-mono);
+  color: var(--text-bright-body);
+}
+/* Compact tier for short panels (the default docked layout is ~290px tall,
+   well under the dc mock's ~816px reference canvas) — every full-size
+   number above is measured to overflow that height. The empty state's flex
+   children are all `flex-shrink: 0` (deliberately, so a too-tall layout
+   overflows/gets clipped by `.panel-body`'s `overflow: hidden` rather than
+   silently squashing e.g. the icon into an oval), so this compact tier is
+   what actually keeps things fitting: it trades the design's roomier
+   spacing for one that's measured to fit the default panel height (with
+   the transport bar's `padding-bottom` reservation above already
+   subtracted) while still showing the icon, title, body, and all three
+   onboarding hints. */
+@container vp-body (max-height: 360px) {
+  .vp-empty {
+    gap: 4px;
+  }
+  .vp-empty-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  .vp-empty-hints {
+    gap: 4px;
+  }
+  .vp-empty-hint {
+    padding: 3px 12px;
+  }
+}

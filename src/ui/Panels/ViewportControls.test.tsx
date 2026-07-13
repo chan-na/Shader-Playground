@@ -1,46 +1,54 @@
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { ViewportControls } from "./ViewportControls";
 
-// NOTE: zustand v5 + useSyncExternalStore returns the *initial* store snapshot
-// during renderToStaticMarkup, so we exercise the cold-start layout (time = 0,
-// paused, default camera/background). Interactive store mutations are covered
-// by their store-level unit tests.
+// Time/Camera controls moved to TransportBar (M3-U3) — see
+// src/ui/Viewport/TransportBar.test.tsx. This suite only covers what's left:
+// the Viewport section (background swatch + GPU timer toggle).
+
+const initialGpuTimer = useGpuTimerStore.getState();
+
+afterEach(() => {
+  useGpuTimerStore.setState(initialGpuTimer, true);
+  cleanup();
+});
 
 describe("ViewportControls", () => {
-  it("renders Time / Camera / Viewport sections", () => {
-    const html = renderToStaticMarkup(<ViewportControls />);
-    expect(html).toContain(">Time<");
-    expect(html).toContain(">Camera<");
-    expect(html).toContain(">Viewport<");
+  it("renders only the Viewport section (no Time/Camera headings)", () => {
+    render(<ViewportControls />);
+    expect(screen.getByText("Viewport")).not.toBeNull();
+    expect(screen.queryByText("Time")).toBeNull();
+    expect(screen.queryByText("Camera")).toBeNull();
   });
 
-  it("starts playing (⏸ Pause visible at initial state)", () => {
-    // timeStore initial playing = true → button shows ⏸ Pause
-    const html = renderToStaticMarkup(<ViewportControls />);
-    expect(html).toContain("⏸ Pause");
-    expect(html).not.toContain("▶ Play");
+  it("does not expose the time/camera transport testids (moved to TransportBar)", () => {
+    render(<ViewportControls />);
+    expect(screen.queryByTestId("time-playpause")).toBeNull();
+    expect(screen.queryByTestId("time-scrub")).toBeNull();
+    expect(screen.queryByTestId("time-speed")).toBeNull();
+    expect(screen.queryByTestId("camera-fov")).toBeNull();
   });
 
-  it("exposes test-id hooks for time / speed / fov / background", () => {
-    const html = renderToStaticMarkup(<ViewportControls />);
-    expect(html).toContain('data-testid="time-playpause"');
-    expect(html).toContain('data-testid="time-scrub"');
-    expect(html).toContain('data-testid="time-speed"');
-    expect(html).toContain('data-testid="camera-fov"');
-    expect(html).toContain('data-testid="bg-color"');
+  it("exposes the background color swatch", () => {
+    render(<ViewportControls />);
+    const swatch = screen.getByTestId("bg-color");
+    expect(swatch).not.toBeNull();
+    // useViewportStore's default background [0.07, 0.07, 0.09] (viewportStore.ts).
+    expect(swatch.getAttribute("value")).toBe("#121217");
   });
 
-  it("labels the reset buttons with their tooltips (titles)", () => {
-    const html = renderToStaticMarkup(<ViewportControls />);
-    expect(html).toContain('title="Reset time"');
-    expect(html).toContain('title="Reset camera"');
-  });
+  it("shows the GPU timer toggle when supported, unavailable otherwise", () => {
+    useGpuTimerStore.setState({ supported: false });
+    const { unmount } = render(<ViewportControls />);
+    expect(screen.getByTestId("gpu-timer-unsupported")).not.toBeNull();
+    expect(screen.queryByTestId("gpu-timer-toggle")).toBeNull();
+    unmount();
 
-  it("formats time as 0.00s by default and FOV in degrees", () => {
-    const html = renderToStaticMarkup(<ViewportControls />);
-    expect(html).toContain("0.00s");
-    // FOV label: e.g. "60°" / "45°" depending on default camera fov
-    expect(html).toMatch(/\d+°/);
+    useGpuTimerStore.setState({ supported: true, enabled: true });
+    render(<ViewportControls />);
+    const toggle = screen.getByTestId("gpu-timer-toggle");
+    expect(toggle).not.toBeNull();
+    expect((toggle as HTMLInputElement).checked).toBe(true);
   });
 });

@@ -24,22 +24,54 @@ export interface GlInfo {
   version: string;
 }
 
+/**
+ * One drawable composite cell: an Output node paired with the shader-pass
+ * node whose FBO it composites. Mirrors the `drawable` filter in
+ * execute.ts's composite step so pane order matches the composite cell
+ * order 1:1. Not exported — consumers read it structurally through
+ * `RendererState.panes`.
+ */
+interface ViewportPane {
+  outputNodeId: string;
+  sourceNodeId: string;
+}
+
 export interface RendererState {
   ready: boolean;
   stats: RendererStats;
   glInfo: GlInfo | null;
+  /** Drawable Output panes for the current compiled plan, in composite order. */
+  panes: ViewportPane[];
+  /** Canvas backing (device-pixel) resolution, as last set by the RAF resize step. */
+  canvasSize: { width: number; height: number };
   setReady: (ready: boolean) => void;
   setStats: (stats: Partial<RendererStats>) => void;
   setGlInfo: (info: GlInfo) => void;
   bumpRenderTick: () => void;
   pushError: (msg: string) => void;
   clearErrors: () => void;
+  setPanes: (panes: ViewportPane[]) => void;
+  setCanvasSize: (size: { width: number; height: number }) => void;
 }
 
-export const useRendererStore = create<RendererState>((set) => ({
+function panesEqual(a: ViewportPane[], b: ViewportPane[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const pa = a[i];
+    const pb = b[i];
+    if (!pa || !pb) return false;
+    if (pa.outputNodeId !== pb.outputNodeId) return false;
+    if (pa.sourceNodeId !== pb.sourceNodeId) return false;
+  }
+  return true;
+}
+
+export const useRendererStore = create<RendererState>((set, get) => ({
   ready: false,
   stats: { fps: 0, frame: 0, drawCalls: 0, renderTick: 0, errors: [] },
   glInfo: null,
+  panes: [],
+  canvasSize: { width: 1, height: 1 },
   setReady: (ready) => set({ ready }),
   setGlInfo: (glInfo) => set({ glInfo }),
   setStats: (patch) => set((s) => ({ stats: { ...s.stats, ...patch } })),
@@ -57,4 +89,16 @@ export const useRendererStore = create<RendererState>((set) => ({
     }));
   },
   clearErrors: () => set((s) => ({ stats: { ...s.stats, errors: [] } })),
+  setPanes: (panes) => {
+    // No-op guard: recompile() calls this every recompile (potentially every
+    // frame while the graph is being edited), so bail out without touching
+    // state — and without a new array reference — when nothing changed.
+    if (panesEqual(get().panes, panes)) return;
+    set({ panes });
+  },
+  setCanvasSize: (size) => {
+    const cur = get().canvasSize;
+    if (cur.width === size.width && cur.height === size.height) return;
+    set({ canvasSize: size });
+  },
 }));

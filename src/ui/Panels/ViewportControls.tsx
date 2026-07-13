@@ -1,6 +1,4 @@
-import { useCameraStore } from "../../state/cameraStore";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
-import { useTimeStore } from "../../state/timeStore";
 import { useViewportStore } from "../../state/viewportStore";
 
 function rgbToHex(rgb: [number, number, number]) {
@@ -19,18 +17,6 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 export function ViewportControls() {
-  const camera = useCameraStore((s) => s.camera);
-  const setCamera = useCameraStore((s) => s.setCamera);
-  const resetCamera = useCameraStore((s) => s.reset);
-
-  const time = useTimeStore((s) => s.simTime);
-  const playing = useTimeStore((s) => s.playing);
-  const speed = useTimeStore((s) => s.speed);
-  const setPlaying = useTimeStore((s) => s.setPlaying);
-  const setSpeed = useTimeStore((s) => s.setSpeed);
-  const setTime = useTimeStore((s) => s.setTime);
-  const resetTime = useTimeStore((s) => s.reset);
-
   const background = useViewportStore((s) => s.background);
   const setBackground = useViewportStore((s) => s.setBackground);
 
@@ -38,168 +24,54 @@ export function ViewportControls() {
   const gpuEnabled = useGpuTimerStore((s) => s.enabled);
   const toggleGpu = useGpuTimerStore((s) => s.toggleEnabled);
 
-  const fovDeg = (camera.fov * 180) / Math.PI;
-
   return (
-    <>
-      <div className="inspector-section">
-        <div className="inspector-label">
-          <span>Time</span>
-          <span style={{ color: "#666" }}>{time.toFixed(2)}s</span>
-        </div>
-        <div className="inspector-row">
-          <button
-            type="button"
-            className="btn-small"
-            onClick={() => setPlaying(!playing)}
-            title={playing ? "Pause (Space)" : "Play (Space)"}
-            data-testid="time-playpause"
-          >
-            {playing ? "⏸ Pause" : "▶ Play"}
-          </button>
-          <button
-            type="button"
-            className="btn-small"
-            onClick={() => resetTime()}
-            title="Reset time"
-          >
-            ⏮ 0
-          </button>
-        </div>
-        <div className="inspector-row">
-          <input
-            type="range"
-            min={0}
-            max={30}
-            step={0.01}
-            value={Math.min(time, 30)}
-            onChange={(e) => setTime(parseFloat(e.target.value))}
-            data-testid="time-scrub"
-          />
-          <input
-            type="number"
-            min={0}
-            step={0.1}
-            value={time.toFixed(2)}
-            onChange={(e) => setTime(parseFloat(e.target.value) || 0)}
-            style={{ width: 60 }}
-          />
-        </div>
-        <div className="inspector-row">
-          <span style={{ width: 36, color: "#888", fontSize: 11 }}>Speed</span>
-          <input
-            type="range"
-            min={0}
-            max={4}
-            step={0.01}
-            value={speed}
-            onChange={(e) => setSpeed(parseFloat(e.target.value))}
-            data-testid="time-speed"
-          />
-          <span
+    <div className="inspector-section">
+      <div className="inspector-label">Viewport</div>
+      <div className="inspector-row">
+        <span style={{ width: 56, color: "#888", fontSize: 11 }}>
+          Background
+        </span>
+        <input
+          type="color"
+          value={rgbToHex(background)}
+          onChange={(e) => setBackground(hexToRgb(e.target.value))}
+          data-testid="bg-color"
+        />
+        <span style={{ color: "#888", fontFamily: "monospace", fontSize: 11 }}>
+          {background.map((x) => x.toFixed(2)).join(", ")}
+        </span>
+      </div>
+      <div className="inspector-row">
+        <span style={{ width: 56, color: "#888", fontSize: 11 }}>
+          GPU timer
+        </span>
+        {gpuSupported ? (
+          <label
             style={{
-              color: "#888",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              color: "#aaa",
               fontSize: 11,
-              fontFamily: "monospace",
-              width: 36,
-              textAlign: "right",
             }}
           >
-            {speed.toFixed(2)}×
-          </span>
-        </div>
-      </div>
-
-      <div className="inspector-section">
-        <div className="inspector-label">Camera</div>
-        <div className="inspector-row">
-          <button
-            type="button"
-            className="btn-small"
-            onClick={() => resetCamera()}
-            title="Reset camera"
-          >
-            ⟲ Reset camera
-          </button>
-        </div>
-        <div className="inspector-row">
-          <span style={{ width: 36, color: "#888", fontSize: 11 }}>FOV</span>
-          <input
-            type="range"
-            min={10}
-            max={120}
-            step={1}
-            value={fovDeg}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              setCamera({ ...camera, fov: (v * Math.PI) / 180 });
-            }}
-            data-testid="camera-fov"
-          />
+            <input
+              type="checkbox"
+              checked={gpuEnabled}
+              onChange={toggleGpu}
+              data-testid="gpu-timer-toggle"
+            />
+            {gpuEnabled ? "on" : "off"}
+          </label>
+        ) : (
           <span
-            style={{
-              color: "#888",
-              fontSize: 11,
-              fontFamily: "monospace",
-              width: 36,
-              textAlign: "right",
-            }}
+            style={{ color: "#666", fontSize: 11 }}
+            data-testid="gpu-timer-unsupported"
           >
-            {fovDeg.toFixed(0)}°
+            unavailable
           </span>
-        </div>
+        )}
       </div>
-
-      <div className="inspector-section">
-        <div className="inspector-label">Viewport</div>
-        <div className="inspector-row">
-          <span style={{ width: 56, color: "#888", fontSize: 11 }}>
-            Background
-          </span>
-          <input
-            type="color"
-            value={rgbToHex(background)}
-            onChange={(e) => setBackground(hexToRgb(e.target.value))}
-            data-testid="bg-color"
-          />
-          <span
-            style={{ color: "#888", fontFamily: "monospace", fontSize: 11 }}
-          >
-            {background.map((x) => x.toFixed(2)).join(", ")}
-          </span>
-        </div>
-        <div className="inspector-row">
-          <span style={{ width: 56, color: "#888", fontSize: 11 }}>
-            GPU timer
-          </span>
-          {gpuSupported ? (
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                color: "#aaa",
-                fontSize: 11,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={gpuEnabled}
-                onChange={toggleGpu}
-                data-testid="gpu-timer-toggle"
-              />
-              {gpuEnabled ? "on" : "off"}
-            </label>
-          ) : (
-            <span
-              style={{ color: "#666", fontSize: 11 }}
-              data-testid="gpu-timer-unsupported"
-            >
-              unavailable
-            </span>
-          )}
-        </div>
-      </div>
-    </>
+    </div>
   );
 }

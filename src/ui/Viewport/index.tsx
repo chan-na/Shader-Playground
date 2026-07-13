@@ -32,6 +32,9 @@ import { useTimeStore } from "../../state/timeStore";
 import { useViewportStore } from "../../state/viewportStore";
 import { log, normalizeError } from "../../utils/log";
 import { DockPanelHeader } from "../DockPanelHeader";
+import { EmptyState } from "./EmptyState";
+import { PaneOverlay } from "./PaneOverlay";
+import { TransportBar } from "./TransportBar";
 
 /** Output 노드 개수 → Viewport 헤더 메타 배지 텍스트("1 · single" 등, App
  *  Shell.dc.html L215). 분할 구현 전이라도 배지는 현재 그래프 상태를 반영한다. */
@@ -182,8 +185,26 @@ export function Viewport() {
         // undone / replaced) so ProblemsPanel rows and badge counts don't keep
         // reporting phantom problems (M10).
         diagStore.retainOnly(shaderNodeIds);
+        // Publish the drawable Output panes for this plan so DOM overlays can
+        // read composite cell membership without recomputing it themselves.
+        // Must mirror the `drawable` filter in execute.ts's composite step
+        // exactly, so pane order matches composite cell order 1:1.
+        const panes: Array<{ outputNodeId: string; sourceNodeId: string }> = [];
+        for (const o of plan.outputs) {
+          if (
+            o.sourceNodeId !== null &&
+            plan.shaderPassByNode.has(o.sourceNodeId)
+          ) {
+            panes.push({
+              outputNodeId: o.outputNodeId,
+              sourceNodeId: o.sourceNodeId,
+            });
+          }
+        }
+        useRendererStore.getState().setPanes(panes);
       } catch (e) {
         pushError(String(e));
+        useRendererStore.getState().setPanes([]);
       }
     };
 
@@ -198,6 +219,11 @@ export function Viewport() {
         resized = true;
       }
       gl.viewport(0, 0, canvas.width, canvas.height);
+      if (resized) {
+        useRendererStore
+          .getState()
+          .setCanvasSize({ width: canvas.width, height: canvas.height });
+      }
       return resized;
     };
 
@@ -524,6 +550,7 @@ export function Viewport() {
       useGpuTimerStore.getState().setSupported(false);
       plan.dispose();
       setReady(false);
+      useRendererStore.getState().setPanes([]);
     };
   }, [setReady, setStats, bumpRenderTick, pushError, clearErrors, setGlInfo]);
 
@@ -540,6 +567,9 @@ export function Viewport() {
           className="viewport-canvas"
           data-testid="viewport-canvas"
         />
+        <EmptyState />
+        <PaneOverlay />
+        <TransportBar />
       </div>
     </div>
   );

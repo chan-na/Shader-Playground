@@ -66,6 +66,12 @@ describe("cssVars", () => {
       expect(css).toContain(`--radius-${kebab(k)}: ${v}px;`);
     }
     expect(css).toContain(`--radius-node-card: ${tokens.radius.nodeCard}px;`);
+    expect(css).toContain(
+      `--radius-transport-bar: ${tokens.radius.transportBar}px;`,
+    );
+    expect(css).toContain(
+      `--radius-empty-state-icon: ${tokens.radius.emptyStateIcon}px;`,
+    );
   });
 
   it("shadow 그룹은 문자열 값만 --shadow-<kebab>로 방출하고 함수(portOutputGlow)는 제외한다", () => {
@@ -75,6 +81,10 @@ describe("cssVars", () => {
       `--shadow-node-card-hero: ${tokens.shadow.nodeCardHero};`,
     );
     expect(css).toContain(`--shadow-error-ring: ${tokens.shadow.errorRing};`);
+    expect(css).toContain(
+      `--shadow-on-canvas-text: ${tokens.shadow.onCanvasText};`,
+    );
+    expect(css).toContain(`--shadow-overlay-bar: ${tokens.shadow.overlayBar};`);
     expect(css).not.toContain("--shadow-port-output-glow");
   });
 

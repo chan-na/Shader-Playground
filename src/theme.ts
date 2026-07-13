@@ -122,6 +122,11 @@ export const tokens = {
     // 캔버스 부유 오버레이(미니맵/줌 컨트롤) — Node Editor.dc.html 미니맵
     // radius 9 · 줌 컨트롤 radius 8의 대표값.
     overlay: 9,
+    // 뷰포트 하단 플로팅 트랜스포트 바 — Viewport.dc.html L107: border-radius 12.
+    transportBar: 12,
+    // 뷰포트 빈 상태 중앙 아이콘 박스(64×64) — Viewport.dc.html L52:
+    // border-radius 16.
+    emptyStateIcon: 16,
   },
 
   // ── Shadow ──────────────────────────────────────────────────────────
@@ -135,6 +140,13 @@ export const tokens = {
     // 노드 카드 썸네일(Shader/Image 96px 프리뷰) 안쪽 그림자.
     // design/Node Editor.dc.html L188: box-shadow: inset 0 1px 4px rgba(0,0,0,0.5).
     thumbnailInset: "inset 0 1px 4px rgba(0,0,0,0.5)",
+    // 뷰포트 pane 오버레이(라벨/해상도 캡션)의 text-shadow — 밝은 배경 위에서도
+    // 가독성을 유지한다. design/Viewport.dc.html L76/L83: text-shadow:0 1px 3px
+    // rgba(0,0,0,0.6).
+    onCanvasText: "0 1px 3px rgba(0,0,0,0.6)",
+    // 뷰포트 하단 플로팅 트랜스포트 바 — design/Viewport.dc.html L107:
+    // box-shadow: 0 10px 30px rgba(0,0,0,0.55).
+    overlayBar: "0 10px 30px rgba(0,0,0,0.55)",
   },
 
   // ── Motion ──────────────────────────────────────────────────────────

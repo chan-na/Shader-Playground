@@ -16,6 +16,7 @@ import {
 import { useGraphStore } from "../state/graphStore";
 import type { NodePosition } from "../state/types";
 import { tokens, withAlpha } from "../theme";
+import { GraphEmptyState } from "./GraphEmptyState";
 import { NODE_CATEGORY_OF } from "./NodeEditor/nodeTheme";
 
 /**
@@ -36,6 +37,11 @@ import { NODE_CATEGORY_OF } from "./NodeEditor/nodeTheme";
  * here: the symbol is swapped for a 3×-scaled version of AppToolbar.tsx's
  * existing `tb-brand` mark (reuse over new asset), and the halo is a static
  * glow (no keyframe) per CLAUDE.md's "상시 애니메이션 금지" policy.
+ *
+ * Once `dismissed` (the "Start blank" button below), this renders
+ * `GraphEmptyState` instead of `null` — the design's empty-graph onboarding
+ * (design/System States.dc.html, M7-U2) — whose "Load a preset" flips
+ * `dismissed` back to false to return here.
  */
 
 interface StarterTag {
@@ -192,7 +198,9 @@ export function WelcomeOverlay() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [dismissed, selected]);
 
-  if (dismissed) return null;
+  if (dismissed) {
+    return <GraphEmptyState onLoadPreset={() => setDismissed(false)} />;
+  }
 
   const onFilesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

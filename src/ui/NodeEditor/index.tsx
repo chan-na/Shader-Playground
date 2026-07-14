@@ -24,6 +24,7 @@ import { GROUP_COLLAPSED_HEIGHT } from "../../core/graph/types";
 import { validateGraph } from "../../core/graph/validate";
 import { nodeInputPorts, nodeOutputPorts } from "../../core/nodes/registry";
 import { importFiles } from "../../state/assetActions";
+import { useBootstrapStore } from "../../state/bootstrapStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
@@ -32,6 +33,7 @@ import { DockPanelHeader } from "../DockPanelHeader";
 import { WelcomeOverlay } from "../WelcomeOverlay";
 import { ConnectionLine } from "./ConnectionLine";
 import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
+import { GraphSkeleton } from "./GraphSkeleton";
 import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
 import { createNodeDataCache } from "./rfNodeData";
@@ -45,6 +47,7 @@ const DROP_CARD_W = 180;
 const DROP_CARD_H = 64;
 
 export function NodeEditor() {
+  const bootPhase = useBootstrapStore((s) => s.phase);
   const graphNodes = useGraphStore((s) => s.nodes);
   const graphEdges = useGraphStore((s) => s.edges);
   const positions = useGraphStore((s) => s.positions);
@@ -448,7 +451,8 @@ export function NodeEditor() {
           />
           <ZoomControls />
         </ReactFlow>
-        {graphNodes.length === 0 && <WelcomeOverlay />}
+        {graphNodes.length === 0 &&
+          (bootPhase !== "done" ? <GraphSkeleton /> : <WelcomeOverlay />)}
         {selectedNodeIds.length > 1 && (
           <div
             data-testid="selection-count-badge"

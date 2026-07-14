@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { hydrateGraphAssets } from "../state/assetActions";
 import { clearSession, loadSession, startAutoSave } from "../state/autoSave";
+import { useBootstrapStore } from "../state/bootstrapStore";
 import { createDemoGraph, DEMO_LAYOUT } from "../state/demoGraph";
 import { useGraphStore } from "../state/graphStore";
 import { useHistoryStore } from "../state/historyStore";
@@ -11,16 +12,14 @@ import {
 import { log, normalizeError } from "../utils/log";
 import { RecoveryDialog, swallowEscape } from "./RecoveryDialog";
 
-type Phase = "init" | "prompt" | "done";
-
 export function BootstrapGate() {
-  const [phase, setPhase] = useState<Phase>("init");
+  const phase = useBootstrapStore((s) => s.phase);
   const [pending, setPending] = useState<SerializedProject | null>(null);
   const restoreButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (useGraphStore.getState().nodes.length !== 0) {
-      setPhase("done");
+      useBootstrapStore.getState().setPhase("done");
       startAutoSave();
       return;
     }
@@ -40,7 +39,7 @@ export function BootstrapGate() {
             // Share takes precedence over recovery — drop any stale autosave.
             await clearSession();
             startAutoSave();
-            setPhase("done");
+            useBootstrapStore.getState().setPhase("done");
             return;
           }
         } catch (e) {
@@ -55,13 +54,13 @@ export function BootstrapGate() {
         saved.graph.nodes.length > 0
       ) {
         setPending(saved);
-        setPhase("prompt");
+        useBootstrapStore.getState().setPhase("prompt");
         return;
       }
       useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
       useHistoryStore.getState().clear();
       startAutoSave();
-      setPhase("done");
+      useBootstrapStore.getState().setPhase("done");
     };
     void run();
     return () => {
@@ -99,7 +98,7 @@ export function BootstrapGate() {
       void clearSession();
     }
     startAutoSave();
-    setPhase("done");
+    useBootstrapStore.getState().setPhase("done");
   };
 
   const discard = () => {
@@ -107,7 +106,7 @@ export function BootstrapGate() {
     useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
     useHistoryStore.getState().clear();
     startAutoSave();
-    setPhase("done");
+    useBootstrapStore.getState().setPhase("done");
   };
 
   const savedAt = pending.exportedAt

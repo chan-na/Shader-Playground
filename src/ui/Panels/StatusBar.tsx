@@ -1,13 +1,31 @@
 import { useEffect, useState } from "react";
 import { useDebugUiStore } from "../../state/debugUiStore";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
+import { type StatusTone, statusSummary } from "./statusSummary";
 
-/** Ready-dot glow (App Shell.dc.html L402: box-shadow:0 0 6px #34d399). */
-const READY_DOT_GLOW = `0 0 6px ${withAlpha(tokens.semantic.success, 1)}`;
+/** Left status pill text color per tone (App Shell.dc.html L402 pattern). */
+const TONE_COLOR: Record<StatusTone, string> = {
+  success: "var(--success)",
+  warning: "var(--warning)",
+  error: "var(--error)",
+  muted: "var(--text-muted)",
+};
+
+/**
+ * Status dot glow per tone (App Shell.dc.html L402: box-shadow:0 0 6px
+ * #34d399 for the ready/success case). `muted` has no dc glow reference —
+ * the pre-init dot stays flat.
+ */
+const TONE_DOT_GLOW: Partial<Record<StatusTone, string>> = {
+  success: `0 0 6px ${withAlpha(tokens.semantic.success, 1)}`,
+  warning: `0 0 6px ${withAlpha(tokens.semantic.warning, 1)}`,
+  error: `0 0 6px ${withAlpha(tokens.semantic.error, 1)}`,
+};
 
 /**
  * u_time sampling interval (ms). The RAF loop advances useTimeStore's
@@ -21,8 +39,19 @@ const TIME_SAMPLE_INTERVAL_MS = 250;
 export function StatusBar() {
   const stats = useRendererStore((s) => s.stats);
   const ready = useRendererStore((s) => s.ready);
+  const paneCount = useRendererStore((s) => s.panes.length);
+  const contextUnavailable = useRendererStore((s) => s.contextUnavailable);
   const nodeCount = useGraphStore((s) => s.nodes.length);
   const edgeCount = useGraphStore((s) => s.edges.length);
+  const compileErrorCount = useDiagnosticsStore((s) => {
+    let n = 0;
+    for (const d of Object.values(s.byNode)) {
+      for (const arr of [d.vertex, d.fragment, d.link]) {
+        for (const x of arr) if (x.severity === "error") n++;
+      }
+    }
+    return n;
+  });
   const gpuSupported = useGpuTimerStore((s) => s.supported);
   const gpuEnabled = useGpuTimerStore((s) => s.enabled);
   const gpuTotalMs = useGpuTimerStore((s) => s.totalMs);
@@ -41,22 +70,33 @@ export function StatusBar() {
   const errorCount = stats.errors.length;
   const showGpu = gpuSupported && gpuEnabled;
 
+  const summary = statusSummary({
+    ready,
+    contextUnavailable,
+    nodeCount,
+    paneCount,
+    compileErrorCount,
+  });
+  const toneColor = TONE_COLOR[summary.tone];
+  const dotGlow = TONE_DOT_GLOW[summary.tone];
+
   return (
     <div className="statusbar-row">
       <span
         className="statusbar-status"
-        style={{ color: ready ? "var(--success)" : "var(--text-muted)" }}
+        style={{ color: toneColor }}
+        data-testid="status-pill"
       >
         <span
           className="statusbar-dot"
           aria-hidden="true"
           style={
-            ready
-              ? { background: "var(--success)", boxShadow: READY_DOT_GLOW }
-              : { background: "var(--text-muted)" }
+            dotGlow
+              ? { background: toneColor, boxShadow: dotGlow }
+              : { background: toneColor }
           }
         />
-        {ready ? "GL ready" : "GL init"}
+        {summary.text}
       </span>
       <span title="Frames per second">{stats.fps} FPS</span>
       <span title="Draw calls per frame">{stats.drawCalls} draws</span>

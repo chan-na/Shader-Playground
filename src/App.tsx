@@ -7,6 +7,7 @@ import { CodeEditor } from "./ui/CodeEditor";
 import { CommandPalette } from "./ui/CommandPalette";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { ExportShareDialog } from "./ui/ExportShare/ExportShareDialog";
+import { GpuBlockScreen } from "./ui/GpuBlockScreen";
 import { KeyboardShortcuts } from "./ui/KeyboardShortcuts";
 import { NodeEditor } from "./ui/NodeEditor";
 import { DiagnosticsPanel } from "./ui/Panels/DiagnosticsPanel";
@@ -189,6 +190,7 @@ export function App() {
       <KeyboardShortcuts />
       <BootstrapGate />
       <Toasts />
+      <GpuBlockScreen />
       {diagOpen && <DiagnosticsPanel />}
     </div>
   );

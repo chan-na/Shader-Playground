@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { getExternalStatus } from "../../core/external/registry";
+import type { ExternalStatusKind } from "../../core/external/registry";
+import {
+  getExternalStatus,
+  retryExternalSource,
+} from "../../core/external/registry";
 import type { WebcamGraphNode } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 import { log, normalizeError } from "../../utils/log";
 import { SelectField } from "../controls/SelectField";
+import { PermissionBanner } from "./PermissionBanner";
 import { StatusPill } from "./StatusPill";
 
 interface DeviceInfo {
@@ -16,6 +21,7 @@ interface StatusSnapshot {
   error: string | null;
   width: number;
   height: number;
+  statusKind: ExternalStatusKind;
 }
 
 export function WebcamInspector({ node }: { node: WebcamGraphNode }) {
@@ -75,11 +81,27 @@ export function WebcamInspector({ node }: { node: WebcamGraphNode }) {
   }, [node.id]);
 
   const deviceSelectId = `webcam-device-${node.id}`;
+  const isPending = status?.statusKind === "pending";
+  const isDenied = status?.statusKind === "denied";
+  const fieldsLocked = isPending || isDenied;
 
   return (
     <div className="inspector-section">
       <div className="inspector-label">Webcam</div>
-      <div style={{ marginBottom: 15 }}>
+      {fieldsLocked && (
+        <PermissionBanner
+          device="camera"
+          state={isDenied ? "denied" : "pending"}
+          onRetry={() => retryExternalSource(node.id)}
+        />
+      )}
+      <div
+        style={{
+          marginBottom: 15,
+          opacity: fieldsLocked ? 0.55 : 1,
+          pointerEvents: fieldsLocked ? "none" : "auto",
+        }}
+      >
         <label
           htmlFor={deviceSelectId}
           style={{
@@ -108,15 +130,19 @@ export function WebcamInspector({ node }: { node: WebcamGraphNode }) {
         </SelectField>
       </div>
 
-      <StatusPill
-        tone={status?.error ? "error" : status?.ready ? "success" : "muted"}
-      >
-        {status?.error
-          ? `error: ${status.error}`
-          : status?.ready
-            ? `live · ${status.width}×${status.height}`
-            : "requesting permission…"}
-      </StatusPill>
+      {/* Denied already surfaces its own copy + retry via PermissionBanner —
+       * showing the pill too would repeat the same message twice. */}
+      {!isDenied && (
+        <StatusPill
+          tone={status?.error ? "error" : status?.ready ? "success" : "muted"}
+        >
+          {status?.error
+            ? `error: ${status.error}`
+            : status?.ready
+              ? `live · ${status.width}×${status.height}`
+              : "requesting permission…"}
+        </StatusPill>
+      )}
     </div>
   );
 }

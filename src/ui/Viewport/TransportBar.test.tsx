@@ -1,15 +1,28 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useCameraStore } from "../../state/cameraStore";
+import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { TransportBar } from "./TransportBar";
 
 const initialTime = useTimeStore.getState();
 const initialCamera = useCameraStore.getState();
+const initialRenderer = useRendererStore.getState();
+
+// TransportBar self-gates to `panes.length === 0` (M7-U4, see TransportBar.tsx)
+// so it never overlaps CompileErrorOverlay's action row. Every test in this
+// file exercises the bar itself, so seed a drawable pane up front — the
+// gating behavior is covered separately below.
+beforeEach(() => {
+  useRendererStore
+    .getState()
+    .setPanes([{ outputNodeId: "o1", sourceNodeId: "s1" }]);
+});
 
 afterEach(() => {
   useTimeStore.setState(initialTime, true);
   useCameraStore.setState(initialCamera, true);
+  useRendererStore.setState(initialRenderer, true);
   cleanup();
 });
 
@@ -89,5 +102,11 @@ describe("TransportBar", () => {
     render(<TransportBar />);
     fireEvent.click(screen.getByTitle("Reset camera"));
     expect(useCameraStore.getState().camera.fov).toBe(initialCamera.camera.fov);
+  });
+
+  it("renders nothing when there is no drawable Output pane (M7-U4)", () => {
+    useRendererStore.getState().setPanes([]);
+    const { container } = render(<TransportBar />);
+    expect(container.firstChild).toBeNull();
   });
 });

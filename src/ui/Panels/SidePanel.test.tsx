@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GeometryHandle, ImageHandle } from "../../core/assets/types";
 import { useAssetStore } from "../../state/assetStore";
+import { useBootstrapStore } from "../../state/bootstrapStore";
 import {
   emptyDiagnostics,
   useDiagnosticsStore,
@@ -12,6 +13,7 @@ import { SidePanel } from "./SidePanel";
 const initialAsset = useAssetStore.getState();
 const initialDiagnostics = useDiagnosticsStore.getState();
 const initialRenderer = useRendererStore.getState();
+const initialBootstrap = useBootstrapStore.getState();
 
 const meshHandle: GeometryHandle = {
   id: "mesh-1",
@@ -30,12 +32,16 @@ function resetStores() {
   useAssetStore.setState(initialAsset, true);
   useDiagnosticsStore.setState(initialDiagnostics, true);
   useRendererStore.setState(initialRenderer, true);
+  // SidePanel only shows its real tab content once bootstrap has finished
+  // (M7-U1) — the store is a module singleton, so tests that don't care
+  // about the loading skeleton need it forced to "done" here.
+  useBootstrapStore.setState({ ...initialBootstrap, phase: "done" });
 }
 
 beforeEach(resetStores);
 afterEach(() => {
   cleanup();
-  resetStores();
+  useBootstrapStore.setState(initialBootstrap, true);
 });
 
 describe("SidePanel", () => {
@@ -86,5 +92,32 @@ describe("SidePanel", () => {
 
     const assetsTab = screen.getByTestId("tab-assets");
     expect(assetsTab.querySelector(".panel-tab-badge")?.textContent).toBe("2");
+  });
+
+  it("shows the panel skeleton instead of tab content while bootstrap phase is not 'done'", () => {
+    useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
+
+    render(<SidePanel />);
+
+    expect(screen.getByTestId("panel-skeleton")).not.toBeNull();
+    expect(screen.queryByTestId("asset-browser-drop")).toBeNull();
+    // Tab headers stay visible/clickable even while the body is a skeleton.
+    expect(screen.getByTestId("tab-inspector")).not.toBeNull();
+  });
+
+  it("shows the panel skeleton while a recovery prompt is pending", () => {
+    useBootstrapStore.setState({ ...initialBootstrap, phase: "prompt" });
+
+    render(<SidePanel />);
+
+    expect(screen.getByTestId("panel-skeleton")).not.toBeNull();
+  });
+
+  it("swaps back to real tab content once bootstrap phase is 'done'", () => {
+    useBootstrapStore.setState({ ...initialBootstrap, phase: "done" });
+
+    render(<SidePanel />);
+
+    expect(screen.queryByTestId("panel-skeleton")).toBeNull();
   });
 });

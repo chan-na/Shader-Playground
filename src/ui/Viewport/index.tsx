@@ -32,6 +32,7 @@ import { useTimeStore } from "../../state/timeStore";
 import { useViewportStore } from "../../state/viewportStore";
 import { log, normalizeError } from "../../utils/log";
 import { DockPanelHeader } from "../DockPanelHeader";
+import { CompileErrorOverlay } from "./CompileErrorOverlay";
 import { EmptyState } from "./EmptyState";
 import { PaneOverlay } from "./PaneOverlay";
 import { TransportBar } from "./TransportBar";
@@ -53,6 +54,7 @@ export function Viewport() {
   const pushError = useRendererStore((s) => s.pushError);
   const clearErrors = useRendererStore((s) => s.clearErrors);
   const setGlInfo = useRendererStore((s) => s.setGlInfo);
+  const glRetryTick = useRendererStore((s) => s.glRetryTick);
   const outputCount = useGraphStore(
     (s) => s.nodes.filter((n) => n.kind === "output").length,
   );
@@ -61,13 +63,22 @@ export function Viewport() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Logged (not just captured for the deps array) so a GpuBlockScreen
+    // "Retry detection" click that tears down and re-runs this whole effect
+    // is distinguishable in the log from the initial boot attempt.
+    log.debug("gl", "GL boot effect (re)start", { glRetryTick });
+
     let gl: WebGL2RenderingContext;
     try {
       gl = createGLContext(canvas);
     } catch (e) {
       pushError(String(e));
+      useRendererStore.getState().setContextUnavailable(true);
       return;
     }
+    // Reached only once createGLContext succeeds — clears a prior failed
+    // attempt's GpuBlockScreen (retry success path, M7-U5).
+    useRendererStore.getState().setContextUnavailable(false);
 
     // Capture the GL adapter identity once for the diagnostics report. The
     // unmasked names need WEBGL_debug_renderer_info; fall back to the masked
@@ -552,7 +563,18 @@ export function Viewport() {
       setReady(false);
       useRendererStore.getState().setPanes([]);
     };
-  }, [setReady, setStats, bumpRenderTick, pushError, clearErrors, setGlInfo]);
+    // glRetryTick is a deliberate dep (see the log.debug call above): bumping
+    // it via retryGlContext() tears down and re-runs this whole effect,
+    // which is the only way to retry a failed createGLContext.
+  }, [
+    setReady,
+    setStats,
+    bumpRenderTick,
+    pushError,
+    clearErrors,
+    setGlInfo,
+    glRetryTick,
+  ]);
 
   return (
     <div className="panel panel--viewport">
@@ -568,6 +590,7 @@ export function Viewport() {
           data-testid="viewport-canvas"
         />
         <EmptyState />
+        <CompileErrorOverlay />
         <PaneOverlay />
         <TransportBar />
       </div>

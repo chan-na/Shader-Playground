@@ -44,6 +44,18 @@ export interface RendererState {
   panes: ViewportPane[];
   /** Canvas backing (device-pixel) resolution, as last set by the RAF resize step. */
   canvasSize: { width: number; height: number };
+  /**
+   * True when the Viewport's GL boot effect failed to obtain a WebGL2
+   * context (createGLContext threw). Drives the full-app GpuBlockScreen
+   * scrim (design/System States.dc.html gpu-unsupported, M7-U5).
+   */
+  contextUnavailable: boolean;
+  /**
+   * Bumped by retryGlContext() to force Viewport's GL boot useEffect to
+   * re-run (it's in the effect's deps array) — the only way to retry
+   * createGLContext, since the effect otherwise only runs once on mount.
+   */
+  glRetryTick: number;
   setReady: (ready: boolean) => void;
   setStats: (stats: Partial<RendererStats>) => void;
   setGlInfo: (info: GlInfo) => void;
@@ -52,6 +64,11 @@ export interface RendererState {
   clearErrors: () => void;
   setPanes: (panes: ViewportPane[]) => void;
   setCanvasSize: (size: { width: number; height: number }) => void;
+  setContextUnavailable: (v: boolean) => void;
+  /** User-triggered retry from GpuBlockScreen: re-arm the boot effect and
+   *  optimistically clear the blocking screen (the effect re-sets it to
+   *  true again if createGLContext still fails). */
+  retryGlContext: () => void;
 }
 
 function panesEqual(a: ViewportPane[], b: ViewportPane[]): boolean {
@@ -72,6 +89,8 @@ export const useRendererStore = create<RendererState>((set, get) => ({
   glInfo: null,
   panes: [],
   canvasSize: { width: 1, height: 1 },
+  contextUnavailable: false,
+  glRetryTick: 0,
   setReady: (ready) => set({ ready }),
   setGlInfo: (glInfo) => set({ glInfo }),
   setStats: (patch) => set((s) => ({ stats: { ...s.stats, ...patch } })),
@@ -101,4 +120,7 @@ export const useRendererStore = create<RendererState>((set, get) => ({
     if (cur.width === size.width && cur.height === size.height) return;
     set({ canvasSize: size });
   },
+  setContextUnavailable: (v) => set({ contextUnavailable: v }),
+  retryGlContext: () =>
+    set((s) => ({ glRetryTick: s.glRetryTick + 1, contextUnavailable: false })),
 }));

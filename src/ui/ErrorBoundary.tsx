@@ -1,6 +1,53 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
-import { tokens } from "../theme";
+import {
+  Component,
+  type CSSProperties,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
+import { tokens, withAlpha } from "../theme";
 import { exportLogText, log, normalizeError } from "../utils/log";
+
+/** Scrim tint — same alpha-derivation exception as GpuBlockScreen's
+ * SCRIM_STYLE (see index.css's `.modal-scrim` comment). */
+const SCRIM_STYLE: CSSProperties = {
+  background: withAlpha(tokens.surface.appDarker, 0.72),
+  zIndex: 9998,
+};
+
+const CARD_STYLE: CSSProperties = {
+  width: 440,
+  padding: 24,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 12,
+  textAlign: "center",
+};
+
+const COPY_BUTTON_STYLE: CSSProperties = {
+  background: "transparent",
+  border: `1px solid ${tokens.border.strong}`,
+  color: tokens.text.brightBody,
+  borderRadius: tokens.radius.button,
+  padding: "7px 14px",
+  cursor: "pointer",
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+/** Reload button's solid-white label — documented white-channel exception,
+ * same pattern as GraphEmptyState's ADD_BUTTON_TEXT_STYLE. */
+const RELOAD_BUTTON_STYLE: CSSProperties = {
+  background: tokens.accent.default,
+  border: "none",
+  color: withAlpha("#ffffff", 1),
+  borderRadius: tokens.radius.button,
+  padding: "7px 14px",
+  cursor: "pointer",
+  fontSize: 12,
+  fontWeight: 600,
+};
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -42,63 +89,43 @@ export class ErrorBoundary extends Component<
   render(): ReactNode {
     if (this.state.error === null) return this.props.children;
     return (
-      <div
-        role="alert"
-        data-testid="error-boundary-fallback"
-        style={{
-          position: "fixed",
-          inset: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-          background: tokens.surface.panel,
-          color: tokens.text.brightBody,
-          fontFamily: "system-ui, sans-serif",
-          zIndex: 9998,
-        }}
-      >
-        <div style={{ fontSize: 15, fontWeight: 600 }}>문제가 발생했습니다</div>
+      <div className="modal-scrim" role="alert" style={SCRIM_STYLE}>
         <div
-          style={{ fontSize: 12, color: tokens.text.secondary, maxWidth: 420 }}
+          className="modal-card"
+          data-testid="error-boundary-fallback"
+          style={CARD_STYLE}
         >
-          예기치 못한 오류로 화면을 표시할 수 없습니다. 새로고침하거나 진단
-          정보를 복사해 보고해 주세요.
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            data-testid="error-boundary-copy"
-            onClick={this.handleCopy}
+          <div style={{ fontSize: 15, fontWeight: 600 }}>
+            문제가 발생했습니다
+          </div>
+          <div
             style={{
-              background: "transparent",
-              color: tokens.text.brightBody,
-              border: `1px solid ${tokens.border.stronger}`,
-              borderRadius: tokens.radius.button,
-              padding: "6px 12px",
-              cursor: "pointer",
               fontSize: 12,
+              color: tokens.text.secondary,
+              maxWidth: 380,
             }}
           >
-            진단 정보 복사
-          </button>
-          <button
-            type="button"
-            data-testid="error-boundary-reload"
-            onClick={this.handleReload}
-            style={{
-              background: tokens.accent.active,
-              color: tokens.text.primary,
-              border: `1px solid ${tokens.accent.default}`,
-              borderRadius: tokens.radius.button,
-              padding: "6px 12px",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
-          >
-            새로고침
-          </button>
+            예기치 못한 오류로 화면을 표시할 수 없습니다. 새로고침하거나 진단
+            정보를 복사해 보고해 주세요.
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              data-testid="error-boundary-copy"
+              onClick={this.handleCopy}
+              style={COPY_BUTTON_STYLE}
+            >
+              진단 정보 복사
+            </button>
+            <button
+              type="button"
+              data-testid="error-boundary-reload"
+              onClick={this.handleReload}
+              style={RELOAD_BUTTON_STYLE}
+            >
+              새로고침
+            </button>
+          </div>
         </div>
       </div>
     );

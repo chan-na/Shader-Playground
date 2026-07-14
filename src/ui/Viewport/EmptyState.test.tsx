@@ -1,12 +1,17 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { EmptyState } from "./EmptyState";
 
+const initialDiagnostics = useDiagnosticsStore.getState();
 const initialRenderer = useRendererStore.getState();
 
 afterEach(() => {
+  useDiagnosticsStore.setState(initialDiagnostics, true);
   useRendererStore.setState(initialRenderer, true);
+  useGraphStore.getState().reset();
   cleanup();
 });
 
@@ -42,5 +47,30 @@ describe("EmptyState", () => {
     });
     const { container } = render(<EmptyState />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it("renders nothing when a shader node has an error-severity diagnostic (CompileErrorOverlay takes over)", () => {
+    useRendererStore.setState({ panes: [] });
+    useGraphStore.getState().setGraph({
+      nodes: [
+        {
+          id: "s1",
+          kind: "shader",
+          vertexSource: "void main() {}",
+          fragmentSource: "void main() {}",
+          uniformValues: {},
+        },
+      ],
+      edges: [],
+    });
+    useDiagnosticsStore.getState().set("s1", {
+      vertex: [],
+      fragment: [{ line: 1, severity: "error", message: "boom" }],
+      link: [],
+    });
+
+    const { container } = render(<EmptyState />);
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByTestId("viewport-empty")).toBeNull();
   });
 });

@@ -82,6 +82,7 @@ describe("cssVars", () => {
       `--shadow-node-card-hero: ${tokens.shadow.nodeCardHero};`,
     );
     expect(css).toContain(`--shadow-error-ring: ${tokens.shadow.errorRing};`);
+    expect(css).toContain(`--shadow-warn-ring: ${tokens.shadow.warnRing};`);
     expect(css).toContain(
       `--shadow-on-canvas-text: ${tokens.shadow.onCanvasText};`,
     );

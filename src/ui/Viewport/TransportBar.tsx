@@ -1,4 +1,5 @@
 import { useCameraStore } from "../../state/cameraStore";
+import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
 
@@ -34,8 +35,19 @@ function nextSpeed(speed: number): number {
  * that previously lived in the Inspector's `ViewportControls` side panel —
  * moved here so the transport sits directly over the render it scrubs. The
  * underlying store wiring (timeStore/cameraStore) is unchanged.
+ *
+ * Self-gates to `panes.length === 0` (M7-U4): none of System States.dc.html's
+ * empty/loading/compile-error/webcam-permission mocks show this bar, and
+ * concretely, the bar's floating `z-index` used to sit above
+ * CompileErrorOverlay's action row regardless of DOM order, making its
+ * "Jump to line"/"Copy log" buttons pointer-unreachable whenever a shader
+ * error dropped every drawable pane. Gating on the same `panes.length === 0`
+ * condition CompileErrorOverlay/EmptyState already use for their own mount
+ * makes the two mutually exclusive by construction rather than by
+ * z-index arithmetic.
  */
 export function TransportBar() {
+  const panes = useRendererStore((s) => s.panes);
   const simTime = useTimeStore((s) => s.simTime);
   const playing = useTimeStore((s) => s.playing);
   const speed = useTimeStore((s) => s.speed);
@@ -47,6 +59,8 @@ export function TransportBar() {
   const camera = useCameraStore((s) => s.camera);
   const setCamera = useCameraStore((s) => s.setCamera);
   const resetCamera = useCameraStore((s) => s.reset);
+
+  if (panes.length === 0) return null;
 
   const fovDeg = (camera.fov * 180) / Math.PI;
 

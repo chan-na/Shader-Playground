@@ -125,7 +125,9 @@ export const tokens = {
     // 뷰포트 하단 플로팅 트랜스포트 바 — Viewport.dc.html L107: border-radius 12.
     transportBar: 12,
     // 뷰포트 빈 상태 중앙 아이콘 박스(64×64) — Viewport.dc.html L52:
-    // border-radius 16.
+    // border-radius 16. Graph-empty 온보딩 아이콘(56×56)도 같은 토큰을 공유
+    // (System States.dc.html L110의 실측 15px과 1px 차이 — 두 "빈 상태 아이콘"
+    // 개념을 하나의 토큰으로 통일하는 쪽을 pixel-perfect보다 우선).
     emptyStateIcon: 16,
     // Welcome 화면 스타터 카드 — Welcome.dc.html L107: border-radius 12.
     cardLg: 12,
@@ -141,6 +143,11 @@ export const tokens = {
     selectRing:
       "0 0 0 1.5px rgba(61,155,255,0.75), 0 0 18px rgba(61,155,255,0.4)",
     errorRing: "0 0 0 1.5px rgba(240,85,92,0.7), 0 0 18px rgba(240,85,92,0.35)",
+    // Permission-blocked node card ring (Webcam/Audio pending/denied skin) —
+    // errorRing's warning-hued sibling. design/System States.dc.html L484
+    // (webcam blocked card's combined box-shadow: `...,0 0 0 1.5px
+    // #f5b13d,0 0 14px rgba(245,177,61,0.3)`).
+    warnRing: "0 0 0 1.5px rgba(245,177,61,0.7), 0 0 14px rgba(245,177,61,0.3)",
     portOutputGlow: (famHex: string) => `0 0 7px ${famHex}aa`,
     // 노드 카드 썸네일(Shader/Image 96px 프리뷰) 안쪽 그림자.
     // design/Node Editor.dc.html L188: box-shadow: inset 0 1px 4px rgba(0,0,0,0.5).

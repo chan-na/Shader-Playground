@@ -36,6 +36,14 @@ describe("ErrorBoundary", () => {
     expect(html).toContain("문제가 발생했습니다");
   });
 
+  it("uses the shared modal-scrim/modal-card skin classes (M7-U5)", () => {
+    const boundary = new ErrorBoundary({ children: null });
+    boundary.state = { error: new Error("boom") };
+    const html = renderToStaticMarkup(boundary.render() as ReactElement);
+    expect(html).toContain('class="modal-scrim"');
+    expect(html).toContain('class="modal-card"');
+  });
+
   it("componentDidCatch logs the error with component stack", () => {
     const boundary = new ErrorBoundary({ children: null });
     const err = new TypeError("nope");

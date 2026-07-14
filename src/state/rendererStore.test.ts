@@ -8,6 +8,8 @@ describe("rendererStore", () => {
       stats: { fps: 0, frame: 0, drawCalls: 0, renderTick: 0, errors: [] },
       panes: [],
       canvasSize: { width: 1, height: 1 },
+      contextUnavailable: false,
+      glRetryTick: 0,
     });
   });
 
@@ -104,5 +106,21 @@ describe("rendererStore", () => {
       width: 1024,
       height: 600,
     });
+  });
+
+  it("setContextUnavailable sets and clears the GPU block flag", () => {
+    expect(useRendererStore.getState().contextUnavailable).toBe(false);
+    useRendererStore.getState().setContextUnavailable(true);
+    expect(useRendererStore.getState().contextUnavailable).toBe(true);
+    useRendererStore.getState().setContextUnavailable(false);
+    expect(useRendererStore.getState().contextUnavailable).toBe(false);
+  });
+
+  it("retryGlContext bumps glRetryTick and clears contextUnavailable", () => {
+    useRendererStore.getState().setContextUnavailable(true);
+    const before = useRendererStore.getState().glRetryTick;
+    useRendererStore.getState().retryGlContext();
+    expect(useRendererStore.getState().glRetryTick).toBe(before + 1);
+    expect(useRendererStore.getState().contextUnavailable).toBe(false);
   });
 });

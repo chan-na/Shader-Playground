@@ -1,7 +1,40 @@
-import type { RefObject } from "react";
-import { tokens } from "../theme";
+import type { CSSProperties, RefObject } from "react";
+import { tokens, withAlpha } from "../theme";
 
 const RECOVERY_TITLE_ID = "recovery-dialog-title";
+
+/** Scrim tint — same alpha-derivation exception as GpuBlockScreen's
+ * SCRIM_STYLE (see index.css's `.modal-scrim` comment). */
+const SCRIM_STYLE: CSSProperties = {
+  background: withAlpha(tokens.surface.appDarker, 0.72),
+  zIndex: 9999,
+};
+
+const CARD_STYLE: CSSProperties = { padding: "22px 24px", maxWidth: 400 };
+
+const DISCARD_BUTTON_STYLE: CSSProperties = {
+  background: "transparent",
+  border: `1px solid ${tokens.border.strong}`,
+  color: tokens.text.brightBody,
+  borderRadius: tokens.radius.button,
+  padding: "7px 14px",
+  cursor: "pointer",
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+/** Restore button's solid-white label — documented white-channel exception,
+ * same pattern as GraphEmptyState's ADD_BUTTON_TEXT_STYLE. */
+const RESTORE_BUTTON_STYLE: CSSProperties = {
+  background: tokens.accent.default,
+  border: "none",
+  color: withAlpha("#ffffff", 1),
+  borderRadius: tokens.radius.button,
+  padding: "7px 14px",
+  cursor: "pointer",
+  fontSize: 12,
+  fontWeight: 600,
+};
 
 /**
  * ESC 가 다른 글로벌 핸들러(CommandPalette toggle 등) 로 빠져나가지 않게
@@ -31,35 +64,17 @@ export function RecoveryDialog({
 }: RecoveryDialogProps) {
   return (
     <div
+      className="modal-scrim"
       role="dialog"
       aria-modal="true"
       aria-labelledby={RECOVERY_TITLE_ID}
       data-testid="recovery-dialog"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 9999,
-      }}
+      style={SCRIM_STYLE}
     >
-      <div
-        style={{
-          background: tokens.surface.panel,
-          color: tokens.text.brightBody,
-          border: `1px solid ${tokens.border.strong}`,
-          borderRadius: tokens.radius.panel,
-          padding: "20px 22px",
-          maxWidth: 380,
-          boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
+      <div className="modal-card" style={CARD_STYLE}>
         <div
           id={RECOVERY_TITLE_ID}
-          style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}
+          style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}
         >
           이전 작업을 복구할까요?
         </div>
@@ -77,15 +92,7 @@ export function RecoveryDialog({
             type="button"
             data-testid="recovery-discard"
             onClick={onDiscard}
-            style={{
-              background: "transparent",
-              color: tokens.text.brightBody,
-              border: `1px solid ${tokens.border.stronger}`,
-              borderRadius: tokens.radius.button,
-              padding: "6px 12px",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
+            style={DISCARD_BUTTON_STYLE}
           >
             새로 시작
           </button>
@@ -94,15 +101,7 @@ export function RecoveryDialog({
             type="button"
             data-testid="recovery-restore"
             onClick={onRestore}
-            style={{
-              background: tokens.accent.active,
-              color: tokens.text.primary,
-              border: `1px solid ${tokens.accent.default}`,
-              borderRadius: tokens.radius.button,
-              padding: "6px 12px",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
+            style={RESTORE_BUTTON_STYLE}
           >
             복구
           </button>

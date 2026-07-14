@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { getExternalStatus } from "../../core/external/registry";
+import type { ExternalStatusKind } from "../../core/external/registry";
+import {
+  getExternalStatus,
+  retryExternalSource,
+} from "../../core/external/registry";
 import type { AudioFftSize, AudioGraphNode } from "../../core/graph/types";
 import { AUDIO_FFT_SIZES } from "../../core/graph/types";
 import { useAssetStore } from "../../state/assetStore";
@@ -8,11 +12,13 @@ import { SegmentedControl } from "../controls/SegmentedControl";
 import { SelectField } from "../controls/SelectField";
 import { Slider } from "../controls/Slider";
 import { Toggle } from "../controls/Toggle";
+import { PermissionBanner } from "./PermissionBanner";
 import { StatusPill } from "./StatusPill";
 
 interface StatusSnapshot {
   ready: boolean;
   error: string | null;
+  statusKind: ExternalStatusKind;
 }
 
 const SOURCE_OPTIONS = [
@@ -32,7 +38,9 @@ export function AudioInspector({ node }: { node: AudioGraphNode }) {
     const tick = () => {
       if (cancelled) return;
       const s = getExternalStatus(node.id);
-      setStatus(s ? { ready: s.ready, error: s.error } : null);
+      setStatus(
+        s ? { ready: s.ready, error: s.error, statusKind: s.statusKind } : null,
+      );
       timer = window.setTimeout(tick, 500);
     };
     tick();
@@ -44,10 +52,22 @@ export function AudioInspector({ node }: { node: AudioGraphNode }) {
 
   const assetSelectId = `audio-asset-${node.id}`;
   const fftSelectId = `audio-fft-${node.id}`;
+  const isMic = node.sourceKind === "mic";
+  const isPending = isMic && status?.statusKind === "pending";
+  const isDenied = isMic && status?.statusKind === "denied";
+  const fieldsLocked = isPending || isDenied;
 
   return (
     <div className="inspector-section">
       <div className="inspector-label">Audio</div>
+
+      {fieldsLocked && (
+        <PermissionBanner
+          device="microphone"
+          state={isDenied ? "denied" : "pending"}
+          onRetry={() => retryExternalSource(node.id)}
+        />
+      )}
 
       <div style={{ marginBottom: 15 }}>
         <SegmentedControl
@@ -93,7 +113,15 @@ export function AudioInspector({ node }: { node: AudioGraphNode }) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginBottom: 15,
+          opacity: fieldsLocked ? 0.55 : 1,
+          pointerEvents: fieldsLocked ? "none" : "auto",
+        }}
+      >
         <div style={{ flex: 1 }}>
           <label
             htmlFor={fftSelectId}
@@ -191,25 +219,29 @@ export function AudioInspector({ node }: { node: AudioGraphNode }) {
         </div>
       )}
 
-      <StatusPill
-        tone={
-          node.sourceKind === "file" && !node.assetId
-            ? "muted"
+      {/* Denied already surfaces its own copy + retry via PermissionBanner —
+       * showing the pill too would repeat the same message twice. */}
+      {!isDenied && (
+        <StatusPill
+          tone={
+            node.sourceKind === "file" && !node.assetId
+              ? "muted"
+              : status?.error
+                ? "error"
+                : status?.ready
+                  ? "success"
+                  : "muted"
+          }
+        >
+          {node.sourceKind === "file" && !node.assetId
+            ? "Import an audio file in the Asset browser first."
             : status?.error
-              ? "error"
+              ? `error: ${status.error}`
               : status?.ready
-                ? "success"
-                : "muted"
-        }
-      >
-        {node.sourceKind === "file" && !node.assetId
-          ? "Import an audio file in the Asset browser first."
-          : status?.error
-            ? `error: ${status.error}`
-            : status?.ready
-              ? `live · ${node.fftSize / 2} bins`
-              : "loading…"}
-      </StatusPill>
+                ? `live · ${node.fftSize / 2} bins`
+                : "loading…"}
+        </StatusPill>
+      )}
     </div>
   );
 }

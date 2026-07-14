@@ -78,12 +78,22 @@ describe("WelcomeOverlay", () => {
     );
   });
 
-  it('"Start blank" dismisses the overlay and leaves the graph empty', () => {
+  it('"Start blank" dismisses the overlay for the GraphEmptyState onboarding, graph stays empty', () => {
     render(<WelcomeOverlay />);
     fireEvent.click(screen.getByTestId("welcome-blank-button"));
 
     expect(screen.queryByTestId("welcome-overlay")).toBeNull();
+    expect(screen.getByTestId("graph-empty-state")).not.toBeNull();
     expect(useGraphStore.getState().nodes.length).toBe(0);
+  });
+
+  it('GraphEmptyState "Load a preset" returns to the Welcome starter grid', () => {
+    render(<WelcomeOverlay />);
+    fireEvent.click(screen.getByTestId("welcome-blank-button"));
+    fireEvent.click(screen.getByTestId("graph-empty-load-preset"));
+
+    expect(screen.queryByTestId("graph-empty-state")).toBeNull();
+    expect(screen.getByTestId("welcome-overlay")).not.toBeNull();
   });
 
   it("Enter while nothing is focused (activeElement=body) triggers Create for the selected card", () => {

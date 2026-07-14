@@ -44,4 +44,9 @@ describe("StatusBar", () => {
     const html = renderToStaticMarkup(<StatusBar />);
     expect(html).toContain('data-testid="open-diagnostics"');
   });
+
+  it("renders the left status pill with a stable testid", () => {
+    const html = renderToStaticMarkup(<StatusBar />);
+    expect(html).toContain('data-testid="status-pill"');
+  });
 });

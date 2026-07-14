@@ -13,6 +13,10 @@ interface PortHandleProps {
    * sole "→ Canvas" Output). Defaults to false so every multi-port view
    * gets a label without needing to opt in. */
   hideLabel?: boolean;
+  /** Fade the pin to `outOpacity: 0.4` (design/System States.dc.html L483) —
+   * used by Webcam/Audio node views on their output port while the source is
+   * pending/denied permission, since nothing is flowing through it yet. */
+  dimmed?: boolean;
 }
 
 /**
@@ -20,7 +24,13 @@ interface PortHandleProps {
  * the raw PortSpec.name (e.g. `mesh`, `u_intensity`, `a`) so it maps 1:1 to
  * the underlying uniform/identifier — long names are clamped via CSS ellipsis.
  */
-export function PortHandle({ port, side, top, hideLabel }: PortHandleProps) {
+export function PortHandle({
+  port,
+  side,
+  top,
+  hideLabel,
+  dimmed,
+}: PortHandleProps) {
   const isIn = side === "in";
   const fam = portFamilyHex(port.type);
   // 형태(방향) × 색(타입 패밀리) 이중 인코딩 — design/Node Editor.dc.html
@@ -50,6 +60,7 @@ export function PortHandle({ port, side, top, hideLabel }: PortHandleProps) {
           height: PORT_DIAMETER.card,
           borderRadius: "50%",
           ...shapeStyle,
+          ...(dimmed ? { opacity: 0.4 } : null),
         }}
       />
       {hideLabel ? null : (

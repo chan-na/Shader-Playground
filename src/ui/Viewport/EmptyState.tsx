@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { tokens, withAlpha } from "../../theme";
+import { firstCompileError } from "./compileErrorInfo";
 
 /**
  * Onboarding hint rows (design/Viewport.dc.html L57-61). Kept as an internal
@@ -34,7 +37,13 @@ const HINT_ROWS: ReadonlyArray<{ n: number; content: ReactNode }> = [
  */
 export function EmptyState() {
   const panes = useRendererStore((s) => s.panes);
+  const byNode = useDiagnosticsStore((s) => s.byNode);
+  const nodes = useGraphStore((s) => s.nodes);
   if (panes.length > 0) return null;
+  // A compile failure can also drop every drawable pane to zero — that is
+  // not "no Output connected", so don't show this message for it. The
+  // CompileErrorOverlay renders instead (see Viewport/index.tsx mount order).
+  if (firstCompileError(byNode, nodes) !== null) return null;
 
   return (
     <div className="vp-empty" data-testid="viewport-empty">

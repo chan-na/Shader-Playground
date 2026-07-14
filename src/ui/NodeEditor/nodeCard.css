@@ -27,6 +27,14 @@
   box-shadow: var(--shadow-error-ring), var(--shadow-node-card);
 }
 
+/* Permission-blocked skin for Webcam/Audio nodes whose external source is
+ * pending/denied (M7-U3) — same placement as .node-card--error above, base
+ * card shadow plus the warning-hued ring. design/System States.dc.html
+ * L484's combined webcam-blocked box-shadow. */
+.node-card--blocked {
+  box-shadow: var(--shadow-node-card), var(--shadow-warn-ring);
+}
+
 .react-flow__node.selected .node-card {
   border-color: var(--accent-default);
   box-shadow: var(--shadow-select-ring), var(--shadow-node-card-hero);
@@ -113,6 +121,29 @@
   background: var(--error);
   border-radius: var(--radius-button);
   padding: 1px 6px;
+}
+
+/* Blocked badge (BlockedBadge.tsx) — header meta-slot pill for a Webcam/Audio
+ * node whose external source is pending/denied permission. Unlike
+ * .node-card__error-badge (solid fill, fixed tokens), design/System
+ * States.dc.html's `warnBadge` (L472) is a translucent tint over the header
+ * gradient, so this uses color-mix(var(--warning)) instead of a solid
+ * background — nodeCard.css is a static file, and color-mix keeps the alpha
+ * derivation token-based without needing an inline withAlpha() call here. */
+.node-card__blocked-badge {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  border-radius: 5px;
+  padding: 1px 5px;
 }
 
 .node-card__placeholder {

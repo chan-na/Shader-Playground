@@ -7,6 +7,8 @@ import {
   MiniMap,
   type Node,
   type NodeChange,
+  type OnConnectEnd,
+  type OnConnectStart,
   type OnNodeDrag,
   ReactFlow,
   type ReactFlowInstance,
@@ -25,11 +27,13 @@ import { validateGraph } from "../../core/graph/validate";
 import { nodeInputPorts, nodeOutputPorts } from "../../core/nodes/registry";
 import { importFiles } from "../../state/assetActions";
 import { useBootstrapStore } from "../../state/bootstrapStore";
+import { useConnectionUiStore } from "../../state/connectionUiStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
 import { nextId } from "../../utils/id";
 import { DockPanelHeader } from "../DockPanelHeader";
+import { MOTION_MAX_MS } from "../motion";
 import { WelcomeOverlay } from "../WelcomeOverlay";
 import { ConnectionLine } from "./ConnectionLine";
 import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
@@ -99,7 +103,7 @@ export function NodeEditor() {
         padding: 0.15,
         minZoom: 0.2,
         maxZoom: 1.0,
-        duration: 200,
+        duration: MOTION_MAX_MS,
       });
     });
     prevCountRef.current = graphNodes.length;
@@ -357,9 +361,43 @@ export function NodeEditor() {
       if (validateGraph(tentative).some((e) => e.code === "cycle")) return;
 
       addEdge(newEdge);
+      useConnectionUiStore
+        .getState()
+        .triggerSnap(conn.target, conn.targetHandle);
     },
     [graphEdges, graphNodes, addEdge],
   );
+
+  /**
+   * Records the source port's side/type into connectionUiStore the moment a
+   * drag starts, so fanout-highlight consumers (U3/U4) know what "compatible"
+   * means for this drag. Looked up against the graph store (same pattern as
+   * ConnectionLine's strokeForHandle) rather than React Flow's internal node
+   * data.
+   */
+  const onConnectStart = useCallback<OnConnectStart>((_e, params) => {
+    const { nodeId, handleId, handleType } = params;
+    if (!nodeId || !handleId) return;
+    const node = useGraphStore.getState().nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const side = handleType === "source" ? ("out" as const) : ("in" as const);
+    const ports = side === "out" ? nodeOutputPorts(node) : nodeInputPorts(node);
+    const port = ports.find((p) => p.name === handleId);
+    if (!port) return;
+    useConnectionUiStore.getState().startDrag({
+      nodeId,
+      handleId,
+      side,
+      portType: port.type,
+    });
+  }, []);
+
+  /** Always fires when a port drag ends, whether it resolved into a
+   *  connection or was released over empty space — either way the drag is
+   *  no longer in progress. */
+  const onConnectEnd = useCallback<OnConnectEnd>(() => {
+    useConnectionUiStore.getState().endDrag();
+  }, []);
 
   const isValidConnection = useCallback(
     (conn: Connection | Edge) => {
@@ -417,6 +455,8 @@ export function NodeEditor() {
           onEdgesChange={onEdgesChange}
           onPaneClick={onPaneClick}
           onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
           onNodeDragStop={onNodeDragStop}
           isValidConnection={isValidConnection}
           connectionLineComponent={ConnectionLine}

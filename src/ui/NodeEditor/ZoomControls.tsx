@@ -1,10 +1,12 @@
 import { Panel, useReactFlow, useViewport } from "@xyflow/react";
 import { tokens, withAlpha } from "../../theme";
+import { MOTION_MAX_MS, MOTION_MID_MS } from "../motion";
 
 /** Zoom-in/out transitions get the motion floor (90-150ms range); fit gets a
- * touch longer since it also pans, matching the auto-fit call in index.tsx. */
-const ZOOM_STEP_DURATION_MS = 120;
-const FIT_VIEW_DURATION_MS = 150;
+ * touch longer since it also pans, matching the auto-fit call in index.tsx.
+ * Values come from src/ui/motion.ts (tokens.motion-derived). */
+const ZOOM_STEP_DURATION_MS = MOTION_MID_MS;
+const FIT_VIEW_DURATION_MS = MOTION_MAX_MS;
 const FIT_VIEW_PADDING = 0.15;
 
 /** Round a React Flow zoom factor (e.g. 0.8234) to a percent label ("82%"). */

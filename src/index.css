@@ -2092,7 +2092,7 @@ textarea {
   border-radius: var(--radius-modal);
   box-shadow: var(--shadow-modal);
   overflow: hidden;
-  animation: es-dialog-in 0.18s var(--motion-easing);
+  animation: es-dialog-in var(--motion-duration-max) var(--motion-easing);
 }
 .es-header {
   display: flex;
@@ -2420,7 +2420,7 @@ textarea {
   justify-content: center;
   padding: 22px 30px;
   text-align: center;
-  animation: es-dialog-in 0.2s var(--motion-easing);
+  animation: es-dialog-in var(--motion-duration-max) var(--motion-easing);
 }
 .es-done-icon {
   width: 56px;

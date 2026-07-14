@@ -1,8 +1,25 @@
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useNodeId } from "@xyflow/react";
 import type { CSSProperties } from "react";
 import type { PortSpec } from "../../../core/nodes/registry";
+import { useConnectionUiStore } from "../../../state/connectionUiStore";
 import { PORT_DIAMETER, tokens } from "../../../theme";
 import { portFamilyHex } from "../nodeTheme";
+import { portDragMode, snapSeqFor } from "../portDragMode";
+
+/** Pulse ring diameter (px) for a compatible-port fanout highlight —
+ *  design/node-connect.jsx L96 uses a 30px ring against its 13px hero port
+ *  (`PORT_DIAMETER.hero`); scaled to the card port size (`PORT_DIAMETER.card`
+ *  = 11) by the same ratio and rounded to an even number: 30 * 11/13 ≈ 25.4
+ *  → 26. File-local (not exported) so knip doesn't flag it as dead. */
+const PULSE_RING_D = 26;
+
+/** Snap-ring diameter (px) for the connection-confirmed pulse at a target
+ *  input port — design/node-connect.jsx L303-309 uses a 32px ring against
+ *  its 13px hero port (`PORT_DIAMETER.hero`); scaled to the card port size
+ *  (`PORT_DIAMETER.card` = 11) by the same ratio as `PULSE_RING_D`: 32 *
+ *  11/13 ≈ 27.1 → 28 (even). File-local (not exported) so knip doesn't flag
+ *  it as dead. */
+const SNAP_RING_D = 28;
 
 interface PortHandleProps {
   port: PortSpec;
@@ -33,6 +50,19 @@ export function PortHandle({
 }: PortHandleProps) {
   const isIn = side === "in";
   const fam = portFamilyHex(port.type);
+  const nodeId = useNodeId();
+  // Selector returns a primitive string, so this only re-renders the port at
+  // drag start/end (or when this specific port's classification flips), not
+  // on every pointer-move tick of the drag.
+  const mode = useConnectionUiStore((s) =>
+    portDragMode(port, side, nodeId, s.dragging),
+  );
+  const clearSnap = useConnectionUiStore((s) => s.clearSnap);
+  // Primitive selector (a number), so only the port a connection just landed
+  // on re-renders — not every port on every connection.
+  const snapSeq = useConnectionUiStore((s) =>
+    snapSeqFor(s.snap, nodeId, port.name, side),
+  );
   // 형태(방향) × 색(타입 패밀리) 이중 인코딩 — design/Node Editor.dc.html
   // L156-157(Math in ring/out disc), L81(Mesh out), L190-193(Fresnel).
   const shapeStyle: CSSProperties = isIn
@@ -60,9 +90,46 @@ export function PortHandle({
           height: PORT_DIAMETER.card,
           borderRadius: "50%",
           ...shapeStyle,
-          ...(dimmed ? { opacity: 0.4 } : null),
+          // node-connect.jsx L127: incompatible fanout dim is `1 - 0.62 ≈
+          // 0.38` ≈ the existing `dimmed` prop's 0.4 — same value, reused
+          // rather than introducing a second magic number.
+          ...(dimmed || mode === "incompat" ? { opacity: 0.4 } : null),
+          // Origin/compat glow — node-connect.jsx L86-88's highlight boxShadow.
+          ...(mode === "origin" || mode === "compat"
+            ? { boxShadow: `0 0 0 2px ${fam}, 0 0 14px ${fam}` }
+            : null),
         }}
       />
+      {mode === "compat" && (
+        <span
+          className="sp-port-pulse-ring"
+          style={{
+            top: top - PULSE_RING_D / 2,
+            width: PULSE_RING_D,
+            height: PULSE_RING_D,
+            border: `2px solid ${fam}`,
+            ...(isIn
+              ? { left: -PULSE_RING_D / 2 }
+              : { right: -PULSE_RING_D / 2 }),
+          }}
+        />
+      )}
+      {snapSeq > 0 && (
+        <span
+          key={snapSeq}
+          className="sp-port-snap-ring"
+          onAnimationEnd={clearSnap}
+          style={{
+            top: top - SNAP_RING_D / 2,
+            width: SNAP_RING_D,
+            height: SNAP_RING_D,
+            border: `2.5px solid ${fam}`,
+            ...(isIn
+              ? { left: -SNAP_RING_D / 2 }
+              : { right: -SNAP_RING_D / 2 }),
+          }}
+        />
+      )}
       {hideLabel ? null : (
         <span
           className={`node-card__port-label node-card__port-label--${isIn ? "in" : "out"}`}

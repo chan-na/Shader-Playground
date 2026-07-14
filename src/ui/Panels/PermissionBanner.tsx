@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { tokens, withAlpha } from "../../theme";
+import { STATUS_PULSE_ANIMATION } from "../motion";
 
 export interface PermissionBannerProps {
   device: "camera" | "microphone";
@@ -66,7 +67,7 @@ export function PermissionBanner({
             // Pulses only while this pending banner is mounted — never an
             // idle/decorative loop (CLAUDE.md's motion policy), it stops the
             // moment the permission resolves and the component unmounts.
-            animation: "sp-pulse 1.4s ease-in-out infinite",
+            animation: STATUS_PULSE_ANIMATION,
           }}
         />
         <span style={{ ...textStyle, color: "var(--warning)" }}>

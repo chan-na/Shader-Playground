@@ -192,7 +192,12 @@
 .react-flow__handle {
   transition:
     transform var(--motion-duration-min) var(--motion-easing),
-    box-shadow var(--motion-duration-min) var(--motion-easing);
+    box-shadow var(--motion-duration-min) var(--motion-easing),
+    /* Fanout dim fade (M8-U3). The prototype's fanout ramp is ~230ms
+     * (node-connect.jsx L120: 1.72s→1.95s) but that's clamped down to the
+     * README §Motion 90-150ms band's upper bound rather than imported as-is. */
+    opacity
+    var(--motion-duration-max) var(--motion-easing);
 }
 .react-flow__handle:hover {
   transform: translate(0, -50%) scale(1.25);
@@ -216,10 +221,12 @@
 /* Light drag feedback: a compatible target handle gets a soft accent ring
  * while a connection is being dragged toward it. React Flow itself toggles
  * `.connectingto` + `.valid` on the handle based on `isValidConnection` — no
- * app state needed. The full fan-out highlight/dim pass across every
- * compatible/incompatible port (design/README.md §Interactions "호환 입력
- * 포트 하이라이트") is scoped to the Motion milestone; this is the
- * lightweight per-handle version. */
+ * app state needed. This stacks with the full fan-out highlight/dim pass
+ * across every compatible/incompatible port (design/README.md §Interactions
+ * "호환 입력 포트 하이라이트", implemented in PortHandle.tsx via
+ * portDragMode.ts + connectionUiStore for M8-U3) — the hovered drop target
+ * gets both its own accent ring here and the family-colored glow/pulse
+ * below, which is harmless duplication. */
 .react-flow__handle.connectingto.valid {
   box-shadow: 0 0 0 3px
     color-mix(in srgb, var(--accent-default) 40%, transparent);
@@ -236,6 +243,46 @@
 }
 .sp-connection-line {
   animation: sp-edge-dash 0.6s linear infinite;
+}
+
+/* 호환 포트 팬아웃 펄스 링 — node-connect.jsx L94-99(30px ring)·L123-124
+ * (period 1/1.7s≈590ms, scale 1→1.5, opacity .85→0). 포트 드래그 중에만
+ * 마운트되므로 idle-animation 금지 규칙(theme.ts §motion)의 예외. */
+@keyframes sp-port-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.sp-port-pulse-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: sp-port-pulse 590ms linear infinite;
+}
+
+/* 연결 확정 스냅 펄스 — node-connect.jsx L134·L303-309: 600ms, scale 1→2.6,
+ * opacity .9→0. 연결 이벤트에 대한 1회성 상태 피드백(forwards 후 언마운트)이라
+ * idle-animation 금지 규칙과 무관. */
+@keyframes sp-port-snap {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.sp-port-snap-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: sp-port-snap 600ms linear forwards;
 }
 
 /* ─── Inline editable value displays ──────────────────────────── */

@@ -23,3 +23,5 @@ playwright/.cache/
 
 # Claude Code session state
 .claude/worktrees/
+
+temp

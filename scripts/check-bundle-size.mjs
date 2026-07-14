@@ -10,8 +10,15 @@ const ASSETS_DIR = "dist/assets";
 // the Floyd–Steinberg pass into the worker-only chunk the remaining local-
 // palette plumbing pushed the total over. Raised with explicit sign-off rather
 // than dropping the feature.
+//
+// Design handoff v1 reskin (M0~M8, PR #68): bumped 363 → 385. The full UI
+// redesign added ~17 KiB gzip of genuinely new surface (AppToolbar + docking
+// shell, Export & Share dialog, form-control library, system-state screens,
+// connection motion) — measured 379.58 KiB locally. Code-splitting can't help:
+// this gate sums ALL chunks. Raised with explicit user sign-off; the extra
+// ~5 KiB headroom absorbs gzip variance across Node versions (CI runs 22).
 const LIMITS_KIB = {
-  js: 363,
+  js: 385,
 };
 
 const KIB = 1024;

@@ -166,7 +166,7 @@
           <div style="display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #20242a;border-radius:11px;background:#1a1d22;margin-bottom:18px;">
             <div style="width:46px;height:56px;border-radius:8px;background:linear-gradient(160deg,#1e2126,#101216);border:1px solid #2b3037;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#7dbcff;flex-shrink:0;">HTML</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#e7eaee;">shader-playground.html</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#e7eaee;">{{ htmlFileName }}</div>
               <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;margin-top:3px;">{{ htmlSize }} · WebGL2 · ES 3.0</div>
             </div>
           </div>
@@ -545,6 +545,11 @@ class Component extends DCLogic {
     const doneLink = isDone && t === "link";
     const doneFile = isDone && !doneLink;
     let doneTitle, doneMsg, doneCta, fileExt, fileName, fileMeta, fileIconBg, fileIconBorder, fileIconColor;
+    // D16: export filename = {projectTitle}-{timestamp} so downloads never overwrite; the completion card must show the exact saved name.
+    const projectSlug = "untitled-project";
+    const stamp = "20260714-1532";
+    const htmlFileName = projectSlug + "-" + stamp + ".html";
+    const videoFileName = (ext) => projectSlug + "-" + stamp + "." + ext;
     if (t === "link") {
       doneTitle = "Link is live"; doneMsg = "A live, editable copy of your graph is published. Share it anywhere.";
       doneCta = "Open in new tab";
@@ -554,13 +559,13 @@ class Component extends DCLogic {
     } else if (t === "html") {
       doneTitle = "HTML exported"; doneMsg = "Your standalone file downloaded. Open it in any browser — no server needed.";
       doneCta = "Reveal in folder";
-      fileExt = "HTML"; fileName = "shader-playground.html"; fileMeta = htmlSizeCalc(s) + " · WebGL2 · self-contained";
+      fileExt = "HTML"; fileName = htmlFileName; fileMeta = htmlSizeCalc(s) + " · WebGL2 · self-contained";
       fileIconBg = "rgba(61,155,255,0.13)"; fileIconBorder = "rgba(61,155,255,0.35)"; fileIconColor = "#7dbcff";
     } else {
       const ext = t.toUpperCase();
       doneTitle = ext + " exported"; doneMsg = "Your " + s.duration + "s clip rendered at " + resMap[s.res] + " · " + s.fps + " fps.";
       doneCta = "Save to disk";
-      fileExt = ext; fileName = "fresnel-loop." + t; fileMeta = estSize + " · " + resMap[s.res] + " · " + s.duration + "s";
+      fileExt = ext; fileName = videoFileName(t); fileMeta = estSize + " · " + resMap[s.res] + " · " + s.duration + "s";
       const c = { gif: ["rgba(245,177,61,0.13)", "rgba(245,177,61,0.35)", "#e2ba57"], mp4: ["rgba(224,92,147,0.13)", "rgba(224,92,147,0.35)", "#ee7fac"], webm: ["rgba(160,107,255,0.13)", "rgba(160,107,255,0.35)", "#b48bff"] }[t];
       fileIconBg = c[0]; fileIconBorder = c[1]; fileIconColor = c[2];
     }
@@ -576,8 +581,8 @@ class Component extends DCLogic {
       toastShow = true; toastHex = "#34d399";
       if (t === "link") { toastTitle = "Link created"; toastMsg = "unlisted · ready to share"; }
       else if (t === "code") { toastTitle = "Snippet copied"; toastMsg = (s.lang === "glsl" ? "GLSL" : s.lang) + " · clipboard"; }
-      else if (t === "html") { toastTitle = "Exported."; toastMsg = "shader-playground.html · " + htmlSizeCalc(s); }
-      else { toastTitle = "Exported."; toastMsg = "fresnel-loop." + t + " · " + estSize; }
+      else if (t === "html") { toastTitle = "Exported."; toastMsg = htmlFileName + " · " + htmlSizeCalc(s); }
+      else { toastTitle = "Exported."; toastMsg = videoFileName(t) + " · " + estSize; }
     }
 
     // footers
@@ -617,7 +622,7 @@ class Component extends DCLogic {
 
       doneTitle, doneMsg, doneCta, doneLink, doneFile: doneFileFinal,
       shareUrl: this._shareUrl,
-      fileExt, fileName, fileMeta, fileIconBg, fileIconBorder, fileIconColor,
+      fileExt, fileName, fileMeta, fileIconBg, fileIconBorder, fileIconColor, htmlFileName,
       copyLink: () => this.copyLink(),
       copyLabel: s.copied ? "Copied ✓" : "Copy",
       copyBg: s.copied ? "rgba(52,211,153,0.13)" : "#3d9bff",

@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useAssetStore } from "../../state/assetStore";
+import { useBootstrapStore } from "../../state/bootstrapStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useRendererStore } from "../../state/rendererStore";
+import { DockPanelHeader } from "../DockPanelHeader";
 import { AssetBrowser } from "./AssetBrowser";
 import { Inspector } from "./Inspector";
+import { PanelSkeleton } from "./PanelSkeleton";
 import { ProblemsPanel } from "./ProblemsPanel";
 
 type Tab = "inspector" | "problems" | "assets";
 
 export function SidePanel() {
   const [tab, setTab] = useState<Tab>("inspector");
+  const bootPhase = useBootstrapStore((s) => s.phase);
 
   const problemCount = useDiagnosticsStore((s) => {
     let n = 0;
@@ -25,7 +29,7 @@ export function SidePanel() {
 
   return (
     <div className="panel panel--inspector" data-testid="side-panel">
-      <div className="panel-tabs">
+      <DockPanelHeader panelId="sidePanel">
         <button
           type="button"
           className={
@@ -61,10 +65,16 @@ export function SidePanel() {
           Problems
           {total > 0 && <span className="panel-tab-badge">{total}</span>}
         </button>
-      </div>
-      {tab === "inspector" && <InspectorBody />}
-      {tab === "assets" && <AssetBrowser />}
-      {tab === "problems" && <ProblemsPanel />}
+      </DockPanelHeader>
+      {bootPhase !== "done" ? (
+        <PanelSkeleton />
+      ) : (
+        <>
+          {tab === "inspector" && <InspectorBody />}
+          {tab === "assets" && <AssetBrowser />}
+          {tab === "problems" && <ProblemsPanel />}
+        </>
+      )}
     </div>
   );
 }

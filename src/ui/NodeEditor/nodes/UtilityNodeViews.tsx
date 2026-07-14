@@ -12,6 +12,7 @@ import {
 } from "../../../core/nodes/registry";
 import { isValidSwizzleMask } from "../../../core/nodes/utility";
 import { useGraphStore } from "../../../state/graphStore";
+import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_STRIDE, PORT_TOP_PAD, PortHandle } from "./PortHandle";
 import { NumberField } from "./ValueInput";
 
@@ -22,9 +23,11 @@ export function MathNodeView({ id, data }: NodeProps) {
 
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 172 }}>
-      <div className="node-card__header node-card__header--math">
-        Math · {node.op}
-      </div>
+      <NodeCardHeader
+        kind="math"
+        title="Math"
+        meta={<span className="node-card__meta">{node.op}</span>}
+      />
       <div
         className="node-card__body"
         style={{ paddingLeft: 22, paddingRight: 22 }}
@@ -68,9 +71,11 @@ export function SwizzleNodeView({ id, data }: NodeProps) {
   const valid = isValidSwizzleMask(node.mask);
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 168 }}>
-      <div className="node-card__header node-card__header--swizzle">
-        Swizzle · .{node.mask}
-      </div>
+      <NodeCardHeader
+        kind="swizzle"
+        title="Swizzle"
+        meta={<span className="node-card__meta">.{node.mask}</span>}
+      />
       <div
         className="node-card__body"
         style={{ paddingLeft: 22, paddingRight: 22 }}
@@ -92,7 +97,7 @@ export function SwizzleNodeView({ id, data }: NodeProps) {
         />
         <div
           className="node-card__meta"
-          style={{ color: valid ? "#8a8a90" : "#ff8484" }}
+          style={{ color: valid ? "var(--text-secondary)" : "var(--error)" }}
         >
           {valid ? `→ ${out.type}` : "invalid mask"}
         </div>
@@ -114,9 +119,11 @@ export function CombineNodeView({ id, data }: NodeProps) {
   const out = combineOutputPort(node.arity);
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 176 }}>
-      <div className="node-card__header node-card__header--combine">
-        Combine · {out.type}
-      </div>
+      <NodeCardHeader
+        kind="combine"
+        title="Combine"
+        meta={<span className="node-card__meta">{out.type}</span>}
+      />
       <div
         className="node-card__body"
         style={{ paddingLeft: 22, paddingRight: 22 }}

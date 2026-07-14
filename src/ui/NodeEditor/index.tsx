@@ -1,17 +1,19 @@
 import {
   Background,
+  BackgroundVariant,
   type Connection,
-  Controls,
   type Edge,
   type EdgeChange,
   MiniMap,
   type Node,
   type NodeChange,
+  type OnConnectEnd,
+  type OnConnectStart,
   type OnNodeDrag,
   ReactFlow,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/style.css";
 import "./nodeCard.css";
 
@@ -24,13 +26,22 @@ import { GROUP_COLLAPSED_HEIGHT } from "../../core/graph/types";
 import { validateGraph } from "../../core/graph/validate";
 import { nodeInputPorts, nodeOutputPorts } from "../../core/nodes/registry";
 import { importFiles } from "../../state/assetActions";
+import { useBootstrapStore } from "../../state/bootstrapStore";
+import { useConnectionUiStore } from "../../state/connectionUiStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { tokens, withAlpha } from "../../theme";
 import { nextId } from "../../utils/id";
+import { DockPanelHeader } from "../DockPanelHeader";
+import { MOTION_MAX_MS } from "../motion";
+import { WelcomeOverlay } from "../WelcomeOverlay";
+import { ConnectionLine } from "./ConnectionLine";
+import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
+import { GraphSkeleton } from "./GraphSkeleton";
 import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
 import { createNodeDataCache } from "./rfNodeData";
-import { Toolbar } from "./Toolbar";
+import { ZoomControls } from "./ZoomControls";
 
 /** Width/height approximation for non-group node cards when picking a target
  *  group on drag-stop. The real measurements come from the DOM but we don't
@@ -40,6 +51,7 @@ const DROP_CARD_W = 180;
 const DROP_CARD_H = 64;
 
 export function NodeEditor() {
+  const bootPhase = useBootstrapStore((s) => s.phase);
   const graphNodes = useGraphStore((s) => s.nodes);
   const graphEdges = useGraphStore((s) => s.edges);
   const positions = useGraphStore((s) => s.positions);
@@ -66,6 +78,16 @@ export function NodeEditor() {
     nodeDataCacheRef.current = nodeDataFor;
   }
 
+  // React Flow v12's controlled mode never writes measured dimensions back
+  // onto the `nodes` we pass in — it only reports them via onNodesChange's
+  // "dimensions" changes. Without storing those and re-injecting them as
+  // `node.measured`, every userNode fails @xyflow/react's nodeHasDimensions()
+  // check, so MiniMap (which calls that check per node) filters every node
+  // out and renders no category-color blocks at all.
+  const [measuredSizes, setMeasuredSizes] = useState<
+    Record<string, { width: number; height: number }>
+  >({});
+
   // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear) so
   // small graph panels still show every node. Triggered by rev bumps, not by
   // per-node drags (which don't bump rev).
@@ -81,7 +103,7 @@ export function NodeEditor() {
         padding: 0.15,
         minZoom: 0.2,
         maxZoom: 1.0,
-        duration: 200,
+        duration: MOTION_MAX_MS,
       });
     });
     prevCountRef.current = graphNodes.length;
@@ -127,22 +149,36 @@ export function NodeEditor() {
           height: gn.collapsed ? GROUP_COLLAPSED_HEIGHT : gn.height,
         };
       }
+      const measured = measuredSizes[n.id];
+      if (measured) {
+        rf.measured = measured;
+      }
       return rf;
     });
-  }, [graphNodes, positions, parents, selectedNodeIds, nodeDataFor]);
+  }, [
+    graphNodes,
+    positions,
+    parents,
+    selectedNodeIds,
+    nodeDataFor,
+    measuredSizes,
+  ]);
 
   const rfEdges: Edge[] = useMemo(
     () =>
-      graphEdges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        sourceHandle: e.sourceHandle,
-        target: e.target,
-        targetHandle: e.targetHandle,
-        animated: false,
-        style: { stroke: "#888" },
-      })),
-    [graphEdges],
+      graphEdges.map((e) => {
+        const style: EdgeVisualStyle = edgeStyleFor(e, graphNodes);
+        return {
+          id: e.id,
+          source: e.source,
+          sourceHandle: e.sourceHandle,
+          target: e.target,
+          targetHandle: e.targetHandle,
+          animated: false,
+          style,
+        };
+      }),
+    [graphEdges, graphNodes],
   );
 
   const onNodesChange = useCallback(
@@ -152,6 +188,7 @@ export function NodeEditor() {
       // one clobbering the rest.
       let next = useSelectionStore.getState().selectedNodeIds;
       let touched = false;
+      let dimensionsTouched = false;
       for (const c of changes) {
         if (c.type === "position" && c.position) {
           updateNodePosition(c.id, { x: c.position.x, y: c.position.y });
@@ -168,9 +205,34 @@ export function NodeEditor() {
           } else {
             next = next.filter((id) => id !== c.id);
           }
+        } else if (c.type === "dimensions" && c.dimensions) {
+          dimensionsTouched = true;
         }
       }
       if (touched) setSelectedIds(next);
+      if (dimensionsTouched) {
+        setMeasuredSizes((prev) => {
+          let changedAny = false;
+          const merged = { ...prev };
+          for (const c of changes) {
+            if (c.type !== "dimensions" || !c.dimensions) continue;
+            const existing = merged[c.id];
+            if (
+              existing &&
+              existing.width === c.dimensions.width &&
+              existing.height === c.dimensions.height
+            ) {
+              continue;
+            }
+            merged[c.id] = {
+              width: c.dimensions.width,
+              height: c.dimensions.height,
+            };
+            changedAny = true;
+          }
+          return changedAny ? merged : prev;
+        });
+      }
     },
     [updateNodePosition, removeNode, setSelectedIds],
   );
@@ -299,9 +361,43 @@ export function NodeEditor() {
       if (validateGraph(tentative).some((e) => e.code === "cycle")) return;
 
       addEdge(newEdge);
+      useConnectionUiStore
+        .getState()
+        .triggerSnap(conn.target, conn.targetHandle);
     },
     [graphEdges, graphNodes, addEdge],
   );
+
+  /**
+   * Records the source port's side/type into connectionUiStore the moment a
+   * drag starts, so fanout-highlight consumers (U3/U4) know what "compatible"
+   * means for this drag. Looked up against the graph store (same pattern as
+   * ConnectionLine's strokeForHandle) rather than React Flow's internal node
+   * data.
+   */
+  const onConnectStart = useCallback<OnConnectStart>((_e, params) => {
+    const { nodeId, handleId, handleType } = params;
+    if (!nodeId || !handleId) return;
+    const node = useGraphStore.getState().nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const side = handleType === "source" ? ("out" as const) : ("in" as const);
+    const ports = side === "out" ? nodeOutputPorts(node) : nodeInputPorts(node);
+    const port = ports.find((p) => p.name === handleId);
+    if (!port) return;
+    useConnectionUiStore.getState().startDrag({
+      nodeId,
+      handleId,
+      side,
+      portType: port.type,
+    });
+  }, []);
+
+  /** Always fires when a port drag ends, whether it resolved into a
+   *  connection or was released over empty space — either way the drag is
+   *  no longer in progress. */
+  const onConnectEnd = useCallback<OnConnectEnd>(() => {
+    useConnectionUiStore.getState().endDrag();
+  }, []);
 
   const isValidConnection = useCallback(
     (conn: Connection | Edge) => {
@@ -344,9 +440,13 @@ export function NodeEditor() {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the toolbar Import button
     <div className="panel panel--graph" onDragOver={onDragOver} onDrop={onDrop}>
-      <div className="panel-header">Node Graph</div>
-      <Toolbar />
-      <div className="panel-body" style={{ background: "#1a1a1a" }}>
+      <DockPanelHeader
+        panelId="nodeEditor"
+        label="Node Editor"
+        meta={`${graphNodes.length}N · ${graphEdges.length}E`}
+        collapsedRail
+      />
+      <div className="panel-body" style={{ background: "var(--surface-app)" }}>
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
@@ -355,8 +455,11 @@ export function NodeEditor() {
           onEdgesChange={onEdgesChange}
           onPaneClick={onPaneClick}
           onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
           onNodeDragStop={onNodeDragStop}
           isValidConnection={isValidConnection}
+          connectionLineComponent={ConnectionLine}
           onInit={(inst) => {
             flowRef.current = inst;
           }}
@@ -366,15 +469,51 @@ export function NodeEditor() {
           colorMode="dark"
           deleteKeyCode={["Backspace", "Delete"]}
         >
-          <Background color="#333" gap={16} />
-          <Controls />
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={22}
+            size={2}
+            color={withAlpha("#ffffff", 0.045)}
+          />
           <MiniMap
             pannable
             zoomable
             nodeColor={(n) => minimapColorFor((n as Node).type)}
-            style={{ background: "#252526" }}
+            nodeBorderRadius={2}
+            maskColor={withAlpha(tokens.surface.app, 0.6)}
+            style={{
+              background: withAlpha(tokens.surface.app, 0.85),
+              border: "1px solid var(--border-default)",
+              borderRadius: tokens.radius.overlay,
+              width: 168,
+              height: 112,
+            }}
           />
+          <ZoomControls />
         </ReactFlow>
+        {graphNodes.length === 0 &&
+          (bootPhase !== "done" ? <GraphSkeleton /> : <WelcomeOverlay />)}
+        {selectedNodeIds.length > 1 && (
+          <div
+            data-testid="selection-count-badge"
+            style={{
+              position: "absolute",
+              top: 8,
+              left: 8,
+              zIndex: 10,
+              fontSize: 10.5,
+              fontWeight: 600,
+              color: "var(--accent-hover)",
+              background: withAlpha(tokens.accent.default, 0.16),
+              border: `1px solid ${withAlpha(tokens.accent.default, 0.4)}`,
+              borderRadius: tokens.radius.chip,
+              padding: "2px 8px",
+              pointerEvents: "none",
+            }}
+          >
+            {`${selectedNodeIds.length} nodes selected`}
+          </div>
+        )}
       </div>
       <HelpModal />
     </div>

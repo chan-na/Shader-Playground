@@ -114,9 +114,15 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
   }) => {
     const canvas = page.getByTestId("viewport-canvas");
 
-    // Use the built-in Chain demo via the toolbar button — that exercises
-    // both the store and the real preset wiring.
-    await page.getByRole("button", { name: "Chain", exact: true }).click();
+    // Use the built-in Chain demo via the toolbar's Presets menu (M1-U3
+    // moved the demo-graph buttons behind a "Presets" dropdown) — this still
+    // exercises both the store and the real preset wiring. The dropdown's
+    // items carry an explicit role="menuitem" (AppToolbar's ToolbarMenu,
+    // matching the App Shell.dc.html dropdown pattern), which overrides the
+    // <button>'s implicit "button" role for accessibility-tree queries — so
+    // the item itself must be queried by role="menuitem", not "button".
+    await page.getByRole("button", { name: "Presets" }).click();
+    await page.getByRole("menuitem", { name: "Chain", exact: true }).click();
 
     // Wait for the new graph to be loaded.
     await expect

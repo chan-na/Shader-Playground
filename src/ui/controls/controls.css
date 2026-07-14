@@ -1,0 +1,392 @@
+/* ─── Form control library (M5-U1 + M5-U2 + M5-U3) ───────────────────
+ * Shared skin for Slider / MultiSlider / NumberField / ColorField /
+ * Toggle (M5-U1), SelectField / TextField / buttons (M5-U2), and
+ * SegmentedControl / the danger button variant (M5-U3). Values are
+ * tokenized via var(--*) (src/theme.ts is the single source) except two
+ * literal rgba() values called out below, which have no semantic/brand
+ * token equivalent — same policy the rest of the codebase already
+ * follows for one-off drop shadows (see src/index.css's `.cmdk-modal`
+ * box-shadow).
+ * design/Side Panel.dc.html — L85 (slider), L92/L264 (color), L107-108 +
+ * L246-248 (multi-axis), L121/L232 (toggle), L257 (number input),
+ * L115/L138/L167 (select), L129 (text input), L219-221 (buttons), L231
+ * (segmented).
+ */
+
+/* ── Slider ──────────────────────────────────────────────────────── */
+.ctl-slider {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ctl-slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  display: block;
+}
+
+.ctl-slider-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ctl-slider-input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--ctl-fill-color, var(--accent-default)) var(--ctl-fill, 0%),
+    var(--border-strong) var(--ctl-fill, 0%)
+  );
+}
+
+.ctl-slider-input::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--ctl-fill-color, var(--accent-default)) var(--ctl-fill, 0%),
+    var(--border-strong) var(--ctl-fill, 0%)
+  );
+}
+
+.ctl-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  /* design/Side Panel.dc.html L85 — thumb drop shadow is a fixed-alpha
+     black, not a semantic/brand color; kept as the design's literal
+     value (no var(--shadow-*) token fits a plain black shadow). */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  margin-top: -4px;
+  cursor: pointer;
+}
+
+.ctl-slider-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+/* Multi-axis rows use a 5px track (design L107-108) instead of the
+ * primary slider's 6px (L85) — thumb size stays 14px, so only the
+ * webkit thumb's vertical-centering margin needs to shift with it. */
+.ctl-slider--sm .ctl-slider-input::-webkit-slider-runnable-track {
+  height: 5px;
+}
+.ctl-slider--sm .ctl-slider-input::-moz-range-track {
+  height: 5px;
+}
+.ctl-slider--sm .ctl-slider-input::-webkit-slider-thumb {
+  margin-top: -4.5px;
+}
+
+.ctl-slider-range {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ── Number field ────────────────────────────────────────────────── */
+.ctl-number {
+  height: 28px;
+  width: 64px;
+  padding: 0 10px;
+  background: var(--surface-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.ctl-number:focus {
+  outline: none;
+  border-color: var(--accent-default);
+}
+
+.ctl-number:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Color field ─────────────────────────────────────────────────── */
+.ctl-color {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.ctl-color-swatch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-button);
+  /* design/Side Panel.dc.html L92, L264 — swatch border is a fixed-alpha
+     white overlay (no accent/semantic token fits a plain white), same
+     policy as the slider thumb shadow above. */
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.ctl-color-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ctl-color-hex {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  background: var(--surface-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  padding: 5px 9px;
+}
+
+/* ── Toggle ──────────────────────────────────────────────────────── */
+.ctl-toggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  border: none;
+  padding: 0;
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: all var(--motion-duration-max) var(--motion-easing);
+}
+
+.ctl-toggle[aria-checked="true"] {
+  background: var(--accent-default);
+}
+
+.ctl-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ctl-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: all var(--motion-duration-max) var(--motion-easing);
+  pointer-events: none;
+}
+
+.ctl-toggle[aria-checked="true"] .ctl-toggle-knob {
+  left: 18px;
+  background: var(--text-primary);
+}
+
+/* ── Multi-axis row (MultiSlider) ────────────────────────────────── */
+.ctl-axis-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 6px 0;
+}
+
+.ctl-axis-label {
+  width: 12px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+/* ── Select field (M5-U2) ────────────────────────────────────────── */
+/* design/Side Panel.dc.html L115 (u_blendMode) / L138 (webcam device) /
+ * L167 (output resolution) — all three mocks share this exact skin. */
+.ctl-select-wrap {
+  position: relative;
+}
+
+.ctl-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 32px;
+  padding: 0 28px 0 11px;
+  background: var(--surface-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ctl-select:focus {
+  outline: none;
+  border-color: var(--accent-default);
+}
+
+.ctl-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ctl-select-caret {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* ── Text field (M5-U2) ──────────────────────────────────────────── */
+/* design/Side Panel.dc.html L129 (Param label input) / L257 (mono value
+ * input in the control-library preview). */
+.ctl-text {
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
+  padding: 0 11px;
+  background: var(--surface-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.ctl-text::placeholder {
+  color: var(--text-muted);
+}
+
+.ctl-text:focus {
+  outline: none;
+  border-color: var(--accent-default);
+}
+
+.ctl-text--mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* UniformHintEditor's cramped min/max/step/default/label row — same skin,
+ * shorter (design's inline control-library row runs 26-28px vs. the
+ * standalone 32px field above). */
+.ctl-text--sm {
+  height: 28px;
+}
+
+/* ── Buttons (M5-U2) ─────────────────────────────────────────────── */
+/* design/Side Panel.dc.html L219 (Primary) / L220 (Secondary) / L221
+ * (Ghost) — control-library "Buttons" row. */
+.ctl-btn {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--radius-button);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ctl-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ctl-btn--primary {
+  background: var(--accent-default);
+  border: none;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.ctl-btn--secondary {
+  background: var(--surface-input);
+  border: 1px solid var(--border-stronger);
+  color: var(--text-primary);
+}
+
+.ctl-btn--ghost {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+}
+
+/* GroupInspector's "Delete with children…" trigger — no design mock covers
+ * a destructive button variant (Side Panel.dc.html's Buttons row only shows
+ * Primary/Secondary/Ghost/icon/Disabled), so this derives its alpha-tinted
+ * border from tokens.semantic.error via color-mix(), the same pattern
+ * src/ui/NodeEditor/nodeCard.css already uses for accent-tinted overlays. */
+.ctl-btn--danger {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
+  color: var(--error);
+}
+
+/* ── Segmented control (M5-U3) ───────────────────────────────────── */
+/* design/Side Panel.dc.html L231 (control-library "Segmented · toggle"
+ * sample). The mock's container background is a literal #0e1013, between
+ * surface.appDarker (#08090b) and surface.rail (#0f1114) — rail is the
+ * closer/only named token in that range, so it stands in here. */
+/* A native <fieldset> (a11y/useSemanticElements over a bare role="group"
+ * div) carries its own UA border/margin/padding/min-width — reset all of
+ * them so it lays out exactly like the plain container the design mocks. */
+.ctl-segmented {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-rail);
+  border: 1px solid var(--border-default);
+  /* No tokens.radius entry matches 8 (button/input=7, overlay=9 are the
+   * neighbors) — kept as the mock's literal value, same policy as the
+   * one-off rgba()s above. */
+  border-radius: 8px;
+  padding: 2px;
+  margin: 0;
+  min-width: 0;
+}
+
+.ctl-segmented-btn {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ctl-segmented-btn--active {
+  background: var(--accent-default);
+  color: var(--text-primary);
+}

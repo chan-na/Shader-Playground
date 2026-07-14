@@ -1,6 +1,7 @@
 import type { NodeProps } from "@xyflow/react";
 import type { ComponentType } from "react";
 import type { GraphNodeKind } from "../../core/graph/types";
+import { tokens } from "../../theme";
 import { AudioNodeView } from "./nodes/AudioNodeView";
 import { ComputeNodeView } from "./nodes/ComputeNodeView";
 import { GroupNodeView } from "./nodes/GroupNodeView";
@@ -16,32 +17,35 @@ import {
 } from "./nodes/UtilityNodeViews";
 import { VideoNodeView } from "./nodes/VideoNodeView";
 import { WebcamNodeView } from "./nodes/WebcamNodeView";
+import { categoryHexFor } from "./nodeTheme";
 
 export interface NodeUiSpec {
   view: ComponentType<NodeProps>;
   minimapColor: string;
 }
 
-const FALLBACK_MINIMAP_COLOR = "#888888";
+const FALLBACK_MINIMAP_COLOR = tokens.text.muted;
 
 /**
  * UI-side registry per GraphNodeKind. Adding a new node kind surfaces here
  * as a compile error because the map is typed as exhaustive Record.
+ * minimapColor is derived from the node's category (design/Node Editor.dc.html
+ * L280-293 미니맵 블록이 카테고리 5색만 사용) via categoryHexFor.
  */
 export const NODE_UI: Record<GraphNodeKind, NodeUiSpec> = {
-  mesh: { view: MeshNodeView, minimapColor: "#56d698" },
-  image: { view: ImageNodeView, minimapColor: "#d69c56" },
-  webcam: { view: WebcamNodeView, minimapColor: "#d65656" },
-  video: { view: VideoNodeView, minimapColor: "#c156d6" },
-  audio: { view: AudioNodeView, minimapColor: "#56c1d6" },
-  shader: { view: ShaderNodeView, minimapColor: "#569cd6" },
-  compute: { view: ComputeNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
-  output: { view: OutputNodeView, minimapColor: "#d6569c" },
-  param: { view: ParamNodeView, minimapColor: "#d6d656" },
-  math: { view: MathNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
-  swizzle: { view: SwizzleNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
-  combine: { view: CombineNodeView, minimapColor: FALLBACK_MINIMAP_COLOR },
-  group: { view: GroupNodeView, minimapColor: "#5b6a7a" },
+  mesh: { view: MeshNodeView, minimapColor: categoryHexFor("mesh") },
+  image: { view: ImageNodeView, minimapColor: categoryHexFor("image") },
+  webcam: { view: WebcamNodeView, minimapColor: categoryHexFor("webcam") },
+  video: { view: VideoNodeView, minimapColor: categoryHexFor("video") },
+  audio: { view: AudioNodeView, minimapColor: categoryHexFor("audio") },
+  shader: { view: ShaderNodeView, minimapColor: categoryHexFor("shader") },
+  compute: { view: ComputeNodeView, minimapColor: categoryHexFor("compute") },
+  output: { view: OutputNodeView, minimapColor: categoryHexFor("output") },
+  param: { view: ParamNodeView, minimapColor: categoryHexFor("param") },
+  math: { view: MathNodeView, minimapColor: categoryHexFor("math") },
+  swizzle: { view: SwizzleNodeView, minimapColor: categoryHexFor("swizzle") },
+  combine: { view: CombineNodeView, minimapColor: categoryHexFor("combine") },
+  group: { view: GroupNodeView, minimapColor: categoryHexFor("group") },
 };
 
 /** ReactFlow `nodeTypes` prop derived from NODE_UI in a single pass. */

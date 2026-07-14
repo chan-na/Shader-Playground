@@ -14,6 +14,10 @@
  *   - `updateExternalSources(gl)` is called once per RAF tick to upload
  *     the latest frame into the handle's GLTexture.
  *   - `getExternalTexture(nodeId)` is what `bindSamplers` looks up.
+ *   - `retryExternalSource(nodeId)` disposes and re-acquires a handle in
+ *     place (same spec) — the "Enable camera"/"Enable microphone" retry
+ *     action after a permission denial, so it re-issues getUserMedia without
+ *     waiting for the next graph recompile.
  *   - `disposeAllExternal(gl)` is called on viewport unmount.
  *
  * Handles do NOT live inside ExecutionPlan, because plan.dispose() runs on
@@ -73,6 +77,11 @@ interface WebcamHandle {
   ready: boolean;
   /** Last acquisition error (permission denial, no device, etc.). */
   error: string | null;
+  /** `DOMException.name` when `error` came from a rejected getUserMedia
+   *  call, so getExternalStatus can tell a permission denial apart from any
+   *  other failure. Null for non-DOMException errors (e.g. "MediaDevices is
+   *  unavailable"). */
+  errorName: string | null;
   disposed: boolean;
 }
 
@@ -112,10 +121,23 @@ interface AudioHandle {
   height: number;
   ready: boolean;
   error: string | null;
+  /** Same DOMException-name capture as WebcamHandle, mic mode only — file
+   *  mode's decode/resolver errors are never DOMExceptions and leave this
+   *  null. */
+  errorName: string | null;
   disposed: boolean;
 }
 
 type ExternalHandle = WebcamHandle | VideoHandle | AudioHandle;
+
+/** getUserMedia rejection names that mean "the user (or the browser policy)
+ *  refused the permission prompt", as opposed to any other acquisition
+ *  failure (no device, context lost, etc.). */
+const DENIED_ERROR_NAMES = new Set([
+  "NotAllowedError",
+  "SecurityError",
+  "PermissionDeniedError",
+]);
 
 const handles = new Map<string, ExternalHandle>();
 
@@ -242,20 +264,48 @@ export function getExternalTexture(nodeId: string): WebGLTexture | null {
   return h?.glTexture ?? null;
 }
 
+export type ExternalStatusKind = "pending" | "ready" | "denied" | "error";
+
 export function getExternalStatus(nodeId: string): {
   ready: boolean;
   error: string | null;
   width: number;
   height: number;
+  statusKind: ExternalStatusKind;
 } | null {
   const h = handles.get(nodeId);
   if (!h) return null;
+  // VideoHandle has no errorName field (its errors are never permission
+  // related), so it's treated the same as "no name captured".
+  const errorName = h.kind === "video" ? null : h.errorName;
+  const statusKind: ExternalStatusKind = h.ready
+    ? "ready"
+    : h.error !== null
+      ? errorName !== null && DENIED_ERROR_NAMES.has(errorName)
+        ? "denied"
+        : "error"
+      : "pending";
   return {
     ready: h.ready,
     error: h.error,
     width: h.width,
     height: h.height,
+    statusKind,
   };
+}
+
+/**
+ * Re-acquire a handle in place — disposes the current handle (releasing its
+ * stream/context/texture) and immediately starts a fresh acquisition with
+ * the same spec. Used by the "Enable camera"/"Enable microphone" retry
+ * action after a permission denial. No-op for unknown node IDs (e.g. the
+ * node was removed from the graph before the user clicked retry).
+ */
+export function retryExternalSource(nodeId: string): void {
+  const h = handles.get(nodeId);
+  if (!h) return;
+  disposeHandle(h, lastRenderGl ?? undefined);
+  handles.set(nodeId, acquire(h.spec));
 }
 
 /**
@@ -481,6 +531,7 @@ function acquireWebcam(spec: WebcamExternalSpec): WebcamHandle {
     height: 0,
     ready: false,
     error: null,
+    errorName: null,
     disposed: false,
   };
   void startWebcam(handle, spec.deviceId);
@@ -523,6 +574,7 @@ async function startWebcam(handle: WebcamHandle, deviceId: string | undefined) {
     handle.ready = true;
   } catch (e) {
     handle.error = String(e);
+    handle.errorName = e instanceof DOMException ? e.name : null;
     log.warn("external", "webcam acquisition failed", normalizeError(e));
   }
 }
@@ -685,6 +737,7 @@ function acquireAudio(spec: AudioExternalSpec): AudioHandle {
     height: 0,
     ready: false,
     error: null,
+    errorName: null,
     disposed: false,
   };
   const factory = resolveAudioContextFactory();
@@ -748,6 +801,7 @@ async function startAudioMic(handle: AudioHandle) {
     handle.ready = true;
   } catch (e) {
     handle.error = String(e);
+    handle.errorName = e instanceof DOMException ? e.name : null;
     log.warn("external", "audio mic acquisition failed", normalizeError(e));
   }
 }

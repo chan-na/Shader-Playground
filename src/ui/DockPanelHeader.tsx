@@ -1,0 +1,78 @@
+import type { ReactNode } from "react";
+import { type PanelId, useLayoutStore } from "../state/layoutStore";
+
+export interface DockPanelHeaderProps {
+  panelId: PanelId;
+  /** 대문자로 렌더되는 패널 라벨. 탭이 라벨 자리를 대신하는 패널(Side Panel /
+   *  Code Editor)은 생략하고 `children`으로 탭을 넘긴다. */
+  label?: string;
+  /** mono 메타 배지(예: "5N · 4E", "GLSL · ES 3.0"). */
+  meta?: string;
+  /** 탭 버튼 등 헤더 중앙에 끼워 넣을 슬롯. */
+  children?: ReactNode;
+  /**
+   * true면 이 패널이 접혔을 때 App.tsx가 슬롯을 '폭'으로 줄인다(현재는
+   * shell-left/Node Editor뿐 — viewport/sidePanel/codeEditor는 '높이'로
+   * 줄어 가로 헤더 그대로 둬도 문제없다). 폭 34px 스트립에 가로 헤더를 그대로
+   * 두면 spacer 뒤 버튼들이 스트립 밖으로 overflow:hidden 클리핑되어 마우스로
+   * 클릭할 수 없어진다(M1-U2) — 그 대신 라벨/배지/최대화 버튼을 숨기고 grab +
+   * 복원(⌃) 버튼만 세로로 쌓는 레일 레이아웃으로 렌더한다.
+   */
+  collapsedRail?: boolean;
+}
+
+/**
+ * 모든 도킹 패널이 공유하는 헤더(App Shell.dc.html L88-95 패턴):
+ * grab dots → 라벨/탭 → 메타 배지 → (spacer) → 최대화(⤢) → 접기(⌄).
+ * 접기/최대화는 layoutStore가 단일 출처 — 패널 자체는 언마운트되지 않는다
+ * (WebGL 컨텍스트/CodeMirror 인스턴스 보존은 App.tsx의 슬롯 클래스가 담당).
+ */
+export function DockPanelHeader({
+  panelId,
+  label,
+  meta,
+  children,
+  collapsedRail = false,
+}: DockPanelHeaderProps) {
+  const collapsed = useLayoutStore((s) => s.collapsed[panelId]);
+  const isMaximized = useLayoutStore((s) => s.maximized === panelId);
+  const toggleCollapsed = useLayoutStore((s) => s.toggleCollapsed);
+  const toggleMaximized = useLayoutStore((s) => s.toggleMaximized);
+
+  const isRail = collapsedRail && collapsed;
+
+  return (
+    <div className={isRail ? "dock-header dock-header--rail" : "dock-header"}>
+      <span className="dock-header-grab" aria-hidden="true">
+        ⣿
+      </span>
+      {!isRail && label !== undefined && (
+        <span className="dock-header-label">{label}</span>
+      )}
+      {!isRail && meta !== undefined && (
+        <span className="dock-header-meta">{meta}</span>
+      )}
+      {!isRail && children}
+      <div className="dock-header-spacer" />
+      {!isRail && (
+        <button
+          type="button"
+          className="dock-header-btn"
+          onClick={() => toggleMaximized(panelId)}
+          aria-label={isMaximized ? "Restore panel" : "Maximize panel"}
+        >
+          ⤢
+        </button>
+      )}
+      <button
+        type="button"
+        className="dock-header-btn"
+        onClick={() => toggleCollapsed(panelId)}
+        aria-label={collapsed ? "Expand panel" : "Collapse panel"}
+        aria-expanded={!collapsed}
+      >
+        {collapsed ? "⌃" : "⌄"}
+      </button>
+    </div>
+  );
+}

@@ -3,6 +3,7 @@ import type { ParamGraphNode } from "../../../core/graph/types";
 import { paramOutputPort } from "../../../core/nodes/registry";
 import { useGraphStore } from "../../../state/graphStore";
 import { useTimeStore } from "../../../state/timeStore";
+import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 import { colorSwatchHex, formatParamValue } from "./paramNodeViewHelpers";
 import { ColorField, NumberField } from "./ValueInput";
@@ -22,9 +23,15 @@ export function ParamNodeView({ id, data }: NodeProps) {
       style={{ position: "relative", minWidth: 168 }}
       data-testid={`param-node-${node.paramKind}`}
     >
-      <div className="node-card__header node-card__header--param">
-        {node.label ? `${node.label}` : `Param · ${node.paramKind}`}
-      </div>
+      <NodeCardHeader
+        kind="param"
+        title={node.label ? node.label : "Param"}
+        meta={
+          node.label ? undefined : (
+            <span className="node-card__meta">{node.paramKind}</span>
+          )
+        }
+      />
       <div
         className="node-card__body"
         style={{ paddingLeft: 14, paddingRight: 22 }}

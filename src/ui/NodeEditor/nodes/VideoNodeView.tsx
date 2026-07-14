@@ -6,6 +6,7 @@ import {
 } from "../../../core/external/registry";
 import type { VideoGraphNode } from "../../../core/graph/types";
 import { useAssetStore } from "../../../state/assetStore";
+import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 const PREVIEW_W = 96;
@@ -67,7 +68,7 @@ export function VideoNodeView({ id, data }: NodeProps) {
       data-testid="video-node"
       style={{ position: "relative" }}
     >
-      <div className="node-card__header node-card__header--video">Video</div>
+      <NodeCardHeader kind="video" title="Video" />
       <div className="node-card__body" style={{ paddingRight: 22 }}>
         {!node.assetId ? (
           <div className="node-card__placeholder">no asset</div>

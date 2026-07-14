@@ -10,6 +10,7 @@ import {
   getExternalTexture,
   getExternalVideoElement,
   reconcileExternal,
+  retryExternalSource,
   setAudioBlobResolver,
   setVideoBlobResolver,
   updateExternalSources,
@@ -132,6 +133,74 @@ describe("webcam acquisition outcomes", () => {
         value: original,
       });
     }
+  });
+});
+
+describe("getExternalStatus — statusKind derivation (M7-U3)", () => {
+  it("is 'denied' when getUserMedia rejects with a permission DOMException", async () => {
+    __setGetUserMediaForTests(() =>
+      Promise.reject(new DOMException("blocked", "NotAllowedError")),
+    );
+    reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getExternalStatus("w1")?.statusKind).toBe("denied");
+  });
+
+  it("is 'error' when getUserMedia rejects with a non-permission Error", async () => {
+    __setGetUserMediaForTests(() =>
+      Promise.reject(new Error("no camera found")),
+    );
+    reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getExternalStatus("w1")?.statusKind).toBe("error");
+  });
+
+  it("is 'pending' before getUserMedia resolves and 'ready' after", async () => {
+    let resolveStream: (s: MediaStream) => void = () => {};
+    __setGetUserMediaForTests(
+      () =>
+        new Promise<MediaStream>((res) => {
+          resolveStream = res;
+        }),
+    );
+    reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
+    expect(getExternalStatus("w1")?.statusKind).toBe("pending");
+
+    resolveStream(fakeStream());
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getExternalStatus("w1")?.statusKind).toBe("ready");
+  });
+});
+
+describe("retryExternalSource", () => {
+  it("is a no-op for an unknown node id", () => {
+    expect(() => retryExternalSource("does-not-exist")).not.toThrow();
+    expect(externalHandleCount()).toBe(0);
+  });
+
+  it("disposes the existing handle and re-acquires with the same spec", async () => {
+    let callCount = 0;
+    __setGetUserMediaForTests(() => {
+      callCount += 1;
+      return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+    });
+    reconcileExternal([{ nodeId: "w1", kind: "webcam", deviceId: "cam-a" }]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getExternalStatus("w1")?.statusKind).toBe("denied");
+    expect(callCount).toBe(1);
+
+    retryExternalSource("w1");
+    // Same node id, handle count unchanged (old disposed, new acquired).
+    expect(externalHandleCount()).toBe(1);
+    await Promise.resolve();
+    await Promise.resolve();
+    // getUserMedia was called again for the retry.
+    expect(callCount).toBe(2);
+    expect(getExternalStatus("w1")?.statusKind).toBe("denied");
   });
 });
 

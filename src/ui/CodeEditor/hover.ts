@@ -28,6 +28,7 @@ import {
   resolveSymbol,
 } from "../../core/glsl/symbolTable";
 import { SYSTEM_UNIFORM_DESCRIPTIONS } from "../../core/graph/uniformParser";
+import { tokens } from "../../theme";
 
 const IDENT_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
 
@@ -155,15 +156,15 @@ function renderHoverDom(hit: HoverHit): HTMLElement {
   const root = document.createElement("div");
   root.className = "cm-glsl-hover";
   root.setAttribute("data-source", hit.source);
-  root.style.padding = "6px 8px";
+  root.style.padding = "9px 12px";
   root.style.maxWidth = "420px";
 
   // Signature on top — monospace, slightly brighter than the description.
   const sig = document.createElement("div");
   sig.className = "cm-glsl-hover__sig";
-  sig.style.fontFamily = "ui-monospace, SF Mono, Menlo, Consolas, monospace";
-  sig.style.fontSize = "12px";
-  sig.style.color = "#dcdcaa";
+  sig.style.fontFamily = tokens.font.mono;
+  sig.style.fontSize = "11.5px";
+  sig.style.color = tokens.syntax.function;
   sig.style.whiteSpace = "pre";
   sig.textContent = hit.signature;
   root.appendChild(sig);
@@ -171,8 +172,9 @@ function renderHoverDom(hit: HoverHit): HTMLElement {
   if (hit.description) {
     const desc = document.createElement("div");
     desc.className = "cm-glsl-hover__desc";
-    desc.style.fontSize = "11px";
-    desc.style.color = "#bbb";
+    desc.style.fontSize = "11.5px";
+    desc.style.lineHeight = "1.55";
+    desc.style.color = tokens.text.secondary;
     desc.style.marginTop = "4px";
     desc.textContent = hit.description;
     root.appendChild(desc);

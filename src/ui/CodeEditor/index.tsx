@@ -1,20 +1,78 @@
 import { setDiagnostics } from "@codemirror/lint";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { glslValidator } from "../../core/glsl/glslValidator";
 import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
-import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { tokens, withAlpha } from "../../theme";
 import { debounce } from "../../utils/debounce";
+import { DockPanelHeader } from "../DockPanelHeader";
+import { NODE_GLYPH } from "../NodeEditor/nodeTheme";
 import { setCurrentView } from "./currentView";
 import { glslExtensions } from "./glslSetup";
 import { toCMDiagnostics } from "./lintAdapter";
+import { MultiSelectBanner } from "./MultiSelectBanner";
 import { StageTabs } from "./StageTabs";
+
+/** Node breadcrumb chip (Code Editor.dc.html L39-43) — accent-tinted pill
+ * showing the currently-edited node's category glyph, id, and kind, rendered
+ * in the DockPanelHeader children slot right after the stage tabs. */
+const BREADCRUMB_CONTAINER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 7,
+  padding: "3px 10px 3px 7px",
+  background: withAlpha(tokens.accent.default, 0.1),
+  border: `1px solid ${tokens.accent.muted}`,
+  borderRadius: tokens.radius.button,
+};
+const BREADCRUMB_ICON_STYLE: CSSProperties = {
+  width: 14,
+  height: 14,
+  flexShrink: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: tokens.radius.iconBox,
+  background: withAlpha(tokens.accent.default, 0.2),
+  border: `1px solid ${tokens.accent.default}`,
+  fontSize: 9,
+  color: tokens.accent.hover,
+};
+const BREADCRUMB_NAME_STYLE: CSSProperties = {
+  fontSize: 11.5,
+  fontWeight: 600,
+  color: tokens.text.primary,
+};
+const BREADCRUMB_KIND_STYLE: CSSProperties = {
+  fontFamily: tokens.font.mono,
+  fontSize: 9,
+  color: tokens.text.muted,
+};
+
+function NodeBreadcrumb({
+  id,
+  kind,
+}: {
+  id: string;
+  kind: "shader" | "compute";
+}) {
+  return (
+    <div style={BREADCRUMB_CONTAINER_STYLE}>
+      <span style={BREADCRUMB_ICON_STYLE} aria-hidden="true">
+        {NODE_GLYPH[kind]}
+      </span>
+      <span style={BREADCRUMB_NAME_STYLE}>{id}</span>
+      <span style={BREADCRUMB_KIND_STYLE}>{kind}</span>
+    </div>
+  );
+}
 
 /** Debounced source-commit; carries the edit's (node, stage) target so a later
  * node/stage switch cannot misroute or drop the trailing call (L17). */
@@ -38,11 +96,12 @@ export function CodeEditor() {
   const commitRef = useRef<CommitFn | null>(null);
 
   const selectedId = useSelectionStore((s) => s.selectedNodeId);
+  const selectedIds = useSelectionStore((s) => s.selectedNodeIds);
+  const isMulti = selectedIds.length >= 2;
   const stage = useEditorStore((s) => s.activeStage);
   const setStage = useEditorStore((s) => s.setStage);
   const jumpRequest = useEditorStore((s) => s.jumpRequest);
   const clearJump = useEditorStore((s) => s.clearJump);
-  const fps = useRendererStore((s) => s.stats.fps);
 
   const firstShaderId = useGraphStore(
     (s) => s.nodes.find((n) => n.kind === "shader")?.id ?? null,
@@ -69,6 +128,31 @@ export function CodeEditor() {
   const diags = useDiagnosticsStore((s) =>
     effectiveId ? s.byNode[effectiveId] : undefined,
   );
+
+  // Multi-select banner (Code Editor.dc.html L56-72) — subscribe to the raw
+  // slices (whole nodes array / whole diagnostics map) rather than deriving a
+  // fresh array inside the selector itself (zustand's default selector
+  // equality is referential, so a selector-created array would never be
+  // considered "unchanged"). The chip list is memoized from those slices plus
+  // selectedIds instead, recomputing only when one of them actually changes.
+  const allNodes = useGraphStore((s) => s.nodes);
+  const diagsByNode = useDiagnosticsStore((s) => s.byNode);
+  const multiSelectChips = useMemo(() => {
+    if (!isMulti) return [];
+    const byId = new Map(allNodes.map((n) => [n.id, n]));
+    const chips: Array<{ id: string; hasError: boolean }> = [];
+    for (const id of selectedIds) {
+      const n = byId.get(id);
+      if (!n || (n.kind !== "shader" && n.kind !== "compute")) continue;
+      const d = diagsByNode[id];
+      const hasError = Boolean(
+        d &&
+          (d.vertex.length > 0 || d.fragment.length > 0 || d.link.length > 0),
+      );
+      chips.push({ id, hasError });
+    }
+    return chips;
+  }, [isMulti, selectedIds, allNodes, diagsByNode]);
 
   // Live (pre-recompile) diagnostics from the OffscreenCanvas WebGL2 worker —
   // see Architecture §8.4. Scoped to the currently-edited (node, stage); we
@@ -262,15 +346,20 @@ export function CodeEditor() {
 
   return (
     <div className="panel panel--code">
-      <div className="panel-header">
-        Code · {fps} fps {effectiveId ? `· ${effectiveId}` : ""}
-      </div>
-      <StageTabs
-        active={stage}
-        onChange={setStage}
-        vertexHasError={vertexHasError}
-        fragmentHasError={fragmentHasError}
-      />
+      <DockPanelHeader panelId="codeEditor" meta="GLSL · ES 3.0">
+        <StageTabs
+          active={stage}
+          onChange={setStage}
+          vertexHasError={vertexHasError}
+          fragmentHasError={fragmentHasError}
+        />
+        {!isMulti && effectiveId && node && (
+          <>
+            <span className="dock-header-divider" aria-hidden="true" />
+            <NodeBreadcrumb id={effectiveId} kind={node.kind} />
+          </>
+        )}
+      </DockPanelHeader>
       <div className="panel-body">
         <div
           ref={containerRef}
@@ -280,10 +369,16 @@ export function CodeEditor() {
           style={{
             width: "100%",
             height: "100%",
-            display: node ? "block" : "none",
+            display: node && !isMulti ? "block" : "none",
           }}
         />
-        {!node && (
+        {isMulti && (
+          <MultiSelectBanner
+            count={selectedIds.length}
+            chips={multiSelectChips}
+          />
+        )}
+        {!node && !isMulti && (
           <div className="placeholder-message">No shader node selected</div>
         )}
       </div>

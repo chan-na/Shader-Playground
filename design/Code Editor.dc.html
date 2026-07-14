@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #08090b; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+  ::selection { background: rgba(61,155,255,0.3); }
+  .ce-err { text-decoration: underline wavy #f0555c; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .ce-warn { text-decoration: underline wavy #f5b13d; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  @keyframes ceBlink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+  a { color: #57a9ff; } a:hover { color: #7dbcff; }
+</style>
+</helmet>
+<div style="width:1320px;height:860px;display:flex;flex-direction:column;background:#08090b;color:#e7eaee;overflow:hidden;font-size:13px;">
+
+  <!-- ══ header ══ -->
+  <div style="display:flex;align-items:center;gap:12px;height:44px;flex-shrink:0;padding:0 14px;background:#131519;border-bottom:1px solid #20242a;">
+    <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Code Editor</span>
+    <span style="font-size:11px;color:#565e68;">— GLSL editing &amp; language features</span>
+    <div style="flex:1;"></div>
+    <button onClick="{{ toggleMulti }}" style="display:flex;align-items:center;gap:7px;height:28px;padding:0 11px;background:{{ multiBg }};border:1px solid {{ multiBorder }};border-radius:7px;color:{{ multiColor }};font-size:11.5px;font-weight:500;cursor:pointer;"><span style="width:7px;height:7px;border-radius:2px;background:{{ multiDot }};"></span>Multi-select</button>
+    <button onClick="{{ toggleMap }}" style="height:28px;padding:0 11px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#c4cad2;font-size:11.5px;font-weight:500;cursor:pointer;">{{ mapLabel }}</button>
+  </div>
+
+  <!-- ══ tab bar ══ -->
+  <div style="display:flex;align-items:center;height:38px;flex-shrink:0;padding:0 10px;background:#101216;border-bottom:1px solid #17191e;gap:2px;">
+    <!-- node breadcrumb -->
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 10px 3px 7px;background:rgba(61,155,255,0.1);border:1px solid #1c3452;border-radius:7px;margin-right:8px;">
+      <span style="width:14px;height:14px;border-radius:4px;background:rgba(61,155,255,0.2);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-size:9px;color:#57a9ff;">◆</span>
+      <span style="font-size:11.5px;font-weight:600;color:#c4dcff;">Fresnel</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5f7fb0;">shader</span>
+    </div>
+    <!-- tabs -->
+    <button onClick="{{ selVertex }}" style="display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;background:{{ vtxBg }};border:none;border-top:2px solid {{ vtxTop }};color:{{ vtxColor }};font-family:'JetBrains Mono',monospace;font-size:11.5px;cursor:pointer;">vertex.glsl<span style="width:6px;height:6px;border-radius:50%;background:transparent;"></span></button>
+    <button onClick="{{ selFragment }}" style="display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;background:{{ frgBg }};border:none;border-top:2px solid {{ frgTop }};color:{{ frgColor }};font-family:'JetBrains Mono',monospace;font-size:11.5px;cursor:pointer;">fragment.glsl<span style="width:6px;height:6px;border-radius:50%;background:#f0555c;box-shadow:0 0 5px rgba(240,85,92,0.7);"></span></button>
+    <div style="flex:1;"></div>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;margin-right:10px;">GLSL ES 3.00</span>
+    <button style="height:26px;padding:0 10px;background:#1a1d22;border:1px solid #20242a;border-radius:6px;color:#9aa2ac;font-size:11px;cursor:pointer;" style-hover="color:#e7eaee;">Format</button>
+  </div>
+
+  <!-- ══ editor body ══ -->
+  <div style="flex:1;display:flex;min-height:0;background:#0d0f12;position:relative;">
+
+    <!-- MULTI-SELECT banner -->
+    <sc-if value="{{ isMulti }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;">
+        <div style="width:56px;height:56px;border-radius:14px;background:#131519;border:1px solid #20242a;display:flex;align-items:center;justify-content:center;font-size:22px;color:#57a9ff;">⧉</div>
+        <div style="text-align:center;">
+          <div style="font-size:15px;font-weight:600;color:#c4cad2;margin-bottom:5px;">3 shader nodes selected</div>
+          <div style="font-size:12.5px;color:#656d78;">Select a single node to edit its GLSL. Bulk actions apply to all selected.</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <span style="display:flex;align-items:center;gap:7px;padding:6px 11px;background:#131519;border:1px solid #20242a;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;"><span style="width:9px;height:9px;border-radius:2px;background:#3d9bff;"></span>Fresnel</span>
+          <span style="display:flex;align-items:center;gap:7px;padding:6px 11px;background:#131519;border:1px solid #20242a;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;"><span style="width:9px;height:9px;border-radius:2px;background:#3d9bff;"></span>Blend<span style="width:6px;height:6px;border-radius:50%;background:#f0555c;"></span></span>
+          <span style="display:flex;align-items:center;gap:7px;padding:6px 11px;background:#131519;border:1px solid #20242a;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#c4cad2;"><span style="width:9px;height:9px;border-radius:2px;background:#3d9bff;"></span>Compute</span>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px;">
+          <button style="height:30px;padding:0 14px;background:#3d9bff;border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;">Recompile all</button>
+          <button style="height:30px;padding:0 14px;background:#1a1d22;border:1px solid #2b3037;border-radius:7px;color:#c4cad2;font-size:12px;cursor:pointer;">Group nodes</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- SINGLE-node code region -->
+    <sc-if value="{{ isSingle }}" hint-placeholder-val="{{ true }}">
+      <!-- code column -->
+      <div style="flex:1;position:relative;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:12.5px;padding:8px 0;">
+
+        <!-- FRAGMENT -->
+        <sc-if value="{{ isFragment }}" hint-placeholder-val="{{ true }}">
+          <div style="position:relative;">
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">1</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">#version</span> <span style="color:#b5cea8;">300</span> es</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">2</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">precision</span> <span style="color:#4ec9b0;">highp</span> <span style="color:#4ec9b0;">float</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">3</div><div style="flex:1;padding-left:14px;white-space:pre;"> </div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">4</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">uniform</span> <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">u_time</span>;       <span style="color:#6a737d;">// seconds</span></div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">5</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">uniform</span> <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">u_intensity</span>;  <span style="color:#6a737d;">// 0..2  @range</span></div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">6</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">uniform</span> <span style="color:#4ec9b0;">vec3</span>  <span style="color:#9cdcfe;">u_baseColor</span>;  <span style="color:#6a737d;">// @color</span></div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">7</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">in</span>  <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">v_normal</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">8</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">in</span>  <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">v_viewDir</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">9</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">out</span> <span style="color:#4ec9b0;">vec4</span> <span style="color:#9cdcfe;">fragColor</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">10</div><div style="flex:1;padding-left:14px;white-space:pre;"> </div></div>
+            <!-- fn def (fold) + hover target -->
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;text-align:center;color:#565e68;">▾</div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">11</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#4ec9b0;">float</span> <span style="color:#dcdcaa;background:rgba(97,175,239,0.16);outline:1px solid rgba(97,175,239,0.35);border-radius:2px;">fresnelTerm</span>(<span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">n</span>, <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">v</span>, <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">p</span>) {</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">12</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#c586c0;">return</span> <span style="color:#dcdcaa;">pow</span>(<span style="color:#b5cea8;">1.0</span> - <span style="color:#dcdcaa;">max</span>(<span style="color:#dcdcaa;">dot</span>(<span style="color:#9cdcfe;">n</span>, <span style="color:#9cdcfe;">v</span>), <span style="color:#b5cea8;">0.0</span>), <span style="color:#9cdcfe;">p</span>);</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">13</div><div style="flex:1;padding-left:14px;white-space:pre;">}</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">14</div><div style="flex:1;padding-left:14px;white-space:pre;"> </div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;text-align:center;color:#565e68;">▾</div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">15</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">void</span> <span style="color:#dcdcaa;">main</span>() {</div></div>
+            <!-- current line -->
+            <div style="display:flex;line-height:22px;background:rgba(61,155,255,0.07);"><div style="width:22px;flex-shrink:0;border-left:2px solid #3d9bff;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#c4cad2;">16</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;background:rgba(97,175,239,0.16);border-radius:2px;">f</span> = <span style="color:#dcdcaa;">fresnelTerm</span>(<span style="color:#9cdcfe;">v_normal</span>, <span style="color:#9cdcfe;">v_viewDir</span>, <span style="color:#b5cea8;">3.0</span>);<span style="display:inline-block;width:1px;height:15px;background:#3d9bff;vertical-align:middle;margin-left:1px;animation:ceBlink 1.1s step-end infinite;"></span></div></div>
+            <!-- error line -->
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;text-align:center;color:#f0555c;font-size:11px;">✕</div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#f0555c;">17</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#9cdcfe;background:rgba(97,175,239,0.16);border-radius:2px;">f</span> *= <span class="ce-err" style="color:#9cdcfe;">u_intensty</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">18</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">col</span> = <span style="color:#9cdcfe;">u_baseColor</span> * <span style="color:#9cdcfe;background:rgba(97,175,239,0.16);border-radius:2px;">f</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">19</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#9cdcfe;">col</span> += <span style="color:#b5cea8;">0.15</span> * <span style="color:#dcdcaa;">sin</span>(<span style="color:#9cdcfe;">u_time</span>);</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">20</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#9cdcfe;">fragColor</span> = <span style="color:#4ec9b0;">vec4</span>(<span style="color:#9cdcfe;">col</span>, <span style="color:#b5cea8;">1.0</span>);</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">21</div><div style="flex:1;padding-left:14px;white-space:pre;">}</div></div>
+
+            <!-- HOVER TOOLTIP over fresnelTerm def (line 11) -->
+            <div style="position:absolute;left:120px;top:230px;width:326px;background:#16181c;border:1px solid #2b3037;border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,0.6);z-index:20;overflow:hidden;">
+              <div style="padding:9px 12px;border-bottom:1px solid #20242a;font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:pre-wrap;"><span style="color:#4ec9b0;">float</span> <span style="color:#dcdcaa;">fresnelTerm</span>(<span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">n</span>, <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">v</span>, <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">p</span>)</div>
+              <div style="padding:9px 12px;font-size:11.5px;line-height:1.55;color:#9aa2ac;">Schlick-style rim term. Returns <span style="font-family:'JetBrains Mono',monospace;color:#c4cad2;">pow(1 − dot(n,v), p)</span> clamped to <span style="font-family:'JetBrains Mono',monospace;color:#b5cea8;">[0,1]</span>.</div>
+              <div style="padding:7px 12px;background:#101216;border-top:1px solid #20242a;display:flex;gap:14px;font-size:10.5px;color:#565e68;"><span>defined <span style="color:#9aa2ac;">line 11</span></span><span style="color:#57a9ff;cursor:pointer;">Go to definition ⌘-click</span></div>
+            </div>
+
+            <!-- DIAGNOSTIC bubble on error line (line 17) -->
+            <div style="position:absolute;left:150px;top:388px;width:360px;background:#1a1113;border:1px solid rgba(240,85,92,0.5);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,0.6);z-index:21;overflow:hidden;">
+              <div style="padding:9px 12px;display:flex;gap:9px;">
+                <span style="color:#f0555c;font-size:12px;line-height:1.4;">✕</span>
+                <div><div style="font-size:11.5px;color:#f2b4b7;line-height:1.5;"><span style="font-family:'JetBrains Mono',monospace;color:#ff8a8f;">'u_intensty'</span> : undeclared identifier</div><div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8a5e60;margin-top:2px;">glsl · E0002 · fragment:17:8</div></div>
+              </div>
+              <div style="padding:7px 12px;background:rgba(245,177,61,0.08);border-top:1px solid rgba(240,85,92,0.25);display:flex;align-items:center;gap:8px;font-size:11px;color:#f5b13d;cursor:pointer;"><span>💡</span>Quick fix — rename to <span style="font-family:'JetBrains Mono',monospace;color:#e7c98a;">u_intensity</span></div>
+            </div>
+
+            <!-- AUTOCOMPLETE popup (anchored below line 19) -->
+            <div style="position:absolute;left:150px;top:474px;width:300px;background:#16181c;border:1px solid #2b3037;border-radius:9px;box-shadow:0 16px 40px rgba(0,0,0,0.65);z-index:22;overflow:hidden;">
+              <sc-for list="{{ completions }}" as="c" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:10px;padding:6px 11px;background:{{ c.rowBg }};border-left:2px solid {{ c.sel }};">
+                  <span style="width:16px;height:16px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;background:{{ c.kindBg }};color:{{ c.kindFg }};">{{ c.kind }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#e7eaee;">{{ c.name }}</span>
+                  <span style="flex:1;"></span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;">{{ c.type }}</span>
+                </div>
+              </sc-for>
+              <div style="padding:6px 11px;background:#101216;border-top:1px solid #20242a;font-size:10px;color:#565e68;display:flex;justify-content:space-between;"><span>uniform · in scope</span><span style="font-family:'JetBrains Mono',monospace;">↑↓ ⏎ Tab</span></div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- VERTEX -->
+        <sc-if value="{{ isVertex }}" hint-placeholder-val="{{ false }}">
+          <div style="position:relative;">
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">1</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">#version</span> <span style="color:#b5cea8;">300</span> es</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">2</div><div style="flex:1;padding-left:14px;white-space:pre;"> </div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">3</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">layout</span>(<span style="color:#9cdcfe;">location</span> = <span style="color:#b5cea8;">0</span>) <span style="color:#c586c0;">in</span> <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">a_position</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">4</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">layout</span>(<span style="color:#9cdcfe;">location</span> = <span style="color:#b5cea8;">1</span>) <span style="color:#c586c0;">in</span> <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">a_normal</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">5</div><div style="flex:1;padding-left:14px;white-space:pre;"> </div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">6</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">uniform</span> <span style="color:#4ec9b0;">mat4</span> <span style="color:#9cdcfe;">u_mvp</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">7</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">uniform</span> <span style="color:#4ec9b0;">mat4</span> <span style="color:#9cdcfe;">u_model</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">8</div><div style="flex:1;padding-left:14px;white-space:pre;"> </div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">9</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">out</span> <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">v_normal</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">10</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">out</span> <span style="color:#4ec9b0;">vec3</span> <span style="color:#9cdcfe;">v_viewDir</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">11</div><div style="flex:1;padding-left:14px;white-space:pre;"> </div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;text-align:center;color:#565e68;">▾</div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">12</div><div style="flex:1;padding-left:14px;white-space:pre;"><span style="color:#c586c0;">void</span> <span style="color:#dcdcaa;">main</span>() {</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">13</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#9cdcfe;">v_normal</span> = <span style="color:#4ec9b0;">mat3</span>(<span style="color:#9cdcfe;">u_model</span>) * <span style="color:#9cdcfe;">a_normal</span>;</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">14</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#9cdcfe;">v_viewDir</span> = <span style="color:#dcdcaa;">normalize</span>(-<span style="color:#9cdcfe;">a_position</span>);</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">15</div><div style="flex:1;padding-left:14px;white-space:pre;">  <span style="color:#9cdcfe;">gl_Position</span> = <span style="color:#9cdcfe;">u_mvp</span> * <span style="color:#4ec9b0;">vec4</span>(<span style="color:#9cdcfe;">a_position</span>, <span style="color:#b5cea8;">1.0</span>);</div></div>
+            <div style="display:flex;line-height:22px;"><div style="width:22px;flex-shrink:0;"></div><div style="width:36px;flex-shrink:0;text-align:right;padding-right:11px;color:#3c434c;">16</div><div style="flex:1;padding-left:14px;white-space:pre;">}</div></div>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- minimap -->
+      <sc-if value="{{ showMap }}" hint-placeholder-val="{{ true }}">
+        <div style="width:64px;flex-shrink:0;background:#0b0c0e;border-left:1px solid #17191e;position:relative;padding:10px 8px;overflow:hidden;">
+          <sc-for list="{{ mapLines }}" as="m" hint-placeholder-count="20">
+            <div style="height:4px;margin-bottom:3px;display:flex;gap:2px;padding-left:{{ m.indent }};">
+              <div style="height:100%;border-radius:1px;width:{{ m.w }};background:{{ m.color }};"></div>
+              <sc-if value="{{ m.err }}" hint-placeholder-val="{{ false }}"><div style="height:100%;width:8px;border-radius:1px;background:#f0555c;"></div></sc-if>
+            </div>
+          </sc-for>
+          <!-- viewport rect -->
+          <div style="position:absolute;left:4px;right:4px;top:88px;height:112px;border:1px solid #2b3037;background:rgba(61,155,255,0.05);border-radius:3px;"></div>
+        </div>
+      </sc-if>
+    </sc-if>
+  </div>
+
+  <!-- ══ status bar ══ -->
+  <div style="display:flex;align-items:center;gap:16px;height:26px;flex-shrink:0;padding:0 14px;background:#101216;border-top:1px solid #17191e;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;">
+    <span style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:#3d9bff;"></span>Fresnel · {{ stageLabel }}</span>
+    <span>{{ cursorLabel }}</span>
+    <span>GLSL ES 3.00</span>
+    <span>Spaces: 2</span>
+    <span>UTF-8</span>
+    <div style="flex:1;"></div>
+    <span style="color:#f0555c;">✕ 1</span>
+    <span style="color:#f5b13d;">⚠ 1</span>
+    <span style="color:#565e68;">recompiled 4.2ms</span>
+  </div>
+
+  <!-- ══ reference strip ══ -->
+  <div style="flex-shrink:0;height:118px;background:#0e1013;border-top:1px solid #20242a;display:flex;padding:13px 16px;gap:24px;">
+    <!-- semantic tokens -->
+    <div style="display:flex;flex-direction:column;gap:9px;">
+      <span style="font-size:9.5px;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;">Semantic tokens</span>
+      <div style="display:grid;grid-template-columns:auto auto auto;gap:7px 20px;">
+        <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="6">
+          <div style="display:flex;align-items:center;gap:8px;"><span style="width:11px;height:11px;border-radius:3px;background:{{ t.hex }};"></span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:{{ t.hex }};">{{ t.sample }}</span><span style="font-size:10.5px;color:#656d78;">{{ t.name }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="width:1px;background:#20242a;"></div>
+
+    <!-- LSP features -->
+    <div style="display:flex;flex-direction:column;gap:9px;flex:1;">
+      <span style="font-size:9.5px;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;">Language features</span>
+      <div style="display:grid;grid-template-columns:auto auto auto;gap:8px 22px;">
+        <sc-for list="{{ features }}" as="f" hint-placeholder-count="6">
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:20px;height:20px;border-radius:6px;background:#1a1d22;border:1px solid #2b3037;display:flex;align-items:center;justify-content:center;font-size:11px;color:#9aa2ac;flex-shrink:0;">{{ f.icon }}</span><span style="font-size:11.5px;color:#c4cad2;">{{ f.name }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#565e68;">{{ f.key }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:860},&quot;stage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;fragment&quot;,&quot;vertex&quot;],&quot;default&quot;:&quot;fragment&quot;,&quot;tsType&quot;:&quot;'fragment'|'vertex'&quot;,&quot;section&quot;:&quot;Editor&quot;},&quot;showMinimap&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Editor&quot;}}">
+class Component extends DCLogic {
+  state = { code: "fragment", multi: false, map: true };
+
+  renderVals() {
+    const s = this.state;
+    const frag = (this.props.stage ?? s.code) === "fragment";
+    const showMap = this.props.showMinimap ?? s.map;
+
+    const completions = [
+      { name: "u_intensity", type: "float", kind: "U", kindBg: "rgba(61,155,255,0.18)", kindFg: "#57a9ff", sel: true },
+      { name: "u_time",      type: "float", kind: "U", kindBg: "rgba(61,155,255,0.18)", kindFg: "#57a9ff", sel: false },
+      { name: "u_baseColor", type: "vec3",  kind: "U", kindBg: "rgba(61,155,255,0.18)", kindFg: "#57a9ff", sel: false },
+      { name: "u_resolution",type: "vec2",  kind: "U", kindBg: "rgba(61,155,255,0.18)", kindFg: "#57a9ff", sel: false },
+      { name: "u_mouse",     type: "vec2",  kind: "U", kindBg: "rgba(61,155,255,0.18)", kindFg: "#57a9ff", sel: false },
+    ].map(c => ({ ...c, rowBg: c.sel ? "rgba(61,155,255,0.14)" : "transparent", sel: c.sel ? "#3d9bff" : "transparent" }));
+
+    // minimap density map (fragment shader shape)
+    const mk = (w, color, indent, err) => ({ w, color, indent: indent + "px", err: !!err });
+    const G = "#2b3037", B = "#2f4a6e", V = "#3a4a5a", C = "#26302a";
+    const mapLines = frag ? [
+      mk("62%", B, 0), mk("54%", B, 0), mk("0%", G, 0), mk("70%", V, 0), mk("74%", V, 0),
+      mk("66%", V, 0), mk("46%", V, 0), mk("48%", V, 0), mk("50%", V, 0), mk("0%", G, 0),
+      mk("80%", B, 0), mk("72%", C, 8), mk("18%", G, 0), mk("0%", G, 0), mk("46%", B, 0),
+      mk("78%", V, 8), mk("40%", V, 8, true), mk("58%", V, 8), mk("60%", V, 8), mk("62%", V, 8),
+      mk("20%", G, 0),
+    ] : [
+      mk("50%", B, 0), mk("0%", G, 0), mk("78%", V, 0), mk("78%", V, 0), mk("0%", G, 0),
+      mk("48%", B, 0), mk("50%", B, 0), mk("0%", G, 0), mk("46%", B, 0), mk("48%", B, 0),
+      mk("0%", G, 0), mk("42%", B, 0), mk("70%", C, 8), mk("66%", C, 8), mk("74%", C, 8), mk("18%", G, 0),
+    ];
+
+    const tokens = [
+      { name: "keyword",  hex: "#c586c0", sample: "uniform" },
+      { name: "type",     hex: "#4ec9b0", sample: "vec3" },
+      { name: "variable", hex: "#9cdcfe", sample: "u_time" },
+      { name: "function", hex: "#dcdcaa", sample: "pow()" },
+      { name: "number",   hex: "#b5cea8", sample: "1.0" },
+      { name: "comment",  hex: "#6a737d", sample: "// note" },
+    ];
+
+    const features = [
+      { icon: "◱", name: "Autocomplete", key: "⌃Space" },
+      { icon: "ⓘ", name: "Hover docs",   key: "hover" },
+      { icon: "→", name: "Go to def",    key: "⌘-click" },
+      { icon: "⟳", name: "Rename symbol",key: "F2" },
+      { icon: "≡", name: "Find refs",    key: "⇧F12" },
+      { icon: "✕", name: "Diagnostics",  key: "inline" },
+    ];
+
+    return {
+      completions, mapLines, tokens, features,
+      isMulti: s.multi, isSingle: !s.multi,
+      isFragment: frag, isVertex: !frag,
+      showMap: showMap,
+      stageLabel: frag ? "fragment" : "vertex",
+      cursorLabel: frag ? "Ln 16, Col 24" : "Ln 15, Col 30",
+
+      selVertex: () => this.setState({ code: "vertex" }),
+      selFragment: () => this.setState({ code: "fragment" }),
+      vtxBg: frag ? "transparent" : "#0d0f12", vtxTop: frag ? "transparent" : "#3d9bff", vtxColor: frag ? "#656d78" : "#e7eaee",
+      frgBg: frag ? "#0d0f12" : "transparent", frgTop: frag ? "#3d9bff" : "transparent", frgColor: frag ? "#e7eaee" : "#656d78",
+
+      toggleMulti: () => this.setState({ multi: !s.multi }),
+      multiBg: s.multi ? "rgba(61,155,255,0.14)" : "#1a1d22",
+      multiBorder: s.multi ? "#3d9bff" : "#20242a",
+      multiColor: s.multi ? "#7dbcff" : "#9aa2ac",
+      multiDot: s.multi ? "#3d9bff" : "#565e68",
+
+      mapLabel: s.map ? "Minimap ✓" : "Minimap",
+      toggleMap: () => this.setState({ map: !s.map }),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -39,6 +39,12 @@ describe("RecoveryDialog", () => {
     expect(html).toContain('data-testid="recovery-dialog"');
   });
 
+  it("uses the shared modal-scrim/modal-card skin classes (M7-U5)", () => {
+    const html = renderToStaticMarkup(<RecoveryDialog {...baseProps} />);
+    expect(html).toContain('class="modal-scrim"');
+    expect(html).toContain('class="modal-card"');
+  });
+
   it("renders both actions with stable testids and labels", () => {
     const html = renderToStaticMarkup(<RecoveryDialog {...baseProps} />);
     expect(html).toContain('data-testid="recovery-restore"');

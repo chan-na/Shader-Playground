@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GraphNodeKind } from "../../core/graph/types";
+import { tokens } from "../../theme";
+import { categoryHexFor, NODE_CATEGORY_OF } from "./nodeTheme";
 import { minimapColorFor, NODE_TYPES, NODE_UI } from "./nodeUiRegistry";
 
 const ALL_KINDS: GraphNodeKind[] = [
@@ -32,6 +34,15 @@ describe("NODE_UI registry", () => {
     }
   });
 
+  it("minimapColor is derived from the node category (tokens.nodeCategory 5색)", () => {
+    for (const kind of ALL_KINDS) {
+      expect(NODE_UI[kind].minimapColor).toBe(categoryHexFor(kind));
+      expect(NODE_UI[kind].minimapColor).toBe(
+        tokens.nodeCategory[NODE_CATEGORY_OF[kind]],
+      );
+    }
+  });
+
   it("NODE_TYPES is derived from NODE_UI (same component references)", () => {
     for (const kind of ALL_KINDS) {
       expect(NODE_TYPES[kind]).toBe(NODE_UI[kind].view);
@@ -46,8 +57,8 @@ describe("minimapColorFor", () => {
   });
 
   it("falls back for unknown / undefined kinds", () => {
-    expect(minimapColorFor(undefined)).toBe("#888888");
-    expect(minimapColorFor("not-a-real-kind")).toBe("#888888");
-    expect(minimapColorFor("")).toBe("#888888");
+    expect(minimapColorFor(undefined)).toBe(tokens.text.muted);
+    expect(minimapColorFor("not-a-real-kind")).toBe(tokens.text.muted);
+    expect(minimapColorFor("")).toBe(tokens.text.muted);
   });
 });

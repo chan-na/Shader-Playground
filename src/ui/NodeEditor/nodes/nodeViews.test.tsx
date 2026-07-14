@@ -142,9 +142,13 @@ describe("ComputeNodeView", () => {
     };
     const html = renderInFlow(<ComputeNodeView {...mockProps("c1", node)} />);
     expect(html).toContain("Compute");
+    // Body is now a key-value row list (design/Node Editor.dc.html L221-225):
+    // label(primitive/verts/attrs) + value, instead of a composite string.
     expect(html).toContain("POINTS");
+    expect(html).toContain("verts");
     expect(html).toContain("1,024");
-    expect(html).toContain("1 attr");
+    expect(html).toContain("attrs");
+    expect(html).toMatch(/attrs<\/span><span[^>]*>1<\/span>/);
     expect(html).toContain("handle-mesh");
     // Output port label is always emitted.
     expect(html).toContain(">mesh<");

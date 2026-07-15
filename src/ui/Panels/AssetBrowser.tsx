@@ -103,7 +103,7 @@ export function AssetBrowser() {
     meshList.length + imageList.length + videoList.length + audioList.length;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the Import button below
+    // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the assets-dropzone button below (opens the same file picker)
     <div
       className="panel-body"
       style={{ overflowY: "auto" }}

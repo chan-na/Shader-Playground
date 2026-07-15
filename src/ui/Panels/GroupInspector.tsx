@@ -132,7 +132,7 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
             padding: 8,
             background: withAlpha(tokens.semantic.error, 0.08),
             border: `1px solid ${withAlpha(tokens.semantic.error, 0.25)}`,
-            borderRadius: 7,
+            borderRadius: tokens.radius.button,
             color: "var(--text-primary)",
             fontSize: 12,
           }}

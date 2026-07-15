@@ -30,7 +30,7 @@ export function GpuTimerChip({ nodeId }: Props) {
         fontSize: 9,
         fontWeight: 600,
         color: "var(--warning)",
-        background: withAlpha("#000000", 0.5),
+        background: tokens.overlay.scrim,
         border: `1px solid ${withAlpha(tokens.semantic.warning, 0.35)}`,
         borderRadius: tokens.radius.iconBox,
         padding: "1px 5px",

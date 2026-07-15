@@ -13,7 +13,7 @@ const baseStyle: CSSProperties = {
   alignItems: "center",
   gap: 7,
   padding: "8px 10px",
-  borderRadius: 7,
+  borderRadius: tokens.radius.button,
   fontSize: 11,
 };
 

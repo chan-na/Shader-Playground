@@ -1,11 +1,9 @@
 /**
  * RGB (0..1 float, e.g. shader uniform color) <-> hex string conversions
  * shared by the controls library. Same clamp/rounding semantics as the
- * private copies in src/ui/NodeEditor/nodes/ValueInput.tsx,
- * src/ui/Panels/ParamInspector.tsx and src/ui/Panels/ViewportControls.tsx
- * (out-of-range channels clamp to [0,1], missing channels read as 0) —
- * consolidated here for ColorField in M5-U1. The other three call sites
- * keep their own copies until M5-U3 folds them onto this module too.
+ * private copy in src/ui/NodeEditor/nodes/ValueInput.tsx (out-of-range
+ * channels clamp to [0,1], missing channels read as 0) — consolidated
+ * here for ColorField in M5-U1; ValueInput keeps its own copy.
  */
 export function rgbToHex(rgb: readonly number[]): string {
   const c = (x: number | undefined) =>

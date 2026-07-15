@@ -31,6 +31,7 @@ describe("StatusPill", () => {
       `1px solid ${withAlpha(tokens.semantic.success, 0.25)}`,
     );
     expect(root.style.color).toBe("var(--success)");
+    expect(root.style.borderRadius).toBe(`${tokens.radius.button}px`);
   });
 
   it("error tone uses tokens.semantic.error for the alpha-blended bg/border", () => {

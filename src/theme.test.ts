@@ -136,6 +136,18 @@ describe("색 토큰 hex 형식", () => {
   });
 });
 
+describe("overlay 토큰", () => {
+  it("gridDot이 화이트 채널 rgba(255,255,255,0.045)와 일치한다", () => {
+    expect(tokens.overlay.gridDot).toMatch(
+      /^rgba\(255,\s*255,\s*255,\s*0?\.045\)$/,
+    );
+  });
+
+  it("scrim이 블랙 채널 rgba(0,0,0,0.5)와 일치한다", () => {
+    expect(tokens.overlay.scrim).toMatch(/^rgba\(0,\s*0,\s*0,\s*0?\.5\)$/);
+  });
+});
+
 describe("withAlpha", () => {
   /** rgba(r, g, b, a) 문자열의 r/g/b 채널을 다시 "#rrggbb"로 재조립한다. */
   function rgbaToHex(rgba: string): string {

@@ -23,7 +23,7 @@ export function ShaderNodeView({ id, data }: NodeProps) {
   return (
     <div
       className={`node-card${errorCount > 0 ? " node-card--error" : ""}`}
-      style={{ position: "relative", minWidth: 180 }}
+      style={{ position: "relative", minWidth: 196 }}
     >
       <NodeCardHeader
         kind="shader"
@@ -38,11 +38,13 @@ export function ShaderNodeView({ id, data }: NodeProps) {
           )
         }
       />
-      <div
-        className="node-card__body"
-        style={{ paddingLeft: 22, paddingRight: 22 }}
-      >
-        <NodeThumbnail nodeId={id} />
+      <div className="node-card__body" style={{ padding: "9px 0" }}>
+        {/* Thumbnail insets by the 46px port rail on both sides so the live
+         * preview never overlaps the rail labels (design/Node Editor.dc.html
+         * L188: `margin:0 46px;height:96px`). */}
+        <div style={{ margin: "0 46px" }}>
+          <NodeThumbnail nodeId={id} width="100%" height={96} />
+        </div>
       </div>
       {inputs.map((p, i) => (
         <PortHandle

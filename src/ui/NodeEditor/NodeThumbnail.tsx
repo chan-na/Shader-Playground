@@ -5,8 +5,8 @@ import { tokens } from "../../theme";
 
 export interface NodeThumbnailProps {
   nodeId: string;
-  width?: number;
-  height?: number;
+  width?: number | string;
+  height?: number | string;
 }
 
 export function NodeThumbnail({

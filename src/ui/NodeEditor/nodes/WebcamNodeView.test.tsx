@@ -72,4 +72,29 @@ describe("WebcamNodeView — permission states (M7-U3)", () => {
     );
     expect(screen.queryByText("no signal")).toBeNull();
   });
+
+  it("renders the letterbox + lens ring once ready (no raw #000 background)", async () => {
+    const stream = {
+      getTracks: () => [{ stop: () => {} }],
+    } as unknown as MediaStream;
+    __setGetUserMediaForTests(() => Promise.resolve(stream));
+    reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
+    const node: WebcamGraphNode = { id: "w1", kind: "webcam" };
+
+    renderInFlow(<WebcamNodeView {...mockProps("w1", node)} />);
+
+    const lens = await waitFor(
+      () => {
+        const el = screen.getByTestId("webcam-lens");
+        expect(el).not.toBeNull();
+        return el;
+      },
+      { timeout: 3000 },
+    );
+
+    const letterbox = lens.parentElement as HTMLElement;
+    expect(letterbox.style.background).toContain("var(--surface-letterbox)");
+    const video = letterbox.querySelector("video") as HTMLVideoElement;
+    expect(video.style.background).toBe("");
+  });
 });

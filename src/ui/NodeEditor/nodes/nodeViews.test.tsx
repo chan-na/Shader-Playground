@@ -13,6 +13,7 @@ import type {
   ShaderGraphNode,
   SwizzleGraphNode,
 } from "../../../core/graph/types";
+import { tokens } from "../../../theme";
 import { ComputeNodeView } from "./ComputeNodeView";
 import { ImageNodeView } from "./ImageNodeView";
 import { MeshNodeView } from "./MeshNodeView";
@@ -99,6 +100,10 @@ describe("ShaderNodeView", () => {
     expect(html).toContain("node-card__port-label--out");
     expect(html).toContain(">mesh<");
     expect(html).toContain(">texture<");
+    // Thumbnail insets by the 46px port rail on both sides [D2/B5].
+    expect(html).toContain("margin:0 46px");
+    // Rail label color = port type family, not a static text token [D2].
+    expect(html).toContain(`color:${tokens.portFamily.resource}`);
   });
 
   it("surfaces float uniforms as input handles", () => {
@@ -202,9 +207,11 @@ describe("OutputNodeView", () => {
     const node: GraphNode = { id: "o1", kind: "output" };
     const html = renderInFlow(<OutputNodeView {...mockProps("o1", node)} />);
     expect(html).toContain("Output");
-    expect(html).toContain("→ Canvas");
+    expect(html).toContain("→ viewport");
     expect(html).toContain("handle-texture");
+    // Rail input label (texture) and body meta (→ viewport) coexist [D2].
     expect(html).toContain(">texture<");
+    expect(html).toContain(`color:${tokens.portFamily.resource}`);
   });
 
   it("renders the custom name as the title when set [D15]", () => {

@@ -25,11 +25,6 @@ interface PortHandleProps {
   port: PortSpec;
   side: "in" | "out";
   top: number;
-  /** Hide the textual label and render just the bare pin (used for nodes
-   * whose header already conveys the port role unambiguously, e.g. a
-   * sole "→ Canvas" Output). Defaults to false so every multi-port view
-   * gets a label without needing to opt in. */
-  hideLabel?: boolean;
   /** Fade the pin to `outOpacity: 0.4` (design/System States.dc.html L483) —
    * used by Webcam/Audio node views on their output port while the source is
    * pending/denied permission, since nothing is flowing through it yet. */
@@ -40,14 +35,14 @@ interface PortHandleProps {
  * Handle + textual label aligned to the same vertical offset. The label uses
  * the raw PortSpec.name (e.g. `mesh`, `u_intensity`, `a`) so it maps 1:1 to
  * the underlying uniform/identifier — long names are clamped via CSS ellipsis.
+ *
+ * Rail rules [D2] (design/Node Editor.dc.html L190-195): the label always
+ * renders in the card's left/right port rail (~46px), colored by the port's
+ * type family (`fam`, not a static token — see theme.ts §portFamily), never
+ * hidden — every port gets a label so the data type is legible without
+ * relying solely on the header color.
  */
-export function PortHandle({
-  port,
-  side,
-  top,
-  hideLabel,
-  dimmed,
-}: PortHandleProps) {
+export function PortHandle({ port, side, top, dimmed }: PortHandleProps) {
   const isIn = side === "in";
   const fam = portFamilyHex(port.type);
   const nodeId = useNodeId();
@@ -130,14 +125,20 @@ export function PortHandle({
           }}
         />
       )}
-      {hideLabel ? null : (
-        <span
-          className={`node-card__port-label node-card__port-label--${isIn ? "in" : "out"}`}
-          style={{ top }}
-        >
-          {port.name}
-        </span>
-      )}
+      <span
+        className={`node-card__port-label node-card__port-label--${isIn ? "in" : "out"}`}
+        style={{
+          top,
+          color: fam,
+          // Same single dim value as the pin above (0.4) — design/Node
+          // Editor.dc.html L217's error-card label opacity (0.55) and the
+          // pin's dim opacity are unified to one magic number rather than
+          // introducing a second one for the label alone.
+          ...(dimmed || mode === "incompat" ? { opacity: 0.4 } : null),
+        }}
+      >
+        {port.name}
+      </span>
     </>
   );
 }

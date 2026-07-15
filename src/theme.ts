@@ -208,6 +208,9 @@ export function cssVars(): string {
     ...Object.entries(t.surface).map(
       ([k, v]) => `--surface-${kebab(k)}: ${v};`,
     ),
+    ...Object.entries(t.gradient).map(
+      ([k, v]) => `--gradient-${kebab(k)}: ${v};`,
+    ),
     ...Object.entries(t.border).map(([k, v]) => `--border-${kebab(k)}: ${v};`),
     ...Object.entries(t.accent).map(([k, v]) => `--accent-${kebab(k)}: ${v};`),
     ...Object.entries(t.text).map(([k, v]) => `--text-${kebab(k)}: ${v};`),

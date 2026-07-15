@@ -45,6 +45,15 @@ describe("cssVars", () => {
     }
   });
 
+  it("gradient 그룹이 --gradient-<kebab> 변수로 방출된다", () => {
+    expect(css).toContain(
+      `--gradient-empty-state: ${tokens.gradient.emptyState};`,
+    );
+    for (const [k, v] of Object.entries(tokens.gradient)) {
+      expect(css).toContain(`--gradient-${kebab(k)}: ${v};`);
+    }
+  });
+
   it.each(
     colorGroups,
   )("$name 그룹의 모든 키가 $prefix<kebab> 변수로 방출된다", ({

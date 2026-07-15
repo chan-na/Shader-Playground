@@ -7,15 +7,18 @@ import { tokens, withAlpha } from "../../theme";
  * (design/Viewport.dc.html L120 + L268/L284 `cycleSpeed`). */
 const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 
+/** 컴팩트 변형의 FOV 탭 순환 프리셋 (deg) — design/Viewport.dc.html L310 [D3]. */
+const FOV_PRESETS = [35, 55, 75, 90] as const;
+
 /**
- * Index of the SPEEDS entry closest to `speed`. A plain `indexOf` would miss
- * whenever the store's speed doesn't exactly equal one of the presets, so we
- * fall back to nearest-match by absolute distance.
+ * Index of the `values` entry closest to `target`. A plain `indexOf` would
+ * miss whenever the store's value doesn't exactly equal one of the presets,
+ * so we fall back to nearest-match by absolute distance.
  */
-function nearestSpeedIndex(speed: number): number {
-  return SPEEDS.reduce<{ idx: number; diff: number }>(
-    (best, s, i) => {
-      const diff = Math.abs(s - speed);
+function nearestIndex(values: readonly number[], target: number): number {
+  return values.reduce<{ idx: number; diff: number }>(
+    (best, v, i) => {
+      const diff = Math.abs(v - target);
       return diff < best.diff ? { idx: i, diff } : best;
     },
     { idx: 0, diff: Number.POSITIVE_INFINITY },
@@ -24,9 +27,22 @@ function nearestSpeedIndex(speed: number): number {
 
 /** The preset that follows `speed`'s nearest match, wrapping around. */
 function nextSpeed(speed: number): number {
-  const idx = nearestSpeedIndex(speed);
+  const idx = nearestIndex(SPEEDS, speed);
   const candidate = SPEEDS[(idx + 1) % SPEEDS.length];
   return candidate ?? SPEEDS[0];
+}
+
+/**
+ * The FOV preset that follows `fovDeg`'s nearest match, wrapping around
+ * (dc's `stepFov` uses a plain `indexOf`, which resolves to -1 — and then
+ * wraps to the *last* preset — whenever the camera's FOV isn't exactly one
+ * of the four taps; nearest-match keeps the cycle well-defined from any
+ * FOV the full-variant slider left behind).
+ */
+function nextFovDeg(fovDeg: number): number {
+  const idx = nearestIndex(FOV_PRESETS, fovDeg);
+  const candidate = FOV_PRESETS[(idx + 1) % FOV_PRESETS.length];
+  return candidate ?? FOV_PRESETS[0];
 }
 
 /**
@@ -45,6 +61,15 @@ function nextSpeed(speed: number): number {
  * condition CompileErrorOverlay/EmptyState already use for their own mount
  * makes the two mutually exclusive by construction rather than by
  * z-index arithmetic.
+ *
+ * Renders a single DOM tree that covers both the full (design/Viewport.dc.html
+ * L108-136) and compact (L141-152, [D3]) transport bar variants — the switch
+ * between them is a `@container vp-body (max-width: 700px)` query in
+ * index.css, not a second JSX branch, so there's exactly one set of
+ * testid/state hooks regardless of panel width. The compact variant hides
+ * the scrub + FOV sliders and the u_time/Reset-camera text labels, and swaps
+ * in the `camera-fov-step` stepper button (cycling `FOV_PRESETS`) in place of
+ * the FOV slider — same store wiring, just a narrower rendering of it.
  */
 export function TransportBar() {
   const panes = useRendererStore((s) => s.panes);
@@ -71,20 +96,20 @@ export function TransportBar() {
     >
       <button
         type="button"
+        className="vp-transport-reset-time"
+        onClick={() => resetTime()}
+        title="Reset time"
+      >
+        ⏮
+      </button>
+      <button
+        type="button"
         className="vp-transport-play"
         onClick={() => setPlaying(!playing)}
         title={playing ? "Pause (Space)" : "Play (Space)"}
         data-testid="time-playpause"
       >
         {playing ? "‖" : "▶"}
-      </button>
-      <button
-        type="button"
-        className="vp-transport-reset-time"
-        onClick={() => resetTime()}
-        title="Reset time"
-      >
-        ⏮
       </button>
       <div className="vp-transport-time">
         <span className="vp-transport-label">u_time</span>
@@ -128,11 +153,23 @@ export function TransportBar() {
       </div>
       <button
         type="button"
+        className="vp-transport-fov-step"
+        onClick={() =>
+          setCamera({ ...camera, fov: (nextFovDeg(fovDeg) * Math.PI) / 180 })
+        }
+        title="Cycle FOV preset"
+        data-testid="camera-fov-step"
+      >
+        {`FOV ${fovDeg.toFixed(0)}°`}
+      </button>
+      <button
+        type="button"
         className="vp-transport-reset-cam"
         onClick={() => resetCamera()}
         title="Reset camera"
       >
-        ⟲ Reset
+        <span aria-hidden="true">⟲</span>
+        <span className="vp-transport-reset-cam-text">Reset</span>
       </button>
     </div>
   );

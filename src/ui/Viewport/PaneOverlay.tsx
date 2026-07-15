@@ -1,8 +1,10 @@
 import { splitLayout } from "../../core/graph/execute";
+import { displayNodeName, NODE_META } from "../../core/nodes/registry";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
+import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { tokens, withAlpha } from "../../theme";
-import { dividerCssRects, paneCssRects } from "./paneLayout";
+import { bottomRowFlags, dividerCssRects, paneCssRects } from "./paneLayout";
 
 /**
  * DOM overlay for the Output pane composite grid: 1px divider seams +
@@ -21,12 +23,14 @@ export function PaneOverlay() {
   const byNode = useGpuTimerStore((s) => s.byNode);
   const gpuEnabled = useGpuTimerStore((s) => s.enabled);
   const gpuSupported = useGpuTimerStore((s) => s.supported);
+  const nodes = useGraphStore((s) => s.nodes);
 
   if (panes.length === 0) return null;
 
   const rects = paneCssRects(panes.length);
   const cells = splitLayout(panes.length, canvasSize.width, canvasSize.height);
   const dividers = dividerCssRects(panes.length);
+  const bottoms = bottomRowFlags(panes.length);
 
   return (
     <div className="vp-overlay">
@@ -35,10 +39,21 @@ export function PaneOverlay() {
         const cell = cells[i];
         if (!rect || !cell) return null;
         const ms = byNode[pane.sourceNodeId];
+        const outputNode = nodes.find((n) => n.id === pane.outputNodeId);
+        const display = outputNode ? displayNodeName(outputNode) : null;
+        // [D15] dc L247 "Output · main" — 사용자 지정 이름만 접미로 노출한다.
+        // displayNodeName의 폴백(NODE_META.output.label "Output")이 그대로
+        // 오면 접미를 생략해 "Output · Output" 중복을 피한다 (미지정 노드
+        // 폴백 표기: "Output" 단독 — A/B/C/D 칩이 이미 pane을 구분한다.
+        // 잠정 결정, followup 참조).
+        const paneName =
+          display && display !== NODE_META.output.label
+            ? `Output · ${display}`
+            : "Output";
         return (
           <div
             key={pane.outputNodeId}
-            className="vp-pane"
+            className={`vp-pane${bottoms[i] ? " vp-pane--bottom" : ""}`}
             style={{
               left: rect.left,
               top: rect.top,
@@ -66,7 +81,7 @@ export function PaneOverlay() {
                   textShadow: "var(--shadow-on-canvas-text)",
                 }}
               >
-                {`Output · ${pane.outputNodeId}`}
+                {paneName}
               </span>
             </div>
             {gpuEnabled && gpuSupported && ms !== undefined && (

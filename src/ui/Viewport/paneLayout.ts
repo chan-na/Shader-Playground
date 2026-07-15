@@ -52,6 +52,16 @@ const VERTICAL_TOP_HALF: CssRect = {
 };
 
 /**
+ * 각 pane이 뷰포트 하단 행에 닿는지 여부 [D3]. splitLayout은 GL 좌표(y-up,
+ * 원점 좌하단)이므로 y === 0 이 곧 컨테이너 하단 접촉이다. 컴팩트 트랜스포트
+ * 바(≤700px)가 하단 캡션을 덮지 않도록 PaneOverlay가 이 플래그로 오프셋
+ * 클래스를 단다.
+ */
+export function bottomRowFlags(n: number): boolean[] {
+  return splitLayout(n, LAYOUT_UNITS, LAYOUT_UNITS).map((c) => c.y === 0);
+}
+
+/**
  * 1px divider seam rectangles overlaid on the pane grid (design/Viewport.dc.html
  * L67: grid `gap:1px` / `background:#17191e` — border.headerDivider). One
  * rect per seam; `PaneOverlay` paints each with `var(--border-header-divider)`.

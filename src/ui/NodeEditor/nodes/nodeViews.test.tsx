@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import type {
   CombineGraphNode,
   ComputeGraphNode,
+  GraphNode,
   ImageGraphNode,
   MathGraphNode,
   MeshGraphNode,
@@ -127,6 +128,31 @@ describe("ShaderNodeView", () => {
       2,
     );
   });
+
+  it("renders the user-set name as the title instead of the kind label [D15]", () => {
+    const node: ShaderGraphNode = {
+      id: "s1",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "",
+      uniformValues: {},
+      name: "Fresnel Glow",
+    };
+    const html = renderInFlow(<ShaderNodeView {...mockProps("s1", node)} />);
+    expect(html).toContain("Fresnel Glow");
+  });
+
+  it("does not render the internal node id anywhere in the card [D15]", () => {
+    const node: ShaderGraphNode = {
+      id: "s1",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "",
+      uniformValues: {},
+    };
+    const html = renderInFlow(<ShaderNodeView {...mockProps("s1", node)} />);
+    expect(html).not.toContain("s1");
+  });
 });
 
 describe("ComputeNodeView", () => {
@@ -173,11 +199,18 @@ describe("ComputeNodeView", () => {
 
 describe("OutputNodeView", () => {
   it("renders the static Output card with a single target handle", () => {
-    const html = renderInFlow(<OutputNodeView />);
+    const node: GraphNode = { id: "o1", kind: "output" };
+    const html = renderInFlow(<OutputNodeView {...mockProps("o1", node)} />);
     expect(html).toContain("Output");
     expect(html).toContain("→ Canvas");
     expect(html).toContain("handle-texture");
     expect(html).toContain(">texture<");
+  });
+
+  it("renders the custom name as the title when set [D15]", () => {
+    const node: GraphNode = { id: "o1", kind: "output", name: "Main Output" };
+    const html = renderInFlow(<OutputNodeView {...mockProps("o1", node)} />);
+    expect(html).toContain("Main Output");
   });
 });
 
@@ -190,7 +223,9 @@ describe("ParamNodeView", () => {
       value: 0.42,
     };
     const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
-    expect(html).toContain("Param");
+    // Unnamed param falls back to NODE_META.param.label ("Parameter"), not
+    // the legacy hardcoded "Param" string [D15].
+    expect(html).toContain("Parameter");
     expect(html).toContain("float");
     // Inline numeric input must surface the canonical formatted value.
     expect(html).toContain('value="0.420"');
@@ -237,6 +272,31 @@ describe("ParamNodeView", () => {
     const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
     expect(html).toContain("Intensity");
   });
+
+  it("prefers the user-set name over the legacy label [D15]", () => {
+    const node: ParamGraphNode = {
+      id: "p1",
+      kind: "param",
+      paramKind: "float",
+      value: 1,
+      name: "Wave Speed",
+      label: "Intensity",
+    };
+    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
+    expect(html).toContain("Wave Speed");
+    expect(html).not.toContain(">Intensity<");
+  });
+
+  it("does not render the internal node id anywhere in the card [D15]", () => {
+    const node: ParamGraphNode = {
+      id: "p1",
+      kind: "param",
+      paramKind: "float",
+      value: 0.42,
+    };
+    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
+    expect(html).not.toContain("p1");
+  });
 });
 
 describe("MathNodeView", () => {
@@ -274,6 +334,18 @@ describe("MathNodeView", () => {
     expect(html).toContain('value="1.000"');
     expect(html).toContain('value="2.000"');
     expect(html).toContain(">value<");
+  });
+
+  it("does not render the internal node id anywhere in the card [D15]", () => {
+    const node: MathGraphNode = {
+      id: "m1",
+      kind: "math",
+      op: "add",
+      a: 1,
+      b: 2,
+    };
+    const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
+    expect(html).not.toContain("m1");
   });
 });
 
@@ -325,5 +397,16 @@ describe("CombineNodeView", () => {
     expect(html).toContain(">w<");
     expect(html).toContain('value="0.400"');
     expect(html).toContain("handle-vec4");
+  });
+
+  it("does not render the internal node id anywhere in the card [D15]", () => {
+    const node: CombineGraphNode = {
+      id: "cb1",
+      kind: "combine",
+      arity: 2,
+      values: [0.1, 0.2, 0, 0],
+    };
+    const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
+    expect(html).not.toContain("cb1");
   });
 });

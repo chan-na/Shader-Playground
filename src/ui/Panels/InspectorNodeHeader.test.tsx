@@ -53,14 +53,27 @@ describe("InspectorNodeHeader", () => {
       hexToRgbString(tokens.nodeCategory.process),
     );
 
-    expect(screen.getByTestId("insp-node-title").textContent).toBe("shader");
-    expect(screen.getByText("process · s1")).not.toBeNull();
+    // No `name` set → displayNodeName() falls back to NODE_META.shader.label
+    // (D15) — no longer the raw lowercase `node.kind`.
+    expect(screen.getByTestId("insp-node-title").textContent).toBe("Shader");
+    expect(screen.getByText("process · shader")).not.toBeNull();
   });
 
   it("shows the node's label as the title for a param node", () => {
     render(<InspectorNodeHeader node={paramNode} />);
     expect(screen.getByTestId("insp-node-title").textContent).toBe("Accent");
-    expect(screen.getByText("value · p1 · kind color")).not.toBeNull();
+    expect(screen.getByText("value · param · kind color")).not.toBeNull();
+  });
+
+  it("prefers the user-set name over the label/kind fallback", () => {
+    render(<InspectorNodeHeader node={{ ...shaderNode, name: "My Pass" }} />);
+    expect(screen.getByTestId("insp-node-title").textContent).toBe("My Pass");
+  });
+
+  it("never exposes the internal node id in the meta text", () => {
+    render(<InspectorNodeHeader node={shaderNode} />);
+    const meta = screen.getByText("process · shader");
+    expect(meta.textContent).not.toContain("s1");
   });
 
   it("shows the type chip with the node kind", () => {

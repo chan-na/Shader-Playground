@@ -6,6 +6,7 @@ import {
   getExternalStatus,
 } from "../../../core/external/registry";
 import type { AudioGraphNode } from "../../../core/graph/types";
+import { displayNodeName } from "../../../core/nodes/registry";
 import { useAssetStore } from "../../../state/assetStore";
 import { BlockedBadge } from "./BlockedBadge";
 import { NodeCardHeader } from "./NodeCardHeader";
@@ -68,7 +69,8 @@ export function AudioNodeView({ id, data }: NodeProps) {
     >
       <NodeCardHeader
         kind="audio"
-        title="Audio"
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={isBlocked ? <BlockedBadge nodeId={id} /> : undefined}
       />
       <div className="node-card__body" style={{ paddingRight: 22 }}>

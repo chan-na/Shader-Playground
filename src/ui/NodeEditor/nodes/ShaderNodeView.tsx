@@ -1,7 +1,7 @@
 import type { NodeProps } from "@xyflow/react";
 import { useMemo } from "react";
 import type { ShaderGraphNode } from "../../../core/graph/types";
-import { NODE_META } from "../../../core/nodes/registry";
+import { displayNodeName, NODE_META } from "../../../core/nodes/registry";
 import { useDiagnosticsStore } from "../../../state/diagnosticsStore";
 import { NodeThumbnail } from "../NodeThumbnail";
 import { countNodeDiagnostics, ErrorBadge } from "./ErrorBadge";
@@ -27,7 +27,8 @@ export function ShaderNodeView({ id, data }: NodeProps) {
     >
       <NodeCardHeader
         kind="shader"
-        title="Shader"
+        title={displayNodeName(node)}
+        nodeId={id}
         {...(errorCount > 0 ? { tone: "error" as const } : {})}
         meta={
           errorCount > 0 ? (
@@ -42,7 +43,6 @@ export function ShaderNodeView({ id, data }: NodeProps) {
         style={{ paddingLeft: 22, paddingRight: 22 }}
       >
         <NodeThumbnail nodeId={id} />
-        <div className="node-card__meta">{id}</div>
       </div>
       {inputs.map((p, i) => (
         <PortHandle

@@ -12,9 +12,9 @@ describe("MultiSelectBanner", () => {
       <MultiSelectBanner
         count={3}
         chips={[
-          { id: "shader-1", hasError: false },
-          { id: "shader-2", hasError: false },
-          { id: "compute-1", hasError: false },
+          { id: "shader-1", label: "Fresnel", hasError: false },
+          { id: "shader-2", label: "Blend", hasError: false },
+          { id: "compute-1", label: "Particles", hasError: false },
         ]}
       />,
     );
@@ -22,15 +22,16 @@ describe("MultiSelectBanner", () => {
     expect(screen.getByText("3 nodes selected")).not.toBeNull();
   });
 
-  it("renders one chip per entry, each showing the node id", () => {
+  it("renders one chip per entry showing the display-name label, not the raw id", () => {
     const chips = [
-      { id: "shader-1", hasError: false },
-      { id: "shader-2", hasError: false },
-      { id: "compute-1", hasError: false },
+      { id: "shader-1", label: "Fresnel", hasError: false },
+      { id: "shader-2", label: "Blend", hasError: false },
+      { id: "compute-1", label: "Particles", hasError: false },
     ];
     render(<MultiSelectBanner count={chips.length} chips={chips} />);
     for (const chip of chips) {
-      expect(screen.getByText(chip.id)).not.toBeNull();
+      expect(screen.getByText(chip.label)).not.toBeNull();
+      expect(screen.queryByText(chip.id)).toBeNull();
     }
   });
 
@@ -39,14 +40,14 @@ describe("MultiSelectBanner", () => {
       <MultiSelectBanner
         count={2}
         chips={[
-          { id: "shader-ok", hasError: false },
-          { id: "shader-broken", hasError: true },
+          { id: "shader-ok", label: "OK Pass", hasError: false },
+          { id: "shader-broken", label: "Broken Pass", hasError: true },
         ]}
       />,
     );
     const errorDots = screen.getAllByLabelText("has errors");
     expect(errorDots).toHaveLength(1);
-    expect(errorDots[0]?.parentElement?.textContent).toContain("shader-broken");
+    expect(errorDots[0]?.parentElement?.textContent).toContain("Broken Pass");
   });
 
   it("shows the single-node guidance copy", () => {

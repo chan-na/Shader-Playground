@@ -29,6 +29,43 @@ describe("sanitizeGraphNode — base shape", () => {
   });
 });
 
+describe("sanitizeGraphNode — name [D15]", () => {
+  it("accepts and trims a string name", () => {
+    const r = sanitizeGraphNode({ id: "n1", kind: "output", name: "  Hero  " });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.node.name).toBe("Hero");
+  });
+
+  it("clamps a name longer than MAX_NODE_NAME_LEN", () => {
+    const r = sanitizeGraphNode({
+      id: "n1",
+      kind: "output",
+      name: "x".repeat(SANITIZE_LIMITS.MAX_NODE_NAME_LEN + 50),
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok)
+      expect(r.node.name).toHaveLength(SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
+  });
+
+  it("drops a non-string name rather than coercing it", () => {
+    const r = sanitizeGraphNode({ id: "n1", kind: "output", name: 42 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.node.name).toBeUndefined();
+  });
+
+  it("leaves name unset for a legacy payload without one", () => {
+    const r = sanitizeGraphNode({ id: "n1", kind: "output" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("name" in r.node).toBe(false);
+  });
+
+  it("drops a name that is only whitespace", () => {
+    const r = sanitizeGraphNode({ id: "n1", kind: "output", name: "   " });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.node.name).toBeUndefined();
+  });
+});
+
 describe("sanitizeGraphNode — mesh / image", () => {
   it("falls back to 'cube' for unknown primitives", () => {
     const r = sanitizeGraphNode({

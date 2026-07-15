@@ -1,4 +1,5 @@
 import type { GraphNode } from "../../core/graph/types";
+import { displayNodeName } from "../../core/nodes/registry";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { tokens, withAlpha } from "../../theme";
 import {
@@ -13,8 +14,8 @@ export interface InspectorNodeHeaderProps {
 
 /**
  * Common Inspector header shared by every node kind (design/Side Panel.dc.html
- * L60-72): icon box + title, category/id meta line, and a chip row (GPU ms +
- * kind). The design also shows an 84×84 render thumbnail to the left of the
+ * L60-72): icon box + title, category/kind meta line, and a chip row (GPU ms
+ * + kind). The design also shows an 84×84 render thumbnail to the left of the
  * title — deliberately omitted here: `ThumbnailScheduler` (see
  * design-refactor notes §4) only supports a single subscriber per node, and
  * the node card already scrolled into the graph view owns that slot. A second
@@ -27,12 +28,12 @@ export function InspectorNodeHeader({ node }: InspectorNodeHeaderProps) {
   const ms = useGpuTimerStore((s) => s.byNode[node.id]);
 
   const cat = categoryHexFor(node.kind);
-  const title =
-    (node.kind === "param" || node.kind === "group") && node.label
-      ? node.label
-      : node.kind;
+  const title = displayNodeName(node);
 
-  let meta = `${NODE_CATEGORY_OF[node.kind]} · ${node.id}`;
+  // No node.id here [D15] — the internal id is an implementation detail,
+  // not a user-facing label. `insp-gpu-ms-${node.id}` below is a
+  // data-testid (a test hook), not display text, so it's unaffected.
+  let meta = `${NODE_CATEGORY_OF[node.kind]} · ${node.kind}`;
   if (node.kind === "mesh") meta += ` · primitive ${node.primitive}`;
   if (node.kind === "param") meta += ` · kind ${node.paramKind}`;
 

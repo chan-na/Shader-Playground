@@ -49,6 +49,7 @@ export const SANITIZE_LIMITS = {
   MAX_UNIFORM_KEYS: 64,
   MAX_UNIFORM_KEY_LEN: 128,
   MAX_UNIFORM_ARRAY_LEN: 16,
+  MAX_NODE_NAME_LEN: 256,
   MAX_PARAM_LABEL_LEN: 256,
   MAX_SWIZZLE_LEN: 4,
   MAX_DEVICE_ID_LEN: 256,
@@ -398,7 +399,14 @@ export function sanitizeGraphNode(raw: unknown): SanitizeResult {
     return { ok: false, error: "node missing id" };
   }
   try {
-    return { ok: true, node: buildNode(obj, id) };
+    const node = buildNode(obj, id);
+    if (typeof obj.name === "string") {
+      const trimmed = obj.name
+        .trim()
+        .slice(0, SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
+      if (trimmed !== "") node.name = trimmed;
+    }
+    return { ok: true, node };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "invalid" };
   }

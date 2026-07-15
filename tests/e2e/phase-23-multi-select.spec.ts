@@ -120,6 +120,13 @@ test.describe("Phase 23 — multi-selection editing", () => {
     await withSp(page, (sp) => sp.selection.getState().select("s1"), null);
     await expect(page.getByTestId("multi-select-banner")).toHaveCount(0);
 
+    // Rename s1 through the real Inspector Name field (UI path, D15) so the
+    // banner's "· editing <name>" fragment has a display name to assert on
+    // that provably differs from the raw id.
+    const nameInput = page.getByTestId("node-name-input");
+    await nameInput.fill("Fresnel");
+    await nameInput.press("Enter");
+
     // Multi selection → banner appears and names the count + primary.
     await withSp(
       page,
@@ -129,7 +136,8 @@ test.describe("Phase 23 — multi-selection editing", () => {
     const banner = page.getByTestId("multi-select-banner");
     await expect(banner).toBeVisible();
     await expect(banner).toContainText("2 nodes selected");
-    // Primary is the last id added to the set.
-    await expect(banner).toContainText("s1");
+    // Primary is the last id added to the set — shown via its display name
+    // (displayNodeName), not the raw internal id (D15 clean-up).
+    await expect(banner).toContainText("Fresnel");
   });
 });

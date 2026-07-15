@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type {
   AudioGraphNode,
   ComputeGraphNode,
+  GraphNode,
   GroupGraphNode,
   ParamGraphNode,
   ResolutionScale,
@@ -16,6 +17,7 @@ import {
   SYSTEM_UNIFORM_DESCRIPTIONS,
   samplerUniforms,
 } from "../../core/graph/uniformParser";
+import { displayNodeName, NODE_META } from "../../core/nodes/registry";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
@@ -36,6 +38,78 @@ import { WebcamInspector } from "./WebcamInspector";
 export interface InspectorProps {
   /** When embedded inside SidePanel, skip the outer panel + header wrapper. */
   embedded?: boolean;
+}
+
+/**
+ * Common Inspector "Name" field (design/Side Panel.dc.html L75-81, D15).
+ * Same rename source as the node card header's inline edit
+ * (NodeCardHeader.tsx): `node.name` / `graphStore.renameNode`. Never
+ * rendered for "group" — a group's rename affordance is its `label` field
+ * (GroupInspector's Label input + GroupNodeView's header inline edit),
+ * which `displayNodeName()` already treats as the sole source of truth for
+ * group naming, so a second Name field here would just be a redundant
+ * second writer of the same concept.
+ *
+ * Value is a local draft, not a direct binding to `node.name` — committing
+ * on every keystroke would push a history entry per character. Only
+ * Enter/blur call `renameNode`; Escape reverts the draft. The parent keys
+ * this component on `${node.id}:${node.name ?? ""}` so an external rename
+ * (card double-click edit, undo/redo) remounts it and re-syncs the draft.
+ */
+function NodeNameField({ node }: { node: GraphNode }) {
+  const renameNode = useGraphStore((s) => s.renameNode);
+  const [draft, setDraft] = useState(node.name ?? "");
+
+  // Mirrors displayNodeName()'s fallback steps 3-4 (registry.ts) without
+  // consulting `name` — the placeholder must show what the title would
+  // fall back to if the field were committed empty, not the current value.
+  const fallback =
+    node.kind === "param" && node.label
+      ? node.label
+      : NODE_META[node.kind].label;
+
+  return (
+    <div style={{ padding: "13px 14px 0" }}>
+      <div
+        style={{
+          fontSize: 11,
+          color: "var(--text-secondary)",
+          marginBottom: 7,
+        }}
+      >
+        Name
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <TextField
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => renameNode(node.id, draft)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              renameNode(node.id, draft);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setDraft(node.name ?? "");
+            }
+          }}
+          placeholder={fallback}
+          maxLength={256}
+          dataTestId="node-name-input"
+        />
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9,
+            color: "var(--text-muted)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ↵ rename
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function Inspector({ embedded = false }: InspectorProps) {
@@ -118,8 +192,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
           {node && (
             <span>
               {" "}
-              · editing{" "}
-              <span style={{ fontFamily: "var(--font-mono)" }}>{node.id}</span>
+              · editing <span>{displayNodeName(node)}</span>
             </span>
           )}
           <div
@@ -135,6 +208,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
       {node && (
         <>
           <InspectorNodeHeader node={node} />
+
+          {node.kind !== "group" && (
+            <NodeNameField key={`${node.id}:${node.name ?? ""}`} node={node} />
+          )}
 
           {node.kind === "group" && (
             <GroupInspector node={node as GroupGraphNode} />

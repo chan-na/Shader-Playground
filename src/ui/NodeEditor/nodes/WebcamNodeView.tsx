@@ -6,6 +6,7 @@ import {
   getExternalStream,
 } from "../../../core/external/registry";
 import type { WebcamGraphNode } from "../../../core/graph/types";
+import { displayNodeName } from "../../../core/nodes/registry";
 import { BlockedBadge } from "./BlockedBadge";
 import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
@@ -78,7 +79,8 @@ export function WebcamNodeView({ id, data }: NodeProps) {
     >
       <NodeCardHeader
         kind="webcam"
-        title="Webcam"
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={isBlocked ? <BlockedBadge nodeId={id} /> : undefined}
       />
       <div className="node-card__body" style={{ paddingRight: 22 }}>

@@ -1,7 +1,7 @@
 import type { NodeProps } from "@xyflow/react";
 import { useMemo } from "react";
 import type { ComputeGraphNode } from "../../../core/graph/types";
-import { NODE_META } from "../../../core/nodes/registry";
+import { displayNodeName, NODE_META } from "../../../core/nodes/registry";
 import { useDiagnosticsStore } from "../../../state/diagnosticsStore";
 import { countNodeDiagnostics, ErrorBadge } from "./ErrorBadge";
 import { GpuTimerChip } from "./GpuTimerChip";
@@ -34,7 +34,8 @@ export function ComputeNodeView({ id, data }: NodeProps) {
     >
       <NodeCardHeader
         kind="compute"
-        title="Compute"
+        title={displayNodeName(node)}
+        nodeId={id}
         {...(errorCount > 0 ? { tone: "error" as const } : {})}
         meta={
           errorCount > 0 ? (

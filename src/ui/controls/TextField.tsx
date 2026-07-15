@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, KeyboardEvent } from "react";
 import "./controls.css";
 
 export interface TextFieldProps {
@@ -14,6 +14,12 @@ export interface TextFieldProps {
    * input). */
   mono?: boolean;
   ariaLabel?: string;
+  /** Commit-on-blur hook for draft/commit fields (e.g. Inspector's Name
+   * field) — omit for plain controlled inputs that don't need it. */
+  onBlur?: () => void;
+  /** Commit/cancel-on-key hook (Enter/Escape) for draft/commit fields —
+   * omit for plain controlled inputs that don't need it. */
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
 }
 
 /**
@@ -32,6 +38,8 @@ export function TextField({
   maxLength,
   mono = false,
   ariaLabel,
+  onBlur,
+  onKeyDown,
 }: TextFieldProps) {
   return (
     <input
@@ -44,6 +52,8 @@ export function TextField({
       aria-label={ariaLabel}
       data-testid={dataTestId}
       onChange={onChange}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
     />
   );
 }

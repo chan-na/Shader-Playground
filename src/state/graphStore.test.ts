@@ -386,6 +386,82 @@ describe("graphStore", () => {
     expect(useGraphStore.getState().rev).toBe(before + 1);
   });
 
+  describe("renameNode", () => {
+    it("sets name and bumps rev", () => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+      const before = useGraphStore.getState().rev;
+      useGraphStore.getState().renameNode("a", "Hero Mesh");
+      const after = useGraphStore.getState();
+      expect(after.nodes[0]?.name).toBe("Hero Mesh");
+      expect(after.rev).toBe(before + 1);
+    });
+
+    it("trims whitespace and clamps to 256 chars", () => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+      useGraphStore.getState().renameNode("a", "  padded  ");
+      expect(useGraphStore.getState().nodes[0]?.name).toBe("padded");
+
+      useGraphStore.getState().renameNode("a", "x".repeat(300));
+      expect(useGraphStore.getState().nodes[0]?.name).toHaveLength(256);
+    });
+
+    it("removes the name property when committed as an empty string", () => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+      useGraphStore.getState().renameNode("a", "Named");
+      expect(useGraphStore.getState().nodes[0]?.name).toBe("Named");
+
+      useGraphStore.getState().renameNode("a", "   ");
+      const node = useGraphStore.getState().nodes[0];
+      expect(node && "name" in node).toBe(false);
+    });
+
+    it("does not push history when the committed name is unchanged", () => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+      useGraphStore.getState().renameNode("a", "Same");
+      const pastLength = useHistoryStore.getState().past.length;
+
+      useGraphStore.getState().renameNode("a", "Same");
+      expect(useHistoryStore.getState().past.length).toBe(pastLength);
+      // Re-committing the same name after trimming should also be a no-op.
+      useGraphStore.getState().renameNode("a", "  Same  ");
+      expect(useHistoryStore.getState().past.length).toBe(pastLength);
+    });
+
+    it("is a no-op for group nodes", () => {
+      const gid = useGraphStore
+        .getState()
+        .addGroup("G", { x: 0, y: 0 }, { width: 200, height: 150 });
+      const before = useGraphStore.getState().rev;
+      useGraphStore.getState().renameNode(gid, "Renamed Group");
+      const after = useGraphStore.getState();
+      expect(after.nodes.find((n) => n.id === gid)?.name).toBeUndefined();
+      expect(after.rev).toBe(before);
+    });
+
+    it("undoGraph restores the pre-rename name and redoGraph reapplies it", () => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+      useGraphStore.getState().renameNode("a", "First");
+      useGraphStore.getState().renameNode("a", "Second");
+      expect(useGraphStore.getState().nodes[0]?.name).toBe("Second");
+
+      expect(undoGraph()).toBe(true);
+      expect(useGraphStore.getState().nodes[0]?.name).toBe("First");
+
+      expect(redoGraph()).toBe(true);
+      expect(useGraphStore.getState().nodes[0]?.name).toBe("Second");
+    });
+  });
+
   it("setUniformValue also targets compute nodes", () => {
     const cn: ComputeGraphNode = {
       id: "cu1",

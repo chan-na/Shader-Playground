@@ -3,7 +3,9 @@ import type {
   CombineGraphNode,
   ComputeGraphNode,
   GraphNode,
+  GroupGraphNode,
   MathGraphNode,
+  MeshGraphNode,
   ParamGraphNode,
   ShaderGraphNode,
   SwizzleGraphNode,
@@ -13,6 +15,7 @@ import {
   cloneGraphNode,
   combineInputPorts,
   combineOutputPort,
+  displayNodeName,
   mathInputPorts,
   NODE_META,
   nodeInputPorts,
@@ -427,6 +430,28 @@ describe("cloneGraphNode", () => {
     }
   });
 
+  it("preserves name [D15] across every kind's clone, and adds no key when unset", () => {
+    const named: MeshGraphNode = {
+      id: "m1",
+      kind: "mesh",
+      primitive: "cube",
+      assetId: null,
+      name: "Hero Mesh",
+    };
+    const cloned = cloneGraphNode(named);
+    expect(cloned).toEqual(named);
+    expect(cloned.name).toBe("Hero Mesh");
+
+    const unnamed: MeshGraphNode = {
+      id: "m2",
+      kind: "mesh",
+      primitive: "cube",
+      assetId: null,
+    };
+    const clonedUnnamed = cloneGraphNode(unnamed);
+    expect("name" in clonedUnnamed).toBe(false);
+  });
+
   it("round-trips every GraphNodeKind", () => {
     const samples: GraphNode[] = [
       { id: "mesh", kind: "mesh", primitive: "cube", assetId: null },
@@ -462,6 +487,117 @@ describe("cloneGraphNode", () => {
       const cloned = cloneGraphNode(n);
       expect(cloned).toEqual(n);
       expect(cloned).not.toBe(n);
+    }
+  });
+});
+
+describe("displayNodeName [D15]", () => {
+  it("uses the trimmed user-set name when present", () => {
+    const sn: ShaderGraphNode = {
+      id: "s1",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "",
+      uniformValues: {},
+      name: "  Fresnel Glow  ",
+    };
+    expect(displayNodeName(sn)).toBe("Fresnel Glow");
+  });
+
+  it("falls back to the kind label when name is whitespace-only", () => {
+    const sn: ShaderGraphNode = {
+      id: "s1",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "",
+      uniformValues: {},
+      name: "   ",
+    };
+    expect(displayNodeName(sn)).toBe("Shader");
+  });
+
+  it("param: no name but legacy label set → uses label", () => {
+    const pn: ParamGraphNode = {
+      id: "p1",
+      kind: "param",
+      paramKind: "float",
+      value: 0,
+      label: "Intensity",
+    };
+    expect(displayNodeName(pn)).toBe("Intensity");
+  });
+
+  it("param: both name and legacy label set → name wins", () => {
+    const pn: ParamGraphNode = {
+      id: "p1",
+      kind: "param",
+      paramKind: "float",
+      value: 0,
+      name: "Custom Name",
+      label: "Intensity",
+    };
+    expect(displayNodeName(pn)).toBe("Custom Name");
+  });
+
+  it("group: label is the single source of truth, name is never consulted", () => {
+    const gn: GroupGraphNode = {
+      id: "g1",
+      kind: "group",
+      label: "Post FX",
+      width: 200,
+      height: 100,
+      name: "Ignored Name",
+    };
+    expect(displayNodeName(gn)).toBe("Post FX");
+  });
+
+  it("falls back to NODE_META[kind].label for every kind when unspecified", () => {
+    const samples: GraphNode[] = [
+      { id: "1", kind: "mesh", primitive: "cube", assetId: null },
+      { id: "2", kind: "image", assetId: null },
+      { id: "3", kind: "webcam" },
+      {
+        id: "4",
+        kind: "video",
+        assetId: null,
+        playing: false,
+        loop: false,
+        muted: false,
+      },
+      {
+        id: "5",
+        kind: "audio",
+        sourceKind: "mic",
+        assetId: null,
+        fftSize: 256,
+        smoothing: 0.5,
+        playing: false,
+        loop: false,
+      },
+      {
+        id: "6",
+        kind: "shader",
+        vertexSource: "",
+        fragmentSource: "",
+        uniformValues: {},
+      },
+      {
+        id: "7",
+        kind: "compute",
+        vertexSource: "",
+        count: 1,
+        primitive: "POINTS",
+        attributes: [],
+        uniformValues: {},
+      },
+      { id: "8", kind: "output" },
+      { id: "9", kind: "param", paramKind: "float", value: 0 },
+      { id: "10", kind: "math", op: "add", a: 0, b: 0 },
+      { id: "11", kind: "swizzle", mask: "xy" },
+      { id: "12", kind: "combine", arity: 2, values: [0, 0, 0, 0] },
+    ];
+    for (const n of samples) {
+      expect(displayNodeName(n)).toBe(NODE_META[n.kind].label);
     }
   });
 });

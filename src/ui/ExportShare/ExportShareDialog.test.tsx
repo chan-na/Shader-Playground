@@ -19,7 +19,7 @@ const FIXED_HTML = "x".repeat(FIXED_HTML_LENGTH);
 // htmlExport.test.ts / tests/e2e/phase-11-share-export.spec.ts.
 vi.mock("../../export/htmlExport", () => ({
   buildExportedHtml: vi.fn(() => FIXED_HTML),
-  downloadExportedHtml: vi.fn(),
+  downloadExportedHtml: vi.fn(() => "untitled-project-20260714-1532.html"),
 }));
 
 // Likewise, encodeShareUrl's gzip/base64url encoding is covered by
@@ -30,6 +30,7 @@ vi.mock("../../state/shareUrl", () => ({
 
 import * as htmlExport from "../../export/htmlExport";
 import * as shareUrlModule from "../../state/shareUrl";
+import { useToastStore } from "../../state/toastStore";
 import { ExportShareDialog } from "./ExportShareDialog";
 
 const TRIVIAL_GRAPH = {
@@ -51,6 +52,7 @@ let canvasFixture: HTMLCanvasElement | null = null;
 beforeEach(() => {
   useGraphStore.getState().setGraph(TRIVIAL_GRAPH, {});
   useExportShareStore.setState({ open: false, target: "gif" });
+  useToastStore.setState({ toasts: [] });
   vi.clearAllMocks();
   Object.defineProperty(window.navigator, "clipboard", {
     value: { writeText },
@@ -128,7 +130,7 @@ describe("ExportShareDialog", () => {
     ).not.toBeNull();
   });
 
-  it("Download HTML calls downloadExportedHtml with the file name and shows the done file card", () => {
+  it("Download HTML calls downloadExportedHtml with the file name and shows the done file card with the actual saved name", () => {
     useExportShareStore.getState().openWith("html");
     render(<ExportShareDialog />);
 
@@ -136,8 +138,16 @@ describe("ExportShareDialog", () => {
 
     expect(htmlExport.downloadExportedHtml).toHaveBeenCalledTimes(1);
     const call = vi.mocked(htmlExport.downloadExportedHtml).mock.calls[0];
-    expect(call?.[2]).toBe("shader-playground");
-    expect(screen.getByTestId("es-done-file-card")).not.toBeNull();
+    expect(call?.[2]).toBe("untitled-project");
+
+    const card = screen.getByTestId("es-done-file-card");
+    expect(card.textContent).toContain("untitled-project-20260714-1532.html");
+    expect(card.textContent).not.toContain(".html.html");
+
+    const toasts = useToastStore.getState().toasts;
+    const last = toasts[toasts.length - 1];
+    expect(last?.kind).toBe("success");
+    expect(last?.message).toContain("untitled-project-20260714-1532.html");
   });
 
   it("Create link → Copy shows the URL row and 'Copied ✓' via navigator.clipboard", async () => {
@@ -287,9 +297,77 @@ describe("ExportShareDialog — Record: GIF", () => {
     fireEvent.click(screen.getByTestId("es-stop-recording"));
 
     const card = await screen.findByTestId("es-done-file-card");
-    expect(card.textContent).toContain(".gif");
+    expect(card.textContent).toMatch(/untitled-project-\d{8}-\d{4}\.gif/);
     // Default fps/duration (12fps · 4.0s) + the 2 MiB fixture blob.
     expect(card.textContent).toContain("2.0 MB · 12 fps · 4.0s");
+  });
+
+  it("record-done shows exactly one .es-done-actions row with [Export again | Save to disk] in that order, and Save to disk downloads the recorded file (dc L282-285: one row, not two)", async () => {
+    useExportShareStore.getState().openWith("gif");
+    useGifRecorderStore.setState({
+      status: "recording",
+      frameCount: 40,
+      elapsedMs: 1000,
+    });
+    const { container } = render(<ExportShareDialog />);
+
+    const blob = new Blob(["x".repeat(2 * 1024 * 1024)], {
+      type: "image/gif",
+    });
+    vi.spyOn(useGifRecorderStore.getState(), "stop").mockImplementation(
+      async () => {
+        useGifRecorderStore.setState({
+          status: "idle",
+          lastBlobUrl: "blob:gif-mock",
+        });
+        return blob;
+      },
+    );
+
+    fireEvent.click(screen.getByTestId("es-stop-recording"));
+    await screen.findByTestId("es-done-file-card");
+
+    // Exactly one action row (was two: DoneRecordPanel's own primary button
+    // + the parent's secondary-only row) — dc's done footer is a single
+    // `display:flex;gap:10px` row of [Export again, primaryDone].
+    const actionRows = container.querySelectorAll(".es-done-actions");
+    expect(actionRows.length).toBe(1);
+
+    const row = actionRows[0] as HTMLElement;
+    const buttons = row.querySelectorAll("button");
+    expect(buttons.length).toBe(2);
+    expect(buttons[0]?.getAttribute("data-testid")).toBe("es-export-again");
+    expect(buttons[1]?.getAttribute("data-testid")).toBe("es-save-recording");
+    expect(buttons[1]?.className).toContain("es-btn-primary");
+
+    // Save to disk still downloads the recorded blob under the file name
+    // shown on the done card (htmlExport.test.ts's anchor-intercept
+    // pattern — observe what was clicked without actually navigating).
+    let capturedDownload: string | undefined;
+    const clickSpy = vi.fn();
+    const origCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(
+      (tag: string, options?: ElementCreationOptions) => {
+        const el = origCreateElement(tag, options);
+        if (tag === "a") {
+          (el as HTMLAnchorElement).click = clickSpy;
+          Object.defineProperty(el, "download", {
+            get: () => capturedDownload,
+            set: (v: string) => {
+              capturedDownload = v;
+            },
+          });
+        }
+        return el;
+      },
+    );
+
+    const fileName = screen.getByTestId("es-done-file-card").textContent;
+    fireEvent.click(screen.getByTestId("es-save-recording"));
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(capturedDownload).toBeDefined();
+    expect(fileName).toContain(capturedDownload as string);
   });
 
   it("auto-stops once elapsed reaches the configured duration while open", async () => {

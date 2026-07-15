@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  DEFAULT_EXPORT_BASE,
+  exportFileName,
+} from "../../export/exportFileName";
+import {
   buildExportedHtml,
   downloadExportedHtml,
 } from "../../export/htmlExport";
@@ -96,7 +100,7 @@ const WEBM_FPS_OPTIONS = [
 interface RecordDoneInfo {
   kind: "gif" | "webm";
   blob: Blob;
-  createdAt: number;
+  fileName: string;
   metaLine: string;
 }
 
@@ -473,10 +477,10 @@ function EncodingPanel({ progress }: { progress: number }) {
 }
 
 function DoneHtmlPanel({
-  fileName,
+  savedFileName,
   sizeKB,
 }: {
-  fileName: string;
+  savedFileName: string;
   sizeKB: number;
 }) {
   return (
@@ -491,7 +495,7 @@ function DoneHtmlPanel({
           HTML
         </div>
         <div className="es-done-file-main">
-          <div className="es-done-file-name">{fileName}.html</div>
+          <div className="es-done-file-name">{savedFileName}</div>
           <div className="es-done-file-meta">
             {sizeKB} KB · WebGL2 · self-contained
           </div>
@@ -533,13 +537,7 @@ function DoneLinkPanel({
   );
 }
 
-function DoneRecordPanel({
-  info,
-  onSave,
-}: {
-  info: RecordDoneInfo;
-  onSave: () => void;
-}) {
+function DoneRecordPanel({ info }: { info: RecordDoneInfo }) {
   const isGif = info.kind === "gif";
   return (
     <>
@@ -563,21 +561,9 @@ function DoneRecordPanel({
           {isGif ? "GIF" : "WEBM"}
         </div>
         <div className="es-done-file-main">
-          <div className="es-done-file-name">
-            shader-playground-{info.createdAt}.{info.kind}
-          </div>
+          <div className="es-done-file-name">{info.fileName}</div>
           <div className="es-done-file-meta">{info.metaLine}</div>
         </div>
-      </div>
-      <div className="es-done-actions">
-        <button
-          type="button"
-          className="es-btn-primary"
-          onClick={onSave}
-          data-testid="es-save-recording"
-        >
-          Save to disk
-        </button>
       </div>
     </>
   );
@@ -593,9 +579,10 @@ export function ExportShareDialog() {
   const rev = useGraphStore((s) => s.rev);
 
   const [phase, setPhase] = useState<ExportSharePhase>("configure");
-  const [fileName, setFileName] = useState("shader-playground");
+  const [fileName, setFileName] = useState<string>(DEFAULT_EXPORT_BASE);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [htmlDoneName, setHtmlDoneName] = useState<string | null>(null);
 
   const [gifFps, setGifFps] = useState(12);
   const [gifLongEdge, setGifLongEdge] = useState(480);
@@ -651,6 +638,7 @@ export function ExportShareDialog() {
       setShareUrl(null);
       setCopied(false);
       setRecordDone(null);
+      setHtmlDoneName(null);
     }
   }, [open]);
 
@@ -697,7 +685,7 @@ export function ExportShareDialog() {
       setRecordDone({
         kind: "gif",
         blob,
-        createdAt: Date.now(),
+        fileName: exportFileName(DEFAULT_EXPORT_BASE, "gif"),
         metaLine: `${(blob.size / (1024 * 1024)).toFixed(1)} MB · ${gifFps} fps · ${gifDuration.toFixed(1)}s`,
       });
       setPhase("done");
@@ -733,7 +721,7 @@ export function ExportShareDialog() {
       setRecordDone({
         kind: "webm",
         blob,
-        createdAt: Date.now(),
+        fileName: exportFileName(DEFAULT_EXPORT_BASE, "webm"),
         metaLine: `${(blob.size / (1024 * 1024)).toFixed(1)} MB · ${webmFps} fps · ${elapsedLabel}`,
       });
       setPhase("done");
@@ -773,15 +761,18 @@ export function ExportShareDialog() {
     setPhase("configure");
     setShareUrl(null);
     setCopied(false);
+    setHtmlDoneName(null);
   };
 
   const handleDownloadHtml = () => {
     const s = useGraphStore.getState();
-    downloadExportedHtml(
+    const savedName = downloadExportedHtml(
       { nodes: s.nodes, edges: s.edges },
       s.positions,
       fileName,
     );
+    setHtmlDoneName(savedName);
+    toast.success(`Exported ${savedName} · ${sizeKB} KB`);
     setPhase("done");
   };
 
@@ -843,8 +834,9 @@ export function ExportShareDialog() {
     if (!url) return;
     const a = document.createElement("a");
     a.href = url;
-    a.download = `shader-playground-${recordDone.createdAt}.${recordDone.kind}`;
+    a.download = recordDone.fileName;
     a.click();
+    toast.success(`Exported ${recordDone.fileName}`);
   };
 
   const gifDurationLabel = `${gifDuration.toFixed(1)}s`;
@@ -933,12 +925,12 @@ export function ExportShareDialog() {
               <EncodingPanel progress={gifEncodeProgress} />
             )}
 
-            {displayPhase === "done" && target === "html" && (
+            {displayPhase === "done" && target === "html" && htmlDoneName && (
               <div className="es-done">
                 <div className="es-done-icon" aria-hidden="true">
                   ✓
                 </div>
-                <DoneHtmlPanel fileName={fileName} sizeKB={sizeKB} />
+                <DoneHtmlPanel savedFileName={htmlDoneName} sizeKB={sizeKB} />
                 <div className="es-done-actions">
                   <button
                     type="button"
@@ -997,10 +989,7 @@ export function ExportShareDialog() {
                   <div className="es-done-icon" aria-hidden="true">
                     ✓
                   </div>
-                  <DoneRecordPanel
-                    info={recordDone}
-                    onSave={handleSaveRecording}
-                  />
+                  <DoneRecordPanel info={recordDone} />
                   <div className="es-done-actions">
                     <button
                       type="button"
@@ -1009,6 +998,14 @@ export function ExportShareDialog() {
                       data-testid="es-export-again"
                     >
                       Export again
+                    </button>
+                    <button
+                      type="button"
+                      className="es-btn-primary"
+                      onClick={handleSaveRecording}
+                      data-testid="es-save-recording"
+                    >
+                      Save to disk
                     </button>
                   </div>
                 </div>

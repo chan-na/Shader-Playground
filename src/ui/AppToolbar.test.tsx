@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_OUTPUTS } from "../core/graph/validate";
 import { useCommandPaletteStore } from "../state/commandPaletteStore";
 import { useGifRecorderStore } from "../state/gifRecorder";
@@ -91,4 +91,53 @@ describe("AppToolbar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(useCommandPaletteStore.getState().open).toBe(true);
   });
+
+  it(
+    "Export JSON menuitem downloads a filename matching the unified " +
+      "export naming rule [D16], same as the Export & Share dialog",
+    () => {
+      // jsdom omits URL.createObjectURL / revokeObjectURL — stub them so the
+      // handler can run end-to-end (pattern: htmlExport.test.ts L129-141).
+      const createObjectURL = vi.fn(() => "blob:fake-url");
+      const revokeObjectURL = vi.fn();
+      (
+        URL as unknown as { createObjectURL: typeof createObjectURL }
+      ).createObjectURL = createObjectURL;
+      (
+        URL as unknown as { revokeObjectURL: typeof revokeObjectURL }
+      ).revokeObjectURL = revokeObjectURL;
+
+      // Intercept anchors so we can capture the download name that was set
+      // without actually navigating (pattern: htmlExport.test.ts L152-168).
+      let capturedDownload: string | undefined;
+      const clickSpy = vi.fn();
+      const origCreateElement = document.createElement.bind(document);
+      const createSpy = vi
+        .spyOn(document, "createElement")
+        .mockImplementation((tag: string) => {
+          const el = origCreateElement(tag);
+          if (tag === "a") {
+            (el as HTMLAnchorElement).click = clickSpy;
+            Object.defineProperty(el, "download", {
+              get: () => capturedDownload,
+              set: (v: string) => {
+                capturedDownload = v;
+              },
+            });
+          }
+          return el;
+        });
+
+      render(<AppToolbar />);
+      fireEvent.click(screen.getByRole("button", { name: "＋ More" }));
+      fireEvent.click(
+        screen.getByRole("menuitem", { name: "Export project as JSON" }),
+      );
+
+      expect(capturedDownload).toMatch(/^untitled-project-\d{8}-\d{4}\.json$/);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+
+      createSpy.mockRestore();
+    },
+  );
 });

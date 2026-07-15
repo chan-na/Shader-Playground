@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GraphNode, ParamKind } from "../core/graph/types";
 import { MAX_OUTPUTS } from "../core/graph/validate";
+import { DEFAULT_EXPORT_BASE, exportFileName } from "../export/exportFileName";
 import basicVert from "../shaders/basic.vert?raw";
 import blendFrag from "../shaders/templates/blend.frag?raw";
 import unlitFrag from "../shaders/templates/unlit.frag?raw";
@@ -168,7 +169,7 @@ export function AppToolbar() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `shader-playground-${Date.now()}.json`;
+    a.download = exportFileName(DEFAULT_EXPORT_BASE, "json");
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -201,7 +202,7 @@ export function AppToolbar() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `shader-playground-${Date.now()}.png`;
+      a.download = exportFileName(DEFAULT_EXPORT_BASE, "png");
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }, "image/png");
@@ -223,7 +224,7 @@ export function AppToolbar() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `shader-playground-${Date.now()}.webm`;
+        a.download = exportFileName(DEFAULT_EXPORT_BASE, "webm");
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
@@ -246,7 +247,7 @@ export function AppToolbar() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `shader-playground-${Date.now()}.gif`;
+        a.download = exportFileName(DEFAULT_EXPORT_BASE, "gif");
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }

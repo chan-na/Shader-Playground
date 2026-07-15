@@ -3,6 +3,7 @@ import { useDebugUiStore } from "../../state/debugUiStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
+import { useLayoutStore } from "../../state/layoutStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
@@ -57,6 +58,16 @@ export function StatusBar() {
   const gpuTotalMs = useGpuTimerStore((s) => s.totalMs);
   const diagOpen = useDebugUiStore((s) => s.open);
   const toggleDiag = useDebugUiStore((s) => s.toggleOpen);
+  // D1: Diagnostics는 이제 Side Panel의 4번째 탭이다 — side panel이 접혀
+  // 있으면 open을 true로 만들어도 탭 본문이 보이지 않는다. 진입 경로의
+  // 가시성을 보장하기 위해 열 때는 접힘도 함께 풀어준다(닫을 때는 건드리지
+  // 않음 — 사용자가 의도적으로 접었을 수 있으므로).
+  const sidePanelCollapsed = useLayoutStore((s) => s.collapsed.sidePanel);
+  const toggleCollapsed = useLayoutStore((s) => s.toggleCollapsed);
+  const handleDiagClick = () => {
+    if (!diagOpen && sidePanelCollapsed) toggleCollapsed("sidePanel");
+    toggleDiag();
+  };
 
   // Sampled, not subscribed — see TIME_SAMPLE_INTERVAL_MS above.
   const [simTime, setSimTime] = useState(() => useTimeStore.getState().simTime);
@@ -128,7 +139,7 @@ export function StatusBar() {
       <button
         type="button"
         className="statusbar-diag"
-        onClick={toggleDiag}
+        onClick={handleDiagClick}
         title="Toggle the developer diagnostics panel"
         data-testid="open-diagnostics"
         aria-pressed={diagOpen}

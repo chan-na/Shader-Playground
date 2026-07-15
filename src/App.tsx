@@ -1,5 +1,4 @@
 import { useRef } from "react";
-import { useDebugUiStore } from "./state/debugUiStore";
 import { useLayoutStore } from "./state/layoutStore";
 import { AppToolbar } from "./ui/AppToolbar";
 import { BootstrapGate } from "./ui/BootstrapGate";
@@ -10,7 +9,6 @@ import { ExportShareDialog } from "./ui/ExportShare/ExportShareDialog";
 import { GpuBlockScreen } from "./ui/GpuBlockScreen";
 import { KeyboardShortcuts } from "./ui/KeyboardShortcuts";
 import { NodeEditor } from "./ui/NodeEditor";
-import { DiagnosticsPanel } from "./ui/Panels/DiagnosticsPanel";
 import { SidePanel } from "./ui/Panels/SidePanel";
 import { StatusBar } from "./ui/Panels/StatusBar";
 import { Splitter } from "./ui/Splitter";
@@ -23,7 +21,6 @@ function cx(...parts: Array<string | false | undefined>): string {
 }
 
 export function App() {
-  const diagOpen = useDebugUiStore((s) => s.open);
   const leftFrac = useLayoutStore((s) => s.leftFrac);
   const viewportFrac = useLayoutStore((s) => s.viewportFrac);
   const codeHeight = useLayoutStore((s) => s.codeHeight);
@@ -191,7 +188,6 @@ export function App() {
       <BootstrapGate />
       <Toasts />
       <GpuBlockScreen />
-      {diagOpen && <DiagnosticsPanel />}
     </div>
   );
 }

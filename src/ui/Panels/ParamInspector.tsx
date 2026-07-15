@@ -1,17 +1,28 @@
 import type { ParamGraphNode } from "../../core/graph/types";
+import { paramOutputPort } from "../../core/nodes/registry";
 import { useGraphStore } from "../../state/graphStore";
-import { tokens, withAlpha } from "../../theme";
+import { withAlpha } from "../../theme";
 import { ColorField } from "../controls/ColorField";
 import { MultiSlider } from "../controls/MultiSlider";
 import { NumberField } from "../controls/NumberField";
 import { Slider } from "../controls/Slider";
 import { TextField } from "../controls/TextField";
+import { portFamilyHex, portFamilyOf } from "../NodeEditor/nodeTheme";
 
 const TIME_LABELS = ["Scale", "Offset"] as const;
 
 export function ParamInspector({ node }: { node: ParamGraphNode }) {
   const setParamValue = useGraphStore((s) => s.setParamValue);
   const setParamLabel = useGraphStore((s) => s.setParamLabel);
+
+  // [D18] Output type 배지 색 = 포트 타입 패밀리 (design/README.md §도메인 규칙,
+  // design/Side Panel.dc.html L141: "vec3 · Vector" 배지 색 = vector 패밀리).
+  // paramKind → GLSL 포트 타입은 registry의 paramOutputPort가 단일 출처
+  // (float/time → float(scalar), vec3/color → vec3(vector)).
+  const outPort = paramOutputPort(node.paramKind);
+  const famHex = portFamilyHex(outPort.type);
+  const family = portFamilyOf(outPort.type);
+  const familyLabel = family.charAt(0).toUpperCase() + family.slice(1);
 
   return (
     <div className="inspector-section">
@@ -134,14 +145,14 @@ export function ParamInspector({ node }: { node: ParamGraphNode }) {
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: 10,
-            color: tokens.portFamily.vector,
-            background: withAlpha(tokens.portFamily.vector, 0.1),
-            border: `1px solid ${withAlpha(tokens.portFamily.vector, 0.3)}`,
+            color: famHex,
+            background: withAlpha(famHex, 0.1),
+            border: `1px solid ${withAlpha(famHex, 0.3)}`,
             borderRadius: "var(--radius-icon-box)",
             padding: "2px 8px",
           }}
         >
-          {node.paramKind}
+          {outPort.type} · {familyLabel}
         </span>
       </div>
     </div>

@@ -8,6 +8,13 @@ export interface DockPanelHeaderProps {
   label?: string;
   /** mono 메타 배지(예: "5N · 4E", "GLSL · ES 3.0"). */
   meta?: string;
+  /**
+   * 메타 배지 위치 [D13]: 기본 "start"는 label/children 옆(좌측) — 기존
+   * 패널(Node Editor "5N · 4E", Viewport)의 동작을 보존한다. "end"는
+   * spacer 뒤(최대화 버튼 앞) 우측 정렬 — App Shell.dc.html L361-369의
+   * Code Editor 정본 순서.
+   */
+  metaAlign?: "start" | "end";
   /** 탭 버튼 등 헤더 중앙에 끼워 넣을 슬롯. */
   children?: ReactNode;
   /**
@@ -31,6 +38,7 @@ export function DockPanelHeader({
   panelId,
   label,
   meta,
+  metaAlign = "start",
   children,
   collapsedRail = false,
 }: DockPanelHeaderProps) {
@@ -49,11 +57,14 @@ export function DockPanelHeader({
       {!isRail && label !== undefined && (
         <span className="dock-header-label">{label}</span>
       )}
-      {!isRail && meta !== undefined && (
+      {!isRail && meta !== undefined && metaAlign === "start" && (
         <span className="dock-header-meta">{meta}</span>
       )}
       {!isRail && children}
       <div className="dock-header-spacer" />
+      {!isRail && meta !== undefined && metaAlign === "end" && (
+        <span className="dock-header-meta">{meta}</span>
+      )}
       {!isRail && (
         <button
           type="button"

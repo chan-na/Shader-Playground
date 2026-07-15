@@ -126,4 +126,39 @@ describe("firstCompileError", () => {
     expect(info?.nodeId).toBe("s2");
     expect(info?.message).toBe("real error");
   });
+
+  it("reports failingNodeCount 1 for a single failing shader node [D19]", () => {
+    const nodes = [shaderNode("s1")];
+    const byNode: Record<string, NodeDiagnostics> = {
+      s1: {
+        ...emptyDiagnostics(),
+        fragment: [{ line: 1, severity: "error", message: "boom" }],
+      },
+    };
+
+    const info = firstCompileError(byNode, nodes);
+    expect(info?.failingNodeCount).toBe(1);
+  });
+
+  it("counts every failing shader node while still returning the first one, excluding warning-only nodes [D19]", () => {
+    const nodes = [shaderNode("s1"), shaderNode("s2"), shaderNode("s3")];
+    const byNode: Record<string, NodeDiagnostics> = {
+      s1: {
+        ...emptyDiagnostics(),
+        fragment: [{ line: 1, severity: "error", message: "s1 boom" }],
+      },
+      s2: {
+        ...emptyDiagnostics(),
+        fragment: [{ line: 2, severity: "error", message: "s2 boom" }],
+      },
+      s3: {
+        ...emptyDiagnostics(),
+        fragment: [{ line: 3, severity: "warning", message: "s3 careful" }],
+      },
+    };
+
+    const info = firstCompileError(byNode, nodes);
+    expect(info?.nodeId).toBe("s1");
+    expect(info?.failingNodeCount).toBe(2);
+  });
 });

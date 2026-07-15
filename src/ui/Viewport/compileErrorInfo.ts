@@ -27,6 +27,11 @@ export interface CompileErrorInfo {
   /** `line-2..line+1` window into the stage's source, clamped to bounds.
    *  Empty when `line` is null. */
   excerpt: CompileErrorExcerptRow[];
+  /** Total number of shader nodes carrying an error-severity diagnostic
+   *  [D19]. The overlay always reports a single failing node's count, but
+   *  when this is 2 or more it appends "(+N-1 more)" to explain why that
+   *  differs from the Status Bar's cross-node sum. */
+  failingNodeCount: number;
 }
 
 // Lines before/after the error line included in the excerpt window (dc
@@ -83,6 +88,19 @@ export function firstCompileError(
   byNode: Record<string, NodeDiagnostics>,
   nodes: GraphNode[],
 ): CompileErrorInfo | null {
+  let failingNodeCount = 0;
+  for (const node of nodes) {
+    if (node.kind !== "shader") continue;
+    const d = byNode[node.id];
+    if (!d) continue;
+    if (
+      countErrors(d.vertex) + countErrors(d.fragment) + countErrors(d.link) >
+      0
+    ) {
+      failingNodeCount++;
+    }
+  }
+
   for (const node of nodes) {
     if (node.kind !== "shader") continue;
     const diags = byNode[node.id];
@@ -107,6 +125,7 @@ export function firstCompileError(
         raw: formatDiagnosticRaw(vertexErr),
         errorCount,
         excerpt: buildExcerpt(node.vertexSource, vertexErr.line),
+        failingNodeCount,
       };
     }
     const fragmentErr = firstError(diags.fragment);
@@ -120,6 +139,7 @@ export function firstCompileError(
         raw: formatDiagnosticRaw(fragmentErr),
         errorCount,
         excerpt: buildExcerpt(node.fragmentSource, fragmentErr.line),
+        failingNodeCount,
       };
     }
     const linkErr = firstError(diags.link);
@@ -133,6 +153,7 @@ export function firstCompileError(
         raw: formatDiagnosticRaw(linkErr),
         errorCount,
         excerpt: [],
+        failingNodeCount,
       };
     }
   }

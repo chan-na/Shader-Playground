@@ -181,16 +181,25 @@ export function WelcomeOverlay() {
   const selected =
     STARTERS.find((s) => s.key === selectedKey) ?? SPHERE_STARTER;
 
-  // Enter creates the currently-selected starter, but only when nothing else
-  // is focused (an input, the command palette, etc.) — otherwise this would
-  // hijack Enter from every text field on the page. Skipped entirely once
-  // dismissed so a stray Enter after "Start blank" can't silently repopulate
-  // the graph the user just asked to keep empty.
+  // Enter creates the currently-selected starter, but only when focus is on
+  // body or a welcome-card button (a card click leaves focus there — see B2
+  // below) — not on an input, the command palette, etc., otherwise this
+  // would hijack Enter from every text field on the page. Skipped entirely
+  // once dismissed so a stray Enter after "Start blank" can't silently
+  // repopulate the graph the user just asked to keep empty.
   useEffect(() => {
     if (dismissed) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Enter") return;
-      if (document.activeElement !== document.body) return;
+      const el = document.activeElement;
+      // 카드 버튼에 포커스가 있을 때도 Enter는 Create로 동작해야 한다(B2):
+      // 카드 클릭 → 버튼이 포커스를 가져가 body 가드에 걸리고, Enter가 카드
+      // 재클릭(버튼 기본 동작)으로만 소비되던 문제. preventDefault가 그 기본
+      // 동작(재클릭)도 함께 막는다. 그 외 포커스(입력창·팔레트 등)에서는 기존
+      // 대로 무시 — 페이지의 모든 텍스트 필드에서 Enter를 가로채지 않는다.
+      const cardFocused =
+        el instanceof HTMLElement && el.classList.contains("welcome-card");
+      if (el !== document.body && !cardFocused) return;
       e.preventDefault();
       createStarterGraph(selected);
     };

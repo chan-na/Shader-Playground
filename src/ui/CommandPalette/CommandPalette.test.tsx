@@ -1,7 +1,14 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useCommandPaletteStore } from "../../state/commandPaletteStore";
 import { useGraphStore } from "../../state/graphStore";
+import { useSelectionStore } from "../../state/selectionStore";
 import { CommandPalette } from "./index";
 
 function openPalette() {
@@ -15,6 +22,7 @@ function getInput(): HTMLInputElement {
 beforeEach(() => {
   useGraphStore.getState().reset();
   useCommandPaletteStore.getState().setOpen(false);
+  useSelectionStore.getState().select(null);
 });
 
 afterEach(() => {
@@ -94,10 +102,66 @@ describe("CommandPalette", () => {
     expect(screen.getByText(/No matches for/)).not.toBeNull();
   });
 
+  it("empty-result CTA creates a named Shader node on Enter", () => {
+    openPalette();
+    render(<CommandPalette />);
+    fireEvent.change(getInput(), { target: { value: "my glow pass" } });
+    const cta = screen.getByTestId("cmdk-create-cta");
+    expect(cta.textContent).toContain("my glow pass");
+
+    fireEvent.keyDown(getInput(), { key: "Enter" });
+
+    const created = useGraphStore
+      .getState()
+      .nodes.find((n) => n.kind === "shader" && n.name === "my glow pass");
+    expect(created).not.toBeUndefined();
+    expect(useSelectionStore.getState().selectedNodeId).toBe(created?.id);
+    expect(useCommandPaletteStore.getState().open).toBe(false);
+  });
+
+  it("clicking the CTA row also creates the node", () => {
+    openPalette();
+    render(<CommandPalette />);
+    fireEvent.change(getInput(), { target: { value: "my glow pass" } });
+    fireEvent.click(screen.getByTestId("cmdk-create-cta"));
+
+    const created = useGraphStore
+      .getState()
+      .nodes.find((n) => n.kind === "shader" && n.name === "my glow pass");
+    expect(created).not.toBeUndefined();
+    expect(useSelectionStore.getState().selectedNodeId).toBe(created?.id);
+    expect(useCommandPaletteStore.getState().open).toBe(false);
+  });
+
+  it("CTA is absent when there are results", () => {
+    openPalette();
+    render(<CommandPalette />);
+    expect(screen.queryByTestId("cmdk-create-cta")).toBeNull();
+  });
+
   it("shows the total result count in the footer", () => {
     openPalette();
     render(<CommandPalette />);
     fireEvent.change(getInput(), { target: { value: ">" } });
     expect(screen.getByText("2 results")).not.toBeNull();
+  });
+
+  it("reopening via store.setOpen(true) clears the previous query and active row", () => {
+    openPalette();
+    render(<CommandPalette />);
+    fireEvent.change(getInput(), { target: { value: "@tor" } });
+    expect(getInput().value).toBe("@tor");
+
+    act(() => {
+      useCommandPaletteStore.getState().setOpen(false);
+    });
+    act(() => {
+      useCommandPaletteStore.getState().setOpen(true);
+    });
+
+    expect(getInput().value).toBe("");
+    expect(screen.getByText("Nodes")).not.toBeNull();
+    expect(screen.getByText("Commands")).not.toBeNull();
+    expect(screen.getByText("Presets")).not.toBeNull();
   });
 });

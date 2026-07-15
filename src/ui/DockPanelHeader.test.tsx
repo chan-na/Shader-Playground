@@ -118,4 +118,75 @@ describe("DockPanelHeader", () => {
       expect(screen.getByText("Node Editor")).not.toBeNull();
     });
   });
+
+  // D13: 메타 배지 정렬. 기본은 spacer *앞*(좌측, 기존 패널 보존), "end"는
+  // App Shell.dc.html L361-369의 Code Editor 정본 순서인 spacer *뒤*(우측).
+  describe("metaAlign", () => {
+    it("defaults to start — meta renders before the spacer", () => {
+      const { container } = render(
+        <DockPanelHeader
+          panelId="nodeEditor"
+          label="Node Editor"
+          meta="5N · 4E"
+        />,
+      );
+      const metaEl = screen.getByText("5N · 4E");
+      const spacerEl = container.querySelector(".dock-header-spacer");
+      if (spacerEl === null) {
+        throw new Error("expected .dock-header-spacer to be in the DOM");
+      }
+      // spacerEl following metaEl in the DOM means metaEl comes first.
+      expect(
+        metaEl.compareDocumentPosition(spacerEl) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('metaAlign="end" renders meta after the spacer, before the Maximize button, keeping the same class', () => {
+      const { container } = render(
+        <DockPanelHeader
+          panelId="codeEditor"
+          meta="GLSL · ES 3.0"
+          metaAlign="end"
+        />,
+      );
+      const metaEl = screen.getByText("GLSL · ES 3.0");
+      expect(metaEl.className).toBe("dock-header-meta");
+
+      const spacerEl = container.querySelector(".dock-header-spacer");
+      if (spacerEl === null) {
+        throw new Error("expected .dock-header-spacer to be in the DOM");
+      }
+      // metaEl following spacerEl in the DOM means spacer comes first.
+      expect(
+        spacerEl.compareDocumentPosition(metaEl) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      const maximizeBtn = screen.getByRole("button", {
+        name: "Maximize panel",
+      });
+      expect(
+        metaEl.compareDocumentPosition(maximizeBtn) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('hides metaAlign="end" meta the same as start once collapsed in a rail', () => {
+      render(
+        <DockPanelHeader
+          panelId="nodeEditor"
+          label="Node Editor"
+          meta="5N · 4E"
+          metaAlign="end"
+          collapsedRail
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+      expect(useLayoutStore.getState().collapsed.nodeEditor).toBe(true);
+
+      expect(screen.queryByText("5N · 4E")).toBeNull();
+    });
+  });
 });

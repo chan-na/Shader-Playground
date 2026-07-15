@@ -352,7 +352,11 @@ export function CodeEditor() {
 
   return (
     <div className="panel panel--code">
-      <DockPanelHeader panelId="codeEditor" meta="GLSL · ES 3.0">
+      <DockPanelHeader
+        panelId="codeEditor"
+        meta="GLSL · ES 3.0"
+        metaAlign="end"
+      >
         <StageTabs
           active={stage}
           onChange={setStage}

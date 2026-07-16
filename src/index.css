@@ -2929,7 +2929,11 @@ textarea {
    app boot and BootstrapGate resolving the graph (phase "init"/"prompt") —
    never once phase is "done". That's a real, bounded loading transition,
    the same category as the recording pulse (es-rec-pulse) and encode spinner
-   already in this file, not a decorative idle animation. */
+   already in this file, not a decorative idle animation.
+   [v1.1 D4] .graph-skeleton-status is a canvas-center floating pill, not
+   bottom-left — bottom-left is the zoom controls' (− % + fit) permanent
+   spot and would collide (dc System States.dc.html L131, CHANGELOG v1.1
+   D4). */
 @keyframes sp-shimmer {
   0% {
     background-position: -420px 0;
@@ -2986,14 +2990,31 @@ textarea {
 }
 .graph-skeleton-status {
   position: absolute;
-  left: 14px;
-  bottom: 16px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 9px;
+  /* dc rgba(11,12,14,0.82) == tokens.surface.app (#0b0c0e) at 82% alpha;
+     color-mix pattern follows the existing .cmdk-overlay convention above. */
+  background: color-mix(in srgb, var(--surface-app) 82%, transparent);
+  border: 1px solid var(--border-default);
+  /* dc border-radius: 10px. No dedicated 10 token exists; --radius-overlay
+     (9) is the nearest canvas-floating-overlay token (see theme.ts's
+     radius.overlay comment: minimap 9 / zoom-controls 8 representative
+     value) — within this project's documented ±4 nearest-token tolerance. */
+  border-radius: var(--radius-overlay);
+  padding: 9px 14px;
+  /* literal blur, matches .modal-scrim (L3181) — blur isn't tokenized. */
+  backdrop-filter: blur(6px);
+  /* dc box-shadow: 0 8px 24px rgba(0,0,0,0.5) vs --shadow-node-card's
+     0 8px 20px rgba(0,0,0,0.5) — same offset/alpha, blur differs by 4px;
+     nearest existing shadow token, no new token added. */
+  box-shadow: var(--shadow-node-card);
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .graph-skeleton-spinner {
   width: 14px;

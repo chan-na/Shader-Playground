@@ -12,6 +12,8 @@
  * all absolutely positioned like WelcomeOverlay/the selection-count-badge in
  * the same `.panel-body` slot. `pointer-events: none` since there's nothing
  * to interact with and the real ReactFlow pane sits right behind it.
+ * [v1.1 D4] The status row is a canvas-center floating pill (not a
+ * bottom-left corner row) — see .graph-skeleton-status in index.css.
  */
 
 const SKELETON_CARDS: ReadonlyArray<{ id: string; left: number; top: number }> =

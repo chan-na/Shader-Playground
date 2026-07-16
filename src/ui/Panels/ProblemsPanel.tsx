@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
+import { displayNodeName } from "../../core/nodes/registry";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
@@ -65,7 +66,13 @@ export function ProblemsPanel() {
 
   const nodeLabel = (id: string) => {
     const n = nodes.find((nn) => nn.id === id);
-    return n ? `${n.kind} · ${id}` : id;
+    // `kind` is dropped (D15 UI clean-up): the row already shows
+    // `stage:line[:column]` right after this label, and `kind` duplicated
+    // that context without adding anything the stage doesn't already say.
+    // A diagnostic can outlive its node (e.g. deleted while a stale
+    // diagnostic entry is still in flight) — fall back to the id so the row
+    // still identifies *something* instead of going blank.
+    return n ? displayNodeName(n) : id;
   };
 
   const goTo = (entry: Entry) => {

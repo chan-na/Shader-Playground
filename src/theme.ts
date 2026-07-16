@@ -7,8 +7,9 @@
  *
  * 이 파일이 src/theme.ts 이며, main.tsx가 부트 시 cssVars()를 :root에
  * 주입해 CSS 변수로도 파생한다(예: --surface-panel: #131519). 아래 cssVars() 참고.
+ * design/ 번들의 theme.ts는 핸드오프의 출처이고, 런타임 값의 출처는 이 파일이다 [D20].
  *
- * 버전: v1 · 2026-07-13
+ * 버전: v1.1 · 2026-07-14
  */
 
 export const tokens = {
@@ -28,6 +29,21 @@ export const tokens = {
     // 보더 참조용 — design/Node Editor.dc.html의 모든 핸들이 이 값을
     // border/background로 사용한다.
     nodeCardSolid: "#16181c",
+    letterbox: "#08090b", // Webcam/Video 프리뷰 레터박스 (= appDarker) [D8]
+  },
+
+  // ── Overlay channels (알파 파생용 명명 토큰) [D9] ────────────────────
+  // 캔버스 텍스처/오버레이 레이어에서 white/black 채널을 코드가 직접
+  // 파생하지 않도록 이름을 부여.
+  overlay: {
+    gridDot: "rgba(255,255,255,0.045)", // 노드 캔버스 도트 그리드
+    scrim: "rgba(0,0,0,0.5)", // 몰입 모드·GPU 칩·모달 백드롭 공용 스크림
+  },
+
+  // ── Gradients (종점을 토큰으로) [D10] ────────────────────────────────
+  gradient: {
+    // 뷰포트 빈 상태 배경 (surface.app 근처 2종점 radial)
+    emptyState: "radial-gradient(circle at 50% 40%, #10131a 0%, #0a0b0e 70%)",
   },
 
   // ── Border ──────────────────────────────────────────────────────────
@@ -143,10 +159,9 @@ export const tokens = {
     selectRing:
       "0 0 0 1.5px rgba(61,155,255,0.75), 0 0 18px rgba(61,155,255,0.4)",
     errorRing: "0 0 0 1.5px rgba(240,85,92,0.7), 0 0 18px rgba(240,85,92,0.35)",
-    // Permission-blocked node card ring (Webcam/Audio pending/denied skin) —
-    // errorRing's warning-hued sibling. design/System States.dc.html L484
-    // (webcam blocked card's combined box-shadow: `...,0 0 0 1.5px
-    // #f5b13d,0 0 14px rgba(245,177,61,0.3)`).
+    // 권한 차단 카드 링(Webcam/Audio pending·denied 스킨). errorRing과 동일한
+    // 0.7 알파 패밀리 일관성 유지 [D12] — design/System States.dc.html의 solid
+    // #f5b13d 링 대신 이 값이 정본이다.
     warnRing: "0 0 0 1.5px rgba(245,177,61,0.7), 0 0 14px rgba(245,177,61,0.3)",
     portOutputGlow: (famHex: string) => `0 0 7px ${famHex}aa`,
     // 노드 카드 썸네일(Shader/Image 96px 프리뷰) 안쪽 그림자.
@@ -183,6 +198,7 @@ export const PORT_DIAMETER = { card: 11, hero: 13 } as const;
  *   center y = node.top + portTop + 5.5
  * portTop 은 노드 실제 높이(header 30 + pad 9 + previewH + pad 9) 안에 들 것.
  * 엣지 path 는 위 포트 중심 좌표에 맞춘 베지어(stroke-width 2.5, 색=소스 패밀리).
+ * 포트 라벨은 카드 좌/우 rail(폭 ~46px)에 두고 썸네일을 그만큼 안쪽으로 민다 [D2].
  */
 
 /** :root CSS 변수로 파생하고 싶을 때 (선택) */
@@ -191,6 +207,9 @@ export function cssVars(): string {
   return [
     ...Object.entries(t.surface).map(
       ([k, v]) => `--surface-${kebab(k)}: ${v};`,
+    ),
+    ...Object.entries(t.gradient).map(
+      ([k, v]) => `--gradient-${kebab(k)}: ${v};`,
     ),
     ...Object.entries(t.border).map(([k, v]) => `--border-${kebab(k)}: ${v};`),
     ...Object.entries(t.accent).map(([k, v]) => `--accent-${kebab(k)}: ${v};`),

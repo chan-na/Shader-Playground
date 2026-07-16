@@ -27,6 +27,12 @@ test.describe("Phase 16 — diagnostics panel", () => {
 
     await page.getByTestId("open-diagnostics").click();
     await expect(panel).toBeVisible();
+    // D1: Diagnostics is now the Side Panel's 4th tab — opening it must also
+    // mark that tab active (new-path assertion; testid path above is
+    // unchanged and still exercised).
+    await expect(page.getByTestId("tab-diagnostics")).toHaveClass(
+      /panel-tab--active/,
+    );
     await expect(page.getByTestId("diagnostics-log-list")).toContainText(
       "e2e-diagnostic-marker",
     );

@@ -548,8 +548,6 @@ export function CommandPalette() {
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
         useCommandPaletteStore.getState().toggle();
-        setQuery("");
-        setActive(0);
       } else if (e.key === "Escape" && open) {
         useCommandPaletteStore.getState().setOpen(false);
       }
@@ -558,8 +556,13 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // B1: 열기 경로가 둘 — ⌘K toggle과 store.setOpen(true) 직접 호출
+  // (AppToolbar Search, Welcome "Browse all presets") — 이므로 리셋은
+  // open 전이 지점 한 곳에서만 수행한다.
   useEffect(() => {
     if (open) {
+      setQuery("");
+      setActive(0);
       // Defer focus so the input mounts before focus() runs.
       setTimeout(() => inputRef.current?.focus(), 0);
     }
@@ -588,6 +591,33 @@ export function CommandPalette() {
     cmd.run();
     setOpen(false);
   };
+
+  // D17/E6 — dc "Command Palette.dc.html" L119-124: 빈 결과일 때
+  // "Create a Shader node named …" CTA. 셰이더 템플릿은 dc가 지정하지
+  // 않아 기존 buildCommands()의 "Add Shader: Unlit"과 동일한 형태(잠정
+  // 결정 — followups 기록됨)로 생성한다.
+  const createShaderFromTerm = () => {
+    const name = displayTerm.trim();
+    if (!name) return;
+    const id = nextId("shader");
+    useGraphStore.getState().addNode(
+      {
+        id,
+        kind: "shader",
+        name,
+        vertexSource: basicVert,
+        fragmentSource: unlitFrag,
+        uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
+      },
+      { x: 100, y: 0 },
+    );
+    useSelectionStore.getState().select(id);
+    setOpen(false);
+  };
+
+  // 검색어 없이 결과가 0인 경우는 현재 도달 불가(빈 쿼리는 항상 전체
+  // 커맨드 풀을 반환)하지만, 방어적으로 검색어 존재를 함께 확인한다.
+  const canCreateFromTerm = flat.length === 0 && displayTerm.trim().length > 0;
 
   const resultCount = `${flat.length} ${flat.length === 1 ? "result" : "results"}`;
 
@@ -638,6 +668,7 @@ export function CommandPalette() {
                 e.preventDefault();
                 const cmd = flat[active];
                 if (cmd) run(cmd);
+                else if (canCreateFromTerm) createShaderFromTerm();
               } else if (e.key === "Tab") {
                 e.preventDefault();
                 setQuery(cycleModePrefix(query));
@@ -655,6 +686,23 @@ export function CommandPalette() {
               <div className="cmdk-empty-text">
                 No matches for “<strong>{displayTerm}</strong>”
               </div>
+              {canCreateFromTerm && (
+                <button
+                  type="button"
+                  className="cmdk-empty-cta"
+                  data-testid="cmdk-create-cta"
+                  onClick={createShaderFromTerm}
+                >
+                  <span>
+                    Create a Shader node named “
+                    <span className="cmdk-empty-cta-term">
+                      {displayTerm.trim()}
+                    </span>
+                    ”
+                  </span>
+                  <span className="cmdk-empty-cta-kbd">↵</span>
+                </button>
+              )}
             </div>
           ) : (
             renderGroups.map((g) => (

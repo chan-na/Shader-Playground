@@ -46,6 +46,11 @@ export type ParamKind = "float" | "vec3" | "color" | "time";
 interface BaseNode {
   id: string;
   kind: GraphNodeKind;
+  /**
+   * 사용자 지정 표시명 [D15]. 미지정 시 표시 폴백은 displayNodeName()
+   * (core/nodes/registry) 참조. 빈 문자열은 저장하지 않는다(부재=미지정).
+   */
+  name?: string;
 }
 
 export interface MeshGraphNode extends BaseNode {

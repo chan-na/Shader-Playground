@@ -110,4 +110,43 @@ describe("ProblemsPanel", () => {
     expect(screen.getByText("No problems")).not.toBeNull();
     expect(screen.queryByTestId("problem-row")).toBeNull();
   });
+
+  // D15: the diagnostic row's location text used to read `${kind} · ${id}`,
+  // leaking the internal id. It should show the node's display name instead.
+  it("shows the node's display name (not its raw id) once a node exists for the diagnostic", () => {
+    useGraphStore.getState().addNode({
+      id: "s1",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "",
+      uniformValues: {},
+    });
+    useGraphStore.getState().renameNode("s1", "Fresnel");
+    useDiagnosticsStore.getState().set("s1", {
+      ...emptyDiagnostics(),
+      fragment: [{ line: 2, severity: "error", message: "boom" }],
+    });
+
+    render(<ProblemsPanel />);
+
+    const row = screen.getByTestId("problem-row");
+    expect(row.textContent).toContain("Fresnel");
+    expect(row.textContent).not.toContain("s1");
+  });
+
+  // A diagnostic can outlive its node (e.g. the node was deleted while a
+  // stale diagnostics entry was still in flight) — the row must still show
+  // *something* identifying it rather than going blank, so it falls back to
+  // the raw id.
+  it("falls back to the raw id when no node matches the diagnostic's nodeId", () => {
+    useDiagnosticsStore.getState().set("deleted-node", {
+      ...emptyDiagnostics(),
+      fragment: [{ line: 1, severity: "warning", message: "orphaned" }],
+    });
+
+    render(<ProblemsPanel />);
+
+    const row = screen.getByTestId("problem-row");
+    expect(row.textContent).toContain("deleted-node");
+  });
 });

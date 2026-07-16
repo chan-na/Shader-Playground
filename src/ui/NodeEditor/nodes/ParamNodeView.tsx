@@ -1,6 +1,6 @@
 import type { NodeProps } from "@xyflow/react";
 import type { ParamGraphNode } from "../../../core/graph/types";
-import { paramOutputPort } from "../../../core/nodes/registry";
+import { displayNodeName, paramOutputPort } from "../../../core/nodes/registry";
 import { useGraphStore } from "../../../state/graphStore";
 import { useTimeStore } from "../../../state/timeStore";
 import { NodeCardHeader } from "./NodeCardHeader";
@@ -16,6 +16,9 @@ export function ParamNodeView({ id, data }: NodeProps) {
   const time = useTimeStore((s) => s.simTime);
   const setParamValue = useGraphStore((s) => s.setParamValue);
   const port = paramOutputPort(node.paramKind);
+  // "커스텀 표시명 없음" — neither a user-set `name` nor the legacy `label`
+  // is present, so the paramKind chip fills the meta slot as a fallback.
+  const hasCustomName = Boolean(node.name?.trim() || node.label);
 
   return (
     <div
@@ -25,9 +28,10 @@ export function ParamNodeView({ id, data }: NodeProps) {
     >
       <NodeCardHeader
         kind="param"
-        title={node.label ? node.label : "Param"}
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={
-          node.label ? undefined : (
+          hasCustomName ? undefined : (
             <span className="node-card__meta">{node.paramKind}</span>
           )
         }
@@ -107,7 +111,6 @@ export function ParamNodeView({ id, data }: NodeProps) {
             ))}
           </>
         )}
-        <div className="node-card__meta">{id}</div>
       </div>
       <PortHandle port={port} side="out" top={PORT_TOP_PAD} />
     </div>

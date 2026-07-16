@@ -102,7 +102,12 @@ test.describe("Phase 12 — resilience & expressiveness", () => {
             positions: { saved_node: { x: 0, y: 0 } },
           };
           store.put(payload, "autosave");
-          tx.oncomplete = () => resolve();
+          tx.oncomplete = () => {
+            // Close the handle so this evaluate doesn't leave a dangling
+            // IDB connection behind for the rest of the page's life.
+            db.close();
+            resolve();
+          };
           tx.onerror = () => reject(tx.error);
         };
         open.onerror = () => reject(open.error);
@@ -119,6 +124,16 @@ test.describe("Phase 12 — resilience & expressiveness", () => {
     // Click "새로 시작" (discard) to clean up state for sibling tests.
     await page.getByTestId("recovery-discard").click();
     await expect(dialog).toBeHidden();
+
+    // Teardown stabilizer — do not remove. This is the only spec that
+    // reloads the page with a live SwiftShader WebGL context; disposing the
+    // browser context straight from that state intermittently (~50% locally)
+    // deadlocks Chromium's Target.disposeBrowserContext, which surfaced as
+    // "Tearing down context exceeded the test timeout of 30000ms". Ending on
+    // about:blank tears the GL context down through the normal navigation
+    // path first, which reliably avoids the hang (0/14 failures vs ~7/14
+    // without it). No assertion is affected — this runs after all expects.
+    await page.goto("about:blank");
   });
 
   test("`// @color` hint promotes a vec3 to a color picker", async ({

@@ -69,6 +69,25 @@ describe("serializeProject / deserializeProject", () => {
     expect(restored.warnings).toEqual([]);
   });
 
+  it("round-trips a node's name [D15]", () => {
+    const graph: Graph = {
+      nodes: [{ id: "out1", kind: "output", name: "Hero Output" }],
+      edges: [],
+    };
+    const serialized = serializeProject(graph, {});
+    const restored = deserializeProject(JSON.parse(JSON.stringify(serialized)));
+    expect(restored.graph.nodes[0]?.name).toBe("Hero Output");
+    expect(restored.warnings).toEqual([]);
+  });
+
+  it("loads a legacy payload without a name field, with no warnings", () => {
+    const graph: Graph = { nodes: [{ id: "out1", kind: "output" }], edges: [] };
+    const serialized = serializeProject(graph, {});
+    const restored = deserializeProject(JSON.parse(JSON.stringify(serialized)));
+    expect("name" in (restored.graph.nodes[0] ?? {})).toBe(false);
+    expect(restored.warnings).toEqual([]);
+  });
+
   it("rejects payload with wrong format tag", () => {
     expect(() =>
       deserializeProject({

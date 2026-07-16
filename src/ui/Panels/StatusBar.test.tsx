@@ -1,5 +1,8 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { useDebugUiStore } from "../../state/debugUiStore";
+import { useLayoutStore } from "../../state/layoutStore";
 import { StatusBar } from "./StatusBar";
 
 // NOTE: zustand v5 + useSyncExternalStore returns the *initial* store snapshot
@@ -48,5 +51,33 @@ describe("StatusBar", () => {
   it("renders the left status pill with a stable testid", () => {
     const html = renderToStaticMarkup(<StatusBar />);
     expect(html).toContain('data-testid="status-pill"');
+  });
+});
+
+// D1: Diagnostics moved into the Side Panel as its 4th tab, so opening it
+// from StatusBar must also un-collapse a collapsed side panel — otherwise
+// the toggle flips debugUiStore.open with no visible effect. This needs a
+// live DOM (fireEvent) rather than the static-markup snapshots above, so it
+// gets its own describe/afterEach pair.
+describe("StatusBar — Diagnostics entry point un-collapses the side panel (D1)", () => {
+  const initialLayout = useLayoutStore.getState();
+  const initialDebugUi = useDebugUiStore.getState();
+
+  afterEach(() => {
+    cleanup();
+    useLayoutStore.setState(initialLayout, true);
+    useDebugUiStore.setState(initialDebugUi, true);
+  });
+
+  it("expands a collapsed side panel and opens diagnostics on click", () => {
+    useLayoutStore.setState((s) => ({
+      collapsed: { ...s.collapsed, sidePanel: true },
+    }));
+
+    render(<StatusBar />);
+    fireEvent.click(screen.getByTestId("open-diagnostics"));
+
+    expect(useDebugUiStore.getState().open).toBe(true);
+    expect(useLayoutStore.getState().collapsed.sidePanel).toBe(false);
   });
 });

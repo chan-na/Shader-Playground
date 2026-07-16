@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { glslValidator } from "../../core/glsl/glslValidator";
 import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
+import { displayNodeName } from "../../core/nodes/registry";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
@@ -21,8 +22,9 @@ import { MultiSelectBanner } from "./MultiSelectBanner";
 import { StageTabs } from "./StageTabs";
 
 /** Node breadcrumb chip (Code Editor.dc.html L39-43) — accent-tinted pill
- * showing the currently-edited node's category glyph, id, and kind, rendered
- * in the DockPanelHeader children slot right after the stage tabs. */
+ * showing the currently-edited node's category glyph, display name, and
+ * kind, rendered in the DockPanelHeader children slot right after the stage
+ * tabs. */
 const BREADCRUMB_CONTAINER_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -57,10 +59,10 @@ const BREADCRUMB_KIND_STYLE: CSSProperties = {
 };
 
 function NodeBreadcrumb({
-  id,
+  name,
   kind,
 }: {
-  id: string;
+  name: string;
   kind: "shader" | "compute";
 }) {
   return (
@@ -68,7 +70,7 @@ function NodeBreadcrumb({
       <span style={BREADCRUMB_ICON_STYLE} aria-hidden="true">
         {NODE_GLYPH[kind]}
       </span>
-      <span style={BREADCRUMB_NAME_STYLE}>{id}</span>
+      <span style={BREADCRUMB_NAME_STYLE}>{name}</span>
       <span style={BREADCRUMB_KIND_STYLE}>{kind}</span>
     </div>
   );
@@ -140,7 +142,7 @@ export function CodeEditor() {
   const multiSelectChips = useMemo(() => {
     if (!isMulti) return [];
     const byId = new Map(allNodes.map((n) => [n.id, n]));
-    const chips: Array<{ id: string; hasError: boolean }> = [];
+    const chips: Array<{ id: string; label: string; hasError: boolean }> = [];
     for (const id of selectedIds) {
       const n = byId.get(id);
       if (!n || (n.kind !== "shader" && n.kind !== "compute")) continue;
@@ -149,7 +151,11 @@ export function CodeEditor() {
         d &&
           (d.vertex.length > 0 || d.fragment.length > 0 || d.link.length > 0),
       );
-      chips.push({ id, hasError });
+      // A stale id (selected but since removed from the graph) never reaches
+      // this push — the `!n` guard above already `continue`s past it, so
+      // there is no separate "id as label" fallback to write here; `n` is
+      // always a live node once we get this far.
+      chips.push({ id, label: displayNodeName(n), hasError });
     }
     return chips;
   }, [isMulti, selectedIds, allNodes, diagsByNode]);
@@ -346,7 +352,11 @@ export function CodeEditor() {
 
   return (
     <div className="panel panel--code">
-      <DockPanelHeader panelId="codeEditor" meta="GLSL · ES 3.0">
+      <DockPanelHeader
+        panelId="codeEditor"
+        meta="GLSL · ES 3.0"
+        metaAlign="end"
+      >
         <StageTabs
           active={stage}
           onChange={setStage}
@@ -356,7 +366,7 @@ export function CodeEditor() {
         {!isMulti && effectiveId && node && (
           <>
             <span className="dock-header-divider" aria-hidden="true" />
-            <NodeBreadcrumb id={effectiveId} kind={node.kind} />
+            <NodeBreadcrumb name={displayNodeName(node)} kind={node.kind} />
           </>
         )}
       </DockPanelHeader>

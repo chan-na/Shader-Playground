@@ -161,14 +161,16 @@
   letter-spacing: 1px;
 }
 
-/* ─── Port labels (next to handles) ───────────────────────────── */
+/* ─── 포트 라벨 rail(폭 ~46px) ─────────────────────────────────────
+ * 라벨은 카드 좌/우 rail에 배치, 색=타입 패밀리 [D2]. 색은 PortHandle.tsx가
+ * 포트별로 portFamilyHex를 인라인 style.color로 주입하므로 여기서는
+ * color를 선언하지 않는다. design/Node Editor.dc.html L190-195. */
 .node-card__port-label {
   position: absolute;
-  font-size: 10px;
-  color: var(--text-secondary);
+  font-size: 8.5px;
   font-family: var(--font-mono);
   pointer-events: none;
-  max-width: 84px;
+  max-width: 34px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -176,11 +178,12 @@
 }
 
 .node-card__port-label--in {
-  left: 14px;
+  left: 11px;
   transform: translateY(-50%);
 }
 .node-card__port-label--out {
-  right: 14px;
+  right: 11px;
+  max-width: 30px;
   transform: translateY(-50%);
   text-align: right;
 }

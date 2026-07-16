@@ -28,7 +28,7 @@
   a { color: #57a9ff; } a:hover { color: #7dbcff; }
 </style>
 </helmet>
-<div style="width:1440px;height:900px;display:flex;background:#08090b;color:#e7eaee;overflow:hidden;font-size:13px;">
+<div style="width:1440px;height:900px;display:flex;background:#08090b;color:#e7eaee;overflow:hidden;font-size:13px;position:relative;">
 
   <!-- ══════════ LEFT SWITCHER RAIL ══════════ -->
   <sc-if value="{{ showRail }}" hint-placeholder-val="{{ true }}">
@@ -128,7 +128,7 @@
                   <div style="padding:12px;"><div style="height:56px;border-radius:6px;background:linear-gradient(90deg,#131519 25%,#191c21 50%,#131519 75%);background-size:420px 100%;animation:ssShimmer 1.3s linear infinite;"></div></div>
                 </div>
               </sc-for>
-              <div style="position:absolute;left:14px;bottom:16px;display:flex;align-items:center;gap:9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;"><span style="width:14px;height:14px;border-radius:50%;border:2px solid #2b3037;border-top-color:#3d9bff;animation:ssSpin 0.7s linear infinite;"></span>Restoring graph…</div>
+              <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:9px;background:rgba(11,12,14,0.82);border:1px solid #20242a;border-radius:10px;padding:9px 14px;backdrop-filter:blur(6px);box-shadow:0 8px 24px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa2ac;"><span style="width:14px;height:14px;border-radius:50%;border:2px solid #2b3037;border-top-color:#3d9bff;animation:ssSpin 0.7s linear infinite;"></span>Restoring graph…</div>
             </div>
           </sc-if>
 
@@ -423,10 +423,29 @@
       </div>
     </sc-if>
   </div>
+
+  <!-- ══ CRASH FALLBACK (ErrorBoundary) — 8th state, intentionally minimal (D6) ══ -->
+  <!-- NOTE: uses raw system fonts + neutral greys BY DESIGN — must survive webfont / CSS-var injection failure, so it deliberately does not depend on theme tokens. -->
+  <sc-if value="{{ crashBlock }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:70;background:#111214;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
+      <div style="max-width:430px;text-align:center;color:#dddddd;">
+        <div style="width:44px;height:44px;border-radius:8px;background:#2a2a2a;border:1px solid #3a3a3a;display:flex;align-items:center;justify-content:center;font-size:22px;color:#f0555c;margin:0 auto 18px;">!</div>
+        <div style="font-size:18px;font-weight:600;color:#eeeeee;margin-bottom:8px;">Something went wrong</div>
+        <div style="font-size:13px;line-height:1.6;color:#999999;margin-bottom:14px;">ShaderPlayground hit an unexpected error and had to stop rendering. Your last saved project is safe.</div>
+        <pre style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;text-align:left;color:#8a8a8a;background:#0d0d0e;border:1px solid #262626;border-radius:6px;padding:10px 12px;overflow:auto;margin:0 0 18px;white-space:pre-wrap;">TypeError: cannot read properties of undefined (reading 'compile')
+    at GraphRuntime.tick (runtime.ts:212)</pre>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button style="height:36px;padding:0 18px;background:#3d9bff;border:none;border-radius:6px;color:#ffffff;font-size:13px;font-weight:600;cursor:pointer;">Reload app</button>
+          <button style="height:36px;padding:0 14px;background:transparent;border:1px solid #3a3a3a;border-radius:6px;color:#cccccc;font-size:13px;cursor:pointer;">Copy error report</button>
+        </div>
+        <div style="font-size:11px;color:#666666;margin-top:16px;">Fallback UI · minimal styling by design — no theme tokens or web fonts required</div>
+      </div>
+    </div>
+  </sc-if>
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;empty-graph&quot;,&quot;empty-viewport&quot;,&quot;loading&quot;,&quot;perm-webcam&quot;,&quot;perm-audio&quot;,&quot;compile-error&quot;,&quot;gpu-unsupported&quot;],&quot;default&quot;:&quot;compile-error&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;State&quot;},&quot;showRail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;},&quot;showToolbar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;empty-graph&quot;,&quot;empty-viewport&quot;,&quot;loading&quot;,&quot;perm-webcam&quot;,&quot;perm-audio&quot;,&quot;compile-error&quot;,&quot;gpu-unsupported&quot;,&quot;crash-fallback&quot;],&quot;default&quot;:&quot;compile-error&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;State&quot;},&quot;showRail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;},&quot;showToolbar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;}}">
 class Component extends DCLogic {
   state = { sel: "compile-error" };
 
@@ -443,6 +462,7 @@ class Component extends DCLogic {
       { group: "Permission", key: "perm-audio", label: "Microphone access", glyph: "∿" },
       { group: "Error", key: "compile-error", label: "Compile error", glyph: "⚠" },
       { group: "Error", key: "gpu-unsupported", label: "WebGL2 unavailable", glyph: "⊘" },
+      { group: "Error", key: "crash-fallback", label: "App crashed", glyph: "!" },
     ];
     const catColor = { "Empty": "#77828f", "Loading": "#3d9bff", "Permission": "#f5b13d", "Error": "#f0555c" };
     const groupNames = ["Empty", "Loading", "Permission", "Error"];
@@ -481,7 +501,7 @@ class Component extends DCLogic {
         previewText: isWebcam ? "no signal" : "1280×720", previewTextColor: isWebcam ? "#8f97a1" : "rgba(255,255,255,0.5)",
         inputs: [], hasOut: true, outTop: "58px", outColor: "#a06bff",
         outGlow: isWebcam ? "none" : "0 0 8px rgba(160,107,255,0.6)", outOpacity: isWebcam ? "0.4" : "1",
-        shadow: isWebcam ? "0 8px 22px rgba(0,0,0,0.5),0 0 0 1.5px #f5b13d,0 0 14px rgba(245,177,61,0.3)" : "0 8px 22px rgba(0,0,0,0.45)",
+        shadow: isWebcam ? "0 8px 22px rgba(0,0,0,0.5),0 0 0 1.5px rgba(245,177,61,0.7),0 0 14px rgba(245,177,61,0.3)" : "0 8px 22px rgba(0,0,0,0.45)",
         ...(isWebcam ? warnBadge : { badge: null }),
       },
       {
@@ -492,7 +512,7 @@ class Component extends DCLogic {
         previewText: isAudio ? "muted" : "FFT 512", previewTextColor: isAudio ? "#8f97a1" : "rgba(255,255,255,0.5)",
         inputs: [], hasOut: true, outTop: "58px", outColor: "#7ed957",
         outGlow: isAudio ? "none" : "0 0 8px rgba(126,217,87,0.6)", outOpacity: isAudio ? "0.4" : "1",
-        shadow: isAudio ? "0 8px 22px rgba(0,0,0,0.5),0 0 0 1.5px #f5b13d,0 0 14px rgba(245,177,61,0.3)" : "0 8px 22px rgba(0,0,0,0.45)",
+        shadow: isAudio ? "0 8px 22px rgba(0,0,0,0.5),0 0 0 1.5px rgba(245,177,61,0.7),0 0 14px rgba(245,177,61,0.3)" : "0 8px 22px rgba(0,0,0,0.45)",
         ...(isAudio ? warnBadge : { badge: null }),
       },
       {
@@ -570,6 +590,7 @@ class Component extends DCLogic {
       "perm-audio":     { graph: "live",     vp: "audio",   panel: "inspector", count: "4N · 3E", gNote: "audio blocked", vpNote: "awaiting mic", statusC: "#f5b13d", statusT: "Awaiting mic", m1: "4 nodes", m2: "1 blocked", right: "Grant access to start FFT", rightC: "#f5b13d", fps: false },
       "compile-error":  { graph: "live",     vp: "error",   panel: "problems",  count: "4N · 3E", gNote: "1 node failing", vpNote: "compile failed", statusC: "#f0555c", statusT: "1 error", m1: "compile failed", m2: "Fresnel", right: "2 errors · 1 warning", rightC: "#f0555c", fps: false },
       "gpu-unsupported":{ graph: "live",     vp: "empty",   panel: "empty",     count: "—", gNote: "offline", vpNote: "renderer offline", statusC: "#f0555c", statusT: "WebGL2 unavailable", m1: "renderer offline", m2: "0 fps", right: "GPU context failed", rightC: "#f0555c", fps: false },
+      "crash-fallback": { graph: "live",     vp: "empty",   panel: "empty",     count: "—", gNote: "—", vpNote: "—", statusC: "#f0555c", statusT: "Crashed", m1: "—", m2: "—", right: "—", rightC: "#f0555c", fps: false },
     }[sel] || {};
 
     const disabledAction = sel === "gpu-unsupported" || sel === "compile-error";
@@ -625,6 +646,7 @@ class Component extends DCLogic {
 
       // gpu block
       gpuBlock: sel === "gpu-unsupported",
+      crashBlock: sel === "crash-fallback",
       gpuTips,
     };
   }

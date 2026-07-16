@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GroupGraphNode, MeshGraphNode } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { tokens } from "../../theme";
 import { GroupInspector } from "./GroupInspector";
 
 function resetStores() {
@@ -92,6 +93,9 @@ describe("GroupInspector", () => {
 
     const confirmBox = screen.getByTestId("group-delete-confirm");
     expect(confirmBox).not.toBeNull();
+    expect((confirmBox as HTMLElement).style.borderRadius).toBe(
+      `${tokens.radius.button}px`,
+    );
     const confirmOk = screen.getByTestId("group-delete-confirm-ok");
     expect(confirmOk).not.toBeNull();
 

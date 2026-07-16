@@ -473,7 +473,7 @@ export function NodeEditor() {
             variant={BackgroundVariant.Dots}
             gap={22}
             size={2}
-            color={withAlpha("#ffffff", 0.045)}
+            color={tokens.overlay.gridDot}
           />
           <MiniMap
             pannable

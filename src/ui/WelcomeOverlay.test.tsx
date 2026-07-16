@@ -107,4 +107,33 @@ describe("WelcomeOverlay", () => {
     const mesh = nodes.find(isMesh);
     expect(mesh?.primitive).toBe("torus");
   });
+
+  it("Enter still creates the selected starter when a welcome card has focus (B2)", () => {
+    render(<WelcomeOverlay />);
+    fireEvent.click(screen.getByTestId("welcome-card-torus"));
+    // jsdom doesn't move focus on a plain click() the way a real browser
+    // does for a <button>, so focus it explicitly to reproduce the
+    // post-click state the browser leaves us in (B2's actual bug trigger).
+    (screen.getByTestId("welcome-card-torus") as HTMLButtonElement).focus();
+    expect(document.activeElement).toBe(
+      screen.getByTestId("welcome-card-torus"),
+    );
+
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    const nodes = useGraphStore.getState().nodes;
+    const mesh = nodes.find(isMesh);
+    expect(mesh?.primitive).toBe("torus");
+  });
+
+  it("Enter is still ignored while an unrelated element has focus", () => {
+    render(<WelcomeOverlay />);
+    const link = screen.getByRole("button", { name: "Browse all presets" });
+    link.focus();
+    expect(document.activeElement).toBe(link);
+
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    expect(useGraphStore.getState().nodes.length).toBe(0);
+  });
 });

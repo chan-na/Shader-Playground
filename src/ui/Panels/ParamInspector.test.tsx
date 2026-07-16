@@ -119,6 +119,35 @@ describe("ParamInspector", () => {
     useGraphStore.getState().addNode(node);
     render(<ParamInspector node={node} />);
     expect(screen.getByText("Output type")).not.toBeNull();
-    expect(screen.getByText("vec3")).not.toBeNull();
+    expect(screen.getByText("vec3 · Vector")).not.toBeNull();
+  });
+
+  describe("Output type badge — port family color (D18)", () => {
+    it("shows 'float · Scalar' in scalar green for a float param", () => {
+      const node = floatNode({ paramKind: "float", value: 0.5 });
+      useGraphStore.getState().addNode(node);
+      render(<ParamInspector node={node} />);
+      const badge = screen.getByText("float · Scalar");
+      expect(badge).not.toBeNull();
+      // tokens.portFamily.scalar #7ed957 → jsdom-normalized rgb()
+      expect(badge.style.color).toBe("rgb(126, 217, 87)");
+    });
+
+    it("shows 'float · Scalar' for a time param", () => {
+      const node = floatNode({ paramKind: "time", value: [1, 0] });
+      useGraphStore.getState().addNode(node);
+      render(<ParamInspector node={node} />);
+      expect(screen.getByText("float · Scalar")).not.toBeNull();
+    });
+
+    it("shows 'vec3 · Vector' in vector yellow for a color param", () => {
+      const node = floatNode({ paramKind: "color", value: [1, 0, 0] });
+      useGraphStore.getState().addNode(node);
+      render(<ParamInspector node={node} />);
+      const badge = screen.getByText("vec3 · Vector");
+      expect(badge).not.toBeNull();
+      // tokens.portFamily.vector #f0b429 → jsdom-normalized rgb()
+      expect(badge.style.color).toBe("rgb(240, 180, 41)");
+    });
   });
 });

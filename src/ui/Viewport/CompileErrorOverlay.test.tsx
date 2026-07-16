@@ -136,6 +136,50 @@ describe("CompileErrorOverlay", () => {
     expect(writeText).toHaveBeenCalledWith("ERROR: 0:6: undeclared u_missing");
   });
 
+  it("does not show '(+N more)' when only one shader node is failing", () => {
+    seedFragmentError();
+    render(<CompileErrorOverlay />);
+
+    expect(screen.queryByTestId("compile-error-more")).toBeNull();
+  });
+
+  it("shows '(+1 more)' when a second shader node is also failing, while keeping the title's count at the first node's [D19]", () => {
+    seedFragmentError();
+    useGraphStore.getState().setGraph({
+      nodes: [
+        {
+          id: "s1",
+          kind: "shader",
+          vertexSource: "void main() {}",
+          fragmentSource: FRAGMENT_SOURCE,
+          uniformValues: {},
+        },
+        {
+          id: "s2",
+          kind: "shader",
+          vertexSource: "void main() {}",
+          fragmentSource: FRAGMENT_SOURCE,
+          uniformValues: {},
+        },
+      ],
+      edges: [],
+    });
+    useDiagnosticsStore.getState().set("s2", {
+      vertex: [],
+      fragment: [{ line: 6, severity: "error", message: "undeclared u_other" }],
+      link: [],
+    });
+
+    render(<CompileErrorOverlay />);
+
+    expect(screen.getByTestId("compile-error-more").textContent).toContain(
+      "(+1 more)",
+    );
+    // Title stays fixed to the first failing node (s1) — 1 error, not the
+    // 2-node sum the Status Bar would report.
+    expect(screen.getByText(/1 error/)).toBeTruthy();
+  });
+
   it("shows 'Open in editor' and no code card for a lineless link-stage failure", () => {
     useGraphStore.getState().setGraph({
       nodes: [

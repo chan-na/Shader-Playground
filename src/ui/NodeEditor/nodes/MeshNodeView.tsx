@@ -4,6 +4,7 @@ import {
   type PrimitiveName,
 } from "../../../core/assets/primitives";
 import type { MeshGraphNode } from "../../../core/graph/types";
+import { displayNodeName } from "../../../core/nodes/registry";
 import { useAssetStore } from "../../../state/assetStore";
 import { useGraphStore } from "../../../state/graphStore";
 import { NodeCardHeader } from "./NodeCardHeader";
@@ -35,7 +36,8 @@ export function MeshNodeView({ id, data }: NodeProps) {
     <div className="node-card" style={{ position: "relative", minWidth: 168 }}>
       <NodeCardHeader
         kind="mesh"
-        title="Mesh"
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={<span className="node-card__meta">{label}</span>}
       />
       <div

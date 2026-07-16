@@ -84,6 +84,13 @@ export function CompileErrorOverlay() {
             <span style={{ color: "var(--error)" }}>
               {info.errorCount} error{info.errorCount === 1 ? "" : "s"}
             </span>
+            {info.failingNodeCount > 1 && (
+              <span
+                data-testid="compile-error-more"
+                style={{ color: "var(--text-muted)" }}
+                title={`${info.failingNodeCount} shader nodes are failing — the Status Bar counts errors across all of them`}
+              >{` (+${info.failingNodeCount - 1} more)`}</span>
+            )}
           </div>
         </div>
         {info.excerpt.length > 0 && (

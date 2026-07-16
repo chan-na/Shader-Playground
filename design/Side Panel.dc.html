@@ -47,6 +47,7 @@
         <button onClick="{{ tabInspector }}" style="display:flex;align-items:center;gap:6px;height:34px;padding:0 4px;background:transparent;border:none;border-bottom:2px solid {{ insTop }};color:{{ insColor }};font-size:11.5px;font-weight:500;cursor:pointer;">Inspector</button>
         <button onClick="{{ tabAssets }}" style="display:flex;align-items:center;gap:6px;height:34px;padding:0 4px;background:transparent;border:none;border-bottom:2px solid {{ astTop }};color:{{ astColor }};font-size:11.5px;font-weight:500;cursor:pointer;">Assets</button>
         <button onClick="{{ tabProblems }}" style="display:flex;align-items:center;gap:7px;height:34px;padding:0 4px;background:transparent;border:none;border-bottom:2px solid {{ prbTop }};color:{{ prbColor }};font-size:11.5px;font-weight:500;cursor:pointer;">Problems<span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;color:#fff;background:#f0555c;border-radius:8px;min-width:16px;height:15px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px;">2</span></button>
+        <button onClick="{{ tabDiagnostics }}" style="display:flex;align-items:center;gap:6px;height:34px;padding:0 4px;background:transparent;border:none;border-bottom:2px solid {{ dgTop }};color:{{ dgColor }};font-size:11.5px;font-weight:500;cursor:pointer;">Diagnostics</button>
         <div style="flex:1;"></div>
         <span style="font-size:14px;color:#565e68;cursor:pointer;" style-hover="color:#c4cad2;">⤢</span>
       </div>
@@ -68,6 +69,15 @@
                 <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#6fe3b8;background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.3);border-radius:5px;padding:2px 7px;">{{ nodeMs }}</span>
                 <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;background:#1a1d22;border:1px solid #20242a;border-radius:5px;padding:2px 7px;">{{ nodeType }}</span>
               </div>
+            </div>
+          </div>
+
+          <!-- rename affordance (D15): editable Name field, mirrors node-card double-click inline edit -->
+          <div style="padding:13px 14px 0;">
+            <div style="font-size:11px;color:#9aa2ac;margin-bottom:7px;">Name</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input value="{{ nodeName }}" readonly style="flex:1;height:32px;padding:0 11px;background:#22262c;border:1px solid #2b3037;border-radius:7px;color:#e7eaee;font-family:'IBM Plex Sans',sans-serif;font-size:12px;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#656d78;white-space:nowrap;">↵ rename</span>
             </div>
           </div>
 
@@ -203,6 +213,30 @@
             </div>
           </div>
         </sc-if>
+
+        <!-- ─── DIAGNOSTICS (D1) ─── -->
+        <sc-if value="{{ isDiagnostics }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:12px 14px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+              <sc-for list="{{ diagStats }}" as="st" hint-placeholder-count="4">
+                <div style="background:#1a1d22;border:1px solid #20242a;border-radius:8px;padding:9px 11px;">
+                  <div style="font-size:9px;letter-spacing:0.6px;text-transform:uppercase;color:#656d78;margin-bottom:5px;">{{ st.k }}</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:{{ st.vc }};">{{ st.v }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.9px;text-transform:uppercase;color:#656d78;margin-bottom:9px;">Runtime log</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <sc-for list="{{ diagLog }}" as="d" hint-placeholder-count="5">
+                <div style="display:flex;gap:9px;align-items:flex-start;padding:8px 10px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;color:{{ d.hex }};background:{{ d.bg }};border:1px solid {{ d.bd }};border-radius:4px;padding:1px 5px;min-width:44px;text-align:center;flex-shrink:0;">{{ d.level }}</span>
+                  <div style="min-width:0;flex:1;"><div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#c4cad2;line-height:1.4;">{{ d.msg }}</div></div>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#565e68;flex-shrink:0;">{{ d.time }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
       </div>
     </div>
 
@@ -286,7 +320,7 @@
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:860},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;inspector&quot;,&quot;assets&quot;,&quot;problems&quot;],&quot;default&quot;:&quot;inspector&quot;,&quot;tsType&quot;:&quot;'inspector'|'assets'|'problems'&quot;,&quot;section&quot;:&quot;Panel&quot;},&quot;node&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;shader&quot;,&quot;param&quot;,&quot;webcam&quot;,&quot;audio&quot;,&quot;group&quot;,&quot;output&quot;],&quot;default&quot;:&quot;shader&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Panel&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:860},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;inspector&quot;,&quot;assets&quot;,&quot;problems&quot;,&quot;diagnostics&quot;],&quot;default&quot;:&quot;inspector&quot;,&quot;tsType&quot;:&quot;'inspector'|'assets'|'problems'|'diagnostics'&quot;,&quot;section&quot;:&quot;Panel&quot;},&quot;node&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;shader&quot;,&quot;param&quot;,&quot;webcam&quot;,&quot;audio&quot;,&quot;group&quot;,&quot;output&quot;],&quot;default&quot;:&quot;shader&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Panel&quot;}}">
 class Component extends DCLogic {
   state = { tab: "inspector", node: "shader" };
 
@@ -345,15 +379,31 @@ class Component extends DCLogic {
     ];
 
     const tabActive = (t) => ({ top: tab === t ? "#3d9bff" : "transparent", color: tab === t ? "#e7eaee" : "#656d78" });
-    const ins = tabActive("inspector"), ast = tabActive("assets"), prb = tabActive("problems");
+    const ins = tabActive("inspector"), ast = tabActive("assets"), prb = tabActive("problems"), dg = tabActive("diagnostics");
+
+    const diagStats = [
+      { k: "GPU", v: "Apple M2 · Metal", vc: "#c4cad2" },
+      { k: "Frame", v: "16.6 ms · 60 fps", vc: "#6fe3b8" },
+      { k: "Draw calls", v: "42", vc: "#e7eaee" },
+      { k: "Programs", v: "7 linked", vc: "#e7eaee" },
+    ];
+    const diagLog = [
+      { level: "INFO",  hex: "#57a9ff", bg: "rgba(61,155,255,0.1)",  bd: "#1c3452",              msg: "WebGL2 context created · ANGLE Metal", time: "0.0s" },
+      { level: "INFO",  hex: "#57a9ff", bg: "rgba(61,155,255,0.1)",  bd: "#1c3452",              msg: "7 programs linked · 0 cache miss",     time: "0.3s" },
+      { level: "WARN",  hex: "#f5b13d", bg: "rgba(245,177,61,0.1)",  bd: "rgba(245,177,61,0.3)", msg: "Blend: mediump precision fallback",   time: "1.2s" },
+      { level: "ERROR", hex: "#f0555c", bg: "rgba(240,85,92,0.1)",   bd: "rgba(240,85,92,0.35)", msg: "Blend: program link failed · 2 errors", time: "1.2s" },
+      { level: "DEBUG", hex: "#9aa2ac", bg: "#0e1013",               bd: "#20242a",              msg: "GC pause 3 ms · buffers reclaimed",   time: "4.8s" },
+    ];
 
     return {
       nodeChips, swatches, resOpts, bands, catColors, assets, problems,
-      isInspector: tab === "inspector", isAssets: tab === "assets", isProblems: tab === "problems",
+      diagStats, diagLog,
+      isInspector: tab === "inspector", isAssets: tab === "assets", isProblems: tab === "problems", isDiagnostics: tab === "diagnostics",
       tabInspector: () => this.setState({ tab: "inspector" }),
       tabAssets: () => this.setState({ tab: "assets" }),
       tabProblems: () => this.setState({ tab: "problems" }),
-      insTop: ins.top, insColor: ins.color, astTop: ast.top, astColor: ast.color, prbTop: prb.top, prbColor: prb.color,
+      tabDiagnostics: () => this.setState({ tab: "diagnostics" }),
+      insTop: ins.top, insColor: ins.color, astTop: ast.top, astColor: ast.color, prbTop: prb.top, prbColor: prb.color, dgTop: dg.top, dgColor: dg.color,
 
       nodeName: info.name, nodeGlyph: info.glyph, nodeColor: info.color, nodeType: info.type,
       nodeMeta: info.meta, nodeMs: info.ms, nodeThumb: info.thumb,

@@ -64,6 +64,16 @@ export interface GraphState {
    */
   cloneNode: (id: string) => string | null;
   removeNode: (id: string) => void;
+  /**
+   * Set a node's user-facing display name [D15]. Trimmed and clamped to
+   * `SANITIZE_LIMITS.MAX_NODE_NAME_LEN` (256). An empty result after
+   * trimming removes the `name` property (falls back to the registry's
+   * default display name) rather than storing `""`. No-op for group nodes —
+   * `label` is their single rename source (GroupNodeView/GroupInspector),
+   * to avoid two competing rename UIs. No-op (no history push) when the
+   * normalized name already matches the node's current name.
+   */
+  renameNode: (id: string, name: string) => void;
   updateNodePosition: (id: string, position: NodePosition) => void;
   /**
    * Translate several nodes at once by (dx, dy) in flow coordinates. Used by
@@ -266,6 +276,26 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         rev: s.rev + 1,
       };
     });
+  },
+  renameNode: (id, name) => {
+    // Clamp mirrors SANITIZE_LIMITS.MAX_NODE_NAME_LEN (projectSanitize.ts) —
+    // kept as a literal here rather than importing the sanitize module to
+    // avoid a state↔state-adjacent import for a single constant.
+    const trimmed = name.trim().slice(0, 256);
+    const target = get().nodes.find((n) => n.id === id);
+    if (!target) return;
+    if (target.kind === "group") return;
+    if (trimmed === (target.name ?? "")) return;
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id) return n;
+        if (trimmed !== "") return { ...n, name: trimmed };
+        const { name: _name, ...rest } = n;
+        return rest;
+      }),
+      rev: s.rev + 1,
+    }));
   },
   updateNodePosition: (id, position) =>
     set((s) => ({ positions: { ...s.positions, [id]: position } })),

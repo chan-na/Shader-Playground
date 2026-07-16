@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dividerCssRects, paneCssRects } from "./paneLayout";
+import { bottomRowFlags, dividerCssRects, paneCssRects } from "./paneLayout";
 
 describe("paneCssRects", () => {
   it("n=1 → single pane spans the whole canvas", () => {
@@ -79,6 +79,24 @@ describe("paneCssRects", () => {
       width: "50%",
       height: "50%",
     });
+  });
+});
+
+describe("bottomRowFlags", () => {
+  it("n=1 → the single pane touches the bottom row", () => {
+    expect(bottomRowFlags(1)).toEqual([true]);
+  });
+
+  it("n=2 → both left/right halves touch the bottom row", () => {
+    expect(bottomRowFlags(2)).toEqual([true, true]);
+  });
+
+  it("n=3 → the two top cells don't, the bottom full-width cell does", () => {
+    expect(bottomRowFlags(3)).toEqual([false, false, true]);
+  });
+
+  it("n=4 → the top row of the 2×2 grid doesn't, the bottom row does", () => {
+    expect(bottomRowFlags(4)).toEqual([false, false, true, true]);
   });
 });
 

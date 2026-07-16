@@ -45,6 +45,15 @@ describe("cssVars", () => {
     }
   });
 
+  it("gradient 그룹이 --gradient-<kebab> 변수로 방출된다", () => {
+    expect(css).toContain(
+      `--gradient-empty-state: ${tokens.gradient.emptyState};`,
+    );
+    for (const [k, v] of Object.entries(tokens.gradient)) {
+      expect(css).toContain(`--gradient-${kebab(k)}: ${v};`);
+    }
+  });
+
   it.each(
     colorGroups,
   )("$name 그룹의 모든 키가 $prefix<kebab> 변수로 방출된다", ({
@@ -133,6 +142,18 @@ describe("색 토큰 hex 형식", () => {
     for (const v of Object.values(values)) {
       expect(v).toMatch(/^#[0-9a-f]{6}$/);
     }
+  });
+});
+
+describe("overlay 토큰", () => {
+  it("gridDot이 화이트 채널 rgba(255,255,255,0.045)와 일치한다", () => {
+    expect(tokens.overlay.gridDot).toMatch(
+      /^rgba\(255,\s*255,\s*255,\s*0?\.045\)$/,
+    );
+  });
+
+  it("scrim이 블랙 채널 rgba(0,0,0,0.5)와 일치한다", () => {
+    expect(tokens.overlay.scrim).toMatch(/^rgba\(0,\s*0,\s*0,\s*0?\.5\)$/);
   });
 });
 

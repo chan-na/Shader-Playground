@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { tokens } from "../theme";
 import { clearLogBuffer, getLogBuffer } from "../utils/log";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -33,15 +34,45 @@ describe("ErrorBoundary", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain('data-testid="error-boundary-reload"');
     expect(html).toContain('data-testid="error-boundary-copy"');
-    expect(html).toContain("문제가 발생했습니다");
+    expect(html).toContain("Something went wrong");
   });
 
-  it("uses the shared modal-scrim/modal-card skin classes (M7-U5)", () => {
+  it("is token/webfont-independent by design (D6) — no modal-scrim/modal-card classes", () => {
     const boundary = new ErrorBoundary({ children: null });
     boundary.state = { error: new Error("boom") };
     const html = renderToStaticMarkup(boundary.render() as ReactElement);
-    expect(html).toContain('class="modal-scrim"');
-    expect(html).toContain('class="modal-card"');
+    expect(html).not.toContain("modal-scrim");
+    expect(html).not.toContain("modal-card");
+    expect(html).toContain("#111214");
+    expect(html).toContain("system-ui");
+    expect(html).toContain("no theme tokens or web fonts required");
+  });
+
+  it("Reload CTA background uses tokens.accent.default (the one intentional token reference)", () => {
+    const boundary = new ErrorBoundary({ children: null });
+    boundary.state = { error: new Error("boom") };
+    const html = renderToStaticMarkup(boundary.render() as ReactElement);
+    expect(html).toContain(tokens.accent.default);
+  });
+
+  it("shows the first lines of the error stack when present", () => {
+    const boundary = new ErrorBoundary({ children: null });
+    const err = new Error("stacked boom");
+    err.stack =
+      "Error: stacked boom\n    at Foo (foo.ts:1)\n    at Bar (bar.ts:2)";
+    boundary.state = { error: err };
+    const html = renderToStaticMarkup(boundary.render() as ReactElement);
+    expect(html).toContain("Error: stacked boom");
+    expect(html).toContain("at Foo (foo.ts:1)");
+  });
+
+  it("falls back to name: message when the error has no stack", () => {
+    const boundary = new ErrorBoundary({ children: null });
+    const err = new Error("boom");
+    err.stack = "";
+    boundary.state = { error: err };
+    const html = renderToStaticMarkup(boundary.render() as ReactElement);
+    expect(html).toContain("Error: boom");
   });
 
   it("componentDidCatch logs the error with component stack", () => {

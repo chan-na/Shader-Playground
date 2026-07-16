@@ -6,12 +6,15 @@ import {
   getExternalStream,
 } from "../../../core/external/registry";
 import type { WebcamGraphNode } from "../../../core/graph/types";
+import { displayNodeName } from "../../../core/nodes/registry";
+import { tokens, withAlpha } from "../../../theme";
 import { BlockedBadge } from "./BlockedBadge";
 import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
-const PREVIEW_W = 96;
-const PREVIEW_H = 64;
+// 16:9 letterbox card (dc L288-296): 74px outer container, 56px inner frame.
+const LETTERBOX_H = 74;
+const FRAME_H = 56;
 const POLL_MS = 200;
 
 interface StatusSnapshot {
@@ -78,7 +81,8 @@ export function WebcamNodeView({ id, data }: NodeProps) {
     >
       <NodeCardHeader
         kind="webcam"
-        title="Webcam"
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={isBlocked ? <BlockedBadge nodeId={id} /> : undefined}
       />
       <div className="node-card__body" style={{ paddingRight: 22 }}>
@@ -97,27 +101,47 @@ export function WebcamNodeView({ id, data }: NodeProps) {
           <div
             style={{
               position: "relative",
-              width: PREVIEW_W,
-              height: PREVIEW_H,
+              height: LETTERBOX_H,
+              borderRadius: 5,
+              background: "var(--surface-letterbox)",
+              border: "1px solid var(--border-node)",
+              display: "flex",
+              alignItems: "center",
+              overflow: "hidden",
             }}
           >
             <video
               ref={videoRef}
-              width={PREVIEW_W}
-              height={PREVIEW_H}
               autoPlay
               muted
               playsInline
               style={{
-                width: PREVIEW_W,
-                height: PREVIEW_H,
-                display: isBlocked ? "none" : "block",
+                width: "100%",
+                height: FRAME_H,
                 objectFit: "cover",
-                background: "#000",
-                borderRadius: 3,
+                display: isBlocked ? "none" : "block",
                 opacity: status.ready ? 1 : 0.4,
               }}
             />
+            {!isBlocked && (
+              <div
+                data-testid="webcam-lens"
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  top: "46%",
+                  transform: "translate(-50%,-50%)",
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  // dc L291의 rgba(111,214,163,…)(#6fd6a3 계열)는 토큰이 없어
+                  // nodeCategory.source로 근사 [D8] — followup 기록됨.
+                  background: withAlpha(tokens.nodeCategory.source, 0.16),
+                  border: `1px solid ${withAlpha(tokens.nodeCategory.source, 0.5)}`,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
             {isBlocked && (
               <div
                 style={{

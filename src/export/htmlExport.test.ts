@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Graph } from "../core/graph/types";
+import { tokens } from "../theme";
 import { buildExportedHtml, downloadExportedHtml } from "./htmlExport";
 
 const sample: Graph = {
@@ -108,6 +109,17 @@ describe("buildExportedHtml", () => {
     expect(html).toContain('<canvas id="canvas"');
   });
 
+  it("transplants app tokens into the exported stylesheet (D5)", () => {
+    const html = buildExportedHtml(sample, {});
+    const style = html.split("<style>")[1]?.split("</style>")[0] ?? "";
+    expect(style).toContain(tokens.surface.app);
+    expect(style).toContain(tokens.text.primary);
+    expect(style).toContain(tokens.surface.letterbox);
+    expect(style).toContain(tokens.overlay.scrim);
+    expect(style).not.toContain("#111");
+    expect(style).not.toContain("#ddd");
+  });
+
   it("respects the title/width/height options", () => {
     const html = buildExportedHtml(
       sample,
@@ -148,7 +160,8 @@ describe("downloadExportedHtml", () => {
   it("creates an <a> with a blob URL, clicks it, and revokes the URL after a delay", () => {
     const clickSpy = vi.fn();
     // Intercept anchors so we can observe what was clicked without actually
-    // navigating.
+    // navigating, and capture the download name that was actually set.
+    let capturedDownload: string | undefined;
     const origCreateElement = document.createElement.bind(document);
     const createSpy = vi
       .spyOn(document, "createElement")
@@ -156,11 +169,22 @@ describe("downloadExportedHtml", () => {
         const el = origCreateElement(tag);
         if (tag === "a") {
           (el as HTMLAnchorElement).click = clickSpy;
+          Object.defineProperty(el, "download", {
+            get: () => capturedDownload,
+            set: (v: string) => {
+              capturedDownload = v;
+            },
+          });
         }
         return el;
       });
 
-    downloadExportedHtml(sample, {}, "my-project");
+    const returned = downloadExportedHtml(sample, {}, "my-project");
+
+    // [D16] displayed name = actually-saved name — this is the return-value/
+    // a.download equality this test exists to pin down.
+    expect(returned).toMatch(/^my-project-\d{8}-\d{4}\.html$/);
+    expect(capturedDownload).toBe(returned);
 
     expect(
       (URL as unknown as { createObjectURL: ReturnType<typeof vi.fn> })

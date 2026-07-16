@@ -1,6 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ConnectionDragSource } from "../../../state/connectionUiStore";
 import { useConnectionUiStore } from "../../../state/connectionUiStore";
@@ -27,9 +28,23 @@ import { PortHandle } from "./PortHandle";
  * (no actual `<ReactFlow>` node tree) always sees `nodeId === null`, so the
  * `origin` branch can't be exercised at this level. It's covered instead by
  * portDragMode.test.ts's direct unit tests of the pure classifier.
+ *
+ * NOTE on the "shape recipe" describe below (todo D1): those assertions fix
+ * the *idle*, store-independent shape/color CSS recipe (hollow ring vs solid
+ * disc + glow) rather than any dragging/snap state, so they use
+ * `renderToStaticMarkup` (like nodeViews.test.tsx's `renderInFlow`) instead
+ * of this file's client `render` — a plain string assertion is enough and
+ * keeps that describe decoupled from connectionUiStore/jsdom style
+ * normalization concerns entirely.
  */
 function renderInFlow(element: ReactElement) {
   return render(<ReactFlowProvider>{element}</ReactFlowProvider>);
+}
+
+/** Static-markup variant used only by the shape-recipe describe below —
+ *  see the NOTE above for why this describe doesn't use `renderInFlow`. */
+function renderInFlowStatic(element: ReactElement): string {
+  return renderToStaticMarkup(<ReactFlowProvider>{element}</ReactFlowProvider>);
 }
 
 /** jsdom normalizes inline hex colors to `rgb(r, g, b)` when read back off
@@ -143,5 +158,38 @@ describe("PortHandle — connection snap ring (M8-U4)", () => {
       <PortHandle port={{ name: "out1", type: "float" }} side="out" top={40} />,
     );
     expect(container.querySelector(".sp-port-snap-ring")).toBeNull();
+  });
+});
+
+describe("PortHandle — shape recipe (todo D1)", () => {
+  it("input = hollow ring: family-color border, card-solid fill inside", () => {
+    const html = renderInFlowStatic(
+      <PortHandle port={{ name: "in1", type: "float" }} side="in" top={40} />,
+    );
+    expect(html).toContain(`border:2.5px solid ${tokens.portFamily.scalar}`);
+    expect(html).toContain("background:var(--surface-node-card-solid)");
+  });
+
+  it("output = solid disc + glow: family-color fill, card-solid border, portOutputGlow shadow", () => {
+    const html = renderInFlowStatic(
+      <PortHandle
+        port={{ name: "out1", type: "texture" }}
+        side="out"
+        top={40}
+      />,
+    );
+    expect(html).toContain(`background:${tokens.portFamily.resource}`);
+    expect(html).toContain("border:2px solid var(--surface-node-card-solid)");
+    expect(html).toContain(
+      `box-shadow:${tokens.shadow.portOutputGlow(tokens.portFamily.resource)}`,
+    );
+  });
+
+  it("rail label recipe (M8-U1): in-side class + family color", () => {
+    const html = renderInFlowStatic(
+      <PortHandle port={{ name: "in1", type: "float" }} side="in" top={40} />,
+    );
+    expect(html).toContain("node-card__port-label--in");
+    expect(html).toContain(`color:${tokens.portFamily.scalar}`);
   });
 });

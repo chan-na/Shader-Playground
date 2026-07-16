@@ -5,8 +5,10 @@ export interface MultiSelectBannerProps {
   /** Size of the current selection (>=2 — index.tsx only mounts this when
    * multi-select is active). */
   count: number;
-  /** One chip per selected shader/compute node, in selection order. */
-  chips: Array<{ id: string; hasError: boolean }>;
+  /** One chip per selected shader/compute node, in selection order. `label`
+   * is the display name (`displayNodeName()`); `id` is kept for key/testid
+   * only — see index.tsx's chip-building comment for the stale-id case. */
+  chips: Array<{ id: string; label: string; hasError: boolean }>;
 }
 
 /**
@@ -102,7 +104,7 @@ export function MultiSelectBanner({ count, chips }: MultiSelectBannerProps) {
         {chips.map((chip) => (
           <span key={chip.id} style={CHIP_STYLE}>
             <span style={CHIP_DOT_STYLE} aria-hidden="true" />
-            {chip.id}
+            {chip.label}
             {chip.hasError && (
               <span
                 style={CHIP_ERROR_DOT_STYLE}

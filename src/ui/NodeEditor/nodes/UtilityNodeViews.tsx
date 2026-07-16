@@ -7,6 +7,7 @@ import type {
 import {
   combineInputPorts,
   combineOutputPort,
+  displayNodeName,
   mathInputPorts,
   swizzleOutputPort,
 } from "../../../core/nodes/registry";
@@ -25,7 +26,8 @@ export function MathNodeView({ id, data }: NodeProps) {
     <div className="node-card" style={{ position: "relative", minWidth: 172 }}>
       <NodeCardHeader
         kind="math"
-        title="Math"
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={<span className="node-card__meta">{node.op}</span>}
       />
       <div
@@ -45,7 +47,6 @@ export function MathNodeView({ id, data }: NodeProps) {
             />
           </div>
         ))}
-        <div className="node-card__meta">{id}</div>
       </div>
       {inputs.map((p, i) => (
         <PortHandle
@@ -73,7 +74,8 @@ export function SwizzleNodeView({ id, data }: NodeProps) {
     <div className="node-card" style={{ position: "relative", minWidth: 168 }}>
       <NodeCardHeader
         kind="swizzle"
-        title="Swizzle"
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={<span className="node-card__meta">.{node.mask}</span>}
       />
       <div
@@ -121,7 +123,8 @@ export function CombineNodeView({ id, data }: NodeProps) {
     <div className="node-card" style={{ position: "relative", minWidth: 176 }}>
       <NodeCardHeader
         kind="combine"
-        title="Combine"
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={<span className="node-card__meta">{out.type}</span>}
       />
       <div
@@ -143,7 +146,6 @@ export function CombineNodeView({ id, data }: NodeProps) {
             />
           </div>
         ))}
-        <div className="node-card__meta">{id}</div>
       </div>
       {inputs.map((p, i) => (
         <PortHandle

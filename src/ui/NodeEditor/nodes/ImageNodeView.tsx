@@ -1,6 +1,7 @@
 import type { NodeProps } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import type { ImageGraphNode } from "../../../core/graph/types";
+import { displayNodeName } from "../../../core/nodes/registry";
 import { useAssetStore } from "../../../state/assetStore";
 import { tokens } from "../../../theme";
 import { NodeCardHeader } from "./NodeCardHeader";
@@ -30,7 +31,8 @@ export function ImageNodeView({ id, data }: NodeProps) {
     <div className="node-card" style={{ position: "relative" }}>
       <NodeCardHeader
         kind="image"
-        title="Image"
+        title={displayNodeName(node)}
+        nodeId={id}
         meta={
           asset ? (
             <span className="node-card__meta">{truncate(asset.name, 14)}</span>

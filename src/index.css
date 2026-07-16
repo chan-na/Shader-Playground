@@ -1043,6 +1043,32 @@ textarea {
   color: var(--text-primary);
   font-weight: 400;
 }
+/* D17/E6 — dc "Command Palette.dc.html" L119-124 빈 결과 CTA 행.
+   raw hex(rgba(61,155,255,·) / #c4cad2 / #7dbcff / radius 9)를
+   accent.default 알파 파생 · text.brightBody · 기존 cmdk-enter-glyph가
+   쓰는 accent-hover · radius-overlay로 매핑. */
+.cmdk-empty-cta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border-radius: var(--radius-overlay);
+  background: color-mix(in srgb, var(--accent-default) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-default) 30%, transparent);
+  font-size: 12.5px;
+  color: var(--text-bright-body);
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+}
+.cmdk-empty-cta-term {
+  color: var(--accent-hover);
+}
+.cmdk-empty-cta-kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-hover);
+}
 .cmdk-hint {
   display: flex;
   align-items: center;
@@ -1250,19 +1276,26 @@ textarea {
 .vp-transport-play:hover {
   background: var(--accent-hover);
 }
+/* dc L110 [D14]: 30×30 box, surface.input bg + border.stronger border,
+   radius.overlay corners, text.brightBody glyph — not a transparent
+   text button (that's the *camera* Reset button further right). */
 .vp-transport-reset-time {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  padding: 4px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 13px;
+  border: 1px solid var(--border-stronger);
+  border-radius: var(--radius-overlay);
+  background: var(--surface-input);
+  color: var(--text-bright-body);
+  font-size: 12px;
   cursor: pointer;
+  padding: 0;
 }
 .vp-transport-reset-time:hover {
+  border-color: var(--accent-default);
   color: var(--text-primary);
 }
 .vp-transport-time {
@@ -1394,6 +1427,26 @@ textarea {
   background: var(--text-primary);
   margin-top: -3.5px;
 }
+/* Compact-variant-only FOV stepper (dc L149, [D3]) — hidden by default,
+   swapped in for `.vp-transport-fov-group` by the `vp-body` container query
+   below once the panel narrows past 700px. */
+.vp-transport-fov-step {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-stronger);
+  border-radius: var(--radius-button);
+  background: var(--surface-input);
+  color: var(--text-bright-body);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vp-transport-fov-step:hover {
+  border-color: var(--accent-default);
+}
 
 /* ── Viewport empty state (Viewport.dc.html L49-63, M3-U4) ──
    The dc mock is authored against an ~816px-tall viewport canvas; the
@@ -1406,7 +1459,8 @@ textarea {
    size container so the `@container` block further down can swap in a
    compact layout once the panel is too short for the full design spacing,
    and `padding-bottom` reserves the transport bar's own footprint so the
-   hints never sit behind it even before that swap kicks in. */
+   hints never sit behind it even before that swap kicks in. The background
+   is the 2-stop radial from dc L51 (tokens.gradient.emptyState, [D10]). */
 .panel--viewport .panel-body {
   container-type: size;
   container-name: vp-body;
@@ -1421,7 +1475,7 @@ textarea {
   gap: 22px;
   /* Transport bar footprint: 16px bottom offset + ~52px bar height. */
   padding: 0 16px 68px;
-  background: var(--surface-app);
+  background: var(--gradient-empty-state);
   pointer-events: none;
 }
 .vp-empty-icon {
@@ -1679,6 +1733,94 @@ textarea {
     width: 34px;
     height: 34px;
     font-size: 15px;
+  }
+}
+
+/* ── Viewport transport bar — compact variant (Viewport.dc.html L141-152,
+   [D3]) ── Same `vp-body` size container as the tiers above, but keyed on
+   `max-width` instead of `max-height`: the default docked layout's viewport
+   panel is ~590px wide, comfortably under this 700px threshold, so this is
+   the transport bar's primary rendering in a fresh docked layout rather than
+   an edge case. Swaps the scrub/FOV sliders for taps + a stepper (dc's
+   narrow control bar collapses draggable range inputs to discrete presets,
+   both trading precision for a usable hit target at this width) and drops
+   the two text labels (`u_time`, Reset's "Reset" caption) dc's compact mock
+   omits in favor of the bare icon/value. One DOM tree throughout — see
+   TransportBar.tsx's doc comment — so this block is pure CSS toggling of
+   `display`, no conditional rendering.
+   Radius: dc's compact bar is 11px / buttons 8px, one step below this
+   file's transportBar(12)/overlay(9) tokens; the *full* bar already renders
+   at 12/9 above (D14) and there's no dedicated "compact" radius step in
+   theme.ts (v1.1 doesn't add one, see theme.ts's radius block), so the
+   compact tier below simply inherits the full bar's radius unchanged
+   (1px over spec) rather than inventing a new token for a single 1px
+   correction. */
+@container vp-body (max-width: 700px) {
+  .vp-transport {
+    /* `width: auto` on an absolutely-positioned, `left: 50%`-anchored box
+       computes shrink-to-fit against (containing block − left offset), i.e.
+       half the panel's width, not the bar's actual content — at the default
+       592.56px docked panel that clamped the bar to exactly 296.28px, wrapping
+       the FOV stepper's "FOV 45°" onto two lines and inflating the bar to
+       ~54px tall. `max-content` sizes from the flex children themselves
+       (ignoring the abs-pos containing-block math), so `max-width` below is
+       the only clamp that still applies once the panel is genuinely narrow. */
+    width: max-content;
+    max-width: calc(100% - 24px);
+    gap: 9px;
+    padding: 7px 11px;
+  }
+  .vp-transport-reset-time {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+  .vp-transport-play {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+  .vp-transport-time {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .vp-transport-time > .vp-transport-label {
+    display: none; /* u_time 라벨 */
+  }
+  .vp-transport-value {
+    text-align: center;
+  }
+  .vp-transport-scrub {
+    display: none;
+  }
+  .vp-transport-speed {
+    font-size: 10.5px;
+    padding: 4px 8px;
+  }
+  .vp-transport-divider {
+    height: 20px;
+  }
+  .vp-transport-fov-group {
+    display: none;
+  }
+  .vp-transport-fov-step {
+    display: inline-flex;
+  }
+  .vp-transport-reset-cam {
+    width: 28px;
+    height: 28px;
+    justify-content: center;
+    padding: 0;
+    font-size: 12px;
+  }
+  .vp-transport-reset-cam-text {
+    display: none;
+  }
+  /* 하단 행 캡션을 컴팩트 바 위로: bottom 16px + 바 높이 ~46px
+     (padding 7×2 + play 30 + border 2) + 기본 인셋과 같은 10px 여백 = 72px.
+     design/README.md §C [D3] "하단 행 pane 해상도 캡션은 컴팩트 바 위로 오프셋". */
+  .vp-pane--bottom .vp-pane-res {
+    bottom: 72px;
   }
 }
 
@@ -2787,7 +2929,11 @@ textarea {
    app boot and BootstrapGate resolving the graph (phase "init"/"prompt") —
    never once phase is "done". That's a real, bounded loading transition,
    the same category as the recording pulse (es-rec-pulse) and encode spinner
-   already in this file, not a decorative idle animation. */
+   already in this file, not a decorative idle animation.
+   [v1.1 D4] .graph-skeleton-status is a canvas-center floating pill, not
+   bottom-left — bottom-left is the zoom controls' (− % + fit) permanent
+   spot and would collide (dc System States.dc.html L131, CHANGELOG v1.1
+   D4). */
 @keyframes sp-shimmer {
   0% {
     background-position: -420px 0;
@@ -2844,14 +2990,31 @@ textarea {
 }
 .graph-skeleton-status {
   position: absolute;
-  left: 14px;
-  bottom: 16px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 9px;
+  /* dc rgba(11,12,14,0.82) == tokens.surface.app (#0b0c0e) at 82% alpha;
+     color-mix pattern follows the existing .cmdk-overlay convention above. */
+  background: color-mix(in srgb, var(--surface-app) 82%, transparent);
+  border: 1px solid var(--border-default);
+  /* dc border-radius: 10px. No dedicated 10 token exists; --radius-overlay
+     (9) is the nearest canvas-floating-overlay token (see theme.ts's
+     radius.overlay comment: minimap 9 / zoom-controls 8 representative
+     value) — within this project's documented ±4 nearest-token tolerance. */
+  border-radius: var(--radius-overlay);
+  padding: 9px 14px;
+  /* literal blur, matches .modal-scrim (L3181) — blur isn't tokenized. */
+  backdrop-filter: blur(6px);
+  /* dc box-shadow: 0 8px 24px rgba(0,0,0,0.5) vs --shadow-node-card's
+     0 8px 20px rgba(0,0,0,0.5) — same offset/alpha, blur differs by 4px;
+     nearest existing shadow token, no new token added. */
+  box-shadow: var(--shadow-node-card);
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .graph-skeleton-spinner {
   width: 14px;

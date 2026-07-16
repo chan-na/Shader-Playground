@@ -180,6 +180,23 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
   },
 };
 
+/**
+ * Resolve a node's display name for card titles / pane labels / export
+ * filenames [D15]. Precedence:
+ *  1. `group` — `label` is the single source of truth; a group node has no
+ *     independent `name` concept, so `name` is never consulted here.
+ *  2. user-set `name` (trimmed; blank-after-trim is treated as unset).
+ *  3. `param.label` — legacy fallback predating the `name` field.
+ *  4. the static `NODE_META[kind].label`.
+ */
+export function displayNodeName(node: GraphNode): string {
+  if (node.kind === "group") return node.label;
+  const trimmed = node.name?.trim();
+  if (trimmed) return trimmed;
+  if (node.kind === "param" && node.label) return node.label;
+  return NODE_META[node.kind].label;
+}
+
 /** Math-node port surface depends on the chosen op (unary vs binary). */
 export function mathInputPorts(op: MathOp): PortSpec[] {
   if (MATH_UNARY_OPS.has(op)) return [{ name: "a", type: "float" }];
@@ -223,6 +240,11 @@ export function combineOutputPort(arity: CombineArity): PortSpec {
  * in callers such as `serializeProject` / `deserializeProject`.
  */
 export function cloneGraphNode(n: GraphNode): GraphNode {
+  const cloned = cloneGraphNodeByKind(n);
+  return n.name === undefined ? cloned : { ...cloned, name: n.name };
+}
+
+function cloneGraphNodeByKind(n: GraphNode): GraphNode {
   switch (n.kind) {
     case "mesh":
       return {

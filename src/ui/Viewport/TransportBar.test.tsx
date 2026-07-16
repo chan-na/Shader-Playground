@@ -104,6 +104,50 @@ describe("TransportBar", () => {
     expect(useCameraStore.getState().camera.fov).toBe(initialCamera.camera.fov);
   });
 
+  it("exposes the compact FOV stepper with the initial 45° label (cameraStore default fov = π/4)", () => {
+    render(<TransportBar />);
+    const step = screen.getByTestId("camera-fov-step");
+    expect(step.textContent).toBe("FOV 45°");
+  });
+
+  it("cycles the FOV stepper through FOV_PRESETS on repeated clicks (45° → 55° → 75° → 90° → 35°)", () => {
+    render(<TransportBar />);
+    const step = screen.getByTestId("camera-fov-step");
+
+    fireEvent.click(step);
+    expect(useCameraStore.getState().camera.fov).toBeCloseTo(
+      (55 * Math.PI) / 180,
+      2,
+    );
+
+    fireEvent.click(step);
+    expect(useCameraStore.getState().camera.fov).toBeCloseTo(
+      (75 * Math.PI) / 180,
+      2,
+    );
+
+    fireEvent.click(step);
+    expect(useCameraStore.getState().camera.fov).toBeCloseTo(
+      (90 * Math.PI) / 180,
+      2,
+    );
+
+    fireEvent.click(step);
+    expect(useCameraStore.getState().camera.fov).toBeCloseTo(
+      (35 * Math.PI) / 180,
+      2,
+    );
+  });
+
+  it("⏮가 ▶보다 앞에 온다 (dc L110-112, D14)", () => {
+    render(<TransportBar />);
+    const reset = screen.getByTitle("Reset time");
+    const play = screen.getByTestId("time-playpause");
+    expect(
+      reset.compareDocumentPosition(play) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("renders nothing when there is no drawable Output pane (M7-U4)", () => {
     useRendererStore.getState().setPanes([]);
     const { container } = render(<TransportBar />);

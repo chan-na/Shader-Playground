@@ -398,8 +398,8 @@ class Component extends DCLogic {
       { k: "Draw calls", v: "42", vc: "#e7eaee" },
       { k: "Shaders", v: "7 compiled", vc: "#e7eaee" },
     ];
-    // C-9: 로그 레벨 필터 (All 활성). 카운트 배지는 시안용 정적.
-    const diagFilterDefs = [["All",true],["Info",false],["Warn",false],["Error",false],["Debug",false]];
+    // C-9 (Q9): 누적 레벨 필터 — "Info+" = info 이상 전부(구현 <select> 누적 의미와 일치). All 활성.
+    const diagFilterDefs = [["All",true],["Info+",false],["Warn+",false],["Error+",false],["Debug+",false]];
     const diagFilters = diagFilterDefs.map(([label,on]) => ({
       label, bg: on ? "#3d9bff" : "transparent", fg: on ? "#fff" : "#9aa2ac" }));
     const diagLog = [

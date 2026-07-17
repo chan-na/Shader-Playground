@@ -102,6 +102,7 @@
                 <div style="font-size:13.5px;color:#e7eaee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><sc-for list="{{ it.segs }}" as="sg" hint-placeholder-count="3"><span style="color:{{ sg.color }};font-weight:{{ sg.weight }};">{{ sg.text }}</span></sc-for></div>
                 <sc-if value="{{ it.sub }}" hint-placeholder-val="{{ false }}"><div style="font-size:11px;color:#656d78;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ it.sub }}</div></sc-if>
               </div>
+              <sc-if value="{{ it.warn }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:600;color:#f5c778;background:rgba(245,177,61,0.12);border:1px solid rgba(245,177,61,0.35);border-radius:5px;padding:2px 7px;white-space:nowrap;">⚠ {{ it.warn }}</span></sc-if>
               <span style="flex-shrink:0;font-size:9px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:{{ it.tagColor }};background:{{ it.tagBg }};border-radius:5px;padding:2px 6px;min-width:52px;text-align:center;">{{ it.tag }}</span>
               <div style="flex-shrink:0;display:flex;align-items:center;gap:4px;min-width:56px;justify-content:flex-end;">
                 <sc-if value="{{ it.selected }}" hint-placeholder-val="{{ false }}"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7dbcff;">↵</span></sc-if>
@@ -191,14 +192,15 @@ class Component extends DCLogic {
   }
 
   data(){
-    const N = (glyph, name, cat, hex, ib) => ({ kind:"node", glyph, label:name, cat, iconColor:hex, iconBg:ib, iconBorder:hex, tag:"NODE", tagColor:"#9aa2ac", tagBg:"#1a1d22" });
+    const N = (glyph, name, cat, hex, ib, extra) => ({ kind:"node", glyph, label:name, cat, iconColor:hex, iconBg:ib, iconBorder:hex, tag:"NODE", tagColor:"#9aa2ac", tagBg:"#1a1d22", sub:(extra&&extra.sub)||"", warn:(extra&&extra.warn)||"" });
     const nodes = [
       N("\u25A3","Mesh","Source","#4bbf89","rgba(75,191,137,0.16)"),
       N("\u25A4","Image","Source","#4bbf89","rgba(75,191,137,0.16)"),
       N("\u25C9","Webcam","Source","#4bbf89","rgba(75,191,137,0.16)"),
       N("\u25B7","Video","Source","#4bbf89","rgba(75,191,137,0.16)"),
       N("\u266A","Audio","Source","#4bbf89","rgba(75,191,137,0.16)"),
-      N("\u25C6","Shader","Process","#3d9bff","rgba(61,155,255,0.16)"),
+      N("\u25C6","Shader","Process","#3d9bff","rgba(61,155,255,0.16)",{sub:"starter · links with or without a mesh"}),
+      N("\u25C7","Shader: Unlit","Process","#3d9bff","rgba(61,155,255,0.16)",{sub:"reads surface normals",warn:"needs Mesh"}),
       N("\u2699","Compute","Process","#3d9bff","rgba(61,155,255,0.16)"),
       N("\u25CE","Output","Output","#e05c93","rgba(224,92,147,0.16)"),
       N("\u2219","Float param","Value","#d4a53c","rgba(212,165,60,0.16)"),

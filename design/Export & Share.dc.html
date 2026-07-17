@@ -166,8 +166,12 @@
           <div style="display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #20242a;border-radius:11px;background:#1a1d22;margin-bottom:18px;">
             <div style="width:46px;height:56px;border-radius:8px;background:linear-gradient(160deg,#1e2126,#101216);border:1px solid #2b3037;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#7dbcff;flex-shrink:0;">HTML</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#e7eaee;">{{ htmlFileName }}</div>
-              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;margin-top:3px;">{{ htmlSize }} · WebGL2 · ES 3.0</div>
+              <div style="font-size:11px;color:#9aa2ac;margin-bottom:7px;">File name</div>
+              <div style="display:flex;align-items:center;background:#22262c;border:1px solid #2b3037;border-radius:7px;padding:0 4px 0 10px;height:32px;">
+                <input value="{{ htmlBaseName }}" onInput="{{ setHtmlBase }}" style="flex:1;min-width:0;height:100%;background:transparent;border:none;color:#e7eaee;font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;white-space:nowrap;padding-right:6px;">-&#123;timestamp&#125;.html</span>
+              </div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;margin-top:8px;">{{ htmlSize }} · WebGL2 · ES 3.0 · timestamp added on download</div>
             </div>
           </div>
           <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;margin-bottom:12px;">Include</div>
@@ -333,6 +337,7 @@ class Component extends DCLogic {
       res: "1080p", fps: 30, duration: 4, loop: true,
       lang: "glsl",
       htmlInc: { assets: true, autoplay: true, minify: false },
+      htmlBase: "untitled-project",
       vis: "unlisted", fork: true, embed: false,
       recT: phase === "recording" ? 2.3 : 0,
       progress: phase === "encoding" ? 68 : (phase === "done" ? 100 : 0),
@@ -545,8 +550,9 @@ class Component extends DCLogic {
     const doneLink = isDone && t === "link";
     const doneFile = isDone && !doneLink;
     let doneTitle, doneMsg, doneCta, fileExt, fileName, fileMeta, fileIconBg, fileIconBorder, fileIconColor;
-    // D16: export filename = {projectTitle}-{timestamp} so downloads never overwrite; the completion card must show the exact saved name.
-    const projectSlug = "untitled-project";
+    // D16/C-11: 앱에 projectTitle 상태가 없음 → 파일명 base는 HTML 다이얼로그의 편집 필드(혹은 DEFAULT_EXPORT_BASE)가 정함.
+    // export 파일명 = {base}-{timestamp}.{ext} — timestamp는 다운로드 시점 확정, 완료 카드/토스트는 실제 저장명을 보임.
+    const projectSlug = (s.htmlBase && s.htmlBase.trim()) || "untitled-project";
     const stamp = "20260714-1532";
     const htmlFileName = projectSlug + "-" + stamp + ".html";
     const videoFileName = (ext) => projectSlug + "-" + stamp + "." + ext;
@@ -581,8 +587,8 @@ class Component extends DCLogic {
       toastShow = true; toastHex = "#34d399";
       if (t === "link") { toastTitle = "Link created"; toastMsg = "unlisted · ready to share"; }
       else if (t === "code") { toastTitle = "Snippet copied"; toastMsg = (s.lang === "glsl" ? "GLSL" : s.lang) + " · clipboard"; }
-      else if (t === "html") { toastTitle = "Exported."; toastMsg = htmlFileName + " · " + htmlSizeCalc(s); }
-      else { toastTitle = "Exported."; toastMsg = videoFileName(t) + " · " + estSize; }
+      else if (t === "html") { toastTitle = "Exported"; toastMsg = htmlFileName + " · " + htmlSizeCalc(s); }
+      else { toastTitle = "Exported"; toastMsg = videoFileName(t) + " · " + estSize; }
     }
 
     // footers
@@ -610,6 +616,8 @@ class Component extends DCLogic {
       estSize,
 
       htmlSize: htmlSizeCalc(s),
+      htmlBaseName: projectSlug,
+      setHtmlBase: (e) => this.setState({ htmlBase: e.target.value }),
 
       forkBg: s.fork ? "rgba(61,155,255,0.1)" : "#1a1d22", forkBorder: s.fork ? "rgba(61,155,255,0.3)" : "#20242a", forkDot: s.fork ? "#3d9bff" : "#565e68",
       toggleFork: () => this.setState({ fork: !s.fork }),

@@ -103,7 +103,7 @@
       <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;background:rgba(11,12,14,0.8);border:1px solid #20242a;border-radius:6px;padding:3px 8px;backdrop-filter:blur(4px);">{{ layoutLabel }}</span>
     </div>
 
-    <!-- ══ overlay control bar — full (≥700px) ══ -->
+    <!-- ══ overlay control bar — full (≥990px) ══ -->
     <sc-if value="{{ barFull }}" hint-placeholder-val="{{ true }}">
     <div style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:14px;background:rgba(11,12,14,0.86);border:1px solid #20242a;border-radius:12px;padding:9px 15px;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,0.55);z-index:6;">
       <!-- reset time (D14) -->
@@ -138,7 +138,7 @@
     </div>
     </sc-if>
 
-    <!-- ══ overlay control bar — compact (≤700px docked): scrub + FOV sliders collapse to steppers ══ -->
+    <!-- ══ overlay control bar — compact (≤990px docked): scrub + FOV sliders collapse to steppers ══ -->
     <sc-if value="{{ barCompact }}" hint-placeholder-val="{{ false }}">
       <div style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:9px;background:rgba(11,12,14,0.86);border:1px solid #20242a;border-radius:11px;padding:7px 11px;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,0.55);z-index:6;">
         <button onClick="{{ resetTime }}" style="width:28px;height:28px;border-radius:8px;background:#22262c;border:1px solid #3a414a;color:#c4cad2;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;" style-hover="border-color:#3d9bff;color:#e7eaee;">⏮</button>

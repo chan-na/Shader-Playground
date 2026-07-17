@@ -30,7 +30,20 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 3,
 };
 
-const LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
+// dc L402 표시 순서 (design/Side Panel.dc.html diagFilterDefs) — this array
+// only drives the <option> list below; LEVEL_ORDER's cumulative filter
+// semantics are unaffected by display order.
+const LEVELS: LogLevel[] = ["info", "warn", "error", "debug"];
+
+// [R13/Q9] 누적 의미 오독 방지 — 라벨 정본은 design/Side Panel.dc.html L402
+// (All/Info+/Warn+/Error+/Debug+). 라벨·표시 순서만 dc를 따르고, option의
+// value와 LEVEL_ORDER 필터 로직(누적)은 불변.
+const LEVEL_OPTION_LABEL: Record<LogLevel, string> = {
+  info: "Info+",
+  warn: "Warn+",
+  error: "Error+",
+  debug: "Debug+",
+};
 const CATEGORIES: LogCategory[] = [
   "gl",
   "render",
@@ -264,10 +277,10 @@ export function DiagnosticsPanel() {
           data-testid="diagnostics-level-filter"
           aria-label="level filter"
         >
-          <option value="all">all levels</option>
+          <option value="all">All</option>
           {LEVELS.map((l) => (
             <option key={l} value={l}>
-              {l}+
+              {LEVEL_OPTION_LABEL[l]}
             </option>
           ))}
         </select>

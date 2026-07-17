@@ -977,6 +977,23 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* [Q1] ⚠ needs Mesh 앰버 배지 — dc Command Palette.dc.html L105.
+   warning 패밀리 알파(bg 0.12 / border 0.35). dc 글자색 #f5c778은 무토큰이라
+   var(--warning)로 근사(신규 토큰 0 — v1.3 규칙, followup designer 기록). */
+.cmdk-warn-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  border-radius: var(--radius-icon-box); /* 5px = dc radius 5 */
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+  font-size: 9.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 .cmdk-tag {
   flex-shrink: 0;
   min-width: 52px;

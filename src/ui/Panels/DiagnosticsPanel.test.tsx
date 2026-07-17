@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { useDebugUiStore } from "../../state/debugUiStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
@@ -10,11 +11,13 @@ import { DiagnosticsPanel } from "./DiagnosticsPanel";
 const initialRenderer = useRendererStore.getState();
 const initialGraph = useGraphStore.getState();
 const initialDiagnostics = useDiagnosticsStore.getState();
+const initialDebugUi = useDebugUiStore.getState();
 
 function resetStores() {
   useRendererStore.setState(initialRenderer, true);
   useGraphStore.setState(initialGraph, true);
   useDiagnosticsStore.setState(initialDiagnostics, true);
+  useDebugUiStore.setState(initialDebugUi, true);
   clearLogBuffer();
 }
 
@@ -118,5 +121,44 @@ describe("DiagnosticsPanel", () => {
     for (const retired of ["#7a7a7a", "#7aa2f7", "#e0af68", "#ff6b6b"]) {
       expect(html).not.toContain(retired);
     }
+  });
+
+  it("level filter options use the dc cumulative labels in dc order [R13]", () => {
+    const html = renderToStaticMarkup(<DiagnosticsPanel />);
+    for (const label of [
+      ">All<",
+      ">Info+<",
+      ">Warn+<",
+      ">Error+<",
+      ">Debug+<",
+    ]) {
+      expect(html).toContain(label);
+    }
+    const order = [">All<", ">Info+<", ">Warn+<", ">Error+<", ">Debug+<"].map(
+      (label) => html.indexOf(label),
+    );
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i]).toBeGreaterThan(order[i - 1] as number);
+    }
+    // option value is unchanged — labels/order only.
+    expect(html).toContain('value="all"');
+    expect(html).toContain('value="info"');
+    expect(html).toContain('value="warn"');
+    expect(html).toContain('value="error"');
+    expect(html).toContain('value="debug"');
+  });
+
+  // NOTE: uses client render()/screen (not renderToStaticMarkup) — see the
+  // metric-cards test's NOTE above for why a post-mount store mutation
+  // requires a real client render under zustand v5.
+  it("level filter semantics stay cumulative (labels-only change)", () => {
+    useDebugUiStore.setState({ levelFilter: "warn" });
+    log.info("app", "below-threshold-marker");
+    log.error("gl", "above-threshold-marker");
+
+    render(<DiagnosticsPanel />);
+    const panel = screen.getByTestId("diagnostics-panel");
+    expect(panel.textContent).toContain("above-threshold-marker");
+    expect(panel.textContent).not.toContain("below-threshold-marker");
   });
 });

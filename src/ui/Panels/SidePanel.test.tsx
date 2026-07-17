@@ -10,10 +10,7 @@ import type { GeometryHandle, ImageHandle } from "../../core/assets/types";
 import { useAssetStore } from "../../state/assetStore";
 import { useBootstrapStore } from "../../state/bootstrapStore";
 import { useDebugUiStore } from "../../state/debugUiStore";
-import {
-  emptyDiagnostics,
-  useDiagnosticsStore,
-} from "../../state/diagnosticsStore";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useDockStore } from "../../state/dockStore";
 import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
 import { useRendererStore } from "../../state/rendererStore";
@@ -74,13 +71,16 @@ function renderSidePanel() {
 }
 
 describe("SidePanel", () => {
-  it("renders the four tabs and switches panels on click", () => {
+  // R5 회귀 가드: problems/diagnostics는 도킹 탭이 아니다(상태바 진입
+  // 오버레이, StatusOverlays/StatusBar가 렌더한다) — SidePanel에는 그
+  // testid가 존재해선 안 된다.
+  it("renders the two dock tabs (inspector/assets) and switches panels on click", () => {
     renderSidePanel();
 
     expect(screen.getByTestId("tab-inspector")).not.toBeNull();
     expect(screen.getByTestId("tab-assets")).not.toBeNull();
-    expect(screen.getByTestId("tab-problems")).not.toBeNull();
-    expect(screen.getByTestId("tab-diagnostics")).not.toBeNull();
+    expect(screen.queryByTestId("tab-problems")).toBeNull();
+    expect(screen.queryByTestId("tab-diagnostics")).toBeNull();
 
     expect(screen.queryByTestId("asset-browser-drop")).toBeNull();
     fireEvent.click(screen.getByTestId("tab-assets"));
@@ -111,99 +111,6 @@ describe("SidePanel", () => {
     expect(screen.getByTestId("tab-assets").className).toContain(
       "panel-tab--active",
     );
-  });
-
-  it("clicking Problems shows the Problems body without disturbing the dockStore leaf's active tab", () => {
-    renderSidePanel();
-
-    fireEvent.click(screen.getByTestId("tab-problems"));
-
-    expect(screen.getByTestId("tab-problems").className).toContain(
-      "panel-tab--active",
-    );
-    const tree = useDockStore.getState().tree;
-    const leaf = tree === null ? null : getNodeAt(tree, ["a", "b", "b"]);
-    expect(leaf !== null && leaf.type === "leaf" && leaf.active).toBe(
-      "inspector",
-    );
-  });
-
-  // D1: Diagnostics는 debugUiStore.open을 단일 출처로 삼는 파생 탭이다 —
-  // 아래 4건은 그 파생 관계(탭 클릭 → open, 외부 setOpen → 탭 활성화,
-  // 다른 탭 클릭 → open 해제, 부트스트랩 미완료 시 스켈레톤 우선)를 고정한다.
-  it("clicking the Diagnostics tab renders the panel and sets debugUiStore.open", () => {
-    renderSidePanel();
-
-    expect(screen.queryByTestId("diagnostics-panel")).toBeNull();
-    fireEvent.click(screen.getByTestId("tab-diagnostics"));
-
-    expect(screen.getByTestId("diagnostics-panel")).not.toBeNull();
-    expect(useDebugUiStore.getState().open).toBe(true);
-  });
-
-  it("setting debugUiStore.open externally shows the panel and marks the tab active", () => {
-    renderSidePanel();
-
-    act(() => {
-      useDebugUiStore.getState().setOpen(true);
-    });
-
-    expect(screen.getByTestId("diagnostics-panel")).not.toBeNull();
-    expect(screen.getByTestId("tab-diagnostics").className).toContain(
-      "panel-tab--active",
-    );
-  });
-
-  it("clicking another tab while diagnostics is active clears debugUiStore.open", () => {
-    renderSidePanel();
-    act(() => {
-      useDebugUiStore.getState().setOpen(true);
-    });
-    expect(screen.getByTestId("diagnostics-panel")).not.toBeNull();
-
-    fireEvent.click(screen.getByTestId("tab-assets"));
-
-    expect(useDebugUiStore.getState().open).toBe(false);
-    expect(screen.getByTestId("asset-browser-drop")).not.toBeNull();
-  });
-
-  it("shows the panel skeleton instead of Diagnostics while bootstrap isn't done", () => {
-    useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
-    renderSidePanel();
-
-    act(() => {
-      useDebugUiStore.getState().setOpen(true);
-    });
-
-    expect(screen.getByTestId("panel-skeleton")).not.toBeNull();
-    expect(screen.queryByTestId("diagnostics-panel")).toBeNull();
-  });
-
-  it("shows the Problems badge as an error pill when diagnostics + runtime errors are present", () => {
-    useDiagnosticsStore.getState().set("s1", {
-      ...emptyDiagnostics(),
-      vertex: [{ line: 1, severity: "error", message: "a" }],
-      fragment: [{ line: 2, severity: "warning", message: "b" }],
-    });
-    useRendererStore.setState((s) => ({
-      stats: { ...s.stats, errors: ["boom"] },
-    }));
-
-    renderSidePanel();
-
-    const problemsTab = screen.getByTestId("tab-problems");
-    expect(problemsTab.getAttribute("data-variant")).toBe("error");
-    expect(problemsTab.querySelector(".panel-tab-badge")?.textContent).toBe(
-      "3",
-    );
-  });
-
-  it("hides the Problems badge when there are no diagnostics or runtime errors", () => {
-    renderSidePanel();
-
-    const problemsTab = screen.getByTestId("tab-problems");
-    expect(problemsTab.getAttribute("data-variant")).toBeNull();
-    expect(problemsTab.querySelector(".panel-tab-badge")).toBeNull();
   });
 
   it("shows the Assets badge with the mesh+image count", () => {

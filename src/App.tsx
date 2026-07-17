@@ -7,6 +7,7 @@ import { ExportShareDialog } from "./ui/ExportShare/ExportShareDialog";
 import { GpuBlockScreen } from "./ui/GpuBlockScreen";
 import { KeyboardShortcuts } from "./ui/KeyboardShortcuts";
 import { StatusBar } from "./ui/Panels/StatusBar";
+import { StatusOverlays } from "./ui/Panels/StatusOverlays";
 import { Toasts } from "./ui/Toasts";
 
 export function App() {
@@ -16,6 +17,7 @@ export function App() {
       <ErrorBoundary>
         <div className="shell-content">
           <DockLayout />
+          <StatusOverlays />
         </div>
       </ErrorBoundary>
       <div className="statusbar">

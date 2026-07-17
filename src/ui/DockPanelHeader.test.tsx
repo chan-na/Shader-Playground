@@ -183,15 +183,8 @@ describe("DockPanelHeader", () => {
       expect(assetsTab.className).not.toContain("panel-tab--active");
     });
 
-    it("clicking a tab sets it active in dockStore and calls onTabSelect", () => {
-      const onTabSelect = vi.fn();
-      render(
-        withLeaf(
-          "l3",
-          ["a", "b", "b"],
-          <DockPanelHeader onTabSelect={onTabSelect} />,
-        ),
-      );
+    it("clicking a tab sets it active in dockStore", () => {
+      render(withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />));
 
       fireEvent.click(screen.getByTestId("tab-assets"));
 
@@ -200,17 +193,6 @@ describe("DockPanelHeader", () => {
       expect(getNodeAt(tree, ["a", "b", "b"])).toMatchObject({
         active: "assets",
       });
-      expect(onTabSelect).toHaveBeenCalledWith("assets");
-    });
-
-    it("suppressActive hides the underline and sets aria-selected=false even on the active tab", () => {
-      render(
-        withLeaf("l3", ["a", "b", "b"], <DockPanelHeader suppressActive />),
-      );
-
-      const inspectorTab = screen.getByTestId("tab-inspector");
-      expect(inspectorTab.className).not.toContain("panel-tab--active");
-      expect(inspectorTab.getAttribute("aria-selected")).toBe("false");
     });
 
     // R6 core: closing an *inactive* tab's ✕ must not first activate it —
@@ -252,25 +234,6 @@ describe("DockPanelHeader", () => {
       fireEvent.pointerDown(closeAssets);
 
       expect(onPointerDown).not.toHaveBeenCalled();
-    });
-
-    it("stops the tab ✕'s click from bubbling to the tab's own select handler", () => {
-      const onTabSelect = vi.fn();
-      render(
-        withLeaf(
-          "l3",
-          ["a", "b", "b"],
-          <DockPanelHeader onTabSelect={onTabSelect} />,
-        ),
-      );
-      const closeAssets = within(screen.getByTestId("tab-assets")).getByRole(
-        "button",
-        { name: "Close Assets tab" },
-      );
-
-      fireEvent.click(closeAssets);
-
-      expect(onTabSelect).not.toHaveBeenCalled();
     });
 
     it("renders a per-tab count badge from the `badges` prop", () => {

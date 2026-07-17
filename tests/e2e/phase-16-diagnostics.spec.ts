@@ -27,12 +27,16 @@ test.describe("Phase 16 — diagnostics panel", () => {
 
     await page.getByTestId("open-diagnostics").click();
     await expect(panel).toBeVisible();
-    // D1: Diagnostics is now the Side Panel's 4th tab — opening it must also
-    // mark that tab active (new-path assertion; testid path above is
-    // unchanged and still exercised).
-    await expect(page.getByTestId("tab-diagnostics")).toHaveClass(
-      /panel-tab--active/,
+    // R5: Diagnostics는 상태바 토글 → 하단 트랜지언트 오버레이(172px). Not a Side
+    // Panel tab — `tab-diagnostics` no longer exists (SidePanel/
+    // DockPanelHeader legacy path removed). The StatusBar toggle's
+    // aria-pressed + the overlay's own testid are the new-path activation
+    // signals.
+    await expect(page.getByTestId("open-diagnostics")).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
+    await expect(page.getByTestId("diagnostics-overlay")).toBeVisible();
     await expect(page.getByTestId("diagnostics-log-list")).toContainText(
       "e2e-diagnostic-marker",
     );
@@ -44,5 +48,10 @@ test.describe("Phase 16 — diagnostics panel", () => {
 
     await page.getByTestId("open-diagnostics").click();
     await expect(panel).toHaveCount(0);
+    // R5 (B5-U5): the overlay itself (not just its inner panel testid) must
+    // unmount on re-toggle close — guards against the overlay wrapper
+    // lingering (e.g. StatusOverlays still rendering a stale open/problemsOpen
+    // state) while the inner DiagnosticsPanel disappears.
+    await expect(page.getByTestId("diagnostics-overlay")).toHaveCount(0);
   });
 });

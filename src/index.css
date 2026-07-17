@@ -56,6 +56,9 @@ textarea {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* B5-U2: 하단 트랜지언트 오버레이(.status-overlay, position:absolute)의
+     배치 기준 — dc는 도크 body 내부/상태바 위에 오버레이를 배치한다. */
+  position: relative;
 }
 /* B4-U3: DockLayout's own root wrapper — hosts the drag-ghost/drop-preview
    overlays (both `position:absolute`) and the .dock-root--dragging state
@@ -1374,11 +1377,29 @@ textarea {
 .statusbar-muted {
   color: var(--text-muted);
 }
-.statusbar-error {
-  color: var(--error);
-}
 .statusbar-spacer {
   flex: 1;
+}
+/* ⚠ N problems (dc L240, B5-U3) — reset a <button> down to the plain
+   status-bar text/icon look (no border/box), then color it semantic.warning
+   (#f5b13d, dc L240 exact match). Zero-count state layers `.statusbar-muted`
+   on top (below) for its higher-specificity color override, keeping the
+   layout reset shared by both states — the "no problems" copy has no dc
+   reference (dc always shows a nonzero demo count), carried over from the
+   legacy 'no errors' slot as a provisional decision (design-followup-v1.4). */
+.statusbar-problems {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--warning);
+}
+.statusbar-problems.statusbar-muted {
+  color: var(--text-muted);
 }
 .statusbar-diag {
   background: transparent;
@@ -1389,8 +1410,42 @@ textarea {
   padding: 1px 8px;
 }
 .statusbar-diag[aria-pressed="true"] {
+  /* dc L618 diagColor: diagOpen ? "#3d9bff" — tokens.accent.default exact
+     match (B5-U3, was var(--text-primary) under the pre-R5 leaf-tab model). */
   background: var(--surface-hover);
-  color: var(--text-primary);
+  color: var(--accent-default);
+}
+
+/* ── Status overlays — bottom transient panel (design/CHANGELOG.md §v1.4
+   R5, `Docking Prototype.dc.html` L210-212, B5-U2). diagnostics/problems
+   are not dock tabs — they share this one 172px absolute region above the
+   status bar, mutually exclusive via debugUiStore. ──────────────────── */
+.status-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 172px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  /* dc L210 bg #0d0f12 — 대응 토큰 없음, surface.panel(#131519) 근사
+     (followup 기록). */
+  background: var(--surface-panel);
+  border-top: 1px solid var(--border-default); /* dc #20242a 정확 일치 */
+}
+.status-overlay-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0 10px 0 12px;
+  background: var(--surface-docking-header); /* dc L211 #101216 정확 일치 */
+  border-bottom: 1px solid var(--border-header-divider); /* dc #17191e 정확 일치 */
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-bright-body); /* dc L212 #c4cad2 정확 일치 */
 }
 
 /* ── Viewport pane overlay (Viewport.dc.html L65-87, M3-U2) ───────── */

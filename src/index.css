@@ -57,46 +57,50 @@ textarea {
   flex-direction: column;
   min-height: 0;
 }
-.shell-main {
-  flex: 1;
+/* B2-U1: DockLayout.tsx replaces the old shell-main/shell-right generic
+   containers with a recursive .dock-split/.dock-leaf tree. The legacy
+   shell-left/shell-right-top/shell-right-bottom/shell-code class names stay
+   on the DOM (dockLayoutModel.legacyLeafClass) purely to preserve the
+   selector contract — tests/e2e/m1-dock-header-collapse.spec.ts queries
+   .shell-left directly — but their layout rules (flex/direction/min-*) now
+   live in the generic .dock-split/.dock-leaf rules below. */
+.dock-split {
   display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.dock-split--row {
+  flex-direction: row;
+}
+.dock-split--col {
+  flex-direction: column;
+}
+.dock-leaf {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.dock-leaf > .panel {
+  flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 .shell-left {
-  display: flex;
-  min-width: 0;
   border-right: 1px solid var(--border-default);
-}
-.shell-right {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.shell-right-top,
-.shell-right-bottom {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
 }
 .shell-code {
   border-top: 1px solid var(--border-default);
-  display: flex;
-  min-height: 0;
-}
-.shell-left > .panel,
-.shell-right-top > .panel,
-.shell-right-bottom > .panel,
-.shell-code > .panel {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
 }
 
 /* ── Splitter (resize handle between docked panels) ──────────────── */
 /* <hr> carries an implicit ARIA role of "separator" — reset its UA
    defaults (inset border, block margin) since it's reused as a drag handle. */
 .splitter {
-  flex: 0 0 5px;
+  /* dc `_layout`'s D=6 (Docking Prototype.dc.html L307) is the divider
+     thickness the flex math (dockTree.DIVIDER_PX) is built around — was 5px
+     pre-B2, now aligned so DockLayout's `w - D` split math matches the
+     rendered gutter exactly. */
+  flex: 0 0 6px;
   align-self: stretch;
   margin: 0;
   padding: 0;
@@ -115,7 +119,7 @@ textarea {
   cursor: row-resize;
 }
 
-/* ── Panel collapse/maximize slots (layoutStore-driven, App.tsx) ─────
+/* ── Panel collapse/maximize slots (dockStore-driven, DockLayout.tsx) ─────
    A collapsed slot keeps its panel mounted (WebGL/CodeMirror survive) but
    hides everything below the dock header. A maximized slot's siblings +
    adjoining splitters are hidden outright via shell-slot--hidden. */

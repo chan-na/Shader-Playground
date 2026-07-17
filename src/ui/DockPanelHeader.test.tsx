@@ -1,26 +1,44 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useLayoutStore } from "../state/layoutStore";
+import type { ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useDockStore } from "../state/dockStore";
+import { createDefaultDockTree, getNodeAt } from "../state/dockTree";
 import { DockPanelHeader } from "./DockPanelHeader";
+import { DockLeafContext, useDockLeaf } from "./dockLeafContext";
 
-const initial = useLayoutStore.getState();
+const initial = useDockStore.getState();
 
 beforeEach(() => {
-  useLayoutStore.setState(initial, true);
+  useDockStore.setState(
+    { ...initial, tree: createDefaultDockTree(), maximized: null },
+    true,
+  );
 });
 
 afterEach(() => {
   cleanup();
 });
 
+/** 기본 트리의 nodeEditor leaf(l1, path ["a","a"])로 감싼 정적 provider —
+ * B2-U1: leaf 데이터(collapsed/active)는 컨텍스트가 아니라 dockStore에서
+ * path로 직접 구독하므로, provider는 라우팅 정보(leafId/path)만 고정해도
+ * 스토어 변경에 반응한다. */
+function withLeaf(leafId: string, path: ("a" | "b")[], children: ReactNode) {
+  return (
+    <DockLeafContext.Provider value={{ leafId, path }}>
+      {children}
+    </DockLeafContext.Provider>
+  );
+}
+
 describe("DockPanelHeader", () => {
   it("renders the label with the uppercase-styled class and the meta badge", () => {
     render(
-      <DockPanelHeader
-        panelId="nodeEditor"
-        label="Node Editor"
-        meta="5N · 4E"
-      />,
+      withLeaf(
+        "l1",
+        ["a", "a"],
+        <DockPanelHeader label="Node Editor" meta="5N · 4E" />,
+      ),
     );
     const label = screen.getByText("Node Editor");
     expect(label.className).toBe("dock-header-label");
@@ -29,39 +47,66 @@ describe("DockPanelHeader", () => {
 
   it("renders a children slot (e.g. tabs) alongside the grab handle", () => {
     render(
-      <DockPanelHeader panelId="sidePanel">
-        <button type="button">Inspector</button>
-      </DockPanelHeader>,
+      withLeaf(
+        "l3",
+        ["a", "b", "b"],
+        <DockPanelHeader>
+          <button type="button">Inspector</button>
+        </DockPanelHeader>,
+      ),
     );
     expect(screen.getByRole("button", { name: "Inspector" })).not.toBeNull();
   });
 
-  it("toggles collapsed[panelId] and flips aria-expanded on Collapse click", () => {
-    render(<DockPanelHeader panelId="viewport" label="Viewport" />);
+  it("toggles the leaf's collapsed flag in dockStore and flips aria-expanded on Collapse click", () => {
+    render(
+      withLeaf("l2", ["a", "b", "a"], <DockPanelHeader label="Viewport" />),
+    );
     const collapseBtn = screen.getByRole("button", { name: "Collapse panel" });
     expect(collapseBtn.getAttribute("aria-expanded")).toBe("true");
-    expect(useLayoutStore.getState().collapsed.viewport).toBe(false);
 
     fireEvent.click(collapseBtn);
 
-    expect(useLayoutStore.getState().collapsed.viewport).toBe(true);
+    const treeAfter = useDockStore.getState().tree;
+    if (treeAfter === null) throw new Error("unreachable");
+    expect(getNodeAt(treeAfter, ["a", "b", "a"])).toMatchObject({
+      collapsed: true,
+    });
     const expandBtn = screen.getByRole("button", { name: "Expand panel" });
     expect(expandBtn.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(expandBtn);
-    expect(useLayoutStore.getState().collapsed.viewport).toBe(false);
+    const treeAfter2 = useDockStore.getState().tree;
+    if (treeAfter2 === null) throw new Error("unreachable");
+    expect(getNodeAt(treeAfter2, ["a", "b", "a"])).toMatchObject({
+      collapsed: false,
+    });
   });
 
-  it("sets maximized on Maximize click, and clears it back to null on a second click", () => {
-    render(<DockPanelHeader panelId="codeEditor" label="Code Editor" />);
+  it("sets maximized to this leaf's id on Maximize click, and clears it back to null on a second click", () => {
+    render(withLeaf("l4", ["b"], <DockPanelHeader label="Code Editor" />));
     const maximizeBtn = screen.getByRole("button", { name: "Maximize panel" });
 
     fireEvent.click(maximizeBtn);
-    expect(useLayoutStore.getState().maximized).toBe("codeEditor");
+    expect(useDockStore.getState().maximized).toBe("l4");
     const restoreBtn = screen.getByRole("button", { name: "Restore panel" });
 
     fireEvent.click(restoreBtn);
-    expect(useLayoutStore.getState().maximized).toBeNull();
+    expect(useDockStore.getState().maximized).toBeNull();
+  });
+
+  it("throws when rendered outside DockLeafContext.Provider", () => {
+    function Bare() {
+      useDockLeaf();
+      return null;
+    }
+    // React logs an error boundary-less throw to console; suppress that
+    // noise for this expected-failure assertion.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => render(<Bare />)).toThrow(
+      "useDockLeaf must be used inside DockLeafContext.Provider",
+    );
+    spy.mockRestore();
   });
 
   // M1-U2: shell-left (Node Editor) is the one docked slot that collapses to
@@ -72,12 +117,11 @@ describe("DockPanelHeader", () => {
   describe("collapsedRail", () => {
     it("renders the normal horizontal header while expanded, even with collapsedRail set", () => {
       render(
-        <DockPanelHeader
-          panelId="nodeEditor"
-          label="Node Editor"
-          meta="5N · 4E"
-          collapsedRail
-        />,
+        withLeaf(
+          "l1",
+          ["a", "a"],
+          <DockPanelHeader label="Node Editor" meta="5N · 4E" collapsedRail />,
+        ),
       );
       expect(screen.getByText("Node Editor")).not.toBeNull();
       expect(screen.getByText("5N · 4E")).not.toBeNull();
@@ -92,16 +136,17 @@ describe("DockPanelHeader", () => {
 
     it("switches to a vertical rail — hiding label/meta/maximize — once collapsed, and the restore button un-collapses it", () => {
       render(
-        <DockPanelHeader
-          panelId="nodeEditor"
-          label="Node Editor"
-          meta="5N · 4E"
-          collapsedRail
-        />,
+        withLeaf(
+          "l1",
+          ["a", "a"],
+          <DockPanelHeader label="Node Editor" meta="5N · 4E" collapsedRail />,
+        ),
       );
 
       fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
-      expect(useLayoutStore.getState().collapsed.nodeEditor).toBe(true);
+      const tree = useDockStore.getState().tree;
+      if (tree === null) throw new Error("unreachable");
+      expect(getNodeAt(tree, ["a", "a"])).toMatchObject({ collapsed: true });
 
       expect(screen.queryByText("Node Editor")).toBeNull();
       expect(screen.queryByText("5N · 4E")).toBeNull();
@@ -114,7 +159,11 @@ describe("DockPanelHeader", () => {
       );
 
       fireEvent.click(restoreBtn);
-      expect(useLayoutStore.getState().collapsed.nodeEditor).toBe(false);
+      const treeAfter = useDockStore.getState().tree;
+      if (treeAfter === null) throw new Error("unreachable");
+      expect(getNodeAt(treeAfter, ["a", "a"])).toMatchObject({
+        collapsed: false,
+      });
       expect(screen.getByText("Node Editor")).not.toBeNull();
     });
   });
@@ -124,11 +173,11 @@ describe("DockPanelHeader", () => {
   describe("metaAlign", () => {
     it("defaults to start — meta renders before the spacer", () => {
       const { container } = render(
-        <DockPanelHeader
-          panelId="nodeEditor"
-          label="Node Editor"
-          meta="5N · 4E"
-        />,
+        withLeaf(
+          "l1",
+          ["a", "a"],
+          <DockPanelHeader label="Node Editor" meta="5N · 4E" />,
+        ),
       );
       const metaEl = screen.getByText("5N · 4E");
       const spacerEl = container.querySelector(".dock-header-spacer");
@@ -144,11 +193,11 @@ describe("DockPanelHeader", () => {
 
     it('metaAlign="end" renders meta after the spacer, before the Maximize button, keeping the same class', () => {
       const { container } = render(
-        <DockPanelHeader
-          panelId="codeEditor"
-          meta="GLSL · ES 3.0"
-          metaAlign="end"
-        />,
+        withLeaf(
+          "l4",
+          ["b"],
+          <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end" />,
+        ),
       );
       const metaEl = screen.getByText("GLSL · ES 3.0");
       expect(metaEl.className).toBe("dock-header-meta");
@@ -174,17 +223,22 @@ describe("DockPanelHeader", () => {
 
     it('hides metaAlign="end" meta the same as start once collapsed in a rail', () => {
       render(
-        <DockPanelHeader
-          panelId="nodeEditor"
-          label="Node Editor"
-          meta="5N · 4E"
-          metaAlign="end"
-          collapsedRail
-        />,
+        withLeaf(
+          "l1",
+          ["a", "a"],
+          <DockPanelHeader
+            label="Node Editor"
+            meta="5N · 4E"
+            metaAlign="end"
+            collapsedRail
+          />,
+        ),
       );
 
       fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
-      expect(useLayoutStore.getState().collapsed.nodeEditor).toBe(true);
+      const tree = useDockStore.getState().tree;
+      if (tree === null) throw new Error("unreachable");
+      expect(getNodeAt(tree, ["a", "a"])).toMatchObject({ collapsed: true });
 
       expect(screen.queryByText("5N · 4E")).toBeNull();
     });

@@ -12,6 +12,7 @@ import {
   type DockRegion,
   type DockSplit,
   findLeafPath,
+  findTabLeafPath,
   firstLeafPath,
   getNodeAt,
   layoutDockTree,
@@ -224,6 +225,33 @@ describe("findLeafPath", () => {
   });
 });
 
+describe("findTabLeafPath", () => {
+  it("finds the leaf carrying the inspector tab", () => {
+    const tree = createDefaultDockTree();
+    expect(findTabLeafPath(tree, "inspector")).toEqual(["a", "b", "b"]);
+  });
+
+  it("finds the leaf carrying the nodeEditor tab", () => {
+    const tree = createDefaultDockTree();
+    expect(findTabLeafPath(tree, "nodeEditor")).toEqual(["a", "a"]);
+  });
+
+  it("finds the leaf carrying the code tab", () => {
+    const tree = createDefaultDockTree();
+    expect(findTabLeafPath(tree, "code")).toEqual(["b"]);
+  });
+
+  it("returns null for a null tree", () => {
+    expect(findTabLeafPath(null, "inspector")).toBeNull();
+  });
+
+  it("returns null when the panel isn't docked anywhere", () => {
+    const tree = createDefaultDockTree();
+    const removed = removePanel(tree, "inspector");
+    expect(findTabLeafPath(removed.node, "inspector")).toBeNull();
+  });
+});
+
 describe("firstLeafPath", () => {
   it("returns the in-order first leaf of the default tree", () => {
     const tree = createDefaultDockTree();
@@ -400,9 +428,12 @@ describe("layoutDockTree — R3 기본 트리 = 현행 앱 첫 화면 동치", (
   it("lays out the default tree at 1440×826 into the 4 App Shell regions", () => {
     // 검산 근거(dc BW=1440, BH=826=900-툴바48-상태바26):
     //   588 = round((826-6) × 0.717)              — root col split(상/하)
-    //   842 = round((1440-6) × 0.587)              ≡ layoutStore.leftFrac(1.42/2.42≈0.587)
-    //   324 = round((588-6) × 0.556)                ≡ layoutStore.viewportFrac(1.25/2.25≈0.556, 높이 비율)
-    //   232 = 826 - 588 - 6                          ≡ 현행 layoutStore.codeHeight(232)
+    //   842 = round((1440-6) × 0.587)              ≡ 이전 고정 레이아웃 스토어의
+    //                                                 leftFrac(1.42/2.42≈0.587)
+    //   324 = round((588-6) × 0.556)                ≡ 이전 고정 레이아웃 스토어의
+    //                                                 viewportFrac(1.25/2.25≈0.556, 높이 비율)
+    //   232 = 826 - 588 - 6                          ≡ 이전 고정 레이아웃 스토어의
+    //                                                 codeHeight(232)
     const { regions, dividers } = layoutDockTree(
       createDefaultDockTree(),
       1440,

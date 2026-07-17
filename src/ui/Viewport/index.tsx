@@ -583,7 +583,6 @@ export function Viewport() {
   return (
     <div className="panel panel--viewport">
       <DockPanelHeader
-        panelId="viewport"
         label="Viewport"
         meta={`${outputCount} · ${splitLabel(outputCount)}`}
       />

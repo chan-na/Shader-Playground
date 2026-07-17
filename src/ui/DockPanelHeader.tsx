@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { type PanelId, useLayoutStore } from "../state/layoutStore";
+import { useDockStore } from "../state/dockStore";
+import { getNodeAt } from "../state/dockTree";
+import { useDockLeaf } from "./dockLeafContext";
 
 export interface DockPanelHeaderProps {
-  panelId: PanelId;
   /** 대문자로 렌더되는 패널 라벨. 탭이 라벨 자리를 대신하는 패널(Side Panel /
    *  Code Editor)은 생략하고 `children`으로 탭을 넘긴다. */
   label?: string;
@@ -24,7 +25,7 @@ export interface DockPanelHeaderProps {
   /** 탭 버튼 등 헤더 중앙에 끼워 넣을 슬롯. */
   children?: ReactNode;
   /**
-   * true면 이 패널이 접혔을 때 App.tsx가 슬롯을 '폭'으로 줄인다(현재는
+   * true면 이 패널이 접혔을 때 `DockLayout`이 슬롯을 '폭'으로 줄인다(현재는
    * shell-left/Node Editor뿐 — viewport/sidePanel/codeEditor는 '높이'로
    * 줄어 가로 헤더 그대로 둬도 문제없다). 폭 34px 스트립에 가로 헤더를 그대로
    * 두면 spacer 뒤 버튼들이 스트립 밖으로 overflow:hidden 클리핑되어 마우스로
@@ -37,8 +38,10 @@ export interface DockPanelHeaderProps {
 /**
  * 모든 도킹 패널이 공유하는 헤더(App Shell.dc.html L88-95 패턴):
  * grab dots → 라벨/탭 → 메타 배지 → (spacer) → 최대화(⤢) → 접기(⌄).
- * 접기/최대화는 layoutStore가 단일 출처 — 패널 자체는 언마운트되지 않는다
- * (WebGL 컨텍스트/CodeMirror 인스턴스 보존은 App.tsx의 슬롯 클래스가 담당).
+ * 접기/최대화의 단일 출처는 `dockStore` — 이 leaf의 경로는
+ * `useDockLeaf()`(DockLayout이 심어둔 컨텍스트)로 얻는다. 패널 자체는
+ * 언마운트되지 않는다(WebGL 컨텍스트/CodeMirror 인스턴스 보존은
+ * `DockLayout`/`index.css`의 슬롯 클래스가 담당).
  *
  * (v1.4 R12) 향후 도킹 헤더에 붙는 패널 dot 5색(accent/source/value/resource/
  * vector)은 **장식적 패널 식별자**일 뿐 — 노드 카테고리/포트 타입 의미축과
@@ -46,17 +49,20 @@ export interface DockPanelHeaderProps {
  * 재사용. design/README.md §M · design/CHANGELOG.md §v1.4 R12.
  */
 export function DockPanelHeader({
-  panelId,
   label,
   meta,
   metaAlign = "start",
   children,
   collapsedRail = false,
 }: DockPanelHeaderProps) {
-  const collapsed = useLayoutStore((s) => s.collapsed[panelId]);
-  const isMaximized = useLayoutStore((s) => s.maximized === panelId);
-  const toggleCollapsed = useLayoutStore((s) => s.toggleCollapsed);
-  const toggleMaximized = useLayoutStore((s) => s.toggleMaximized);
+  const { leafId, path } = useDockLeaf();
+  const collapsed = useDockStore((s) => {
+    const n = s.tree === null ? null : getNodeAt(s.tree, path);
+    return n !== null && n.type === "leaf" && n.collapsed === true;
+  });
+  const isMaximized = useDockStore((s) => s.maximized === leafId);
+  const toggleCollapsed = useDockStore((s) => s.toggleCollapsed);
+  const toggleMaximized = useDockStore((s) => s.toggleMaximized);
 
   const isRail = collapsedRail && collapsed;
 
@@ -80,7 +86,7 @@ export function DockPanelHeader({
         <button
           type="button"
           className="dock-header-btn"
-          onClick={() => toggleMaximized(panelId)}
+          onClick={() => toggleMaximized(leafId)}
           aria-label={isMaximized ? "Restore panel" : "Maximize panel"}
         >
           ⤢
@@ -89,7 +95,7 @@ export function DockPanelHeader({
       <button
         type="button"
         className="dock-header-btn"
-        onClick={() => toggleCollapsed(panelId)}
+        onClick={() => toggleCollapsed(path)}
         aria-label={collapsed ? "Expand panel" : "Collapse panel"}
         aria-expanded={!collapsed}
       >

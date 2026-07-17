@@ -14,7 +14,10 @@ import {
   emptyDiagnostics,
   useDiagnosticsStore,
 } from "../../state/diagnosticsStore";
+import { useDockStore } from "../../state/dockStore";
+import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
 import { useRendererStore } from "../../state/rendererStore";
+import { DockLeafContext } from "../dockLeafContext";
 import { SidePanel } from "./SidePanel";
 
 const initialAsset = useAssetStore.getState();
@@ -22,6 +25,7 @@ const initialDiagnostics = useDiagnosticsStore.getState();
 const initialRenderer = useRendererStore.getState();
 const initialBootstrap = useBootstrapStore.getState();
 const initialDebugUi = useDebugUiStore.getState();
+const initialDock = useDockStore.getState();
 
 const meshHandle: GeometryHandle = {
   id: "mesh-1",
@@ -41,6 +45,10 @@ function resetStores() {
   useDiagnosticsStore.setState(initialDiagnostics, true);
   useRendererStore.setState(initialRenderer, true);
   useDebugUiStore.setState(initialDebugUi, true);
+  useDockStore.setState(
+    { ...initialDock, tree: createDefaultDockTree() },
+    true,
+  );
   // SidePanel only shows its real tab content once bootstrap has finished
   // (M7-U1) — the store is a module singleton, so tests that don't care
   // about the loading skeleton need it forced to "done" here.
@@ -53,9 +61,21 @@ afterEach(() => {
   useBootstrapStore.setState(initialBootstrap, true);
 });
 
+/** B2-U1: SidePanel now reads its collapsed state via `useDockLeaf()` (routed
+ * through `DockPanelHeader`), so every render needs a `DockLeafContext`
+ * provider. `l3`/`["a","b","b"]` is the default tree's inspector/assets leaf
+ * (`createDefaultDockTree()`). */
+function renderSidePanel() {
+  return render(
+    <DockLeafContext.Provider value={{ leafId: "l3", path: ["a", "b", "b"] }}>
+      <SidePanel />
+    </DockLeafContext.Provider>,
+  );
+}
+
 describe("SidePanel", () => {
   it("renders the four tabs and switches panels on click", () => {
-    render(<SidePanel />);
+    renderSidePanel();
 
     expect(screen.getByTestId("tab-inspector")).not.toBeNull();
     expect(screen.getByTestId("tab-assets")).not.toBeNull();
@@ -67,11 +87,52 @@ describe("SidePanel", () => {
     expect(screen.getByTestId("asset-browser-drop")).not.toBeNull();
   });
 
+  // B2-U2: Inspector/Assets 탭 활성 상태는 dockStore leaf.active와 양방향
+  // 동기화된다 — 아래 3건이 그 계약을 고정한다.
+  it("clicking the Assets tab updates the dockStore leaf's active tab", () => {
+    renderSidePanel();
+
+    fireEvent.click(screen.getByTestId("tab-assets"));
+
+    const tree = useDockStore.getState().tree;
+    const leaf = tree === null ? null : getNodeAt(tree, ["a", "b", "b"]);
+    expect(leaf !== null && leaf.type === "leaf" && leaf.active).toBe("assets");
+  });
+
+  it("setting the dockStore leaf's active tab externally shows the Assets body (reverse sync)", () => {
+    renderSidePanel();
+
+    expect(screen.queryByTestId("asset-browser-drop")).toBeNull();
+    act(() => {
+      useDockStore.getState().setActiveTab(["a", "b", "b"], "assets");
+    });
+
+    expect(screen.getByTestId("asset-browser-drop")).not.toBeNull();
+    expect(screen.getByTestId("tab-assets").className).toContain(
+      "panel-tab--active",
+    );
+  });
+
+  it("clicking Problems shows the Problems body without disturbing the dockStore leaf's active tab", () => {
+    renderSidePanel();
+
+    fireEvent.click(screen.getByTestId("tab-problems"));
+
+    expect(screen.getByTestId("tab-problems").className).toContain(
+      "panel-tab--active",
+    );
+    const tree = useDockStore.getState().tree;
+    const leaf = tree === null ? null : getNodeAt(tree, ["a", "b", "b"]);
+    expect(leaf !== null && leaf.type === "leaf" && leaf.active).toBe(
+      "inspector",
+    );
+  });
+
   // D1: Diagnostics는 debugUiStore.open을 단일 출처로 삼는 파생 탭이다 —
   // 아래 4건은 그 파생 관계(탭 클릭 → open, 외부 setOpen → 탭 활성화,
   // 다른 탭 클릭 → open 해제, 부트스트랩 미완료 시 스켈레톤 우선)를 고정한다.
   it("clicking the Diagnostics tab renders the panel and sets debugUiStore.open", () => {
-    render(<SidePanel />);
+    renderSidePanel();
 
     expect(screen.queryByTestId("diagnostics-panel")).toBeNull();
     fireEvent.click(screen.getByTestId("tab-diagnostics"));
@@ -81,7 +142,7 @@ describe("SidePanel", () => {
   });
 
   it("setting debugUiStore.open externally shows the panel and marks the tab active", () => {
-    render(<SidePanel />);
+    renderSidePanel();
 
     act(() => {
       useDebugUiStore.getState().setOpen(true);
@@ -94,7 +155,7 @@ describe("SidePanel", () => {
   });
 
   it("clicking another tab while diagnostics is active clears debugUiStore.open", () => {
-    render(<SidePanel />);
+    renderSidePanel();
     act(() => {
       useDebugUiStore.getState().setOpen(true);
     });
@@ -108,7 +169,7 @@ describe("SidePanel", () => {
 
   it("shows the panel skeleton instead of Diagnostics while bootstrap isn't done", () => {
     useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
-    render(<SidePanel />);
+    renderSidePanel();
 
     act(() => {
       useDebugUiStore.getState().setOpen(true);
@@ -128,7 +189,7 @@ describe("SidePanel", () => {
       stats: { ...s.stats, errors: ["boom"] },
     }));
 
-    render(<SidePanel />);
+    renderSidePanel();
 
     const problemsTab = screen.getByTestId("tab-problems");
     expect(problemsTab.getAttribute("data-variant")).toBe("error");
@@ -138,7 +199,7 @@ describe("SidePanel", () => {
   });
 
   it("hides the Problems badge when there are no diagnostics or runtime errors", () => {
-    render(<SidePanel />);
+    renderSidePanel();
 
     const problemsTab = screen.getByTestId("tab-problems");
     expect(problemsTab.getAttribute("data-variant")).toBeNull();
@@ -149,7 +210,7 @@ describe("SidePanel", () => {
     useAssetStore.getState().addMesh(meshHandle);
     useAssetStore.getState().addImage(imageHandle);
 
-    render(<SidePanel />);
+    renderSidePanel();
 
     const assetsTab = screen.getByTestId("tab-assets");
     expect(assetsTab.querySelector(".panel-tab-badge")?.textContent).toBe("2");
@@ -158,7 +219,7 @@ describe("SidePanel", () => {
   it("shows the panel skeleton instead of tab content while bootstrap phase is not 'done'", () => {
     useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
 
-    render(<SidePanel />);
+    renderSidePanel();
 
     expect(screen.getByTestId("panel-skeleton")).not.toBeNull();
     expect(screen.queryByTestId("asset-browser-drop")).toBeNull();
@@ -169,7 +230,7 @@ describe("SidePanel", () => {
   it("shows the panel skeleton while a recovery prompt is pending", () => {
     useBootstrapStore.setState({ ...initialBootstrap, phase: "prompt" });
 
-    render(<SidePanel />);
+    renderSidePanel();
 
     expect(screen.getByTestId("panel-skeleton")).not.toBeNull();
   });
@@ -177,7 +238,7 @@ describe("SidePanel", () => {
   it("swaps back to real tab content once bootstrap phase is 'done'", () => {
     useBootstrapStore.setState({ ...initialBootstrap, phase: "done" });
 
-    render(<SidePanel />);
+    renderSidePanel();
 
     expect(screen.queryByTestId("panel-skeleton")).toBeNull();
   });

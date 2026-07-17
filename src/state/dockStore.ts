@@ -1,6 +1,6 @@
 /**
- * 도킹 스토어 — 현행 고정 4패널 `layoutStore`를 대체할 트리 기반 도크 모델
- * (v1.4 R1~R7)의 zustand 상태.
+ * 도킹 스토어 — 이전의 고정 4패널 레이아웃 스토어를 대체한(B2에서 완전
+ * 이관·삭제) 트리 기반 도크 모델(v1.4 R1~R7)의 zustand 상태.
  *
  * B1에서는 순수 상태만 다룬다 — 렌더러 연결은 B2, 영속화(R9 localStorage)는
  * B6에서 붙는다. 상태는 의도적으로 순수 JSON 직렬화 가능 형태를 유지한다
@@ -53,8 +53,9 @@ export interface DockState {
    * (L505-508) 이식 — 접기 조작은 최대화를 항상 해제한다(dc 정본). */
   toggleCollapsed: (path: DockPath) => void;
   /** 지정 leaf의 최대화 상태를 토글한다. dc `toggleMaximize`(L509-511) +
-   * 현행 `layoutStore.toggleMaximized` 관례 병합 — 새로 최대화하는 leaf가
-   * 접혀 있었다면 강제로 펼친다(dc는 이 코너를 정의하지 않음). */
+   * 이전 고정 레이아웃 스토어의 `toggleMaximized` 관례 병합 — 새로
+   * 최대화하는 leaf가 접혀 있었다면 강제로 펼친다(dc는 이 코너를 정의하지
+   * 않음). */
   toggleMaximized: (leafId: string) => void;
   /** 패널 하나를 트리에서 제거한다. dc `closeTab`(L493-496) 이식. */
   closeTab: (id: DockPanelId) => void;
@@ -130,7 +131,8 @@ export const useDockStore = create<DockState>((set, get) => ({
     // 좁히기를 위한 방어적 가드.
     if (leaf === null || leaf.type !== "leaf") return;
     if (leaf.collapsed === true) {
-      // 접힌 채 최대화되면 본문이 보이지 않는다 — 현행 layoutStore 관례 이식.
+      // 접힌 채 최대화되면 본문이 보이지 않는다 — 이전 고정 레이아웃
+      // 스토어의 관례 이식.
       set({
         tree: setNodeAt(tree, path, { ...leaf, collapsed: false }),
         maximized: leafId,

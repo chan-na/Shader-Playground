@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useDebugUiStore } from "../../state/debugUiStore";
-import { useLayoutStore } from "../../state/layoutStore";
+import { useDockStore } from "../../state/dockStore";
+import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
 import { StatusBar } from "./StatusBar";
 
 // NOTE: zustand v5 + useSyncExternalStore returns the *initial* store snapshot
@@ -55,29 +56,39 @@ describe("StatusBar", () => {
 });
 
 // D1: Diagnostics moved into the Side Panel as its 4th tab, so opening it
-// from StatusBar must also un-collapse a collapsed side panel — otherwise
-// the toggle flips debugUiStore.open with no visible effect. This needs a
-// live DOM (fireEvent) rather than the static-markup snapshots above, so it
-// gets its own describe/afterEach pair.
-describe("StatusBar — Diagnostics entry point un-collapses the side panel (D1)", () => {
-  const initialLayout = useLayoutStore.getState();
+// from StatusBar must also un-collapse a collapsed side panel leaf —
+// otherwise the toggle flips debugUiStore.open with no visible effect. This
+// needs a live DOM (fireEvent) rather than the static-markup snapshots
+// above, so it gets its own describe/afterEach pair. B2-U2: the source of
+// truth moved from the legacy layout store's fixed `sidePanel` slot to the
+// dockStore leaf carrying the inspector/assets tabs (the default tree's
+// `l3`, path ["a","b","b"]).
+describe("StatusBar — Diagnostics entry point un-collapses the side panel leaf (D1)", () => {
+  const initialDock = useDockStore.getState();
   const initialDebugUi = useDebugUiStore.getState();
+
+  beforeEach(() => {
+    useDockStore.setState(
+      { ...initialDock, tree: createDefaultDockTree() },
+      true,
+    );
+  });
 
   afterEach(() => {
     cleanup();
-    useLayoutStore.setState(initialLayout, true);
+    useDockStore.setState(initialDock, true);
     useDebugUiStore.setState(initialDebugUi, true);
   });
 
-  it("expands a collapsed side panel and opens diagnostics on click", () => {
-    useLayoutStore.setState((s) => ({
-      collapsed: { ...s.collapsed, sidePanel: true },
-    }));
+  it("expands a collapsed side panel leaf and opens diagnostics on click", () => {
+    useDockStore.getState().toggleCollapsed(["a", "b", "b"]);
 
     render(<StatusBar />);
     fireEvent.click(screen.getByTestId("open-diagnostics"));
 
     expect(useDebugUiStore.getState().open).toBe(true);
-    expect(useLayoutStore.getState().collapsed.sidePanel).toBe(false);
+    const tree = useDockStore.getState().tree;
+    const leaf = tree === null ? null : getNodeAt(tree, ["a", "b", "b"]);
+    expect(leaf !== null && leaf.type === "leaf" && leaf.collapsed).toBe(false);
   });
 });

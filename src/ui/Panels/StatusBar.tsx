@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useDebugUiStore } from "../../state/debugUiStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useDockStore } from "../../state/dockStore";
+import { findTabLeafPath, getNodeAt } from "../../state/dockTree";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
-import { useLayoutStore } from "../../state/layoutStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
@@ -61,11 +62,25 @@ export function StatusBar() {
   // D1: Diagnostics는 이제 Side Panel의 4번째 탭이다 — side panel이 접혀
   // 있으면 open을 true로 만들어도 탭 본문이 보이지 않는다. 진입 경로의
   // 가시성을 보장하기 위해 열 때는 접힘도 함께 풀어준다(닫을 때는 건드리지
-  // 않음 — 사용자가 의도적으로 접었을 수 있으므로).
-  const sidePanelCollapsed = useLayoutStore((s) => s.collapsed.sidePanel);
-  const toggleCollapsed = useLayoutStore((s) => s.toggleCollapsed);
+  // 않음 — 사용자가 의도적으로 접었을 수 있으므로). B2-U2: 대상은 "고정
+  // sidePanel 패널"이 아니라 "inspector 또는 assets 탭을 가진 leaf" —
+  // 도킹 트리에서 두 탭은 항상 같은 leaf에 있으므로(기본 트리 l3) inspector
+  // 탐색이 실패할 일은 없지만, 트리 재배치로 갈라지는 경우까지 대비해 assets
+  // 로 한 번 더 폴백한다.
+  const dockTree = useDockStore((s) => s.tree);
+  const toggleLeafCollapsed = useDockStore((s) => s.toggleCollapsed);
   const handleDiagClick = () => {
-    if (!diagOpen && sidePanelCollapsed) toggleCollapsed("sidePanel");
+    if (!diagOpen) {
+      const path =
+        findTabLeafPath(dockTree, "inspector") ??
+        findTabLeafPath(dockTree, "assets");
+      if (path !== null) {
+        const leaf = dockTree === null ? null : getNodeAt(dockTree, path);
+        if (leaf !== null && leaf.type === "leaf" && leaf.collapsed === true) {
+          toggleLeafCollapsed(path);
+        }
+      }
+    }
     toggleDiag();
   };
 

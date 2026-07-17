@@ -112,7 +112,7 @@ describe("toggleMaximized", () => {
     expect(useDockStore.getState().maximized).toBe("l2");
   });
 
-  it("force-expands a collapsed leaf being maximized (layoutStore parity)", () => {
+  it("force-expands a collapsed leaf being maximized (legacy layout store parity)", () => {
     useDockStore.getState().toggleCollapsed(["b"]);
     expect(nodeAt(useDockStore.getState().tree, ["b"])).toMatchObject({
       collapsed: true,

@@ -5,15 +5,16 @@
  * §v1.4 R1·R2·R3·R4·R7. 이 파일은 dc의 `_defaultTree()` / `_getAt` / `_setAt` /
  * `_collect` / `MIN_W`·`MIN_H`를 순수 TS로 이식한 B1-1 산출물(+ B1-3에서
  * `_layout`/divider 클램프 이식 추가)이다.
- * `src/state/layoutStore.ts`(기존 4분할 레이아웃 스토어)는 B2에서 이 트리
- * 모델로 교체될 예정이며, 그 전까지는 병행 존재가 의도된 상태다 — 건드리지
- * 않는다.
+ * 이전의 고정 4분할 레이아웃 스토어는 B2에서 이 트리 모델로 교체 완료·삭제됨
+ * — 마지막 소비자였던 StatusBar가 B2-U2에서 `dockStore`/`findTabLeafPath`
+ * 경유로 이관되었다.
  *
  * ⚠ 결함 정정: dc `_defaultTree()`(L276-290)는 가운데 split(viewport ↔
  * inspector/assets)을 `dir:"row"`로 정의하지만, 이는 **정본 결함**이다.
  * R2("App Shell = 기본 레이아웃 정본") 타이브레이크에 따라 아래
  * `createDefaultDockTree()`는 `dir:"col"`로 구현한다. 근거:
- *   - 0.556 = 1.25/2.25 = 현행 `layoutStore.viewportFrac`(**높이** 비율).
+ *   - 0.556 = 1.25/2.25 = 이전 고정 레이아웃 스토어의 뷰포트:사이드패널
+ *     **높이** 비율.
  *   - `src/index.css` `.shell-right { flex-direction: column }`.
  *   - `design/App Shell.dc.html` L208 `flex-direction:column`(RIGHT COLUMN).
  * 즉 viewport/inspector는 세로로 쌓이는 관계이며, 가로(row)로 나란히
@@ -174,6 +175,21 @@ export function findLeafPath(
   const inB = findLeafPath(node.b, leafId);
   if (inB !== null) return ["b", ...inB];
   return null;
+}
+
+/** 주어진 패널 id를 탭으로 가진 첫 leaf(a 우선)의 경로. dc `_findLeaf`
+ * (L334-337)의 `tabs.includes` 분기 이식 — leaf id 비교 분기는
+ * `findLeafPath`가 담당한다(B2-U2, StatusBar가 호출). */
+export function findTabLeafPath(
+  node: DockNode | null,
+  id: DockPanelId,
+): DockPath | null {
+  if (node === null) return null;
+  if (node.type === "leaf") return node.tabs.includes(id) ? [] : null;
+  const inA = findTabLeafPath(node.a, id);
+  if (inA !== null) return ["a", ...inA];
+  const inB = findTabLeafPath(node.b, id);
+  return inB === null ? null : ["b", ...inB];
 }
 
 /**

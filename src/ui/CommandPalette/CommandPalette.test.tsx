@@ -117,6 +117,20 @@ describe("CommandPalette", () => {
     expect(created).not.toBeUndefined();
     expect(useSelectionStore.getState().selectedNodeId).toBe(created?.id);
     expect(useCommandPaletteStore.getState().open).toBe(false);
+
+    // [C-7] The node is born with no mesh input, so compile.ts compiles it
+    // against fullscreen.vert (which emits v_uv only). A template reading
+    // v_normal (unlit.frag) could never link on the first frame — exactly the
+    // "new node is instantly in an error state" defect. Pin the CTA to a
+    // fullscreen-safe template so it cannot regress to unlit. Match on
+    // *declared* varyings, not raw text: a template may legitimately mention
+    // v_normal in a comment explaining why it avoids it.
+    const frag = created?.kind === "shader" ? created.fragmentSource : "";
+    const fragIns = [...frag.matchAll(/^\s*in\s+\w+\s+(\w+)\s*;/gm)].map(
+      (m) => m[1],
+    );
+    expect(fragIns).not.toContain("v_normal");
+    expect(fragIns).toContain("v_uv");
   });
 
   it("clicking the CTA row also creates the node", () => {

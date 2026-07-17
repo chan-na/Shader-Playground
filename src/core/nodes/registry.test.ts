@@ -406,27 +406,30 @@ describe("cloneGraphNode", () => {
     expect(clonedWithDevice).toEqual(withDevice);
   });
 
-  it("preserves param label only when defined (no explicit undefined leak)", () => {
-    const withLabel: ParamGraphNode = {
+  // [A-1] A param carries no `label` any more — its title rides on the common
+  // `name`, which cloneGraphNode copies via the shared BaseNode path.
+  it("clones a param without reintroducing a label field, and deep-copies its value", () => {
+    const named: ParamGraphNode = {
       id: "p1",
       kind: "param",
       paramKind: "float",
       value: 0.25,
-      label: "Intensity",
+      name: "Intensity",
     };
-    const cloned = cloneGraphNode(withLabel);
-    expect(cloned).toEqual(withLabel);
+    const cloned = cloneGraphNode(named);
+    expect(cloned).toEqual(named);
+    expect("label" in cloned).toBe(false);
 
-    const noLabel: ParamGraphNode = {
+    const unnamed: ParamGraphNode = {
       id: "p2",
       kind: "param",
       paramKind: "vec3",
       value: [0.1, 0.2, 0.3],
     };
-    const clonedNoLabel = cloneGraphNode(noLabel);
-    expect("label" in clonedNoLabel).toBe(false);
-    if (clonedNoLabel.kind === "param") {
-      expect(clonedNoLabel.value).not.toBe(noLabel.value);
+    const clonedUnnamed = cloneGraphNode(unnamed);
+    expect("label" in clonedUnnamed).toBe(false);
+    if (clonedUnnamed.kind === "param") {
+      expect(clonedUnnamed.value).not.toBe(unnamed.value);
     }
   });
 
@@ -516,25 +519,27 @@ describe("displayNodeName [D15]", () => {
     expect(displayNodeName(sn)).toBe("Shader");
   });
 
-  it("param: no name but legacy label set → uses label", () => {
+  // [A-1] `label` is no longer a param field, so there is no label fallback
+  // step any more: a param resolves by `name` then the registry default, like
+  // every other kind. Legacy label values are migrated into `name` on load —
+  // see projectSanitize.test.ts.
+  it("param: no name → falls back to the registry default", () => {
     const pn: ParamGraphNode = {
       id: "p1",
       kind: "param",
       paramKind: "float",
       value: 0,
-      label: "Intensity",
     };
-    expect(displayNodeName(pn)).toBe("Intensity");
+    expect(displayNodeName(pn)).toBe("Parameter");
   });
 
-  it("param: both name and legacy label set → name wins", () => {
+  it("param: name set → uses name", () => {
     const pn: ParamGraphNode = {
       id: "p1",
       kind: "param",
       paramKind: "float",
       value: 0,
       name: "Custom Name",
-      label: "Intensity",
     };
     expect(displayNodeName(pn)).toBe("Custom Name");
   });

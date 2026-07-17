@@ -93,6 +93,50 @@ describe("firstCompileError", () => {
     expect(info?.errorCount).toBe(2);
   });
 
+  it("builds the vertex excerpt from the source that was actually compiled", () => {
+    // A shader node with no mesh input compiles as a fullscreen pass, so the
+    // driver's line numbers index fullscreen.vert — not node.vertexSource.
+    // Reading the node here would quote unrelated lines from a file the
+    // compiler never saw.
+    const authored = ["auth1", "auth2", "auth3", "auth4"].join("\n");
+    const compiled = ["fs1", "fs2", "fs3", "fs4"].join("\n");
+    const nodes = [shaderNode("s1", { vertexSource: authored })];
+    const byNode: Record<string, NodeDiagnostics> = {
+      s1: {
+        ...emptyDiagnostics(),
+        vertex: [{ line: 3, severity: "error", message: "boom" }],
+        compiledVertexSource: compiled,
+      },
+    };
+
+    const info = firstCompileError(byNode, nodes);
+    expect(info?.stage).toBe("vertex");
+    expect(info?.excerpt).toEqual([
+      { lineNo: 1, text: "fs1", isError: false },
+      { lineNo: 2, text: "fs2", isError: false },
+      { lineNo: 3, text: "fs3", isError: true },
+      { lineNo: 4, text: "fs4", isError: false },
+    ]);
+  });
+
+  it("falls back to the node's vertex source when no compiled source was recorded", () => {
+    const authored = ["auth1", "auth2", "auth3"].join("\n");
+    const nodes = [shaderNode("s1", { vertexSource: authored })];
+    const byNode: Record<string, NodeDiagnostics> = {
+      s1: {
+        ...emptyDiagnostics(),
+        vertex: [{ line: 2, severity: "error", message: "boom" }],
+      },
+    };
+
+    const info = firstCompileError(byNode, nodes);
+    expect(info?.excerpt).toEqual([
+      { lineNo: 1, text: "auth1", isError: false },
+      { lineNo: 2, text: "auth2", isError: true },
+      { lineNo: 3, text: "auth3", isError: false },
+    ]);
+  });
+
   it("treats a link-stage error as lineless: line null and an empty excerpt", () => {
     const nodes = [shaderNode("s1")];
     const byNode: Record<string, NodeDiagnostics> = {

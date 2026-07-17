@@ -1,5 +1,7 @@
 # Handoff: ShaderPlayground — UI 전면 리디자인
 
+> **버전 v1.2** · 2026-07-16 (이전: v1.1 2026-07-14). v1.2 = v1.1 구현 중 나온 정본 확정 요청(design-request.md A/B/C 27건) 반영. 자세한 변경 사유는 `CHANGELOG.md` 참조.
+
 ## Overview
 ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레이그라운드**다. 세 주역 — **① 노드 그래프(React Flow) · ② GLSL 코드 에디터(CodeMirror 6) · ③ 실시간 WebGL2 3D 뷰포트** — 가 한 화면에 공존하는 전문가용 크리에이티브 도구. 이 번들은 기존 임시 UI를 폐기하고 처음부터 다시 만든 하이파이 리디자인의 결과물이다.
 
@@ -30,14 +32,14 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 - **`surface.*`** — elevation 계층(app-darker → app → panel → card → input → hover), 도킹 헤더, 레일, 노드 카드 그라디언트, `letterbox`(Webcam/Video 프리뷰 레터박스 = app-darker). [D8]
 - **`border.*`** — default / strong / stronger / header-divider / node(카드 외곽).
 - **`accent.*`** — 브랜드 블루 default/hover/active/muted.
-- **`text.*`** — primary / bright-body / secondary / muted / disabled.
+- **`text.*`** — primary / **emphasis(순백 `#fff`, 인라인 rename 편집 중 상태) [B-2]** / bright-body / secondary / muted / disabled.
 - **`semantic.*`** — success / warning / error / info (토스트·상태바·에러 공용).
-- **`nodeCategory.*`** — 노드 5 카테고리 색. 헤더 그라디언트 `linear-gradient(180deg, rgba(<hex>,0.22~0.30), rgba(<hex>,0.08~0.12))`, 아이콘 박스 `bg rgba(<hex>,0.2) / border 1px <hex>`. 매핑: Source=Mesh·Image·Webcam·Video·Audio / Process=Shader·Compute / Output=Output / Value=Param·Math·Swizzle·Combine / Container=Group.
+- **`nodeCategory.*`** — 노드 5 카테고리 색 + **`sourceBright`(`#6fd6a3`, source의 밝은 변형 — Webcam 렌즈 링 등) [B-3]**. 헤더 그라디언트 `linear-gradient(180deg, rgba(<hex>,0.22~0.30), rgba(<hex>,0.08~0.12))`, 아이콘 박스 `bg rgba(<hex>,0.2) / border 1px <hex>`. 매핑: Source=Mesh·Image·Webcam·Video·Audio / Process=Shader·Compute / Output=Output / Value=Param·Math·Swizzle·Combine / Container=Group.
 - **`portFamily.*` + `portTypeToFamily`** — 포트 도메인 규칙(아래).
 - **`syntax.*`** — CodeMirror 6 `HighlightStyle`용 GLSL 신택스 색.
-- **`overlay.*`** — 캔버스/오버레이 알파 채널 명명 토큰: `gridDot`(노드 캔버스 도트 그리드), `scrim`(몰입 모드·GPU 칩·모달 백드롭 공용). white/black 채널을 코드에서 직접 파생하지 않고 이름으로 참조. [D9]
+- **`overlay.*`** — 캔버스/오버레이 알파 채널 명명 토큰: `gridDot`(노드 캔버스 도트 그리드), `scrim`(**GPU 칩[향후 몰입 모드] 공용** — 모달 백드롭은 `withAlpha(surface.appDarker, 0.72)` 별도, M7-U5) [D9·B-1], `track`(`rgba(255,255,255,0.18)` — Video 스크럽 등 중립 트랙/필 표면) [B-4]. white/black 채널을 코드에서 직접 파생하지 않고 이름으로 참조.
 - **`gradient.emptyState`** — 뷰포트 빈 상태 2종점 radial 그라디언트. [D10]
-- **`radius.*` · `shadow.*`(선택 링 · 에러 링 · warnRing[0.7 알파, errorRing과 패밀리 일관] · 포트 글로우) · `motion.*` · `font.*`** — 나머지 스칼라 토큰.
+- **`radius.*`**(카드/버튼/입력/칩/아이콘박스/패널 + `transportBar`(12)/`overlay`(9) 및 컴팩트 변형 `transportBarCompact`(11)/`overlayCompact`(8) [B-5] + `skeletonStatus`(10) [B-6]) · **`shadow.*`**(선택 링 · 에러 링 · warnRing[0.7 알파, errorRing과 패밀리 일관] · `skeletonStatus`[blur 24, B-6] · 포트 글로우) · **`motion.*`** · **`font.*`**(+`fontBundle.standalone` = standalone export용 data-URI 웹폰트 [B-7]) — 나머지 스칼라 토큰.
 
 ### 도메인 규칙 (값이 아니라 "규칙"이라 문서로 남김)
 
@@ -60,7 +62,7 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 
 **컴파일 에러 카운트** [D19]: CompileErrorOverlay는 **항상 단일(첫 실패) 노드 기준**으로 카운트를 표시. 여러 노드 동시 실패 시 StatusBar(전 노드 합산)와 수가 다를 수 있으며, 오버레이에 `(+N more)`를 병기해 차이를 설명한다.
 
-**크래시 폴백(ErrorBoundary) 예외** [D6]: 앱 크래시 폴백 화면은 **의도적으로 토큰/웹폰트에 의존하지 않는다**(system-ui 폰트 + 중립 그레이). CSS 변수·웹폰트 주입이 실패한 상황에서도 렌더돼야 하므로 이 화면만 `theme.ts` 토큰 규칙에서 제외. 액센트 버튼 색만 `accent.default` 유지.
+**크래시 폴백(ErrorBoundary) 예외** [D6]: 앱 크래시 폴백 화면은 **의도적으로 토큰/웹폰트에 의존하지 않는다**(system-ui 폰트 + 중립 그레이). CSS 변수·웹폰트 주입이 실패한 상황에서도 렌더돼야 하므로 이 화면만 `theme.ts` 토큰 규칙에서 제외. 액센트 버튼 색만 `accent.default` 유지. '!' 아이콘 등 에러 액센트(`#f0555c`)는 `semantic.error`를 **빌드타임 보간**한 인라인 상수로 추적(런타임 CSS var 의존은 회피) [A-7].
 
 ---
 
@@ -78,8 +80,8 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 ### B. Node Editor — `Node Editor.dc.html` (1320×860) ★핵심
 - **목적**: 노드 그래프 캔버스. 시각 정체성의 절반.
 - **캔버스**: 배경 `#0b0c0e` + 도트 그리드 `radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)` / `background-size: 22px 22px`.
-- **노드 카드 구조**: 헤더(아이콘 박스 + 타이틀 + 우측 메타칩) + 본체(썸네일 96px 또는 값/메타). Shader/Image 노드는 **라이브 썸네일**(96×96, radius 7, inset shadow). Compute는 썸네일 대신 메타(particles/dispatch/buffer). 포트 라벨은 카드 좌/우 **포트 rail**(폭 ~46px)에 두고 썸네일을 rail만큼 안쪽(`margin:0 46px`)으로 밀어 겹침 방지. 라벨 = 포트 타입 패밀리 색, mono 8.5px, max-width ~30–34px ellipsis. Output 노드는 좌 rail 입력 라벨(`tex`) + 본체 메타(`→ viewport`)를 함께 표기. [D2]
-- **포트 지오메트리 (구현 시 정밀도 필수)**: 포트 절대위치 `top`은 노드 실제 높이(header 30 + pad 9 + previewH + pad 9) 안에 들어와야 한다. 엣지 path는 포트 중심 좌표에 맞춘다: 입력 x = `node.left`, 출력 x = `node.left + node.width`; y = `node.top + portTop + 5.5`. React Flow에선 각 노드 타입의 Handle 위치를 이 규칙으로 배치.
+- **노드 카드 구조**: 헤더(아이콘 박스 + 타이틀 + 우측 메타칩) + 본체(썸네일 96px 또는 값/메타). Shader/Image 노드는 **라이브 썸네일**(96×96, radius 7, inset shadow). Compute는 썸네일 대신 메타(particles/dispatch/buffer). 포트 라벨은 카드 좌/우 **포트 rail**(폭 ~46px)에 두고 썸네일을 rail만큼 안쪽(`margin:0 46px`)으로 밀어 걹침 방지. 라벨 = 포트 타입 패밀리 색, mono 8.5px, max-width ~30–34px ellipsis. 라벨은 축약하지 않고 **raw 포트명**(`texture`, `color` 등) 그대로 사용(단축 매핑 없음) [C-2]. Output 노드는 좌 rail 입력 라벨(raw `texture`) + 본체 메타(`→ viewport`, **pane 문자 미노출** — 카드가 뷰포트 레이아웃을 모름)를 함께 표기, paddingLeft 46(raw 포트명 폭 확보). [D2·C-1·C-2]
+- **포트 지오메트리 (구현 시 정밀도 필수)**: 포트 절대위치 `top`은 노드 실제 높이(header 30 + pad 9 + previewH + pad 9) 안에 들어와야 한다. 엣지 path는 포트 중심 좌표에 맞춘다: 입력 x = `node.left`, 출력 x = `node.left + node.width`; y = `node.top + portTop + 5.5`. React Flow에선 각 노드 타입의 Handle 위치를 이 규칙으로 배치. **다포트 카드**(uniform 수만큼 입력 증가)는 **stride 30 고정 + 카드 본체(previewH) 동적 확장**: `previewH = max(96, (nPorts−1)·30 + 56)`, 실용 상한 ~10 포트. 포트가 3개를 넘으면 카드가 세로로 늘어 프리뷰가 포트 span을 덮는다(시안은 Node Editor의 우상단 'Noise' 데모 노드). 구 시안의 stride 30 3-포트 고정 가정이 실물에서 카드를 넘친 건을 해소. [C-3]
 - **엣지**: 베지어 곡선, stroke 2.5, 색=소스 포트 패밀리. 상태별 — 유효(실선), 무효(빨강 점선), 1:N 팬아웃(분기점 dot), 드래그 중(점선 애니메이션 `stroke-dashoffset`).
 - **노드 상태**: default / selected(파랑 링) / multi-select(파랑 테두리+마퀴) / error(빨강 테두리+우상단 빨강 카운트 뱃지).
 - **오버레이**: 미니맵(우하단, 168×112, 카테고리 색 미니 블록 + 뷰포트 프레임), 줌 컨트롤(좌하단, − / % / + / fit).
@@ -95,7 +97,7 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 - **pane 오버레이**: 좌상단 라벨(A/B/C/D + 이름), 우상단 GPU ms 뱃지(success 색), 좌하단 해상도, 스캔라인 오버레이.
 - **하단 트랜스포트 바**(중앙 플로팅, 배경 `rgba(11,12,14,0.86)` + blur): **⏮ reset-time(u_time=0)** → 재생/정지 → u_time 스크럽 → 배속(0.25~4×) → 구분선 → FOV 슬라이더 → Reset(카메라). [D14]
 - **빈 상태**: Output 미연결 시 중앙 아이콘 + "No Output connected" + 3단계 온보딩 힌트(⌘K → Add Output …). 배경 = `gradient.emptyState`(2종점 radial 토큰). [D10]
-- **좁은 도킹 폭(≤700px)** [D3]: 트랜스포트 바 **컴팩트 변형** — 스크럽·FOV 슬라이더를 스텝퍼 버튼(FOV 탭→프리셋 순환)으로 축약, ⏮/▶/시간/배속/reset만 유지. 하단 행 pane 해상도 캡션은 컴팩트 바 위로 오프셋.
+- **좁은 도킹 폭(≤990px)** [D3·C-6]: 트랜스포트 바 **컴팩트 변형** — 스크럽·FOV 슬라이더를 스텝퍼 버튼(FOV 탭→프리셋 순환)으로 축약, ⏮/▶/시간/배속/reset만 유지. 하단 행 pane 해상도 캡션은 컴팩트 바 위로 오프셋. 임계값을 700→**990px로 상향**해 700~989px 구간에서 풀 바가 하단 pane 캡션과 겹치던 문제 해소(컴팩트 티어가 넓은 구간 커버). 컴팩트 바/버튼 radius = `radius.transportBarCompact`(11)/`overlayCompact`(8) [B-5]. FOV 스텝퍼는 dc가 `indexOf`(비프리셋서 -1) 동작이 원 의도 — 구현의 최근접 순환과 다르나 dc 유지 [A-4].
 - **몰입/VJ 모드**: 전체 스크림 + 최소 트랜스포트 + 녹화 준비 표시(Esc 종료).
 
 ### D. Code Editor — `Code Editor.dc.html` (1320×860)
@@ -108,10 +110,10 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 
 ### E. Side Panel — `Side Panel.dc.html` (1320×860)
 - **목적**: Inspector / Assets / Problems / **Diagnostics** 탭. 선택 노드에 따라 Inspector 내용이 완전히 바뀜.
-- **Inspector**: uniform 자동 컨트롤 — `float`→슬라이더, `vec2/3/4`→다축 슬라이더, 색→컬러 피커, `bool`→토글. 노드 종류별 8종 인스펙터. 상단 공통 **`Name` 필드**로 노드 rename(그래프 더블클릭 인라인과 동일 값)[D15]. `Output type` 배지 색 = 포트 패밀리[D18].
+- **Inspector**: uniform 자동 컨트롤 — `float`→슬라이더, `vec2/3/4`→다축 슬라이더, 색→컬러 피커, `bool`→토글. 노드 종류별 8종 인스펙터. 상단 공통 **`Name` 필드**로 노드 rename(그래프 더블클릭 인라인과 동일 값)[D15]. **모든 노드 종류(param·group 포함)가 이 공통 Name 하나로 rename** — param의 Label 필드·group의 Group label 필드는 제거해 단일 소스화 [A-1·A-2]. `Output type` 배지 색 = 포트 패밀리[D18].
 - **Assets**: 썸네일 그리드, 드래그&드롭 임포트, "노드로 추가".
 - **Problems**: 전 노드 에러 목록, 클릭 시 노드 선택 + 코드 라인 점프, 탭 헤더 카운트 뱃지.
-- **Diagnostics** [D1]: 런타임 진단 — GPU/Frame/Draw calls/Programs 메트릭 카드 + INFO/WARN/ERROR/DEBUG 레벨 태그 런타임 로그. 레벨 색 = semantic + text.muted, 카드 = surface.card, 배경 = surface.panel. (Problems=컴파일 에러 목록과 별개.)
+- **Diagnostics** [D1]: 런타임 진단 — GPU/Frame/Draw calls/**Shaders** 메트릭 카드 + 레벨 로그. `Shaders`는 실제 GL 링크 카운터가 없어 **error 진단 없는 shader/compute 노드 수 프록시**("N compiled") [A-6]. 레벨 태그 색(dc 실측값이 정본) = **INFO `accent.hover` · WARN `warning` · ERROR `error` · DEBUG `text.secondary`** [A-5]. 로그 행 = **카테고리 접두**(gl/shader/mem, `text.muted`) + 레벨 태그 + 메시지 + 시간. 상단 **툴바**(Copy/Clear/Close) + **레벨 필터**(All/Info/Warn/Error/Debug, All 기본) [C-9]. 카드 = surface.card, 배경 = surface.panel. (Problems=컴파일 에러 목록과 별개.)
 - 폼 컨트롤 라이브러리(슬라이더·다축·컬러·토글·셀렉트·숫자입력)가 여기 대량 등장.
 
 ### F. Command Palette — `Command Palette.dc.html` (1440×900)
@@ -122,8 +124,8 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 
 ### H. Export & Share — `Export & Share.dc.html` (1440×900)
 - 단일 HTML export, URL 공유 인코딩, 녹화(WebM/GIF) 흐름.
-- **파일명 규칙** [D16]: export 파일명 = `{projectTitle}-{timestamp}`(예: `untitled-project-20260714-1532.html`) — 덮어쓰기 방지. **완료 카드·토스트 표시명 = 실제 저장명** 필수.
-- **standalone HTML 산출물** [D5]: export되어 나가는 HTML은 앱 토큰 그대로 이식 — 배경 `surface.app`, 텍스트 `text.primary` 등(토큰 밖 임의 hex 금지).
+- **파일명 규칙** [D16·C-10·C-11]: export 파일명 = `{base}-{timestamp}.{ext}`(예: `untitled-project-20260716-1532.html`) — 덮어쓰기 방지. **앱에 projectTitle 상태 없음** → `{base}`는 HTML 다이얼로그의 **편집형 File name 필드**에서 옴(퀵 저장·비HTML 경로는 `DEFAULT_EXPORT_BASE`=`untitled-project` 고정) [C-10·C-11a]. timestamp는 다운로드 시점 확정(다이얼로그 프리뷰엔 `-{timestamp}.html` 자리표시). 완료 카드·토스트 표시명 = 실제 저장명. **성공 토스트 = `Exported {name} · {size}`**(HTML·GIF·WebM 동일 포맷, 크기 표기 포함) [C-11b].
+- **standalone HTML 산출물** [D5·B-7·A-8]: export되어 나가는 HTML은 앱 토큰 그대로 이식 — 배경 `surface.app`, 텍스트 `text.primary`, badge 배경=`overlay.scrim`, 링크=`text.primary`, `#canvas` 배경=`surface.letterbox`(근사 3건 승인). **IBM Plex Sans 서브셋을 data URI로 번들**(브랜드 타이포 일관, 파일 +수십 KB) [B-7]. 폴백 에러 div의 `color:white`는 D6 크래시 폴백과 같은 '토큰 비의존' 예외지만 빌드타임 상수로 토큰화 [A-8].
 
 ### I. System States — `System States.dc.html` (1440×900)
 - 좌측 스위처 레일 + 공유 앱 크롬으로 **8개** 상태 시연: Empty(빈 그래프/빈 뷰포트) · Loading(스피너·진행바·스켈레톤 시머) · Permission(카메라/마이크 권한) · Error(컴파일 에러 오버레이 / WebGL2 unavailable 블로킹 / **App crashed 폴백**). 상태별로 노드 그래프·엣지·상태바·툴바가 문맥에 맞게 변함.

@@ -43,11 +43,11 @@ const CATEGORIES: LogCategory[] = [
 
 /**
  * Level tag colors (design/Side Panel.dc.html L391-395, diagLog hex/bg/bd).
- * D1 rule: level color = semantic token (not the dc's literal per-row hex) —
- * error/warn/info map to semantic.error/warning/info, debug to text.muted.
- * INFO's dc fg (dc L391, = accent.hover) and DEBUG's dc fg (dc L395,
- * = text.secondary) both differ from this rule; tracked as a design followup
- * rather than deviating from the D1 rule here.
+ * [A-5] The dc pixel values are canonical where they conflict with the README
+ * §E D1 rule ("level color = semantic + text.muted") — v1.2 resolved the one
+ * README-vs-dc contradiction in favor of the dc and restated the rule as:
+ * INFO = accent.hover · WARN = warning · ERROR = error · DEBUG = text.secondary.
+ * So INFO/DEBUG intentionally do NOT use semantic.info/text.muted here.
  */
 const LEVEL_STYLE: Record<
   LogLevel,
@@ -64,14 +64,16 @@ const LEVEL_STYLE: Record<
     borderColor: withAlpha(tokens.semantic.warning, 0.3),
   },
   info: {
-    color: "var(--info)",
+    // dc fg (L391) = accent.hover, canonical over the semantic.info rule [A-5].
+    color: "var(--accent-hover)",
     background: withAlpha(tokens.semantic.info, 0.1),
     // dc bd (L391) matches tokens.accent.muted exactly.
     borderColor: tokens.accent.muted,
   },
   debug: {
-    color: "var(--text-muted)",
-    // dc bg (L395) has no matching token — nearest approx (surface.app).
+    // dc fg (L395) = text.secondary, canonical over the text.muted rule [A-5].
+    color: "var(--text-secondary)",
+    // dc bg (L395, #0e1013) has no matching token — surface.app 근사 승인 [B-8].
     background: "var(--surface-app)",
     borderColor: "var(--border-default)",
   },
@@ -149,6 +151,9 @@ export function DiagnosticsPanel() {
     },
     {
       k: "Frame",
+      // dc L386의 값 색 #6fe3b8은 대응 토큰이 없어 semantic.success(#34d399)로
+      // 근사 — 근사 5건 일괄 승인 [B-8]. (v1.1에서 이 건만 사유 주석이 누락돼
+      // 있던 것을 보완.)
       v: frameMetricValue(stats.fps),
       color: "var(--success)",
     },
@@ -158,7 +163,9 @@ export function DiagnosticsPanel() {
       color: "var(--text-primary)",
     },
     {
-      k: "Programs",
+      // "Programs: N linked" → "Shaders: N compiled" [A-6] — 실제 GL 링크
+      // 카운터가 없어 값이 프록시이므로 라벨을 측정 대상에 맞췄다.
+      k: "Shaders",
       v: linkedProgramsValue(nodes, byNode),
       color: "var(--text-primary)",
     },
@@ -366,8 +373,8 @@ export function DiagnosticsPanel() {
                     whiteSpace: "pre-wrap",
                   }}
                 >
-                  {/* dc has no category column — kept to preserve the
-                      existing category-filter feature's visible context. */}
+                  {/* 카테고리 접두(gl/shader/mem)가 v1.2에서 dc에 정식 추가됐다
+                      — text.muted 색도 dc와 일치 [C-9]. */}
                   <span style={{ color: "var(--text-muted)" }}>
                     {e.category}
                   </span>
@@ -377,8 +384,8 @@ export function DiagnosticsPanel() {
                   style={{
                     fontFamily: "var(--font-mono)",
                     fontSize: 9,
-                    // dc time column fg (L391-395) has no matching token —
-                    // nearest approx (text.muted). Followup logged.
+                    // dc time column fg (L391-395, #565e68)에 대응 토큰이 없어
+                    // text.muted로 근사 — 근사 5건 일괄 승인 [B-8].
                     color: "var(--text-muted)",
                     flexShrink: 0,
                   }}

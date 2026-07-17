@@ -190,6 +190,10 @@ export function Viewport() {
             else if (er.stage === "fragment") d.fragment.push(...parsed);
             else d.link.push(...parsed);
           }
+          // Carries the fullscreen-pass substitution through to the overlay's
+          // excerpt; absent when the node never reached createProgram.
+          const compiledVert = plan.compiledVertexSource[id];
+          if (compiledVert !== undefined) d.compiledVertexSource = compiledVert;
           diagStore.set(id, d);
         }
         // Prune diagnostics for shader nodes that no longer exist (deleted /

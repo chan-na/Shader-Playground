@@ -30,33 +30,8 @@ import {
   GROUP_DEFAULT_WIDTH,
   GROUP_MIN_HEIGHT,
   GROUP_MIN_WIDTH,
+  SANITIZE_LIMITS,
 } from "../core/graph/types";
-
-/**
- * Hard caps for untrusted project payloads (share URL, imported JSON,
- * autosave). These bound the work that hydration / compileGraph will do
- * before touching the GPU. Numbers are generous relative to typical app
- * usage but tight enough to prevent quota / GPU memory blowups from
- * malicious or corrupted input.
- */
-export const SANITIZE_LIMITS = {
-  MAX_NODES: 2048,
-  MAX_EDGES: 8192,
-  MAX_SHADER_SOURCE_LEN: 64 * 1024,
-  MAX_COMPUTE_COUNT: 1_000_000,
-  MAX_COMPUTE_ATTRIBUTES: 16,
-  MAX_ATTRIBUTE_NAME_LEN: 128,
-  MAX_UNIFORM_KEYS: 64,
-  MAX_UNIFORM_KEY_LEN: 128,
-  MAX_UNIFORM_ARRAY_LEN: 16,
-  MAX_NODE_NAME_LEN: 256,
-  MAX_PARAM_LABEL_LEN: 256,
-  MAX_SWIZZLE_LEN: 4,
-  MAX_DEVICE_ID_LEN: 256,
-  MAX_GROUP_LABEL_LEN: 256,
-  MAX_GROUP_DIMENSION: 8192,
-  MAX_GROUP_COLOR_LEN: 16,
-} as const;
 
 const MESH_PRIMITIVES: ReadonlySet<MeshGraphNode["primitive"]> = new Set([
   "cube",
@@ -308,13 +283,9 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
             .slice(0, SANITIZE_LIMITS.MAX_UNIFORM_ARRAY_LEN)
             .map((n) => safeFiniteNumber(n))
         : safeFiniteNumber(v);
+      // [A-1] `label` is no longer a param field — sanitizeGraphNode migrates a
+      // legacy one into `name`.
       const node: ParamGraphNode = { id, kind: "param", paramKind, value };
-      if (
-        typeof raw.label === "string" &&
-        raw.label.length <= SANITIZE_LIMITS.MAX_PARAM_LABEL_LEN
-      ) {
-        node.label = raw.label;
-      }
       return node;
     }
     case "math": {
@@ -400,11 +371,22 @@ export function sanitizeGraphNode(raw: unknown): SanitizeResult {
   }
   try {
     const node = buildNode(obj, id);
-    if (typeof obj.name === "string") {
-      const trimmed = obj.name
-        .trim()
-        .slice(0, SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
-      if (trimmed !== "") node.name = trimmed;
+    // [A-1] `name` is the single rename source for every non-group kind. Params
+    // written before v1.2 kept their title in `label`, so carry that over —
+    // dropping the field without this migration would silently rename every
+    // existing param back to "Parameter". An explicit `name` always wins; the
+    // legacy `label` is only consulted when it would otherwise be lost.
+    // (Groups are excluded: `label` remains *their* single source — see
+    // graphStore.renameNode — so there is nothing to migrate.)
+    const nameSources: unknown[] = [obj.name];
+    if (node.kind === "param") nameSources.push(obj.label);
+    for (const src of nameSources) {
+      if (typeof src !== "string") continue;
+      const trimmed = src.trim().slice(0, SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
+      if (trimmed !== "") {
+        node.name = trimmed;
+        break;
+      }
     }
     return { ok: true, node };
   } catch (e) {

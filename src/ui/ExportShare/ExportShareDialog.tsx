@@ -104,6 +104,15 @@ interface RecordDoneInfo {
   metaLine: string;
 }
 
+/**
+ * 녹화 산출물 크기 표기 [D16]. 완료 카드 metaLine과 저장 토스트가 같은 값을
+ * 쓰도록 한 곳에 모아 둔다 — HTML은 KB, 녹화는 MB로 각 완료 카드의 단위를
+ * 따르되 토스트 형태는 `Exported {name} · {size}`로 공통.
+ */
+function recordSizeLabel(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function viewportCanvas(): HTMLCanvasElement | null {
   return document.querySelector(".viewport-canvas") as HTMLCanvasElement | null;
 }
@@ -234,14 +243,28 @@ function HtmlConfigurePanel({
           HTML
         </div>
         <div className="es-file-card-main">
-          <TextField
-            value={fileName}
-            onChange={(e) => onFileNameChange(e.target.value)}
-            dataTestId="es-html-filename"
-            ariaLabel="HTML export file name"
-          />
+          {/* [C-10] The editable base is kept (it is the only way to name an
+              HTML export — the app has no projectTitle state, see C-11a), and
+              the dc's completed-filename display is reconciled with it as a
+              static `-{timestamp}.html` suffix inside the same field. The
+              timestamp itself is only fixed at download time, so it stays a
+              placeholder rather than a live preview that would drift from the
+              real name. design/Export & Share.dc.html L167-172. */}
+          <div className="es-field-label">File name</div>
+          <div className="es-filename-field">
+            <TextField
+              value={fileName}
+              onChange={(e) => onFileNameChange(e.target.value)}
+              dataTestId="es-html-filename"
+              ariaLabel="HTML export file name"
+              mono
+            />
+            <span className="es-filename-suffix" aria-hidden="true">
+              -{"{timestamp}"}.html
+            </span>
+          </div>
           <div className="es-file-card-meta">
-            {sizeKB} KB · WebGL2 · self-contained
+            {sizeKB} KB · WebGL2 · self-contained · timestamp added on download
           </div>
         </div>
       </div>
@@ -686,7 +709,7 @@ export function ExportShareDialog() {
         kind: "gif",
         blob,
         fileName: exportFileName(DEFAULT_EXPORT_BASE, "gif"),
-        metaLine: `${(blob.size / (1024 * 1024)).toFixed(1)} MB · ${gifFps} fps · ${gifDuration.toFixed(1)}s`,
+        metaLine: `${recordSizeLabel(blob.size)} · ${gifFps} fps · ${gifDuration.toFixed(1)}s`,
       });
       setPhase("done");
     } else {
@@ -722,7 +745,7 @@ export function ExportShareDialog() {
         kind: "webm",
         blob,
         fileName: exportFileName(DEFAULT_EXPORT_BASE, "webm"),
-        metaLine: `${(blob.size / (1024 * 1024)).toFixed(1)} MB · ${webmFps} fps · ${elapsedLabel}`,
+        metaLine: `${recordSizeLabel(blob.size)} · ${webmFps} fps · ${elapsedLabel}`,
       });
       setPhase("done");
     } else {
@@ -836,7 +859,9 @@ export function ExportShareDialog() {
     a.href = url;
     a.download = recordDone.fileName;
     a.click();
-    toast.success(`Exported ${recordDone.fileName}`);
+    toast.success(
+      `Exported ${recordDone.fileName} · ${recordSizeLabel(recordDone.blob.size)}`,
+    );
   };
 
   const gifDurationLabel = `${gifDuration.toFixed(1)}s`;

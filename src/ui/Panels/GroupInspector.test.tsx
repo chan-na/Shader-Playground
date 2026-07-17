@@ -32,19 +32,17 @@ function groupNode(overrides: Partial<GroupGraphNode> = {}): GroupGraphNode {
 }
 
 describe("GroupInspector", () => {
-  it("typing in the label input calls setGroupLabel", () => {
+  // [A-2] The Group label field is gone — a group renames through the
+  // Inspector's common Name field (Inspector.test.tsx covers that path, and
+  // graphStore.test.ts covers renameNode routing into `label`). This panel must
+  // not offer a second, competing rename UI.
+  it("renders no Group label field — renaming lives in the common Name field", () => {
     const node = groupNode();
     useGraphStore.getState().addNode(node);
     render(<GroupInspector node={node} />);
 
-    fireEvent.change(screen.getByTestId("group-label-input"), {
-      target: { value: "Renamed" },
-    });
-
-    const updated = useGraphStore
-      .getState()
-      .nodes.find((n) => n.id === "g1") as GroupGraphNode;
-    expect(updated.label).toBe("Renamed");
+    expect(screen.queryByTestId("group-label-input")).toBeNull();
+    expect(screen.queryByText("Label")).toBeNull();
   });
 
   it("changing the native color input calls setGroupColor", () => {
@@ -62,13 +60,13 @@ describe("GroupInspector", () => {
     expect(updated.color).toBe("#336699");
   });
 
-  it("preserves the group-* testid surface (inspector, label, color, ungroup, cascade)", () => {
+  // group-label-input is intentionally absent from this surface as of [A-2].
+  it("preserves the group-* testid surface (inspector, color, ungroup, cascade)", () => {
     const node = groupNode();
     useGraphStore.getState().addNode(node);
     render(<GroupInspector node={node} />);
 
     expect(screen.getByTestId("group-inspector")).not.toBeNull();
-    expect(screen.getByTestId("group-label-input")).not.toBeNull();
     expect(screen.getByTestId("group-color-input")).not.toBeNull();
     expect(screen.getByTestId("group-ungroup")).not.toBeNull();
     expect(screen.getByTestId("group-delete-cascade")).not.toBeNull();

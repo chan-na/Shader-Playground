@@ -51,11 +51,11 @@ describe("frameMetricValue", () => {
 });
 
 describe("linkedProgramsValue", () => {
-  it("reports 0 linked when there are no shader/compute nodes", () => {
-    expect(linkedProgramsValue([meshNode("m1")], {})).toBe("0 linked");
+  it("reports 0 compiled when there are no shader/compute nodes", () => {
+    expect(linkedProgramsValue([meshNode("m1")], {})).toBe("0 compiled");
   });
 
-  it("counts shader nodes with an error diagnostic as not linked", () => {
+  it("counts shader nodes with an error diagnostic as not compiled", () => {
     const nodes = [shaderNode("s1"), shaderNode("s2")];
     const byNode: Record<string, NodeDiagnostics> = {
       s1: {
@@ -63,10 +63,10 @@ describe("linkedProgramsValue", () => {
         fragment: [{ line: 1, severity: "error", message: "boom" }],
       },
     };
-    expect(linkedProgramsValue(nodes, byNode)).toBe("1 linked");
+    expect(linkedProgramsValue(nodes, byNode)).toBe("1 compiled");
   });
 
-  it("still counts a node with only warnings as linked", () => {
+  it("still counts a node with only warnings as compiled", () => {
     const nodes = [shaderNode("s1")];
     const byNode: Record<string, NodeDiagnostics> = {
       s1: {
@@ -74,12 +74,12 @@ describe("linkedProgramsValue", () => {
         vertex: [{ line: 2, severity: "warning", message: "meh" }],
       },
     };
-    expect(linkedProgramsValue(nodes, byNode)).toBe("1 linked");
+    expect(linkedProgramsValue(nodes, byNode)).toBe("1 compiled");
   });
 
   it("includes compute nodes in the program count", () => {
     const nodes = [shaderNode("s1"), computeNode("c1")];
-    expect(linkedProgramsValue(nodes, {})).toBe("2 linked");
+    expect(linkedProgramsValue(nodes, {})).toBe("2 compiled");
   });
 });
 

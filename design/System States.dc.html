@@ -425,7 +425,8 @@
   </div>
 
   <!-- ══ CRASH FALLBACK (ErrorBoundary) — 8th state, intentionally minimal (D6) ══ -->
-  <!-- NOTE: uses raw system fonts + neutral greys BY DESIGN — must survive webfont / CSS-var injection failure, so it deliberately does not depend on theme tokens. -->
+  <!-- NOTE: raw system fonts + neutral greys BY DESIGN — must survive webfont / CSS-var injection failure, so it does not depend on RUNTIME theme tokens.
+       A-7 (v1.2): the "!" accent (#f0555c) is now BUILD-TIME interpolated from semantic.error (inline constant, not a runtime CSS var) so it tracks the token without reintroducing runtime dependence. Greys/fonts stay token-independent. -->
   <sc-if value="{{ crashBlock }}" hint-placeholder-val="{{ false }}">
     <div style="position:absolute;inset:0;z-index:70;background:#111214;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
       <div style="max-width:430px;text-align:center;color:#dddddd;">

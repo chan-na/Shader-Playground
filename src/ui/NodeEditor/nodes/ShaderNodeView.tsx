@@ -7,7 +7,12 @@ import { NodeThumbnail } from "../NodeThumbnail";
 import { countNodeDiagnostics, ErrorBadge } from "./ErrorBadge";
 import { GpuTimerChip } from "./GpuTimerChip";
 import { NodeCardHeader } from "./NodeCardHeader";
-import { PORT_STRIDE, PORT_TOP_PAD, PortHandle } from "./PortHandle";
+import {
+  multiPortPreviewH,
+  PORT_STRIDE_MULTI,
+  PORT_TOP_PAD,
+  PortHandle,
+} from "./PortHandle";
 
 export function ShaderNodeView({ id, data }: NodeProps) {
   const node = data.node as ShaderGraphNode;
@@ -41,9 +46,15 @@ export function ShaderNodeView({ id, data }: NodeProps) {
       <div className="node-card__body" style={{ padding: "9px 0" }}>
         {/* Thumbnail insets by the 46px port rail on both sides so the live
          * preview never overlaps the rail labels (design/Node Editor.dc.html
-         * L188: `margin:0 46px;height:96px`). */}
+         * L188: `margin:0 46px;height:96px`). Height follows the input-port
+         * span once a shader declares enough uniforms to outgrow the 96px
+         * default — dc's 6-port 'Noise' card is the reference [C-3]. */}
         <div style={{ margin: "0 46px" }}>
-          <NodeThumbnail nodeId={id} width="100%" height={96} />
+          <NodeThumbnail
+            nodeId={id}
+            width="100%"
+            height={multiPortPreviewH(inputs.length)}
+          />
         </div>
       </div>
       {inputs.map((p, i) => (
@@ -51,7 +62,7 @@ export function ShaderNodeView({ id, data }: NodeProps) {
           key={p.name}
           port={p}
           side="in"
-          top={PORT_TOP_PAD + i * PORT_STRIDE}
+          top={PORT_TOP_PAD + i * PORT_STRIDE_MULTI}
         />
       ))}
       <PortHandle

@@ -8,8 +8,13 @@
  * 이 파일이 src/theme.ts 이며, main.tsx가 부트 시 cssVars()를 :root에
  * 주입해 CSS 변수로도 파생한다(예: --surface-panel: #131519). 아래 cssVars() 참고.
  * design/ 번들의 theme.ts는 핸드오프의 출처이고, 런타임 값의 출처는 이 파일이다 [D20].
+ * 두 파일은 의도적으로 다르다 — design/theme.ts는 디자이너 정본(값의 출처)이고,
+ * 이 파일은 거기에 dc 실측 기반 구현 파생 토큰(nodeCardSolid · emptyStateIcon ·
+ * cardLg · modal · thumbnailInset · onCanvasText · overlayBar · shadow.modal)과
+ * 헬퍼(withAlpha · 확장 cssVars)를 더한 상위집합이다. 번들 갱신 시 design/theme.ts로
+ * 이 파일을 덮어쓰지 말 것 — 위 파생분이 사라진다(v1.1 실사고). 신규 토큰만 병합한다.
  *
- * 버전: v1.1 · 2026-07-14
+ * 버전: v1.2 · 2026-07-16 (design/theme.ts v1.2 = 0080f37 기준 병합)
  */
 
 export const tokens = {
@@ -37,7 +42,11 @@ export const tokens = {
   // 파생하지 않도록 이름을 부여.
   overlay: {
     gridDot: "rgba(255,255,255,0.045)", // 노드 캔버스 도트 그리드
-    scrim: "rgba(0,0,0,0.5)", // 몰입 모드·GPU 칩·모달 백드롭 공용 스크림
+    // GPU 칩(향후 몰입 모드) 공용 스크림. 모달 백드롭은 이 값이 아니라
+    // withAlpha(surface.appDarker, 0.72) — M7-U5 결정 [B-1 v1.2: 범위 축소].
+    scrim: "rgba(0,0,0,0.5)",
+    // Video 스크럽 등 중립 트랙/필 표면. 순백 채널 직접 파생을 명명 토큰으로 [B-4].
+    track: "rgba(255,255,255,0.18)",
   },
 
   // ── Gradients (종점을 토큰으로) [D10] ────────────────────────────────
@@ -66,6 +75,8 @@ export const tokens = {
   // ── Text ────────────────────────────────────────────────────────────
   text: {
     primary: "#e7eaee",
+    // 순백 강조 — 인라인 rename 편집 중 상태를 헤더 타이틀과 구분 [B-2].
+    emphasis: "#ffffff",
     brightBody: "#c4cad2",
     secondary: "#9aa2ac",
     muted: "#656d78",
@@ -88,6 +99,9 @@ export const tokens = {
     output: "#e05c93", // Output
     value: "#d4a53c", // Param · Math · Swizzle · Combine
     container: "#77828f", // Group
+    // source 카테고리의 밝은 변형(Webcam 렌즈 링 등). source 알파 파생 근사에
+    // 이름을 부여한 것 [B-3].
+    sourceBright: "#6fd6a3",
   },
 
   // ── Port type families ★ (형태=방향, 색=타입 패밀리) ─────────────────
@@ -140,6 +154,11 @@ export const tokens = {
     overlay: 9,
     // 뷰포트 하단 플로팅 트랜스포트 바 — Viewport.dc.html L107: border-radius 12.
     transportBar: 12,
+    // 컴팩트(≤990px) 티어 전용 — 풀 바(12/9) 상속 근사 대신 정본화 [B-5].
+    transportBarCompact: 11,
+    overlayCompact: 8,
+    // 그래프 스켈레톤 상태 필 — 근사(overlay 9) 대신 dc 실측 정본화 [B-6].
+    skeletonStatus: 10,
     // 뷰포트 빈 상태 중앙 아이콘 박스(64×64) — Viewport.dc.html L52:
     // border-radius 16. Graph-empty 온보딩 아이콘(56×56)도 같은 토큰을 공유
     // (System States.dc.html L110의 실측 15px과 1px 차이 — 두 "빈 상태 아이콘"
@@ -163,6 +182,9 @@ export const tokens = {
     // 0.7 알파 패밀리 일관성 유지 [D12] — design/System States.dc.html의 solid
     // #f5b13d 링 대신 이 값이 정본이다.
     warnRing: "0 0 0 1.5px rgba(245,177,61,0.7), 0 0 14px rgba(245,177,61,0.3)",
+    // 그래프 스켈레톤 상태 필. nodeCard 패밀리 + blur 24 — 근사(nodeCard blur 20)
+    // 대신 dc 실측 정본화 [B-6].
+    skeletonStatus: "0 8px 24px rgba(0,0,0,0.5)",
     portOutputGlow: (famHex: string) => `0 0 7px ${famHex}aa`,
     // 노드 카드 썸네일(Shader/Image 96px 프리뷰) 안쪽 그림자.
     // design/Node Editor.dc.html L188: box-shadow: inset 0 1px 4px rgba(0,0,0,0.5).

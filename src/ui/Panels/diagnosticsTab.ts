@@ -14,13 +14,19 @@ export function frameMetricValue(fps: number): string {
 }
 
 /**
- * "Programs" metric card value: `<linked> linked` (dc L388).
+ * "Shaders" metric card value: `<n> compiled` (dc L388, v1.2).
  *
  * There is no GL program cache in any store to count directly, so this is a
- * graph-shape proxy: the program count is the number of shader/compute nodes,
- * and a program counts as "linked" when its node has no severity==="error"
- * diagnostic across vertex/fragment/link (a node with only warnings, or no
- * diagnostics at all, is still linked).
+ * graph-shape proxy: the count is the number of shader/compute nodes, and one
+ * counts as compiled when its node has no severity==="error" diagnostic across
+ * vertex/fragment/link (a node with only warnings, or no diagnostics at all,
+ * still counts).
+ *
+ * [A-6] The dc's v1.1 label was "Programs: N linked", which implied a real GL
+ * link counter this proxy can't provide. Rather than expose a new GL-layer
+ * counter (out of scope), v1.2 moved the label to "Shaders: N compiled" to
+ * match what is actually being measured. A true linked-program count remains a
+ * post-v1.2 task.
  */
 export function linkedProgramsValue(
   nodes: readonly GraphNode[],
@@ -37,7 +43,7 @@ export function linkedProgramsValue(
     );
     return !hasError;
   }).length;
-  return `${linked} linked`;
+  return `${linked} compiled`;
 }
 
 /** Runtime log row's relative time column: seconds since the buffer's first entry (dc L391-395 "time"). */

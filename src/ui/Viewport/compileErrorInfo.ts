@@ -124,7 +124,14 @@ export function firstCompileError(
         message: vertexErr.message,
         raw: formatDiagnosticRaw(vertexErr),
         errorCount,
-        excerpt: buildExcerpt(node.vertexSource, vertexErr.line),
+        // The driver's line numbers index the source it was handed, which is
+        // fullscreen.vert (not node.vertexSource) whenever the node compiled
+        // as a fullscreen pass. Falling back to the node's own source is only
+        // for diagnostics recorded before the compiler reported a source.
+        excerpt: buildExcerpt(
+          diags.compiledVertexSource ?? node.vertexSource,
+          vertexErr.line,
+        ),
         failingNodeCount,
       };
     }

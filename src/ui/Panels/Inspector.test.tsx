@@ -136,12 +136,24 @@ describe("Inspector — Name field (D15)", () => {
     ).toBe("Blur pass");
   });
 
-  it("does not render for a selected group node", () => {
+  // [A-2] The Name field is now common to every kind, groups included — it
+  // used to be suppressed for groups, which left them with a separate "Group
+  // label" field. It seeds from the group's `label` and commits back into it.
+  it("renders for a selected group node, seeded from the group's label", () => {
     useGraphStore.getState().addNode(groupNode);
     useSelectionStore.getState().select("g1");
     render(<Inspector embedded />);
 
-    expect(screen.queryByTestId("node-name-input")).toBeNull();
+    const input = screen.getByTestId("node-name-input") as HTMLInputElement;
+    expect(input.value).toBe(groupNode.label);
+
+    fireEvent.change(input, { target: { value: "Lighting" } });
+    fireEvent.blur(input);
+
+    const group = useGraphStore.getState().nodes.find((n) => n.id === "g1");
+    expect(group?.kind === "group" && group.label).toBe("Lighting");
+    // The rename must not leave a second title on the node.
+    expect(group?.name).toBeUndefined();
   });
 
   it("reflects a rename made through the store (card-side rename) after a remount key change", () => {

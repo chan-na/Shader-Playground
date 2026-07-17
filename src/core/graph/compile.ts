@@ -141,6 +141,16 @@ export interface ExecutionPlan {
   outputSourceNodeId: string | null;
   errors: ValidationError[];
   shaderErrors: Record<string, ShaderError[]>;
+  /**
+   * Shader node-id → the vertex source that was actually handed to the GL
+   * compiler. This is *not* always `node.vertexSource`: a shader node with no
+   * mesh input is compiled as a fullscreen pass, which swaps in
+   * `fullscreen.vert` (see the `meshIsFullscreen` branch below). Consumers
+   * that map a vertex-stage diagnostic's line number back to source text must
+   * read this rather than the node, or they will point at a file the driver
+   * never saw.
+   */
+  compiledVertexSource: Record<string, string>;
   width: number;
   height: number;
   /** True when at least one ComputePass exists — RAF idle gate checks this. */
@@ -171,6 +181,7 @@ export function emptyPlan(width: number, height: number): ExecutionPlan {
     outputSourceNodeId: null,
     errors: [],
     shaderErrors: {},
+    compiledVertexSource: {},
     width,
     height,
     hasCompute: false,
@@ -474,6 +485,7 @@ export function compileGraph(
 
   const errors = validateGraph(graph);
   const shaderErrors: Record<string, ShaderError[]> = {};
+  const compiledVertexSource: Record<string, string> = {};
   const fatal = errors.some(
     (e) =>
       e.code === "cycle" ||
@@ -558,6 +570,7 @@ export function compileGraph(
     if (meshIsFullscreen) {
       vertexSource = fullscreenVert;
     }
+    compiledVertexSource[sn.id] = vertexSource;
 
     const built = createProgram(gl, vertexSource, sn.fragmentSource);
     if (built.errors.length) shaderErrors[sn.id] = built.errors;
@@ -686,6 +699,7 @@ export function compileGraph(
     outputSourceNodeId: outputs[0]?.sourceNodeId ?? null,
     errors,
     shaderErrors,
+    compiledVertexSource,
     width: opts.width,
     height: opts.height,
     hasCompute: passes.some((p) => p.kind === "compute"),

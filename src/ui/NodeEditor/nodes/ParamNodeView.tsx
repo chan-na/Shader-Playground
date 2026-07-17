@@ -16,9 +16,10 @@ export function ParamNodeView({ id, data }: NodeProps) {
   const time = useTimeStore((s) => s.simTime);
   const setParamValue = useGraphStore((s) => s.setParamValue);
   const port = paramOutputPort(node.paramKind);
-  // "커스텀 표시명 없음" — neither a user-set `name` nor the legacy `label`
-  // is present, so the paramKind chip fills the meta slot as a fallback.
-  const hasCustomName = Boolean(node.name?.trim() || node.label);
+  // "커스텀 표시명 없음" — no user-set `name`, so the paramKind chip fills the
+  // meta slot as a fallback. (The legacy `label` source is gone [A-1]; existing
+  // projects had it migrated into `name` by projectSanitize.)
+  const hasCustomName = Boolean(node.name?.trim());
 
   return (
     <div

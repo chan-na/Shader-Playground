@@ -64,7 +64,7 @@ function nextFovDeg(fovDeg: number): number {
  *
  * Renders a single DOM tree that covers both the full (design/Viewport.dc.html
  * L108-136) and compact (L141-152, [D3]) transport bar variants — the switch
- * between them is a `@container vp-body (max-width: 700px)` query in
+ * between them is a `@container vp-body (max-width: 990px)` query [C-6] in
  * index.css, not a second JSX branch, so there's exactly one set of
  * testid/state hooks regardless of panel width. The compact variant hides
  * the scrub + FOV sliders and the u_time/Reset-camera text labels, and swaps

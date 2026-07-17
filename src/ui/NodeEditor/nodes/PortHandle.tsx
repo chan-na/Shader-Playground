@@ -145,5 +145,79 @@ export function PortHandle({ port, side, top, dimmed }: PortHandleProps) {
 
 /** Vertical-rhythm helpers used across node views so single-port and
  * multi-port cards line up the same way. */
+
+/**
+ * Port stride (px) for fixed-arity cards (Math / Combine).
+ *
+ * NOT changed by C-3: that rule is scoped to cards that "grow one input per
+ * uniform" (shader/compute — see PORT_STRIDE_MULTI). These cards pair each
+ * port with a `.node-card__field` row, so their stride answers to the field
+ * rhythm (~26px: input 21 + body gap 5), not to the dc's shader cards. The dc
+ * steps its Combine card by 24 (handles at 44/68/92) while this file has used
+ * 18 since v1 — a pre-existing gap that v1.2 does not respec, so it is left
+ * alone here and logged as a v1.3 question rather than "fixed" on a guess.
+ */
 export const PORT_STRIDE = 18;
+
+/**
+ * Port stride (px) for uniform-driven cards (Shader / Compute) [C-3].
+ *
+ * 30 per design/Node Editor.dc.html's shader cards — both the 3-port Fresnel
+ * (64/94/124) and the 6-port Noise (64…214) step by 30. Since these cards gain
+ * an input port per uniform, a fixed stride alone would push lower ports out of
+ * a fixed-height card; the helpers below grow the body to match. README's
+ * practical ceiling is ~10 ports — deliberately not clamped, as clamping would
+ * reintroduce the very overflow this rule exists to remove.
+ */
+export const PORT_STRIDE_MULTI = 30;
+
 export const PORT_TOP_PAD = 38;
+
+/** Slack (px) between the last port's bottom and the card's bottom edge —
+ *  the dc's 6-port Noise card leaves 2px (card 227 vs port bottom 225). */
+const PORT_TAIL_SLACK = 2;
+
+/** Card-relative bottom edge (px) of the last port on an `nPorts` card. */
+function portSpanBottom(nPorts: number): number {
+  return (
+    PORT_TOP_PAD +
+    Math.max(0, nPorts - 1) * PORT_STRIDE_MULTI +
+    PORT_DIAMETER.card
+  );
+}
+
+/**
+ * Body height (px) that keeps every port inside the card [C-3].
+ *
+ * `chromeH` is the card's non-body vertical chrome (header + the body's own
+ * vertical padding), so the result is exactly the body height at which the
+ * last port clears the card's bottom edge by `PORT_TAIL_SLACK`.
+ *
+ * NOTE on the spec: README v1.2 states `previewH = max(96,(n−1)·30+56)`, but
+ * that constant is expressed in the *dc's* geometry, where port 0 sits at
+ * top:64. This implementation has always placed port 0 at PORT_TOP_PAD(38) —
+ * a v1 simplification (the dc varies 40/50/64 per card type; the impl uses one
+ * value) — so the dc's constant can't be transplanted literally. Deriving from
+ * this file's own constants instead reproduces the dc's *rule* (body grows with
+ * the port span, ~2px tail slack, 96 floor) rather than its coordinates. Cross
+ * -check: the dc's own cards are 96px @3 ports and 176px @6 — which its stated
+ * +56 formula (116 / 206) matches at neither point, so the pixel values, not
+ * the formula text, are what this follows [A-5 precedent: dc pixels win].
+ */
+function portSpanBodyH(nPorts: number, chromeH: number): number {
+  return portSpanBottom(nPorts) + PORT_TAIL_SLACK - chromeH;
+}
+
+/** Shader card preview (thumbnail) height — chrome is header 30 + padding
+ *  9×2 = 48, and the 96 floor is the dc's default thumbnail [D2·C-3]. */
+export function multiPortPreviewH(nPorts: number): number {
+  return Math.max(96, portSpanBodyH(nPorts, 48));
+}
+
+/** Compute card body min-height — same rule, but the body is a kv list with
+ *  no thumbnail, so there is no 96 floor: content sizes the card until the
+ *  port span exceeds it. Chrome is header 30 + `.node-card__body` padding
+ *  8(top)+9(bottom) = 47 [C-3]. */
+export function multiPortBodyMinH(nPorts: number): number {
+  return Math.max(0, portSpanBodyH(nPorts, 47));
+}

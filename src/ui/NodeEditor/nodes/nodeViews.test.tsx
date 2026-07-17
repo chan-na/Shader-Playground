@@ -268,30 +268,29 @@ describe("ParamNodeView", () => {
     expect(html).toContain("handle-vec3");
   });
 
-  it("uses the custom label when defined", () => {
+  it("uses the custom name when defined", () => {
     const node: ParamGraphNode = {
       id: "p1",
       kind: "param",
       paramKind: "float",
       value: 1,
-      label: "Intensity",
+      name: "Intensity",
     };
     const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
     expect(html).toContain("Intensity");
   });
 
-  it("prefers the user-set name over the legacy label [D15]", () => {
+  // [A-1] `name` is now the only user-set title source for a param.
+  it("renders the user-set name [D15·A-1]", () => {
     const node: ParamGraphNode = {
       id: "p1",
       kind: "param",
       paramKind: "float",
       value: 1,
       name: "Wave Speed",
-      label: "Intensity",
     };
     const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
     expect(html).toContain("Wave Speed");
-    expect(html).not.toContain(">Intensity<");
   });
 
   it("does not render the internal node id anywhere in the card [D15]", () => {

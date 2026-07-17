@@ -126,8 +126,18 @@ describe("ExportShareDialog", () => {
 
     const expectedKB = Math.round(FIXED_HTML_LENGTH / 1024);
     expect(
-      screen.getByText(`${expectedKB} KB · WebGL2 · self-contained`),
+      screen.getByText(
+        `${expectedKB} KB · WebGL2 · self-contained · timestamp added on download`,
+      ),
     ).not.toBeNull();
+
+    // [C-10] The editable base keeps its own field, and the completed name is
+    // conveyed by a static suffix rather than a live preview (the timestamp is
+    // only fixed at download time).
+    expect(screen.getByTestId("es-html-filename")).not.toBeNull();
+    expect(container.querySelector(".es-filename-suffix")?.textContent).toBe(
+      "-{timestamp}.html",
+    );
   });
 
   it("Download HTML calls downloadExportedHtml with the file name and shows the done file card with the actual saved name", () => {

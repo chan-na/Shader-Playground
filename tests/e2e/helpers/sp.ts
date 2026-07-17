@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import type {
   Diagnostics,
+  DockTreeNodeMinimal,
   GraphEdge,
   GraphNodeMinimal,
   ShaderStage,
@@ -86,6 +87,18 @@ export interface SpStores {
   };
   diagnostics: {
     getState: () => { byNode: Record<string, Diagnostics> };
+  };
+  dock: {
+    getState: () => {
+      tree: unknown;
+      maximized: string | null;
+      nextLeafId: number;
+    };
+    setState: (partial: {
+      tree?: DockTreeNodeMinimal | null;
+      maximized?: string | null;
+      nextLeafId?: number;
+    }) => void;
   };
   time: {
     getState: () => {

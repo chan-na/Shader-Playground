@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { waitForApp, waitForReady, withSp } from "./sp";
-import type { GraphEdge, GraphNodeMinimal } from "./types";
+import type { DockTreeNodeMinimal, GraphEdge, GraphNodeMinimal } from "./types";
 
 /** Wait for the app boot + demo bootstrap to complete. */
 export async function bootApp(page: Page): Promise<void> {
@@ -20,6 +20,25 @@ export async function setGraph(
       sp.graph.getState().setGraph(args.graph, args.positions ?? {});
     },
     { graph, positions: positions ?? {} },
+  );
+}
+
+/** Replace the dock tree wholesale (R8 setup — avoids 3-4 real drags). */
+export async function setDockTree(
+  page: Page,
+  tree: DockTreeNodeMinimal,
+  nextLeafId: number,
+): Promise<void> {
+  await withSp(
+    page,
+    (sp, args) => {
+      sp.dock.setState({
+        tree: args.tree,
+        maximized: null,
+        nextLeafId: args.nextLeafId,
+      });
+    },
+    { tree, nextLeafId },
   );
 }
 

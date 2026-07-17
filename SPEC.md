@@ -440,6 +440,18 @@ Phase 31~33 의 GIF 인코더는 워커가 완료를 *단일 메시지* 로만 �
 - **검증**: Vitest 단위 +5 건 — `encode.test`(onProgress 프레임당 1회·단조·완결 카운트 / onProgress 옵셔널), `gifEncoderClient.test`(progress 메시지를 `job.onProgress` 로 순서대로 전달 + promise 미settle / unknown reqId progress 무시 / 인라인 폴백도 progress 보고), `gifRecorder.test`(encode 중 encodeProgress 가 1 까지 상승 후 idle 에서 0 리셋, start 가 잔여 progress 클리어). Playwright E2E `phase-34-gif-progress.spec.ts` 2 건 — (a) 스토어가 `encodeProgress` 노출 + idle 에서 0, (b) chromium 실제 워커 경로에서 라이브 녹화→stop 시 progress 가 단조 증가하며 1 에 도달하고 완료 후 idle·0 으로 복귀(스토어 subscribe 로 transient 값 포착). Phase 31~33 기존 GIF 스펙은 회귀 가드로 유지.
 - **비범위 (Out of scope — 별도 백로그)**: transparency(1-bit), 정적 HTML export 의 GIF, per-frame palette 색 안정화, 인라인 폴백의 디더링.
 
+### Phase 35 — 도킹 레이아웃 (트리 도크 모델, 디자인 핸드오프 v1.3/v1.4) (완료)
+고정 4분할 레이아웃을 **트리 기반 도크**로 교체 — 디자인 핸드오프 v1.3/v1.4(`design/CHANGELOG.md` §v1.3·§v1.4, `design/README.md` §M)가 정본. `Docking Prototype.dc.html`을 구현 스코프로 승격하면서 나온 모순·기능 삭제·사양 부재 결정(R1~R15) 중 도킹 모델 자체에 해당하는 R1·R4·R5·R6·R7·R8·R9·R11 을 반영한다.
+- **모델**: 트리 기반 도크(`split{dir,ratio,a,b}` / `leaf{tabs[],active,collapsed}`), 도킹 5종(nodeEditor/viewport/inspector/code/assets — R5: problems/diagnostics 제외), 기본 트리 = `col 0.717 [ row 0.587 [nodeEditor | col 0.556 [viewport | (inspector,assets)]] | code(하단 전폭) ]`(src/state/dockTree.ts `createDefaultDockTree`).
+- **드래그/드롭 규칙**: ⣿=leaf 전체, 탭=그 탭만. pointer* 이벤트 전용(R10). 판정 우선순위 — (1) region 상단 34px 탭바 존(`TAB_BAR_DROP_PX`) 탭 병합이 **셸 바깥 42px 밴드(`OUTER_DROP_BAND_PX`)보다 우선**, (2) 바깥 밴드 → 전체 가장자리 도킹, (3) region 내부 가장자리 22%(`REGION_EDGE_DROP_FRAC`) → 스플릿(프리뷰 라벨 `Split <zone>`), 그 외 중앙 병합. 드롭 타깃 없이 release → 첫 region으로 강제 도킹(R1 — 플로팅 없음, `fallbackDropTarget`).
+- **접기/최대화(R4)**: leaf 단위, 접힌 leaf = split 방향 고정 34px strip + 그 split의 divider 비활성(렌더 제거), 복원 버튼은 strip 안에서 실포인터 도달 가능.
+- **닫기(R6)**: 헤더 ✕ = 패널 전체(모든 탭), 탭별 ✕ = 그 탭만(비활성 탭도 활성화 없이).
+- **최소 크기(R7)**: leaf 최소 240×160(`MIN_LEAF_WIDTH/HEIGHT`), divider 드래그 클램프(0.15~0.85 + 픽셀 하한).
+- **탭 오버플로(R8)**: 4개↑ 가로 스크롤 + 우측 페이드 마스크, 34px 헤더 높이 불변.
+- **영속화(R9)**: localStorage `shader-playground.dock-layout`(500ms 디바운스, `sanitizeDockLayoutSnapshot` 검증), 손상 값은 조용히 기본 트리 폴백. `Reset layout` = 기본 트리. ＋Panel 재도킹, empty state 카피 `No panels docked — add one with ＋ Panel`.
+- **반응형(R11)**: 컴팩트(≤990px, C-6 임계 재사용) 도킹 비활성(고정 스택 폴백, 드래그 트리거 무력화), 넓어지면 트리 무변경 복원.
+- **검증**: Playwright E2E — `m1-dock-header-collapse.spec.ts`(접기 도달성), `m2-dock-drag.spec.ts`(드래그/강제 도킹), `m3-dock-b6.spec.ts`(영속화·＋Panel·empty·컴팩트), `m4-dock-dragdrop.spec.ts`(존 우선순위·스플릿, B7 신설), `m5-dock-chrome.spec.ts`(R4/R6/R7/R8, B7 신설), `m6-dock-fallback.spec.ts`(R9 손상 폴백·R11 드래그 비활성, B7 신설). Vitest 단위 — `dockTree.test.ts`, `dockStore.test.ts`, `dockLayoutModel.test.ts`, `DockLayout.test.tsx`, `DockPanelHeader.test.tsx`, `autoSave.test.ts`.
+
 ### (백로그)
 - 쉐이더 핫리로드 디스크 백업(File System Access API).
 - **GLSL LSP — 추가 확장**: Phase 24 / 25 / 26 / 27 / 28 가 진단·심볼 테이블·Hover·시맨틱 토큰·Goto/References/Rename·Cross-stage rename 까지 다룸. **함수 오버로드 해석**, **call hierarchy**, **for-init block-scope 정확도**, **그래프 연결을 따라가는 multi-program rename** 이 잠재 후속. CodeMirror 6 유지(Monaco 전환은 여전히 회피 권장).

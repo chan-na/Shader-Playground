@@ -5,11 +5,15 @@
  * B1에서는 순수 상태만 다룬다 — 렌더러 연결은 B2, 영속화(R9 localStorage)는
  * B6에서 붙는다. 상태는 의도적으로 순수 JSON 직렬화 가능 형태를 유지한다
  * (`{ tree, maximized, nextLeafId }` — 함수/클래스 인스턴스 없음, R9 준비).
+ * B4-U2에서 드래그 분리/재도킹 액션(`detachForDrag`/`dockDetached`)을
+ * 추가했다 — 트랜지언트 고스트 자체(위치/사이즈/렌더링)는 B4-U3의 책임이고,
+ * 이 스토어는 dc `onMove`/`dockGhost`의 트리 변형 절반만 담당한다.
  *
  * 모든 트리 갱신은 `./dockTree`의 불변 함수(`getNodeAt`/`setNodeAt`/
- * `removePanel`/`findLeafPath`/`firstLeafPath`/`collectPanelIds`/
- * `clampDividerRatio`) 경유 — 이 파일 안에서 트리 노드를 직접 변이하지
- * 않는다. 순환 의존성 방지를 위해 다른 store는 import하지 않는다.
+ * `removePanel`/`findLeafPath`/`findTabLeafPath`/`firstLeafPath`/
+ * `collectPanelIds`/`clampDividerRatio`/`insertDetachedLeaf`) 경유 — 이
+ * 파일 안에서 트리 노드를 직접 변이하지 않는다. 순환 의존성 방지를 위해
+ * 다른 store는 import하지 않는다.
  */
 
 import { create } from "zustand";
@@ -17,12 +21,16 @@ import {
   clampDividerRatio,
   collectPanelIds,
   createDefaultDockTree,
+  type DockDropTarget,
+  type DockLeaf,
   type DockNode,
   type DockPanelId,
   type DockPath,
   findLeafPath,
+  findTabLeafPath,
   firstLeafPath,
   getNodeAt,
+  insertDetachedLeaf,
   removePanel,
   setNodeAt,
 } from "./dockTree";
@@ -67,6 +75,39 @@ export interface DockState {
   /** 트리/최대화/leaf id 카운터를 기본값으로 되돌린다. dc
    * `resetLayout`(L524-526) 이식. */
   resetLayout: () => void;
+  /** 드래그 시작 시 트리에서 leaf 전체 또는 단일 탭을 분리한다. dc
+   * `onMove`의 `pending` 분기(L389-411) 중 트리 변형 부분만 이식 — 고스트
+   * 위치/사이즈 계산(L396-409의 w/h/x/y)은 B4-U3(렌더러/드래그 핸들러)의
+   * 책임이다.
+   *
+   * - `mode: "leaf"`: 지정 경로가 leaf가 아니면(또는 tree가 `null`이면)
+   *   `null`을 반환하고 no-op. leaf면 `{tabs, active}`를 확보한 뒤
+   *   `closePanel`과 동일한 `removePanel` 루프로 그 탭 전체를 제거한다.
+   * - `mode: "tab"`: `findTabLeafPath`로 해당 탭이 실존하는지 확인하고
+   *   (없으면 `null`·no-op) `removePanel` 1회로 그 탭만 제거한다.
+   *
+   * 두 모드 모두 dc L410처럼 `maximized: null`을 정본으로 강제한다(드래그
+   * 시작은 항상 최대화를 해제한다). 반환된 payload는 B4-U3의 트랜지언트
+   * 고스트가 들고 있다가 `dockDetached`로 반드시 되돌아온다(R1: 플로팅
+   * 없음 — 분리된 패널이 도킹되지 않은 채 남는 경우는 없다). */
+  detachForDrag: (
+    payload:
+      | { mode: "leaf"; path: DockPath }
+      | { mode: "tab"; id: DockPanelId },
+  ) => { tabs: DockPanelId[]; active: DockPanelId } | null;
+  /** 분리된(드래그 중이던) 탭들을 드롭 타깃 위치에 다시 도킹한다. dc
+   * `dockGhost`(L466-487)의 스토어 측 절반 — leaf id 발급(dc의
+   * `this.dc.uid++`, L468)은 여기서 `nextLeafId` 카운터로 수행하고, 실제
+   * 트리 삽입은 `insertDetachedLeaf`(B4-U1)에 위임한다.
+   *
+   * `tabs.length === 0`이면 no-op(방어 가드 — `detachForDrag`는 항상
+   * 비어있지 않은 payload를 반환하므로 정상 경로에서는 도달하지 않지만,
+   * 다른 store 액션들의 방어 가드 관례를 따른다). */
+  dockDetached: (
+    tabs: DockPanelId[],
+    active: DockPanelId,
+    target: DockDropTarget,
+  ) => void;
 }
 
 /** 최대화된 leaf가 트리에서 사라졌으면 `maximized`를 정리한다. dc
@@ -190,5 +231,45 @@ export const useDockStore = create<DockState>((set, get) => ({
 
   resetLayout: () => {
     set({ tree: createDefaultDockTree(), maximized: null, nextLeafId: 5 });
+  },
+
+  detachForDrag: (payload) => {
+    const { tree } = get();
+    if (tree === null) return null;
+
+    if (payload.mode === "leaf") {
+      const leaf = getNodeAt(tree, payload.path);
+      if (leaf === null || leaf.type !== "leaf") return null;
+      const tabs = [...leaf.tabs];
+      const active = leaf.active;
+      let cur: DockNode | null = tree;
+      for (const id of tabs) {
+        cur = removePanel(cur, id).node;
+      }
+      set({ tree: cur, maximized: null });
+      return { tabs, active };
+    }
+
+    // mode === "tab"
+    const path = findTabLeafPath(tree, payload.id);
+    if (path === null) return null;
+    const result = removePanel(tree, payload.id);
+    set({ tree: result.node, maximized: null });
+    return { tabs: [payload.id], active: payload.id };
+  },
+
+  dockDetached: (tabs, active, target) => {
+    if (tabs.length === 0) return;
+    const { tree, nextLeafId } = get();
+    const leaf: DockLeaf = {
+      type: "leaf",
+      id: `l${nextLeafId}`,
+      tabs: [...tabs],
+      active,
+    };
+    set({
+      tree: insertDetachedLeaf(tree, target, leaf),
+      nextLeafId: nextLeafId + 1,
+    });
   },
 }));

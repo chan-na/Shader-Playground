@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useDockStore } from "./dockStore";
 import {
   clampDividerRatio,
+  collectPanelIds,
   createDefaultDockTree,
+  DOCK_PANEL_IDS,
+  type DockDropTarget,
   type DockNode,
   type DockPath,
   firstLeafPath,
@@ -264,6 +267,174 @@ describe("resetLayout", () => {
     expect(useDockStore.getState().tree).toEqual(createDefaultDockTree());
     expect(useDockStore.getState().maximized).toBeNull();
     expect(useDockStore.getState().nextLeafId).toBe(5);
+  });
+});
+
+describe("detachForDrag", () => {
+  it("detaches the entire l3 leaf (inspector+assets) via leaf mode, promoting the sibling l2", () => {
+    const result = useDockStore
+      .getState()
+      .detachForDrag({ mode: "leaf", path: ["a", "b", "b"] });
+    expect(result).toEqual({
+      tabs: ["inspector", "assets"],
+      active: "inspector",
+    });
+    expect(useDockStore.getState().tree).toEqual({
+      type: "split",
+      dir: "col",
+      ratio: 0.717,
+      a: {
+        type: "split",
+        dir: "row",
+        ratio: 0.587,
+        a: {
+          type: "leaf",
+          id: "l1",
+          tabs: ["nodeEditor"],
+          active: "nodeEditor",
+        },
+        b: { type: "leaf", id: "l2", tabs: ["viewport"], active: "viewport" },
+      },
+      b: {
+        type: "leaf",
+        id: "l4",
+        tabs: ["code"],
+        active: "code",
+        collapsed: false,
+      },
+    });
+  });
+
+  it("detaches a single tab via tab mode, leaving the sibling tab on l3", () => {
+    const result = useDockStore
+      .getState()
+      .detachForDrag({ mode: "tab", id: "inspector" });
+    expect(result).toEqual({ tabs: ["inspector"], active: "inspector" });
+    expect(nodeAt(useDockStore.getState().tree, ["a", "b", "b"])).toEqual({
+      type: "leaf",
+      id: "l3",
+      tabs: ["assets"],
+      active: "assets",
+    });
+  });
+
+  it("resets maximized to null on detach, regardless of which leaf was maximized", () => {
+    useDockStore.getState().toggleMaximized("l1");
+    expect(useDockStore.getState().maximized).toBe("l1");
+
+    useDockStore.getState().detachForDrag({ mode: "tab", id: "assets" });
+    expect(useDockStore.getState().maximized).toBeNull();
+  });
+
+  it("is a no-op (null result, unchanged tree reference) for an invalid path", () => {
+    const before = useDockStore.getState().tree;
+    const result = useDockStore
+      .getState()
+      .detachForDrag({ mode: "leaf", path: ["a", "a", "a"] });
+    expect(result).toBeNull();
+    expect(useDockStore.getState().tree).toBe(before);
+  });
+
+  it("is a no-op (null result, unchanged tree reference) for a tab that isn't docked", () => {
+    useDockStore.getState().closeTab("assets");
+    const before = useDockStore.getState().tree;
+    const result = useDockStore
+      .getState()
+      .detachForDrag({ mode: "tab", id: "assets" });
+    expect(result).toBeNull();
+    expect(useDockStore.getState().tree).toBe(before);
+  });
+
+  it("reaches the empty state (tree: null) when every leaf is detached in sequence", () => {
+    let path = firstLeafPath(useDockStore.getState().tree);
+    let guard = 0;
+    while (path !== null && guard < 10) {
+      useDockStore.getState().detachForDrag({ mode: "leaf", path });
+      path = firstLeafPath(useDockStore.getState().tree);
+      guard += 1;
+    }
+    expect(useDockStore.getState().tree).toBeNull();
+  });
+});
+
+describe("dockDetached", () => {
+  it("is a no-op for an empty tabs array", () => {
+    const before = useDockStore.getState().tree;
+    const nextLeafIdBefore = useDockStore.getState().nextLeafId;
+    useDockStore.getState().dockDetached([], "inspector", { kind: "empty" });
+    expect(useDockStore.getState().tree).toBe(before);
+    expect(useDockStore.getState().nextLeafId).toBe(nextLeafIdBefore);
+  });
+
+  it("docks outward-left: root becomes a row split (ratio 0.28) with the new leaf as a", () => {
+    const originalTree = useDockStore.getState().tree;
+    useDockStore
+      .getState()
+      .dockDetached(["code"], "code", { kind: "outer", side: "left" });
+    expect(useDockStore.getState().tree).toEqual({
+      type: "split",
+      dir: "row",
+      ratio: 0.28,
+      a: { type: "leaf", id: "l5", tabs: ["code"], active: "code" },
+      b: originalTree,
+    });
+    expect(useDockStore.getState().nextLeafId).toBe(6);
+  });
+
+  it("merges into a region center target, updating the leaf's active tab", () => {
+    const target: DockDropTarget = {
+      kind: "region",
+      zone: "center",
+      path: ["a", "b", "b"],
+    };
+    useDockStore.getState().dockDetached(["code"], "code", target);
+    expect(nodeAt(useDockStore.getState().tree, ["a", "b", "b"])).toEqual({
+      type: "leaf",
+      id: "l3",
+      tabs: ["inspector", "assets", "code"],
+      active: "code",
+    });
+  });
+
+  it("becomes the new root when the tree is empty and the target is {kind: 'empty'}", () => {
+    let path = firstLeafPath(useDockStore.getState().tree);
+    let guard = 0;
+    while (path !== null && guard < 10) {
+      useDockStore.getState().closePanel(path);
+      path = firstLeafPath(useDockStore.getState().tree);
+      guard += 1;
+    }
+    expect(useDockStore.getState().tree).toBeNull();
+
+    useDockStore
+      .getState()
+      .dockDetached(["nodeEditor"], "nodeEditor", { kind: "empty" });
+    expect(useDockStore.getState().tree).toEqual({
+      type: "leaf",
+      id: "l5",
+      tabs: ["nodeEditor"],
+      active: "nodeEditor",
+    });
+    expect(useDockStore.getState().nextLeafId).toBe(6);
+  });
+
+  it("round-trips detachForDrag -> dockDetached without losing any panel (R1)", () => {
+    const result = useDockStore
+      .getState()
+      .detachForDrag({ mode: "leaf", path: ["a", "b", "b"] });
+    expect(result).not.toBeNull();
+    if (result === null) throw new Error("expected a detach payload");
+
+    useDockStore.getState().dockDetached(result.tabs, result.active, {
+      kind: "outer",
+      side: "bottom",
+    });
+
+    const ids = collectPanelIds(useDockStore.getState().tree);
+    expect(ids).toHaveLength(DOCK_PANEL_IDS.length);
+    for (const id of DOCK_PANEL_IDS) {
+      expect(ids).toContain(id);
+    }
   });
 });
 

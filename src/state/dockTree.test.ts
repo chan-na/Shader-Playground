@@ -3,23 +3,39 @@ import {
   COLLAPSED_STRIP_PX,
   clampDividerRatio,
   collectPanelIds,
+  computeDropTarget,
   createDefaultDockTree,
   DIVIDER_PX,
   DOCK_PANEL_IDS,
   type DockDivider,
+  type DockDropTarget,
   type DockLeaf,
   type DockNode,
+  type DockPath,
   type DockRegion,
   type DockSplit,
+  type DropHit,
+  type DropPreviewRect,
+  dockPathsEqual,
+  fallbackDropTarget,
   findLeafPath,
   findTabLeafPath,
   firstLeafPath,
   getNodeAt,
+  insertDetachedLeaf,
   layoutDockTree,
   MIN_LEAF_HEIGHT,
   MIN_LEAF_WIDTH,
+  OUTER_DOCK_RATIO,
+  OUTER_DROP_BAND_PX,
+  OUTER_PREVIEW_FRAC,
+  type OuterDropSide,
+  REGION_EDGE_DROP_FRAC,
+  REGION_SPLIT_RATIO,
+  type RegionDropZone,
   removePanel,
   setNodeAt,
+  TAB_BAR_DROP_PX,
 } from "./dockTree";
 
 /** 테스트 전용 narrowing 헬퍼 — split이 아니면 즉시 실패시켜 이후 접근을
@@ -44,6 +60,15 @@ describe("constants", () => {
     expect(COLLAPSED_STRIP_PX).toBe(34);
     expect(MIN_LEAF_WIDTH).toBe(240);
     expect(MIN_LEAF_HEIGHT).toBe(160);
+  });
+
+  it("matches dc computeDrop/dockGhost geometry constants (B4-U1)", () => {
+    expect(TAB_BAR_DROP_PX).toBe(34);
+    expect(OUTER_DROP_BAND_PX).toBe(42);
+    expect(REGION_EDGE_DROP_FRAC).toBe(0.22);
+    expect(OUTER_DOCK_RATIO).toBe(0.28);
+    expect(REGION_SPLIT_RATIO).toBe(0.4);
+    expect(OUTER_PREVIEW_FRAC).toBe(0.32);
   });
 });
 
@@ -726,5 +751,356 @@ describe("clampDividerRatio — R7", () => {
     expect(clampDividerRatio("row", 6, 826, 0.5)).toBe(0.5);
     expect(clampDividerRatio("row", 6, 826, 0.05)).toBe(0.15);
     expect(clampDividerRatio("row", 6, 826, 0.99)).toBe(0.85);
+  });
+});
+
+/** `regionTarget`/`outerTarget` 헬퍼용 — 타입 자체를 값처럼 재사용하기
+ * 위한 얇은 래퍼(RegionDropZone/OuterDropSide/DockDropTarget/DockPath를
+ * 실제로 소비해 insertDetachedLeaf 테스트의 타깃 리터럴 반복을 줄인다). */
+function regionTarget(zone: RegionDropZone, path: DockPath): DockDropTarget {
+  return { kind: "region", zone, path };
+}
+function outerTarget(side: OuterDropSide): DockDropTarget {
+  return { kind: "outer", side };
+}
+
+describe("computeDropTarget — B4-U1 (dc computeDrop L442-464)", () => {
+  const { regions } = layoutDockTree(createDefaultDockTree(), 1440, 826);
+  // l1(nodeEditor)  x0,y0,w842,h588    path ["a","a"]
+  // l2(viewport)    x848,y0,w592,h324  path ["a","b","a"]
+  // l3(inspector/assets) x848,y330,w592,h258 path ["a","b","b"]
+  // l4(code)        x0,y594,w1440,h232 path ["b"]
+
+  it("prefers the region tab bar zone over the outer band (top-left corner, y=10 x=10)", () => {
+    const hit = computeDropTarget(10, 10, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: { kind: "region", zone: "center", path: ["a", "a"] },
+      preview: { x: 0, y: 0, w: 842, h: 32 },
+      label: "Add to tab bar",
+    });
+  });
+
+  it("docks to the outer left band", () => {
+    const hit: DropHit | null = computeDropTarget(20, 400, 1440, 826, regions);
+    const preview: DropPreviewRect = {
+      x: 0,
+      y: 0,
+      w: 1440 * OUTER_PREVIEW_FRAC,
+      h: 826,
+    };
+    expect(hit).toEqual({
+      target: outerTarget("left"),
+      preview,
+      label: "Dock left",
+    });
+  });
+
+  it("docks to the outer right band", () => {
+    const hit = computeDropTarget(1420, 400, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: outerTarget("right"),
+      preview: {
+        x: 1440 * (1 - OUTER_PREVIEW_FRAC),
+        y: 0,
+        w: 1440 * OUTER_PREVIEW_FRAC,
+        h: 826,
+      },
+      label: "Dock right",
+    });
+  });
+
+  it("docks to the outer top band", () => {
+    const hit = computeDropTarget(400, 38, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: outerTarget("top"),
+      preview: { x: 0, y: 0, w: 1440, h: 826 * OUTER_PREVIEW_FRAC },
+      label: "Dock top",
+    });
+  });
+
+  it("docks to the outer bottom band", () => {
+    const hit = computeDropTarget(400, 800, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: outerTarget("bottom"),
+      preview: {
+        x: 0,
+        y: 826 * (1 - OUTER_PREVIEW_FRAC),
+        w: 1440,
+        h: 826 * OUTER_PREVIEW_FRAC,
+      },
+      label: "Dock bottom",
+    });
+  });
+
+  it("splits the region's left 22% edge zone (l3, fx=0.1 fy=0.5)", () => {
+    const hit = computeDropTarget(907.2, 459, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: regionTarget("left", ["a", "b", "b"]),
+      preview: { x: 848, y: 330, w: 296, h: 258 },
+      label: "Split left",
+    });
+  });
+
+  it("splits the region's right 22% edge zone (l3, fx=0.9 fy=0.5)", () => {
+    const hit = computeDropTarget(1380.8, 459, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: regionTarget("right", ["a", "b", "b"]),
+      preview: { x: 1144, y: 330, w: 296, h: 258 },
+      label: "Split right",
+    });
+  });
+
+  it("splits the region's top 22% edge zone (l3, fx=0.5 fy=0.15, below the 34px tab bar)", () => {
+    const hit = computeDropTarget(1144, 368.7, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: regionTarget("top", ["a", "b", "b"]),
+      preview: { x: 848, y: 330, w: 592, h: 129 },
+      label: "Split top",
+    });
+  });
+
+  it("splits the region's bottom 22% edge zone (l3, fx=0.5 fy=0.85)", () => {
+    const hit = computeDropTarget(1144, 549.3, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: regionTarget("bottom", ["a", "b", "b"]),
+      preview: { x: 848, y: 459, w: 592, h: 129 },
+      label: "Split bottom",
+    });
+  });
+
+  it("merges as a tab at the region center (l3, fx=fy=0.5, m=0.5 > 0.22)", () => {
+    const hit = computeDropTarget(1144, 459, 1440, 826, regions);
+    expect(hit).toEqual({
+      target: regionTarget("center", ["a", "b", "b"]),
+      preview: { x: 848, y: 330, w: 592, h: 258 },
+      label: "Add as tab",
+    });
+  });
+
+  it("returns null outside every region and outside the outer band (the 6px divider gap between l1 and l2/l3)", () => {
+    expect(computeDropTarget(845, 400, 1440, 826, regions)).toBeNull();
+  });
+
+  it("resolves an exact left/top corner tie in favor of left (dc L459-462 checks dl before dt)", () => {
+    // synthetic square region, offset from every container edge by more
+    // than OUTER_DROP_BAND_PX so the outer-band branches can't fire, and
+    // offset from its own top by more than TAB_BAR_DROP_PX so the tab-bar
+    // branch can't fire either — isolates the m===dl vs m===dt tie.
+    const tieRegions: DockRegion[] = [
+      {
+        leaf: { type: "leaf", id: "solo", tabs: ["code"], active: "code" },
+        x: 400,
+        y: 400,
+        w: 200,
+        h: 200,
+        path: [],
+      },
+    ];
+    // fx = (440-400)/200 = 0.2, fy = (440-400)/200 = 0.2 — identical
+    // subtraction/division on both axes, guaranteed bit-exact fx===fy.
+    const hit = computeDropTarget(440, 440, 1000, 1000, tieRegions);
+    expect(hit).toEqual({
+      target: regionTarget("left", []),
+      preview: { x: 400, y: 400, w: 100, h: 200 },
+      label: "Split left",
+    });
+  });
+});
+
+describe("fallbackDropTarget — B4-U1 (dc _fallbackTarget L429-432, R1)", () => {
+  it("falls back to the first region's center when regions exist", () => {
+    const { regions } = layoutDockTree(createDefaultDockTree(), 1440, 826);
+    expect(fallbackDropTarget(regions)).toEqual({
+      kind: "region",
+      zone: "center",
+      path: ["a", "a"],
+    });
+  });
+
+  it("falls back to empty when there are no regions — never a resting floating state", () => {
+    expect(fallbackDropTarget([])).toEqual({ kind: "empty" });
+  });
+});
+
+describe("insertDetachedLeaf — B4-U1 (dc dockGhost L466-487)", () => {
+  const leaf: DockLeaf = {
+    type: "leaf",
+    id: "new",
+    tabs: ["assets"],
+    active: "assets",
+  };
+
+  it("makes the leaf the root when the tree is null", () => {
+    expect(insertDetachedLeaf(null, { kind: "empty" }, leaf)).toEqual(leaf);
+  });
+
+  it("makes the leaf the root when the target is empty, even with a non-null tree", () => {
+    const tree = createDefaultDockTree();
+    expect(insertDetachedLeaf(tree, { kind: "empty" }, leaf)).toEqual(leaf);
+  });
+
+  it("wraps the tree in an outer-left split — new leaf is a (ratio 0.28), tree is b (0.72)", () => {
+    const tree = createDefaultDockTree();
+    const next = insertDetachedLeaf(tree, outerTarget("left"), leaf);
+    expect(next).toEqual({
+      type: "split",
+      dir: "row",
+      ratio: OUTER_DOCK_RATIO,
+      a: leaf,
+      b: tree,
+    });
+    expect(asSplit(next).b).toBe(tree);
+  });
+
+  it("wraps the tree in an outer-right split — tree is a (ratio 0.72), new leaf is b", () => {
+    const tree = createDefaultDockTree();
+    const next = insertDetachedLeaf(tree, outerTarget("right"), leaf);
+    expect(next).toEqual({
+      type: "split",
+      dir: "row",
+      ratio: 1 - OUTER_DOCK_RATIO,
+      a: tree,
+      b: leaf,
+    });
+    expect(asSplit(next).a).toBe(tree);
+  });
+
+  it("wraps the tree in an outer-top split — col dir, new leaf is a (ratio 0.28)", () => {
+    const tree = createDefaultDockTree();
+    const next = insertDetachedLeaf(tree, outerTarget("top"), leaf);
+    expect(next).toEqual({
+      type: "split",
+      dir: "col",
+      ratio: OUTER_DOCK_RATIO,
+      a: leaf,
+      b: tree,
+    });
+  });
+
+  it("wraps the tree in an outer-bottom split — col dir, tree is a (ratio 0.72)", () => {
+    const tree = createDefaultDockTree();
+    const next = insertDetachedLeaf(tree, outerTarget("bottom"), leaf);
+    expect(next).toEqual({
+      type: "split",
+      dir: "col",
+      ratio: 1 - OUTER_DOCK_RATIO,
+      a: tree,
+      b: leaf,
+    });
+  });
+
+  it("merges into a region-center target: appends tabs, sets active to the new leaf's, keeps sibling subtrees by reference", () => {
+    const tree = createDefaultDockTree();
+    const originalCode = asSplit(tree).b;
+    const originalNodeEditor = asSplit(asSplit(tree).a).a;
+    const path: DockPath = ["a", "b", "b"]; // l3: inspector/assets
+    // mergeLeaf carries a tab ("code") not already on l3 — dc dockGhost
+    // does not dedupe (tabs: [...node.tabs, ...g.tabs]), so a leaf
+    // carrying a tab id already present elsewhere in the tree is a valid
+    // (if unusual) input to this pure function; the caller is responsible
+    // for having removed that id from its previous leaf beforehand.
+    const mergeLeaf: DockLeaf = {
+      type: "leaf",
+      id: "new",
+      tabs: ["code"],
+      active: "code",
+    };
+    const next = insertDetachedLeaf(
+      tree,
+      regionTarget("center", path),
+      mergeLeaf,
+    );
+
+    expect(getNodeAt(next, path)).toEqual({
+      type: "leaf",
+      id: "l3",
+      tabs: ["inspector", "assets", "code"],
+      active: "code",
+    });
+    // sibling subtrees keep the exact same reference (structural sharing).
+    expect(asSplit(next).b).toBe(originalCode);
+    expect(asSplit(asSplit(next).a).a).toBe(originalNodeEditor);
+  });
+
+  it("splits a region-left target: new leaf is a (ratio 0.4), the region node is b (0.6)", () => {
+    const tree = createDefaultDockTree();
+    const path: DockPath = ["a", "b", "a"]; // l2: viewport
+    const originalViewport = getNodeAt(tree, path);
+    const next = insertDetachedLeaf(tree, regionTarget("left", path), leaf);
+    expect(getNodeAt(next, path)).toEqual({
+      type: "split",
+      dir: "row",
+      ratio: REGION_SPLIT_RATIO,
+      a: leaf,
+      b: originalViewport,
+    });
+  });
+
+  it("splits a region-right target: the region node is a (ratio 0.6), new leaf is b", () => {
+    const tree = createDefaultDockTree();
+    const path: DockPath = ["a", "b", "a"]; // l2: viewport
+    const originalViewport = getNodeAt(tree, path);
+    const next = insertDetachedLeaf(tree, regionTarget("right", path), leaf);
+    expect(getNodeAt(next, path)).toEqual({
+      type: "split",
+      dir: "row",
+      ratio: 1 - REGION_SPLIT_RATIO,
+      a: originalViewport,
+      b: leaf,
+    });
+  });
+
+  it("splits a region-top target: col dir, new leaf is a (ratio 0.4)", () => {
+    const tree = createDefaultDockTree();
+    const path: DockPath = ["a", "b", "b"]; // l3: inspector/assets
+    const originalLeaf = getNodeAt(tree, path);
+    const next = insertDetachedLeaf(tree, regionTarget("top", path), leaf);
+    expect(getNodeAt(next, path)).toEqual({
+      type: "split",
+      dir: "col",
+      ratio: REGION_SPLIT_RATIO,
+      a: leaf,
+      b: originalLeaf,
+    });
+  });
+
+  it("splits a region-bottom target: col dir, the region node is a (ratio 0.6)", () => {
+    const tree = createDefaultDockTree();
+    const path: DockPath = ["a", "b", "b"]; // l3: inspector/assets
+    const originalLeaf = getNodeAt(tree, path);
+    const next = insertDetachedLeaf(tree, regionTarget("bottom", path), leaf);
+    expect(getNodeAt(next, path)).toEqual({
+      type: "split",
+      dir: "col",
+      ratio: 1 - REGION_SPLIT_RATIO,
+      a: originalLeaf,
+      b: leaf,
+    });
+  });
+
+  it("returns the original tree unchanged when a center target's path points at a split node (defensive guard, not a dc case)", () => {
+    const tree = createDefaultDockTree();
+    const path: DockPath = ["a", "b"]; // the viewport|inspector-assets split
+    const next = insertDetachedLeaf(tree, regionTarget("center", path), leaf);
+    expect(next).toBe(tree);
+  });
+
+  it("returns the original tree unchanged when a split target's path resolves to nothing (defensive guard, not a dc case)", () => {
+    const tree = createDefaultDockTree();
+    const path: DockPath = ["a", "a", "a"]; // descends past leaf l1
+    const next = insertDetachedLeaf(tree, regionTarget("left", path), leaf);
+    expect(next).toBe(tree);
+  });
+});
+
+describe("dockPathsEqual — B4-U1 (dc _samePath L333)", () => {
+  it("returns true for equal paths, including two empty paths", () => {
+    expect(dockPathsEqual([], [])).toBe(true);
+    expect(dockPathsEqual(["a", "b", "a"], ["a", "b", "a"])).toBe(true);
+  });
+
+  it("returns false for a different length or a differing step", () => {
+    expect(dockPathsEqual(["a"], ["a", "b"])).toBe(false);
+    expect(dockPathsEqual(["a", "b"], ["a", "a"])).toBe(false);
   });
 });

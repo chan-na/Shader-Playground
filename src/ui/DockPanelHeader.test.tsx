@@ -15,6 +15,7 @@ import {
   getNodeAt,
 } from "../state/dockTree";
 import { DockPanelHeader } from "./DockPanelHeader";
+import { DockDragContext, type DockDragStart } from "./dockDragContext";
 import { DockLeafContext, useDockLeaf } from "./dockLeafContext";
 
 const initial = useDockStore.getState();
@@ -39,6 +40,25 @@ function withLeaf(leafId: string, path: ("a" | "b")[], children: ReactNode) {
     <DockLeafContext.Provider value={{ leafId, path }}>
       {children}
     </DockLeafContext.Provider>
+  );
+}
+
+/** Same as `withLeaf`, plus a `DockDragContext.Provider` wrapping it — B4-U4:
+ * lets a test hand in spy `startLeafDrag`/`startTabDrag` to assert what the
+ * grab handle/tab pointerdown wiring calls. Tests that don't need this
+ * (the vast majority above) render with bare `withLeaf` and get the
+ * context's default no-op — that's exactly the "renders fine without a
+ * provider" case asserted below. */
+function withLeafAndDrag(
+  leafId: string,
+  path: ("a" | "b")[],
+  children: ReactNode,
+  drag: DockDragStart,
+) {
+  return (
+    <DockDragContext.Provider value={drag}>
+      {withLeaf(leafId, path, children)}
+    </DockDragContext.Provider>
   );
 }
 
@@ -476,6 +496,85 @@ describe("DockPanelHeader", () => {
       expect(getNodeAt(tree, ["a", "a"])).toMatchObject({ collapsed: true });
 
       expect(screen.queryByText("5N · 4E")).toBeNull();
+    });
+  });
+
+  // B4-U4: the grab handle drags the whole leaf (every tab); a tab drags
+  // only itself. dc `grabDown`/`down` (Docking Prototype.dc.html L558/L544).
+  describe("drag start wiring (B4-U4)", () => {
+    it("⣿ grab pointerdown calls startLeafDrag with this leaf's path, not startTabDrag", () => {
+      const startLeafDrag = vi.fn();
+      const startTabDrag = vi.fn();
+      const { container } = render(
+        withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
+          startLeafDrag,
+          startTabDrag,
+        }),
+      );
+
+      const grab = container.querySelector(".dock-header-grab");
+      if (grab === null) throw new Error("expected .dock-header-grab");
+      fireEvent.pointerDown(grab);
+
+      expect(startLeafDrag).toHaveBeenCalledTimes(1);
+      expect(startLeafDrag.mock.calls[0]?.[0]).toEqual(["a", "b", "b"]);
+      expect(startTabDrag).not.toHaveBeenCalled();
+    });
+
+    it("a tab's pointerdown calls startTabDrag with that tab's id, not startLeafDrag", () => {
+      const startLeafDrag = vi.fn();
+      const startTabDrag = vi.fn();
+      render(
+        withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
+          startLeafDrag,
+          startTabDrag,
+        }),
+      );
+
+      fireEvent.pointerDown(screen.getByTestId("tab-assets"));
+
+      expect(startTabDrag).toHaveBeenCalledTimes(1);
+      expect(startTabDrag.mock.calls[0]?.[0]).toBe("assets");
+      expect(startLeafDrag).not.toHaveBeenCalled();
+    });
+
+    // dc t.xDown: e.stopPropagation() (L546) — the ✕'s own pointerdown
+    // handler stops the event before it bubbles to the tab's onPointerDown,
+    // so closing a tab never arms a drag.
+    it("the tab ✕'s pointerdown does not call startTabDrag (stopPropagation)", () => {
+      const startLeafDrag = vi.fn();
+      const startTabDrag = vi.fn();
+      render(
+        withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
+          startLeafDrag,
+          startTabDrag,
+        }),
+      );
+
+      const closeAssets = within(screen.getByTestId("tab-assets")).getByRole(
+        "button",
+        { name: "Close Assets tab" },
+      );
+      fireEvent.pointerDown(closeAssets);
+
+      expect(startTabDrag).not.toHaveBeenCalled();
+      expect(startLeafDrag).not.toHaveBeenCalled();
+    });
+
+    // No `DockDragContext.Provider` in scope (the default export's no-op) —
+    // every other test in this file renders exactly this way, so this just
+    // asserts the pointerdown wiring doesn't throw/crash without one.
+    it("renders and handles pointerdown fine without a DockDragContext.Provider (default no-op)", () => {
+      const { container } = render(
+        withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />),
+      );
+
+      const grab = container.querySelector(".dock-header-grab");
+      if (grab === null) throw new Error("expected .dock-header-grab");
+      expect(() => fireEvent.pointerDown(grab)).not.toThrow();
+      expect(() =>
+        fireEvent.pointerDown(screen.getByTestId("tab-assets")),
+      ).not.toThrow();
     });
   });
 });

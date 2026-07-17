@@ -57,6 +57,26 @@ textarea {
   flex-direction: column;
   min-height: 0;
 }
+/* B4-U3: DockLayout's own root wrapper — hosts the drag-ghost/drop-preview
+   overlays (both `position:absolute`) and the .dock-root--dragging state
+   class, so it needs `position:relative` + to fill the same space
+   `.shell-content` used to give straight to the tree/.dock-empty. This
+   container wraps *both* branches (tree and the tree===null empty state) —
+   dragging the last docked panel makes the tree briefly null while the
+   ghost/preview overlays and the window pointer listeners must stay alive. */
+.dock-root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+/* R10: cursor/selection feedback while a drag ghost is live. No layout
+   change — the overlays are absolutely positioned siblings. */
+.dock-root--dragging {
+  user-select: none;
+  cursor: grabbing;
+}
 /* B2-U1: DockLayout.tsx replaces the old shell-main/shell-right generic
    containers with a recursive .dock-split/.dock-leaf tree. The legacy
    shell-left/shell-right-top/shell-right-bottom/shell-code class names stay
@@ -272,6 +292,86 @@ textarea {
   color: var(--error);
 }
 
+/* R10: pointer*만 쓰는 드래그(마우스+터치/펜)의 네이티브 스크롤/제스처 개입
+   방지 — grab handle의 pointerdown 드래그 시작(B4-U4 배선 완료). 탭 쪽은
+   아래 `.dock-header-tabs .panel-tab`에 함께 넣는다(하나로 합치면
+   noDescendingSpecificity 린트가 걸린다: `.panel-tab`이 이보다 뒤에서
+   정의됨). */
+.dock-header-grab {
+  touch-action: none;
+}
+
+/* ── 드래그 고스트 / 드롭 프리뷰 (B4-U3) — dc `onMove`/`computeDrop`/
+   `dockGhost`(Docking Prototype.dc.html L385-464, DROP PREVIEW L188-206)
+   이식. 둘 다 `.dock-root`(position:relative) 기준 절대 배치. 배경/보더의
+   알파 파생(rgba)은 CSS 변수로 표현 못 해 DockLayout.tsx가 인라인
+   style(tokens + withAlpha)로 얹는다 — 여기 규칙은 raw hex 없이 표현 가능한
+   부분만 담당한다. ─────────────────────────────────────────────────── */
+.dock-drop-preview {
+  position: absolute;
+  border: 2px solid var(--accent-default);
+  border-radius: var(--radius-overlay-compact);
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dock-drop-preview-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  /* dc 라벨색 #7dbcff는 무토큰 — accent.hover(#57a9ff)로 근사(신규 토큰 0
+     제약). followup(designer)에 기록. */
+  color: var(--accent-hover);
+  border-radius: var(--radius-chip);
+  padding: 3px 9px;
+}
+.dock-drag-ghost {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-app);
+  border: 1px solid var(--accent-default);
+  /* dc 실측 radius 10 — overlay(9)로 근사(신규 토큰 0, '부유 오버레이'
+     개념 통일 선례를 따름). */
+  border-radius: var(--radius-overlay);
+  overflow: hidden;
+  z-index: 80;
+  pointer-events: none;
+  opacity: 0.94;
+}
+.dock-drag-ghost-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--surface-docking-header);
+  border-bottom: 1px solid var(--border-header-divider);
+}
+.dock-drag-ghost-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.dock-drag-ghost-count {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+.dock-drag-ghost-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
 /* ── Width-collapsed rail (M1-U2 fix, B3-U1 derivation update) ────────────
    shell-left/Node Editor is the one docked slot that collapses to a 34px
    *width* strip instead of a 34px *height* strip (App.tsx shellLeftFlex).
@@ -410,6 +510,13 @@ textarea {
 .dock-header-tabs .panel-tab {
   flex-shrink: 0;
   white-space: nowrap;
+  /* R10: pointer*만 쓰는 드래그(마우스+터치/펜)의 네이티브 스크롤/제스처
+     개입 방지 — 탭 드래그 시작 후보(pointerdown)다. */
+  touch-action: none;
+  /* dc L535 tabStyle cursor:grab(B4-U4 배선 완료) — SidePanel의 레거시
+     오버레이 탭(`children` 슬롯, `.dock-header-tabs` 밖)에는 영향 없도록
+     이 스코프로 한정. */
+  cursor: grab;
 }
 .panel-tab--active {
   color: var(--text-primary);

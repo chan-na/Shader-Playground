@@ -7,6 +7,8 @@ import {
 } from "../state/dockTree";
 import {
   collapsesToRail,
+  GHOST_POINTER_OFFSET,
+  ghostSize,
   leafPanelKind,
   legacyLeafClass,
   PANEL_TITLES,
@@ -228,5 +230,71 @@ describe("PANEL_TITLES", () => {
       code: "Code",
       assets: "Assets",
     });
+  });
+});
+
+// B4-U3: dc `onMove`'s pending-drag ghost-size clamp (L398-406) — leaf mode
+// clamps 92% of the source region to 320~540 × 220~440, tab mode clamps 85%
+// to 300~460 × 200~360; a null region (defensive — no source region found)
+// falls back to a fixed size per mode.
+describe("ghostSize", () => {
+  describe("leaf mode", () => {
+    it("clamps to the lower bound (320×220) for a tiny region", () => {
+      expect(ghostSize("leaf", { w: 100, h: 100 })).toEqual({
+        w: 320,
+        h: 220,
+      });
+    });
+
+    it("clamps to the upper bound (540×440) for a huge region", () => {
+      expect(ghostSize("leaf", { w: 2000, h: 2000 })).toEqual({
+        w: 540,
+        h: 440,
+      });
+    });
+
+    it("scales to 92% of the region inside the clamp range", () => {
+      expect(ghostSize("leaf", { w: 400, h: 300 })).toEqual({
+        w: 368, // 400 * 0.92
+        h: 276, // 300 * 0.92
+      });
+    });
+
+    it("falls back to 400×300 when the source region is null", () => {
+      expect(ghostSize("leaf", null)).toEqual({ w: 400, h: 300 });
+    });
+  });
+
+  describe("tab mode", () => {
+    it("clamps to the lower bound (300×200) for a tiny region", () => {
+      expect(ghostSize("tab", { w: 100, h: 100 })).toEqual({
+        w: 300,
+        h: 200,
+      });
+    });
+
+    it("clamps to the upper bound (460×360) for a huge region", () => {
+      expect(ghostSize("tab", { w: 2000, h: 2000 })).toEqual({
+        w: 460,
+        h: 360,
+      });
+    });
+
+    it("scales to 85% of the region inside the clamp range", () => {
+      expect(ghostSize("tab", { w: 400, h: 300 })).toEqual({
+        w: 340, // 400 * 0.85
+        h: 255, // 300 * 0.85
+      });
+    });
+
+    it("falls back to 380×260 when the source region is null", () => {
+      expect(ghostSize("tab", null)).toEqual({ w: 380, h: 260 });
+    });
+  });
+});
+
+describe("GHOST_POINTER_OFFSET", () => {
+  it("matches dc's fixed cursor offset (-70, -15, L408-409)", () => {
+    expect(GHOST_POINTER_OFFSET).toEqual({ x: 70, y: 15 });
   });
 });

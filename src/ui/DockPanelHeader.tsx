@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { useDockStore } from "../state/dockStore";
 import { type DockPanelId, getNodeAt } from "../state/dockTree";
-import { collapsesToRail, PANEL_TITLES } from "./dockLayoutModel";
+import { useDockDragStart } from "./dockDragContext";
+import { collapsesToRail, PANEL_DOTS, PANEL_TITLES } from "./dockLayoutModel";
 import { useDockLeaf } from "./dockLeafContext";
 
 export interface DockPanelHeaderProps {
@@ -36,20 +37,6 @@ export interface DockPanelHeaderProps {
    * problems/diagnostics 오버레이 탭 상태를 닫는 데 쓴다(B3-U2). */
   onTabSelect?: (id: DockPanelId) => void;
 }
-
-// (R12) 패널 dot 5색 — **장식적 패널 식별자**일 뿐, 노드 카테고리/포트 타입
-// 의미축과 무관하다(예: Code 보라 dot ≠ resource 포트 보라). 신규 토큰 0 —
-// 기존 CSS 변수를 재사용한다. dc META(Docking Prototype.dc.html L265-271):
-// #3d9bff=accent.default · #4bbf89=nodeCategory.source · #d4a53c=
-// nodeCategory.value · #a06bff=portFamily.resource · #f0b429=portFamily.vector.
-// design/CHANGELOG.md §v1.4 R12 · design/README.md §M.
-const PANEL_DOTS: Record<DockPanelId, string> = {
-  nodeEditor: "var(--accent-default)",
-  viewport: "var(--node-cat-source)",
-  inspector: "var(--node-cat-value)",
-  code: "var(--port-resource)",
-  assets: "var(--port-vector)",
-};
 
 /**
  * 모든 도킹 패널이 공유하는 헤더(v1.4 `Docking Prototype.dc.html` L84-99
@@ -97,6 +84,7 @@ export function DockPanelHeader({
   const closePanel = useDockStore((s) => s.closePanel);
 
   const isRail = collapsed === true && railCapable;
+  const { startLeafDrag, startTabDrag } = useDockDragStart();
 
   function selectTab(id: DockPanelId) {
     setActiveTab(path, id);
@@ -105,7 +93,16 @@ export function DockPanelHeader({
 
   return (
     <div className={isRail ? "dock-header dock-header--rail" : "dock-header"}>
-      <span className="dock-header-grab" aria-hidden="true">
+      <span
+        className="dock-header-grab"
+        aria-hidden="true"
+        // R10/B4-U4: ⣿ grab handle drags the whole leaf (every tab) — dc
+        // `grabDown` (Docking Prototype.dc.html L558). `aria-hidden` stays —
+        // R10 confirms docking rearrangement is pointer-only (no keyboard
+        // alternative needed), so this handler intentionally has no
+        // keyboard-reachable equivalent.
+        onPointerDown={(e) => startLeafDrag(path, e)}
+      >
         ⣿
       </span>
       {!isRail && leaf !== null && leaf.type === "leaf" && (
@@ -133,6 +130,11 @@ export function DockPanelHeader({
                 data-testid={`tab-${id}`}
                 className={active ? "panel-tab panel-tab--active" : "panel-tab"}
                 onClick={() => selectTab(id)}
+                // B4-U4: this tab alone detaches and drags — dc `down`
+                // (Docking Prototype.dc.html L544, `startTabDrag({mode:"tab"
+                // ,...})`). The tab ✕'s own onPointerDown (below) calls
+                // stopPropagation, so it never reaches this handler.
+                onPointerDown={(e) => startTabDrag(id, e)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();

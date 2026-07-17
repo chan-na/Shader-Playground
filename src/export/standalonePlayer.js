@@ -2,6 +2,11 @@
 // renders a serialized project against a canvas. Inlined verbatim into the
 // HTML produced by the "Export HTML" command. Keep this file dependency-free.
 //
+// 폴백 div의 color:white 등 인라인 스타일은 의도적으로 토큰 비의존 —
+// CHANGELOG §v1.3 Q11 [A-8] 확정. ?raw로 원문 인라인되어 보간 지점이 없고,
+// D6(폴백은 토큰 비의존, README §도메인)이 standalone 폴백에도 적용된다.
+// 토큰화/템플릿 리팩터 금지(크래시 폴백에 빌드 파이프라인 의존을 늘리지 않는다).
+//
 // Expected globals at runtime:
 //   window.__SP_PROJECT   — { format, version, graph: { nodes, edges }, positions }
 //   document.getElementById('canvas')  — target canvas
@@ -468,6 +473,7 @@
   // ── main ────────────────────────────────────────────────────────────────
   var project = window.__SP_PROJECT;
   if (!project) {
+    // Q11: color:white 현행 유지 정본 — 파일 헤더 주석 참조
     document.body.innerHTML =
       '<div style="color:white;font-family:sans-serif;padding:24px">No project data.</div>';
     return;

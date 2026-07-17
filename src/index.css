@@ -152,6 +152,9 @@ textarea {
   text-transform: uppercase;
   color: var(--text-secondary);
 }
+/* 배지 박스(배경+보더)가 metaAlign start/end 양쪽 정본 — v1.3 Q4에서 dc(App
+   Shell 'GLSL · ES 3.0' plain mono)가 이 구현으로 정정됨. plain 텍스트 변형
+   없음. */
 .dock-header-meta {
   font-family: var(--font-mono);
   font-size: 10px;

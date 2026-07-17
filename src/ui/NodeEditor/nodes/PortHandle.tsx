@@ -182,6 +182,22 @@ export const PORT_STRIDE = 27;
  */
 export const PORT_STRIDE_MULTI = 30;
 
+/**
+ * First port's y (px), relative to the card's top edge — the single anchor
+ * every port's `top` is computed from. Implementation has used one shared
+ * constant since v1, even though the dc draws it differently per card kind:
+ * Output 40 / Combine 44 / Webcam·Video 50 / Shader 64.
+ *
+ * That gap was v1's "accepted deviation" from the dc — CHANGELOG §v1.3 Q6
+ * promoted it to the canonical rule: port geometry is always handed down as
+ * a *rule* ("body expands to cover the port span · 2px tail slack · 96
+ * floor"), never as per-card dc pixel offsets, and the implementation
+ * derives everything from this one constant's coordinate system. dc pixels
+ * (including the 40/44/50/64 above) are review/verification values only —
+ * porting them as constants is explicitly forbidden (design/README.md
+ * §도메인 "좌표계 주의 (Q6)"). See `PORT_STRIDE`(above) and `portSpanBodyH`
+ * (below) for how the rest of the geometry is derived from this anchor.
+ */
 export const PORT_TOP_PAD = 38;
 
 /** Slack (px) between the last port's bottom and the card's bottom edge —
@@ -228,7 +244,9 @@ export function multiPortPreviewH(nPorts: number): number {
 /** Compute card body min-height — same rule, but the body is a kv list with
  *  no thumbnail, so there is no 96 floor: content sizes the card until the
  *  port span exceeds it. Chrome is header 30 + `.node-card__body` padding
- *  8(top)+9(bottom) = 47 [C-3]. */
+ *  8(top)+9(bottom) = 47 [C-3]. This "no 96 floor" handling was the
+ *  implementation team's provisional call until CHANGELOG §v1.3 Q8 made it
+ *  the current-approved rule, codified in design/README.md §B. */
 export function multiPortBodyMinH(nPorts: number): number {
   return Math.max(0, portSpanBodyH(nPorts, 47));
 }

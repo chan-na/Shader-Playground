@@ -13,6 +13,12 @@ export interface DockPanelHeaderProps {
    * 패널(Node Editor "5N · 4E", Viewport)의 동작을 보존한다. "end"는
    * spacer 뒤(최대화 버튼 앞) 우측 정렬 — App Shell.dc.html L361-369의
    * Code Editor 정본 순서.
+   *
+   * 배지 박스 스타일 정본 확정(v1.3 Q4): metaAlign="end"에서도 배경+보더
+   * 배지 박스가 정본이다(plain mono 텍스트 변형 없음 — 공통 컴포넌트
+   * 일관성 우선). v1.2 무응답으로 미확정이던 지점을 dc가 이 구현으로
+   * 정정(App Shell 'GLSL · ES 3.0' plain mono → 배지 박스) —
+   * design/README.md §도메인 [D13] Q4 문단 · design/CHANGELOG.md §v1.3 Q4.
    */
   metaAlign?: "start" | "end";
   /** 탭 버튼 등 헤더 중앙에 끼워 넣을 슬롯. */
@@ -33,6 +39,11 @@ export interface DockPanelHeaderProps {
  * grab dots → 라벨/탭 → 메타 배지 → (spacer) → 최대화(⤢) → 접기(⌄).
  * 접기/최대화는 layoutStore가 단일 출처 — 패널 자체는 언마운트되지 않는다
  * (WebGL 컨텍스트/CodeMirror 인스턴스 보존은 App.tsx의 슬롯 클래스가 담당).
+ *
+ * (v1.4 R12) 향후 도킹 헤더에 붙는 패널 dot 5색(accent/source/value/resource/
+ * vector)은 **장식적 패널 식별자**일 뿐 — 노드 카테고리/포트 타입 의미축과
+ * 무관(예: Code 보라 dot ≠ resource 포트 보라). 신규 토큰 없이 기존 값
+ * 재사용. design/README.md §M · design/CHANGELOG.md §v1.4 R12.
  */
 export function DockPanelHeader({
   panelId,

@@ -58,6 +58,9 @@ export function ComputeNodeView({ id, data }: NodeProps) {
           // Compute grows one input port per non-sampler uniform just like
           // Shader does, but its body is a fixed 3-row kv list with no
           // thumbnail to expand — so the port span sets a floor instead [C-3].
+          // This expansion rule (no 96 floor) was a provisional call at
+          // v1.2 (no dc coverage yet) — CHANGELOG §v1.3 Q8 now canonically
+          // approves it.
           minHeight: multiPortBodyMinH(inputs.length),
         }}
       >

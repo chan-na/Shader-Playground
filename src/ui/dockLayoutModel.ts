@@ -1,17 +1,21 @@
 /**
- * 도킹 레이아웃 순수 파생 함수 — B2-U1. `DockLayout.tsx`(재귀 flex 렌더러)와
- * `DockPanelHeader.tsx`가 소비한다. React 비의존 — 이 파일이 커버리지
- * 확보처(순수 함수 전수 테스트는 `dockLayoutModel.test.ts`).
+ * 도킹 레이아웃 순수 파생 함수 — B2-U1(+B3-U1 `collapsesToRail`).
+ * `DockLayout.tsx`(재귀 flex 렌더러)와 `DockPanelHeader.tsx`가 소비한다.
+ * React 비의존 — 이 파일이 커버리지 확보처(순수 함수 전수 테스트는
+ * `dockLayoutModel.test.ts`).
  *
- * import는 `../state/dockTree`의 타입 + `COLLAPSED_STRIP_PX`만. raw hex/토큰
- * 직접 사용 없음(이 파일은 클래스명/flex 문자열/라벨만 다룬다).
+ * import는 `../state/dockTree`의 타입 + `COLLAPSED_STRIP_PX`/`getNodeAt`만.
+ * raw hex/토큰 직접 사용 없음(이 파일은 클래스명/flex 문자열/라벨만 다룬다).
  */
 
 import {
   COLLAPSED_STRIP_PX,
   type DockLeaf,
+  type DockNode,
   type DockPanelId,
+  type DockPath,
   type DockSplit,
+  getNodeAt,
 } from "../state/dockTree";
 
 /** leaf가 어떤 레거시 슬롯(App.tsx 하드코딩 4패널) 역할을 하는지. B2에서는
@@ -92,6 +96,27 @@ export function splitChildFlex(split: DockSplit): SplitChildFlex {
     b: `${1 - split.ratio} 1 0px`,
     showDivider: !(aCol || bCol),
   };
+}
+
+/** 접힌 leaf가 '폭 34px 스트립'으로 접히는지(= 세로 레일 헤더가 필요한지).
+ * 직계 부모 split의 `dir`가 `"row"`면 leaf는 가로로 나란히 놓여 있으므로
+ * 접힘은 **폭** 방향(strip)이 된다 — 반대로 부모가 `"col"`이면 접힘은
+ * **높이** 방향이라 가로 헤더 그대로 둬도 문제없다.
+ *
+ * 이전에는 각 패널이 `collapsedRail` prop으로 이를 하드코딩했다(M1-U2 당시엔
+ * shell-left/Node Editor뿐이었으므로). 하지만 트리 모델에서는 임의의 leaf가
+ * row split 아래로 이동할 수 있으므로(B4 드래그 재도킹) prop 하드코딩은
+ * 트리 형태가 바뀌면 어긋난다 — 이 함수가 트리에서 직접 유도한다(B3-U1).
+ *
+ * 루트 leaf(`path=[]`, 부모가 없음)·`null` 트리·leaf 아래로 더 내려가는
+ * 잘못된 경로는 전부 `false`. */
+export function collapsesToRail(
+  tree: DockNode | null,
+  path: DockPath,
+): boolean {
+  if (tree === null || path.length === 0) return false;
+  const parent = getNodeAt(tree, path.slice(0, -1));
+  return parent !== null && parent.type === "split" && parent.dir === "row";
 }
 
 /** dc `META`(L265-271)의 title 필드 이식 — 도킹 가능한 5종 패널의 표시명.

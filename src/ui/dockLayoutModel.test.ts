@@ -6,6 +6,7 @@ import {
   type DockSplit,
 } from "../state/dockTree";
 import {
+  collapsesToRail,
   leafPanelKind,
   legacyLeafClass,
   PANEL_TITLES,
@@ -169,6 +170,32 @@ describe("splitChildFlex", () => {
       b: "0.5 1 0px",
       showDivider: true,
     });
+  });
+});
+
+describe("collapsesToRail", () => {
+  it("is true for a leaf whose direct parent split is row-direction (l1 nodeEditor, path [a,a])", () => {
+    expect(collapsesToRail(tree, ["a", "a"])).toBe(true);
+  });
+
+  it("is false for a leaf whose direct parent split is col-direction (l2 viewport, path [a,b,a])", () => {
+    expect(collapsesToRail(tree, ["a", "b", "a"])).toBe(false);
+  });
+
+  it("is false for a leaf whose direct parent is the col-direction root split (l4 code, path [b])", () => {
+    expect(collapsesToRail(tree, ["b"])).toBe(false);
+  });
+
+  it("is false for the root path (no parent to inspect)", () => {
+    expect(collapsesToRail(tree, [])).toBe(false);
+  });
+
+  it("is false for a null tree", () => {
+    expect(collapsesToRail(null, ["a", "a"])).toBe(false);
+  });
+
+  it("is false for a path that descends past a leaf (invalid path)", () => {
+    expect(collapsesToRail(tree, ["a", "a", "a"])).toBe(false);
   });
 });
 

@@ -19,10 +19,12 @@ type Tab = "inspector" | "assets" | "problems" | "diagnostics";
 export function SidePanel() {
   // B2-U2: inspector/assets 탭 활성 상태의 단일 출처는 dockStore leaf.active
   // — 이 leaf의 경로는 DockLayout이 심어둔 DockLeafContext로 얻는다.
+  // B3-U2: inspector/assets는 이제 DockPanelHeader가 leaf.tabs에서 직접
+  // dock 탭으로 렌더한다(탭 1급화, R6) — 이 컴포넌트는 더 이상
+  // `setActiveTab`을 직접 호출하지 않는다(dockActive 파생 읽기만 남음).
   // problems/diagnostics는 아직 도킹 탭이 아니므로(R5, B5까지 유지) 로컬
-  // 상태/debugUiStore를 그대로 쓴다.
+  // 상태/debugUiStore로 children 오버레이 탭을 그대로 그린다.
   const { path } = useDockLeaf();
-  const setActiveTab = useDockStore((s) => s.setActiveTab);
   const dockActive = useDockStore((s) => {
     const n = s.tree === null ? null : getNodeAt(s.tree, path);
     return n !== null && n.type === "leaf" ? n.active : "inspector";
@@ -57,38 +59,14 @@ export function SidePanel() {
 
   return (
     <div className="panel panel--inspector" data-testid="side-panel">
-      <DockPanelHeader>
-        <button
-          type="button"
-          className={
-            tab === "inspector" ? "panel-tab panel-tab--active" : "panel-tab"
-          }
-          onClick={() => {
-            setDiagOpen(false);
-            setProblemsOpen(false);
-            setActiveTab(path, "inspector");
-          }}
-          data-testid="tab-inspector"
-        >
-          Inspector
-        </button>
-        <button
-          type="button"
-          className={
-            tab === "assets" ? "panel-tab panel-tab--active" : "panel-tab"
-          }
-          onClick={() => {
-            setDiagOpen(false);
-            setProblemsOpen(false);
-            setActiveTab(path, "assets");
-          }}
-          data-testid="tab-assets"
-        >
-          Assets
-          {assetCount > 0 && (
-            <span className="panel-tab-badge">{assetCount}</span>
-          )}
-        </button>
+      <DockPanelHeader
+        suppressActive={diagOpen || problemsOpen}
+        badges={{ assets: assetCount }}
+        onTabSelect={() => {
+          setDiagOpen(false);
+          setProblemsOpen(false);
+        }}
+      >
         <button
           type="button"
           className={

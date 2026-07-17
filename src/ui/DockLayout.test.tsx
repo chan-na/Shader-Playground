@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDockStore } from "../state/dockStore";
-import { createDefaultDockTree } from "../state/dockTree";
+import { createDefaultDockTree, firstLeafPath } from "../state/dockTree";
 
 // The 4 panel components DockLayout renders are heavy (WebGL canvas,
 // CodeMirror, ReactFlow) and already covered by their own test suites —
@@ -108,9 +108,50 @@ describe("DockLayout", () => {
     expect(screen.getByTestId("stub-code-editor")).not.toBeNull();
   });
 
-  it("renders nothing when the tree is null (empty-state precursor, unreachable in B2 without close UI)", () => {
+  it("B3-U4: renders the R1 empty state (no floating-panel wording) when the tree is null, with no panel stubs mounted", () => {
     useDockStore.setState({ tree: null });
-    const { container } = render(<DockLayout />);
-    expect(container.firstChild).toBeNull();
+    render(<DockLayout />);
+
+    const empty = screen.getByTestId("dock-empty");
+    expect(empty).not.toBeNull();
+    // Exact R1 copy — v1.3's "drop a floating panel here" was superseded by
+    // v1.4 R1 (floating removed entirely); a mismatch here is a regression
+    // to the stale copy, not just a wording nit.
+    expect(
+      screen.getByText("No panels docked — add one with ＋ Panel"),
+    ).not.toBeNull();
+
+    expect(screen.queryByTestId("stub-node-editor")).toBeNull();
+    expect(screen.queryByTestId("stub-viewport")).toBeNull();
+    expect(screen.queryByTestId("stub-side-panel")).toBeNull();
+    expect(screen.queryByTestId("stub-code-editor")).toBeNull();
+  });
+
+  it("B3-U4: closing every panel via the real closePanel path (root-first, repeated) reaches the empty state, and addPanel leaves it again", () => {
+    const { rerender } = render(<DockLayout />);
+
+    // Repeatedly close whatever leaf is currently first — this drives the
+    // store through the same closePanel calls the dock header ✕ (R6) will
+    // issue, rather than just setting tree:null directly, so it exercises
+    // removePanel's tree-collapsing logic all the way to null.
+    act(() => {
+      let path = firstLeafPath(useDockStore.getState().tree);
+      while (path !== null) {
+        useDockStore.getState().closePanel(path);
+        path = firstLeafPath(useDockStore.getState().tree);
+      }
+    });
+    expect(useDockStore.getState().tree).toBeNull();
+    rerender(<DockLayout />);
+    expect(screen.getByTestId("dock-empty")).not.toBeNull();
+
+    // Existing render path regression guard: bringing a panel back makes the
+    // empty state disappear and the leaf render again.
+    act(() => {
+      useDockStore.getState().addPanel("viewport");
+    });
+    rerender(<DockLayout />);
+    expect(screen.queryByTestId("dock-empty")).toBeNull();
+    expect(screen.getByTestId("stub-viewport")).not.toBeNull();
   });
 });

@@ -49,7 +49,18 @@ function cx(...parts: Array<string | false | undefined>): string {
 export function DockLayout() {
   const tree = useDockStore((s) => s.tree);
   const maximized = useDockStore((s) => s.maximized);
-  if (tree === null) return null; // B2에서는 도달 불가(닫기 UI 없음) — empty state는 B3
+  if (tree === null) {
+    // R1 정본 카피 — v1.3의 "drop a floating panel here"는 폐기됐다(플로팅
+    // 없음). ＋ Panel 버튼 자체는 B6에서 툴바에 붙는다.
+    return (
+      <div className="dock-empty" data-testid="dock-empty">
+        <div className="dock-empty-icon" aria-hidden="true">
+          ⊞
+        </div>
+        <div>No panels docked — add one with ＋ Panel</div>
+      </div>
+    );
+  }
   const maxPath = maximized === null ? null : findLeafPath(tree, maximized);
   return (
     <DockNodeView

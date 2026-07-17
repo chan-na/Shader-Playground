@@ -85,6 +85,32 @@ textarea {
   min-width: 0;
   min-height: 0;
 }
+
+/* ── 빈 도크(모든 패널 닫힘, tree=null) — Docking Prototype.dc.html L69-76.
+   R1 카피 정본. 색: #454c55=text.disabled · #2b3037=border.strong. ─── */
+.dock-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-disabled);
+  font-size: 12.5px;
+}
+.dock-empty-icon {
+  width: 52px;
+  height: 52px;
+  /* dc 실측 12px — 신규 토큰 0 제약. '빈 상태 아이콘' 개념을 radius.
+     emptyStateIcon(16) 하나로 통일한 v1.2 선례(theme.ts L164-167 주석)를
+     따른다. pixel-perfect보다 토큰 통일 우선 — followup(designer) 기록. */
+  border-radius: var(--radius-empty-state-icon);
+  border: 1.5px dashed var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
 .shell-left {
   border-right: 1px solid var(--border-default);
 }
@@ -130,8 +156,9 @@ textarea {
   display: none;
 }
 
-/* ── Dock panel header (common to all 4 docked panels, App Shell.dc.html
-   L88-95): grab dots → label/tabs → meta badge → spacer → maximize/collapse. */
+/* ── Dock panel header (common to all docked panels, v1.4 `Docking
+   Prototype.dc.html` L84-99): grab dots → dock 탭 → meta badge → spacer →
+   collapse/maximize/close. */
 .dock-header {
   display: flex;
   align-items: center;
@@ -149,12 +176,63 @@ textarea {
   letter-spacing: 1px;
   cursor: grab;
 }
-.dock-header-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+/* ── Dock 탭(v1.4 R6 — 탭 1급화, DockPanelHeader가 leaf.tabs에서 렌더) ──
+   탭 자체는 기존 .panel-tab 밑줄 idiom 재사용(README §M '탭은 Side Panel
+   밑줄형'). 컨테이너/dot/✕만 신설. Docking Prototype.dc.html L85-90. */
+.dock-header-tabs {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 2px; /* dc L85 */
+  min-width: 0;
+  overflow-x: auto; /* R8: dc L85 — 넘치면 가로 스크롤. */
+  scrollbar-width: none; /* R8: dc L23 (Firefox). */
+}
+/* R8: 스크롤바 숨김(웹킷) — dc L22. */
+.dock-header-tabs::-webkit-scrollbar {
+  height: 0;
+  display: none;
+}
+/* R8: 탭 4개↑에서만 우측 22px 페이드 마스크 — dc L557 tabMask. mask의
+   black/transparent는 알파 채널 전용 키워드(디자인 색 아님 — raw hex 회피). */
+.dock-header-tabs--masked {
+  mask-image: linear-gradient(
+    90deg,
+    black 0,
+    black calc(100% - 22px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    black 0,
+    black calc(100% - 22px),
+    transparent 100%
+  );
+}
+.panel-tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2.5px; /* dc L88 */
+  flex-shrink: 0;
+}
+/* dc L90: font 9px · #565e68 → text.muted 근사(dc 값이 text.muted #656d78와
+   text.disabled #454c55 사이의 무명 값 — 신규 토큰 0 제약, followup 기록) ·
+   opacity .55 → hover 시 error 강조. */
+.panel-tab-close {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-left: 3px;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-muted);
+  opacity: 0.55;
+  cursor: pointer;
+}
+.panel-tab-close:hover,
+.panel-tab-close:focus-visible {
+  color: var(--error);
+  opacity: 1;
 }
 /* 배지 박스(배경+보더)가 metaAlign start/end 양쪽 정본 — v1.3 Q4에서 dc(App
    Shell 'GLSL · ES 3.0' plain mono)가 이 구현으로 정정됨. plain 텍스트 변형
@@ -188,15 +266,22 @@ textarea {
 .dock-header-btn:hover {
   color: var(--text-bright-body);
 }
+/* 헤더 ✕(패널 전체 닫기, R6/v1.4) — dc hover color #f0555c = semantic.error.
+   Docking Prototype.dc.html L97. */
+.dock-header-btn--close:hover {
+  color: var(--error);
+}
 
-/* ── Width-collapsed rail (DockPanelHeader collapsedRail, M1-U2 fix) ─────
+/* ── Width-collapsed rail (M1-U2 fix, B3-U1 derivation update) ────────────
    shell-left/Node Editor is the one docked slot that collapses to a 34px
    *width* strip instead of a 34px *height* strip (App.tsx shellLeftFlex).
-   Left as a horizontal row, the header's spacer + maximize/collapse buttons
-   would be pushed past the 34px strip and clipped by the panel's
+   Left as a horizontal row, the header's spacer + maximize/collapse/close
+   buttons would be pushed past the 34px strip and clipped by the panel's
    overflow:hidden — unclickable by a real pointer even though the DOM node
    is technically present. Stack the header vertically instead so the
-   restore button stays inside the strip's own bounds. */
+   restore button stays inside the strip's own bounds. Whether a given
+   collapsed leaf gets this class is no longer a `collapsedRail` prop — it's
+   derived from the tree (`dockLayoutModel.collapsesToRail`, B3-U1). */
 .dock-header--rail {
   flex-direction: column;
   flex: 1 1 auto;
@@ -316,6 +401,15 @@ textarea {
 }
 .panel-tab:hover {
   color: var(--text-bright-body);
+}
+/* R8: dc tabStyle(L536) flex-shrink:0 + title span white-space:nowrap(L87)
+   이식 — 없으면 flexbox가 스크롤 대신 탭을 찌그러뜨리거나 줄바꿈해 34px
+   높이가 깨진다. `.dock-header-tabs` 안쪽으로 스코프해 SidePanel의
+   problems/diagnostics `children` 탭(DockPanelHeader.tsx가 그리는
+   `.dock-header-tabs` 밖, `children` 슬롯에 렌더됨)에는 영향 없음. */
+.dock-header-tabs .panel-tab {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .panel-tab--active {
   color: var(--text-primary);

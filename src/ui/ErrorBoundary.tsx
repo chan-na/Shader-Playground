@@ -1,9 +1,14 @@
 // [D6] Crash fallback is INTENTIONALLY token/webfont-independent: it must
-// render even when cssVars() injection or webfont loading failed. Raw hex +
-// system-ui here is BY DESIGN, not a tokenization gap — see
-// design/README.md §도메인 규칙, design/System States.dc.html L427-446. Only
-// the Reload CTA references tokens.accent.default (JS constant, safe at
-// runtime).
+// render even when cssVars() injection or webfont loading failed. The neutral
+// greys + system-ui here are BY DESIGN, not a tokenization gap — see
+// design/README.md §도메인 규칙, design/System States.dc.html L427-446.
+//
+// The two *branded* colors — the Reload CTA (accent.default) and the '!' error
+// accent (semantic.error) — reference theme.ts as JS constants [A-7]. That is
+// still D6-compliant: a JS constant is interpolated at build time and inlined
+// into the bundle, so it survives a cssVars() injection failure, whereas a
+// `var(--error)` would not. This keeps the screen tracking the token if
+// semantic.error ever changes, without taking a runtime dependency on it.
 import {
   Component,
   type CSSProperties,
@@ -31,8 +36,8 @@ const CONTENT_STYLE: CSSProperties = {
   color: "#dddddd",
 };
 
-// #f0555c matches tokens.semantic.error's value, but per [D6] this screen
-// deliberately does not reference theme.ts — literal kept intentionally.
+// '!' 에러 액센트는 semantic.error를 빌드타임 보간해 추적한다 [A-7] — 런타임
+// CSS var 의존은 회피(위 D6 주석 참조). 박스의 중립 그레이는 토큰 비의존 유지.
 const ICON_BOX_STYLE: CSSProperties = {
   width: 44,
   height: 44,
@@ -43,7 +48,7 @@ const ICON_BOX_STYLE: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   fontSize: 22,
-  color: "#f0555c",
+  color: tokens.semantic.error,
   margin: "0 auto 18px",
 };
 

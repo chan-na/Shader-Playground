@@ -143,11 +143,10 @@ export function NodeCardHeader({
             boxShadow: `0 0 0 2px ${withAlpha(tokens.accent.default, 0.22)}`,
             fontSize: 11.5,
             fontWeight: 600,
-            // dc L393's edit box uses #fff, but every other header title in
-            // this component is text.primary — approximating with the same
-            // token keeps the rename box visually consistent with its own
-            // display-mode button instead of introducing a one-off literal.
-            color: "var(--text-primary)",
+            // dc L393: the edit box is pure white — text.emphasis exists to
+            // mark the "being edited" state apart from the text.primary header
+            // title [B-2].
+            color: "var(--text-emphasis)",
             width: "100%",
             minWidth: 0,
           }}

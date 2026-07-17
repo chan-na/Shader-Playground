@@ -182,18 +182,21 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
 
 /**
  * Resolve a node's display name for card titles / pane labels / export
- * filenames [D15]. Precedence:
+ * filenames [D15·A-1·A-2]. Precedence:
  *  1. `group` — `label` is the single source of truth; a group node has no
- *     independent `name` concept, so `name` is never consulted here.
+ *     independent `name` concept, so `name` is never consulted here. The
+ *     Inspector's common Name field routes group renames into `label`
+ *     (graphStore.renameNode), so there is still exactly one title per node.
  *  2. user-set `name` (trimmed; blank-after-trim is treated as unset).
- *  3. `param.label` — legacy fallback predating the `name` field.
- *  4. the static `NODE_META[kind].label`.
+ *  3. the static `NODE_META[kind].label`.
+ *
+ * The former `param.label` step is gone [A-1]: a param is renamed through
+ * `name` like every other kind, and projectSanitize migrates legacy values.
  */
 export function displayNodeName(node: GraphNode): string {
   if (node.kind === "group") return node.label;
   const trimmed = node.name?.trim();
   if (trimmed) return trimmed;
-  if (node.kind === "param" && node.label) return node.label;
   return NODE_META[node.kind].label;
 }
 
@@ -316,7 +319,6 @@ function cloneGraphNodeByKind(n: GraphNode): GraphNode {
         kind: "param",
         paramKind: n.paramKind,
         value: Array.isArray(n.value) ? [...n.value] : n.value,
-        ...(n.label !== undefined && { label: n.label }),
       };
     case "math":
       return { id: n.id, kind: "math", op: n.op, a: n.a, b: n.b };

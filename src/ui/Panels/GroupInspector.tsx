@@ -4,7 +4,6 @@ import type { GroupGraphNode } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
-import { TextField } from "../controls/TextField";
 
 // Matches GroupNodeView.tsx's own DEFAULT_TINT (the node card's fallback
 // swatch when `node.color` is unset) so the Inspector and the graph card
@@ -12,13 +11,12 @@ import { TextField } from "../controls/TextField";
 const DEFAULT_TINT = tokens.nodeCategory.container;
 
 /**
- * Editor pane for a group node. Surfaces label/color editing and the two
- * destructive removal modes (release vs. cascade). Per-node delete via
- * Backspace bypasses this panel and uses `removeNode`, which already orphans
- * direct children without cascading.
+ * Editor pane for a group node. Surfaces color editing and the two destructive
+ * removal modes (release vs. cascade); renaming lives in the Inspector's common
+ * Name field [A-2]. Per-node delete via Backspace bypasses this panel and uses
+ * `removeNode`, which already orphans direct children without cascading.
  */
 export function GroupInspector({ node }: { node: GroupGraphNode }) {
-  const setGroupLabel = useGraphStore((s) => s.setGroupLabel);
   const setGroupColor = useGraphStore((s) => s.setGroupColor);
   const removeGroup = useGraphStore((s) => s.removeGroup);
   const select = useSelectionStore((s) => s.select);
@@ -38,23 +36,8 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
     >
       <div className="inspector-label">Group</div>
 
-      <div style={{ marginBottom: 15 }}>
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--text-secondary)",
-            marginBottom: 7,
-          }}
-        >
-          Label
-        </div>
-        <TextField
-          value={node.label}
-          onChange={(e) => setGroupLabel(node.id, e.target.value)}
-          maxLength={256}
-          dataTestId="group-label-input"
-        />
-      </div>
+      {/* [A-2] No Group label field — the common Name field (Inspector.tsx)
+          renames groups too, routing into `label` via renameNode. */}
 
       <div style={{ marginBottom: 15 }}>
         <div

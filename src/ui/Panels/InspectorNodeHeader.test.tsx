@@ -41,7 +41,7 @@ const paramNode: ParamGraphNode = {
   kind: "param",
   paramKind: "color",
   value: [1, 0, 0],
-  label: "Accent",
+  name: "Accent",
 };
 
 describe("InspectorNodeHeader", () => {

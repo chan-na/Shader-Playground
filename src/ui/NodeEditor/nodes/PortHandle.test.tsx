@@ -5,8 +5,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ConnectionDragSource } from "../../../state/connectionUiStore";
 import { useConnectionUiStore } from "../../../state/connectionUiStore";
-import { tokens } from "../../../theme";
-import { PortHandle } from "./PortHandle";
+import { PORT_DIAMETER, tokens } from "../../../theme";
+import {
+  multiPortBodyMinH,
+  multiPortPreviewH,
+  PORT_STRIDE_MULTI,
+  PORT_TOP_PAD,
+  PortHandle,
+} from "./PortHandle";
 
 /**
  * NOTE on render method: unlike ConnectionLine.test.tsx/nodeViews.test.tsx
@@ -191,5 +197,60 @@ describe("PortHandle — shape recipe (todo D1)", () => {
     );
     expect(html).toContain("node-card__port-label--in");
     expect(html).toContain(`color:${tokens.portFamily.scalar}`);
+  });
+});
+
+/**
+ * [C-3] Multi-port vertical rhythm. The property that matters is containment:
+ * a uniform-driven card gains one port per uniform, and no port may fall
+ * outside the card — that overflow (4th port escaping the fixed 144px card) is
+ * exactly what this rule was raised to fix.
+ */
+describe("multi-port card geometry [C-3]", () => {
+  /** Card-relative bottom edge of the last port, mirroring the view's own
+   *  `top={PORT_TOP_PAD + i * PORT_STRIDE_MULTI}` placement. */
+  const lastPortBottom = (n: number) =>
+    PORT_TOP_PAD + (n - 1) * PORT_STRIDE_MULTI + PORT_DIAMETER.card;
+
+  const SHADER_CHROME = 48; // header 30 + body padding 9 + 9
+  const COMPUTE_CHROME = 47; // header 30 + body padding 8 + 9
+
+  it("keeps the 96px default thumbnail until the port span outgrows it", () => {
+    expect(multiPortPreviewH(1)).toBe(96);
+    expect(multiPortPreviewH(3)).toBe(96);
+  });
+
+  it("grows the shader thumbnail so every port stays inside the card", () => {
+    for (let n = 1; n <= 10; n++) {
+      const cardH = SHADER_CHROME + multiPortPreviewH(n);
+      expect(lastPortBottom(n)).toBeLessThanOrEqual(cardH);
+    }
+  });
+
+  it("grows the compute body so every port stays inside the card", () => {
+    for (let n = 1; n <= 10; n++) {
+      const cardH = COMPUTE_CHROME + multiPortBodyMinH(n);
+      expect(lastPortBottom(n)).toBeLessThanOrEqual(cardH);
+    }
+  });
+
+  it("regression: a 5-port shader no longer overflows the old fixed 144px card", () => {
+    // Pre-C-3 the card was header+pad+96+pad = 144 regardless of port count.
+    // The request doc says overflow starts at the 4th port, but that figure is
+    // in the dc's geometry (port 0 at top:64). In this implementation port 0
+    // sits at PORT_TOP_PAD(38), so 4 ports still fit (139 <= 144) and the 5th
+    // is the first to escape — hence 5, not 4, is the regression case here.
+    expect(lastPortBottom(4)).toBeLessThanOrEqual(144);
+    expect(lastPortBottom(5)).toBeGreaterThan(144);
+    expect(SHADER_CHROME + multiPortPreviewH(5)).toBeGreaterThanOrEqual(
+      lastPortBottom(5),
+    );
+  });
+
+  it("compute keeps a content-sized body (no 96 floor) at low port counts", () => {
+    // Unlike the shader thumbnail there is no 96 floor — the kv list's own
+    // height wins until the port span exceeds it.
+    expect(multiPortBodyMinH(1)).toBeLessThan(96);
+    expect(multiPortBodyMinH(2)).toBeLessThan(96);
   });
 });

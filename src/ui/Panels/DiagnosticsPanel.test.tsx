@@ -54,7 +54,7 @@ describe("DiagnosticsPanel", () => {
   // v5's useSyncExternalStore returns the *initial* snapshot under SSR (see
   // StatusBar.test.tsx's note), so a post-mount store mutation only shows up
   // through an actual client render.
-  it("renders the GPU/Frame/Draw calls/Programs metric cards from rendererStore + graphStore/diagnosticsStore", () => {
+  it("renders the GPU/Frame/Draw calls/Shaders metric cards from rendererStore + graphStore/diagnosticsStore", () => {
     useRendererStore.setState({
       glInfo: { renderer: "ANGLE Metal", version: "WebGL 2.0" },
       stats: {
@@ -76,7 +76,10 @@ describe("DiagnosticsPanel", () => {
     expect(panel.textContent).toContain("ANGLE Metal");
     expect(panel.textContent).toContain("16.7 ms · 60 fps");
     expect(panel.textContent).toContain("42");
-    expect(panel.textContent).toContain("linked");
+    // [A-6] label + proxy value: the one shader node added above has no error
+    // diagnostic, so it counts as compiled.
+    expect(panel.textContent).toContain("Shaders");
+    expect(panel.textContent).toContain("1 compiled");
   });
 
   // Uses client render()/screen, not renderToStaticMarkup, for the same
@@ -100,7 +103,7 @@ describe("DiagnosticsPanel", () => {
     // All 4 metric cards must still render (nothing pushed out of view).
     expect(panel.textContent).toContain("Frame");
     expect(panel.textContent).toContain("Draw calls");
-    expect(panel.textContent).toContain("Programs");
+    expect(panel.textContent).toContain("Shaders");
     // The grid item itself must be allowed to shrink below its content's
     // intrinsic width — this is what keeps the 2x2 grid from collapsing.
     expect(panel.innerHTML).toContain("min-width: 0;");

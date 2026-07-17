@@ -1,0 +1,62 @@
+import { describe, expect, it } from "vitest";
+import basicVert from "../basic.vert?raw";
+import fullscreenVert from "../fullscreen.vert?raw";
+import starterFrag from "./starter.frag?raw";
+import unlitFrag from "./unlit.frag?raw";
+
+/**
+ * [C-7] A new Shader node is always born without a mesh input, and
+ * compile.ts substitutes fullscreen.vert for mesh-less shader passes. In
+ * GLSL ES 3.0 every fragment-stage `in` must be matched by a vertex-stage
+ * `out` or the program fails to link — so the default template for a new node
+ * must not read a varying fullscreen.vert doesn't emit.
+ *
+ * These are text assertions rather than a real link: WebGL2 linking needs a GL
+ * context, which the jsdom unit environment has no access to (the Playwright
+ * suite covers the real pipeline). The varying contract is what actually broke,
+ * and it is statically checkable.
+ */
+function declaredVaryings(src: string, qualifier: "in" | "out"): string[] {
+  // Matches e.g. `in vec3 v_normal;` — deliberately ignores `in vec3
+  // a_position` attributes in the vertex stage by only being applied to a
+  // fragment source for "in", and skips uniforms/precision lines.
+  const re = new RegExp(`^\\s*${qualifier}\\s+\\w+\\s+(\\w+)\\s*;`, "gm");
+  return [...src.matchAll(re)].map((m) => m[1] ?? "");
+}
+
+const fullscreenOuts = declaredVaryings(fullscreenVert, "out");
+const basicOuts = declaredVaryings(basicVert, "out");
+
+describe("new-node shader template varying contract [C-7]", () => {
+  it("fullscreen.vert emits only v_uv (the constraint every mesh-less node hits)", () => {
+    expect(fullscreenOuts).toEqual(["v_uv"]);
+  });
+
+  it("starter.frag links against fullscreen.vert — the mesh-less first frame", () => {
+    for (const v of declaredVaryings(starterFrag, "in")) {
+      expect(fullscreenOuts).toContain(v);
+    }
+  });
+
+  it("starter.frag still links against basic.vert once a mesh is connected", () => {
+    // A vertex shader may emit varyings the fragment ignores; only the reverse
+    // is a link error. So the starter must keep working after the user wires a
+    // mesh in and compile.ts stops substituting fullscreen.vert.
+    for (const v of declaredVaryings(starterFrag, "in")) {
+      expect(basicOuts).toContain(v);
+    }
+  });
+
+  it("documents why unlit.frag cannot be the new-node default: it reads a varying fullscreen.vert never emits", () => {
+    // This is the actual C-7 defect, pinned so nobody restores unlit.frag as
+    // the default for CTA / Add Shader. unlit stays the *mesh* template (demo
+    // graph + the explicit "Add Shader: Unlit" command), where basic.vert
+    // supplies v_normal.
+    const unlitIns = declaredVaryings(unlitFrag, "in");
+    expect(unlitIns).toContain("v_normal");
+    expect(fullscreenOuts).not.toContain("v_normal");
+    for (const v of unlitIns) {
+      expect(basicOuts).toContain(v);
+    }
+  });
+});

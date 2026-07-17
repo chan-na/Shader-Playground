@@ -66,13 +66,16 @@ export interface GraphState {
   cloneNode: (id: string) => string | null;
   removeNode: (id: string) => void;
   /**
-   * Set a node's user-facing display name [D15]. Trimmed and clamped to
+   * Set a node's user-facing display name [D15·A-2]. Trimmed and clamped to
    * `SANITIZE_LIMITS.MAX_NODE_NAME_LEN` (256). An empty result after
    * trimming removes the `name` property (falls back to the registry's
-   * default display name) rather than storing `""`. No-op for group nodes —
-   * `label` is their single rename source (GroupNodeView/GroupInspector),
-   * to avoid two competing rename UIs. No-op (no history push) when the
-   * normalized name already matches the node's current name.
+   * default display name) rather than storing `""`. No-op (no history push)
+   * when the normalized name already matches the node's current name.
+   *
+   * Groups are renamed through this path too, so the Inspector can show one
+   * common Name field for every kind — but the value is written to `label`,
+   * a group's single source (also used by GroupNodeView's inline edit). A
+   * blank rename is a no-op for groups, since `label` is non-optional.
    */
   renameNode: (id: string, name: string) => void;
   updateNodePosition: (id: string, position: NodePosition) => void;
@@ -96,7 +99,6 @@ export interface GraphState {
   setUniformHints: (id: string, name: string, hints: UniformHints) => void;
   setResolutionScale: (id: string, scale: ResolutionScale) => void;
   setParamValue: (id: string, value: number | number[]) => void;
-  setParamLabel: (id: string, label: string) => void;
   setMathConfig: (
     id: string,
     patch: { op?: MathOp; a?: number; b?: number },
@@ -284,7 +286,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const trimmed = name.trim().slice(0, SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
     const target = get().nodes.find((n) => n.id === id);
     if (!target) return;
-    if (target.kind === "group") return;
+    // [A-2] The Inspector now shows one common Name field for every kind,
+    // groups included. A group's title lives in `label` (its single source —
+    // also what GroupNodeView's inline edit and serialization use), so route
+    // there instead of giving the node a second, competing `name`. Blank is a
+    // no-op rather than a clear: `label` is non-optional and every other
+    // group-rename path already refuses to empty it.
+    if (target.kind === "group") {
+      if (trimmed === "" || trimmed === target.label) return;
+      get().setGroupLabel(id, trimmed);
+      return;
+    }
     if (trimmed === (target.name ?? "")) return;
     pushHistory(get());
     set((s) => ({
@@ -387,16 +399,6 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }),
       uniformRev: s.uniformRev + 1,
     })),
-  setParamLabel: (id, label) => {
-    pushHistory(get());
-    set((s) => ({
-      nodes: s.nodes.map((n) => {
-        if (n.id !== id || n.kind !== "param") return n;
-        return { ...(n as ParamGraphNode), label } as ParamGraphNode;
-      }),
-      rev: s.rev + 1,
-    }));
-  },
   setMathConfig: (id, patch) => {
     pushHistory(get());
     set((s) => ({

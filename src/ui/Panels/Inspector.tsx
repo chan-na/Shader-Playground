@@ -58,15 +58,16 @@ export interface InspectorProps {
  */
 function NodeNameField({ node }: { node: GraphNode }) {
   const renameNode = useGraphStore((s) => s.renameNode);
-  const [draft, setDraft] = useState(node.name ?? "");
+  // [A-2] A group's title is stored in `label`, not `name` (renameNode routes
+  // it there) — so seed the draft from whichever field is that kind's source.
+  const [draft, setDraft] = useState(
+    node.kind === "group" ? node.label : (node.name ?? ""),
+  );
 
-  // Mirrors displayNodeName()'s fallback steps 3-4 (registry.ts) without
+  // Mirrors displayNodeName()'s final fallback (registry.ts) without
   // consulting `name` — the placeholder must show what the title would
   // fall back to if the field were committed empty, not the current value.
-  const fallback =
-    node.kind === "param" && node.label
-      ? node.label
-      : NODE_META[node.kind].label;
+  const fallback = NODE_META[node.kind].label;
 
   return (
     <div style={{ padding: "13px 14px 0" }}>
@@ -209,9 +210,12 @@ export function Inspector({ embedded = false }: InspectorProps) {
         <>
           <InspectorNodeHeader node={node} />
 
-          {node.kind !== "group" && (
-            <NodeNameField key={`${node.id}:${node.name ?? ""}`} node={node} />
-          )}
+          {/* [A-1·A-2] One Name field for every kind — params and groups
+              included. Their old per-kind Label fields are gone. */}
+          <NodeNameField
+            key={`${node.id}:${node.kind === "group" ? node.label : (node.name ?? "")}`}
+            node={node}
+          />
 
           {node.kind === "group" && (
             <GroupInspector node={node as GroupGraphNode} />

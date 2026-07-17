@@ -243,14 +243,28 @@ function HtmlConfigurePanel({
           HTML
         </div>
         <div className="es-file-card-main">
-          <TextField
-            value={fileName}
-            onChange={(e) => onFileNameChange(e.target.value)}
-            dataTestId="es-html-filename"
-            ariaLabel="HTML export file name"
-          />
+          {/* [C-10] The editable base is kept (it is the only way to name an
+              HTML export — the app has no projectTitle state, see C-11a), and
+              the dc's completed-filename display is reconciled with it as a
+              static `-{timestamp}.html` suffix inside the same field. The
+              timestamp itself is only fixed at download time, so it stays a
+              placeholder rather than a live preview that would drift from the
+              real name. design/Export & Share.dc.html L167-172. */}
+          <div className="es-field-label">File name</div>
+          <div className="es-filename-field">
+            <TextField
+              value={fileName}
+              onChange={(e) => onFileNameChange(e.target.value)}
+              dataTestId="es-html-filename"
+              ariaLabel="HTML export file name"
+              mono
+            />
+            <span className="es-filename-suffix" aria-hidden="true">
+              -{"{timestamp}"}.html
+            </span>
+          </div>
           <div className="es-file-card-meta">
-            {sizeKB} KB · WebGL2 · self-contained
+            {sizeKB} KB · WebGL2 · self-contained · timestamp added on download
           </div>
         </div>
       </div>

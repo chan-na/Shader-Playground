@@ -15,6 +15,7 @@ import blurFrag from "../../shaders/templates/blur.frag?raw";
 import composite3Frag from "../../shaders/templates/composite3.frag?raw";
 import maskFrag from "../../shaders/templates/mask.frag?raw";
 import noiseFrag from "../../shaders/templates/noise.frag?raw";
+import starterFrag from "../../shaders/templates/starter.frag?raw";
 import tonemapFrag from "../../shaders/templates/tonemap.frag?raw";
 import unlitFrag from "../../shaders/templates/unlit.frag?raw";
 import uvDebugFrag from "../../shaders/templates/uvDebug.frag?raw";
@@ -593,9 +594,12 @@ export function CommandPalette() {
   };
 
   // D17/E6 — dc "Command Palette.dc.html" L119-124: 빈 결과일 때
-  // "Create a Shader node named …" CTA. 셰이더 템플릿은 dc가 지정하지
-  // 않아 기존 buildCommands()의 "Add Shader: Unlit"과 동일한 형태(잠정
-  // 결정 — followups 기록됨)로 생성한다.
+  // "Create a Shader node named …" CTA. [C-7] Uses the fullscreen-safe starter
+  // template, not unlit: a node created here has no mesh input, so compile.ts
+  // compiles it against fullscreen.vert (v_uv only) and unlit.frag's
+  // `in vec3 v_normal` would fail to link on the very first frame. Unlit stays
+  // the mesh-shader template (demo graph + the explicit "Add Shader: Unlit"
+  // command), so this leaves the app's first-run visual unchanged.
   const createShaderFromTerm = () => {
     const name = displayTerm.trim();
     if (!name) return;
@@ -606,7 +610,7 @@ export function CommandPalette() {
         kind: "shader",
         name,
         vertexSource: basicVert,
-        fragmentSource: unlitFrag,
+        fragmentSource: starterFrag,
         uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
       },
       { x: 100, y: 0 },

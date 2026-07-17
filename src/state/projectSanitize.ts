@@ -283,13 +283,9 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
             .slice(0, SANITIZE_LIMITS.MAX_UNIFORM_ARRAY_LEN)
             .map((n) => safeFiniteNumber(n))
         : safeFiniteNumber(v);
+      // [A-1] `label` is no longer a param field — sanitizeGraphNode migrates a
+      // legacy one into `name`.
       const node: ParamGraphNode = { id, kind: "param", paramKind, value };
-      if (
-        typeof raw.label === "string" &&
-        raw.label.length <= SANITIZE_LIMITS.MAX_PARAM_LABEL_LEN
-      ) {
-        node.label = raw.label;
-      }
       return node;
     }
     case "math": {
@@ -375,11 +371,22 @@ export function sanitizeGraphNode(raw: unknown): SanitizeResult {
   }
   try {
     const node = buildNode(obj, id);
-    if (typeof obj.name === "string") {
-      const trimmed = obj.name
-        .trim()
-        .slice(0, SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
-      if (trimmed !== "") node.name = trimmed;
+    // [A-1] `name` is the single rename source for every non-group kind. Params
+    // written before v1.2 kept their title in `label`, so carry that over —
+    // dropping the field without this migration would silently rename every
+    // existing param back to "Parameter". An explicit `name` always wins; the
+    // legacy `label` is only consulted when it would otherwise be lost.
+    // (Groups are excluded: `label` remains *their* single source — see
+    // graphStore.renameNode — so there is nothing to migrate.)
+    const nameSources: unknown[] = [obj.name];
+    if (node.kind === "param") nameSources.push(obj.label);
+    for (const src of nameSources) {
+      if (typeof src !== "string") continue;
+      const trimmed = src.trim().slice(0, SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
+      if (trimmed !== "") {
+        node.name = trimmed;
+        break;
+      }
     }
     return { ok: true, node };
   } catch (e) {

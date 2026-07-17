@@ -37,7 +37,8 @@ export const SANITIZE_LIMITS = {
   MAX_UNIFORM_KEY_LEN: 128,
   MAX_UNIFORM_ARRAY_LEN: 16,
   MAX_NODE_NAME_LEN: 256,
-  MAX_PARAM_LABEL_LEN: 256,
+  // [A-1] No MAX_PARAM_LABEL_LEN — `param.label` is gone, and the value
+  // migrated into `name` is clamped by MAX_NODE_NAME_LEN like any other name.
   MAX_SWIZZLE_LEN: 4,
   MAX_DEVICE_ID_LEN: 256,
   MAX_GROUP_LABEL_LEN: 256,
@@ -168,7 +169,8 @@ export interface ParamGraphNode extends BaseNode {
   paramKind: ParamKind;
   /** Current value. For 'time' it's [scale, offset] applied to simTime. */
   value: number | number[];
-  label?: string;
+  // [A-1] No `label` — a param is renamed through the common `name` field like
+  // every other kind. projectSanitize migrates pre-v1.2 `label` values.
 }
 
 export type MathOp =

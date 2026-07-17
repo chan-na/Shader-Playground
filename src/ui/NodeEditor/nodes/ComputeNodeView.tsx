@@ -6,7 +6,12 @@ import { useDiagnosticsStore } from "../../../state/diagnosticsStore";
 import { countNodeDiagnostics, ErrorBadge } from "./ErrorBadge";
 import { GpuTimerChip } from "./GpuTimerChip";
 import { NodeCardHeader } from "./NodeCardHeader";
-import { PORT_STRIDE, PORT_TOP_PAD, PortHandle } from "./PortHandle";
+import {
+  multiPortBodyMinH,
+  PORT_STRIDE_MULTI,
+  PORT_TOP_PAD,
+  PortHandle,
+} from "./PortHandle";
 
 /** label mono 10px muted / value mono 11px primary, space-between — mirrors
  * design/Node Editor.dc.html L221-225's particles/dispatch/buffer rows. */
@@ -47,7 +52,14 @@ export function ComputeNodeView({ id, data }: NodeProps) {
       />
       <div
         className="node-card__body"
-        style={{ paddingLeft: 22, paddingRight: 22 }}
+        style={{
+          paddingLeft: 22,
+          paddingRight: 22,
+          // Compute grows one input port per non-sampler uniform just like
+          // Shader does, but its body is a fixed 3-row kv list with no
+          // thumbnail to expand — so the port span sets a floor instead [C-3].
+          minHeight: multiPortBodyMinH(inputs.length),
+        }}
       >
         <div className="node-card__kv-list">
           <ComputeKvRow label="primitive" value={node.primitive} />
@@ -63,7 +75,7 @@ export function ComputeNodeView({ id, data }: NodeProps) {
           key={p.name}
           port={p}
           side="in"
-          top={PORT_TOP_PAD + i * PORT_STRIDE}
+          top={PORT_TOP_PAD + i * PORT_STRIDE_MULTI}
         />
       ))}
       <PortHandle

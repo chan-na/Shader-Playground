@@ -134,10 +134,10 @@ export function WebcamNodeView({ id, data }: NodeProps) {
                   width: 22,
                   height: 22,
                   borderRadius: "50%",
-                  // dc L291의 rgba(111,214,163,…)(#6fd6a3 계열)는 토큰이 없어
-                  // nodeCategory.source로 근사 [D8] — followup 기록됨.
-                  background: withAlpha(tokens.nodeCategory.source, 0.16),
-                  border: `1px solid ${withAlpha(tokens.nodeCategory.source, 0.5)}`,
+                  // dc L291의 렌즈 링(#6fd6a3)이 nodeCategory.sourceBright로
+                  // 정본화됐다 — source 알파 파생 근사를 대체 [D8·B-3].
+                  background: withAlpha(tokens.nodeCategory.sourceBright, 0.16),
+                  border: `1px solid ${withAlpha(tokens.nodeCategory.sourceBright, 0.5)}`,
                   pointerEvents: "none",
                 }}
               />

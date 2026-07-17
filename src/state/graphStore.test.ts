@@ -370,7 +370,9 @@ describe("graphStore", () => {
     expect(after.rev).toBe(before.rev);
   });
 
-  it("setParamLabel patches label and bumps rev", () => {
+  // [A-1] setParamLabel is gone — a param renames through renameNode like every
+  // other kind (see the renameNode describe block below).
+  it("renameNode sets a param's name and bumps rev", () => {
     const p: ParamGraphNode = {
       id: "p1",
       kind: "param",
@@ -379,8 +381,8 @@ describe("graphStore", () => {
     };
     useGraphStore.getState().addNode(p);
     const before = useGraphStore.getState().rev;
-    useGraphStore.getState().setParamLabel("p1", "Intensity");
-    expect((useGraphStore.getState().nodes[0] as ParamGraphNode).label).toBe(
+    useGraphStore.getState().renameNode("p1", "Intensity");
+    expect((useGraphStore.getState().nodes[0] as ParamGraphNode).name).toBe(
       "Intensity",
     );
     expect(useGraphStore.getState().rev).toBe(before + 1);
@@ -435,14 +437,31 @@ describe("graphStore", () => {
       expect(useHistoryStore.getState().past.length).toBe(pastLength);
     });
 
-    it("is a no-op for group nodes", () => {
+    // [A-2] Groups now rename through this same path (the Inspector shows one
+    // common Name field for every kind) — but the value lands in `label`, the
+    // group's single source, never in a competing `name`.
+    it("routes a group rename into label, leaving name unset", () => {
       const gid = useGraphStore
         .getState()
         .addGroup("G", { x: 0, y: 0 }, { width: 200, height: 150 });
       const before = useGraphStore.getState().rev;
       useGraphStore.getState().renameNode(gid, "Renamed Group");
       const after = useGraphStore.getState();
-      expect(after.nodes.find((n) => n.id === gid)?.name).toBeUndefined();
+      const group = after.nodes.find((n) => n.id === gid);
+      expect(group?.kind === "group" && group.label).toBe("Renamed Group");
+      expect(group?.name).toBeUndefined();
+      expect(after.rev).toBe(before + 1);
+    });
+
+    it("ignores a blank group rename — label is non-optional", () => {
+      const gid = useGraphStore
+        .getState()
+        .addGroup("G", { x: 0, y: 0 }, { width: 200, height: 150 });
+      const before = useGraphStore.getState().rev;
+      useGraphStore.getState().renameNode(gid, "   ");
+      const after = useGraphStore.getState();
+      const group = after.nodes.find((n) => n.id === gid);
+      expect(group?.kind === "group" && group.label).toBe("G");
       expect(after.rev).toBe(before);
     });
 

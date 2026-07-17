@@ -326,14 +326,14 @@ describe("serializeProject / deserializeProject", () => {
           kind: "param",
           paramKind: "float",
           value: 0.5,
-          label: "Intensity",
+          name: "Intensity",
         },
         {
           id: "p2",
           kind: "param",
           paramKind: "vec3",
           value: [0.1, 0.2, 0.3],
-          // no label — exercises the conditional spread
+          // no name — exercises the unnamed path
         },
         { id: "m1", kind: "math", op: "add", a: 1, b: 2 },
         { id: "sw1", kind: "swizzle", mask: "yzx" },
@@ -356,12 +356,12 @@ describe("serializeProject / deserializeProject", () => {
     const param1 = round.graph.nodes.find((n) => n.id === "p1");
     expect(param1?.kind).toBe("param");
     if (param1?.kind === "param") {
-      expect(param1.label).toBe("Intensity");
+      expect(param1.name).toBe("Intensity");
       expect(param1.value).toBe(0.5);
     }
     const param2 = round.graph.nodes.find((n) => n.id === "p2");
     if (param2?.kind === "param") {
-      expect(param2.label).toBeUndefined();
+      expect(param2.name).toBeUndefined();
       expect(param2.value).toEqual([0.1, 0.2, 0.3]);
     }
     const cb = round.graph.nodes.find((n) => n.id === "cb1");

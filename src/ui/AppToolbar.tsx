@@ -4,7 +4,7 @@ import { MAX_OUTPUTS } from "../core/graph/validate";
 import { DEFAULT_EXPORT_BASE, exportFileName } from "../export/exportFileName";
 import basicVert from "../shaders/basic.vert?raw";
 import blendFrag from "../shaders/templates/blend.frag?raw";
-import unlitFrag from "../shaders/templates/unlit.frag?raw";
+import starterFrag from "../shaders/templates/starter.frag?raw";
 import { hydrateGraphAssets, importFiles } from "../state/assetActions";
 import { useCommandPaletteStore } from "../state/commandPaletteStore";
 import {
@@ -296,13 +296,16 @@ export function AppToolbar() {
       { x: -200, y: 560 },
     );
   };
+  // [C-7] Starter template, not unlit — a node added here has no mesh input, so
+  // it compiles against fullscreen.vert (v_uv only) and unlit.frag's
+  // `in vec3 v_normal` could never link on its first frame. See starter.frag.
   const addShader = () => {
     const id = nextId("shader");
     const node: GraphNode = {
       id,
       kind: "shader",
       vertexSource: basicVert,
-      fragmentSource: unlitFrag,
+      fragmentSource: starterFrag,
       uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
     };
     addNode(node, { x: 100, y: 0 });

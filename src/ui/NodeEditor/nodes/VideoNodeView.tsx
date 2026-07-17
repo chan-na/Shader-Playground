@@ -146,10 +146,11 @@ export function VideoNodeView({ id, data }: NodeProps) {
                   bottom: 5,
                   height: 2,
                   borderRadius: 1,
-                  // dc rgba(255,255,255,0.18)의 white 채널 파생 회피 — 근접한
-                  // text.primary color-mix로 근사, 사유 주석 + followup 기록됨.
-                  background:
-                    "color-mix(in srgb, var(--text-primary) 18%, transparent)",
+                  // dc의 rgba(255,255,255,0.18)이 overlay.track으로 정본화됐다 —
+                  // 중립 트랙/필 표면은 순백 채널을 코드가 직접 파생하는 대신
+                  // 이 명명 토큰을 쓴다 [D9·B-4]. overlay.*는 cssVars() 방출
+                  // 대상이 아니므로 TS에서 직접 참조한다.
+                  background: tokens.overlay.track,
                 }}
               >
                 <div

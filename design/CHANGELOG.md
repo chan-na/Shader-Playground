@@ -12,16 +12,38 @@
 ---
 
 ## [Unreleased]
+> 다음 변경 대기 중.
 
-### Added
-- `[screen]` **Docking Prototype (신규 화면, 14번째)** — 정적 App Shell의 도킹 UX를 실동작으로 구현한 인터랙티브 프로토타입. 트리 기반 도크 레이아웃(split/leaf) + 탭 병합. 이유: App Shell은 룩앤필 정본이나 패널 위치가 고정이라 "뗐다 붙였다" 도킹 동작을 개발자가 참조할 소스가 없었음.
-  - 드래그: ⣿(헤더) → 패널 전체(모든 탭) 이동 · 개별 탭 드래그 → 그 탭만 이동.
-  - 드롭 규칙: 영역 가장자리(좌/우/상/하) → 스플릿 · 헤더 탭바/중앙/그 외 → 탭 병합 · 셸 바깥 가장자리 → 전체 레이아웃 가장자리 도킹. **플로팅(떠 있는 창) 상태 없음 — 모든 탭은 항상 특정 패널에 도킹**(드래그 중에만 커서를 따라다니는 트랜지언트 프리뷰).
-  - 스플릿 divider 드래그로 비율 조절 · ＋ Panel로 닫은 패널 재도킹 · ↺ Reset layout.
-- `[component]` **도킹 헤더 크롬을 App Shell 기준에 정렬**: 헤더 높이 34 · ⣿ `text.disabled`(#454c55)·13px · 메타 배지 박스형(surface.card + border.default) · 탭은 Side Panel 밑줄형 idiom(active `border-bottom 2px accent`). 기존 정적 화면과 동일 문법.
+---
 
-> ⚠ 이 화면은 토큰 신규 없음(전부 기존 theme.ts 값). breaking 없음.
-> 📌 v1.2 이후 개발자 피드백 반영은 **다음 세션에서** 별도 진행 예정.
+## v1.4 — 2026-07-17
+> design-request-v1.4.md의 15건(R1~R15)에 대한 디자이너 정본. Docking Prototype을 구현 스코프로 승격하면서 나온 모순·기능 삭제·사양 부재 결정. **모든 R ID 명시 인용**(무응답/보류 0). 신규 토큰 0 · breaking 코드 0 · 값 정본은 `theme.ts`. `Docking Prototype`을 `[Unreleased]`에서 **v1.4 정본으로 확정**(더 이상 "다음 세션" 보류 아님).
+
+### 결정 요약 (요청서 R ID 전부 인용)
+- **R1 [플로팅] `[breaking]`(dc)** = **선택지 1 — 플로팅 없음 확정.** 상주 플로팅 창 상태 없음. dc의 float 리사이즈 핸들/다중창/`floatWindow`·`tabInFloat`/`setFloatActive`/`closeFloatTab`/float 정지 스타일 분기 등 **죽은 코드 전부 제거**. 드래그는 트랜지언트 고스트 1개(release 시 반드시 도킹, `_fallbackTarget`=첫 region). Empty state 카피 정정: "drop a floating panel here" → **"No panels docked — add one with ＋ Panel"**. → `Docking Prototype.dc.html`.
+- **R2 [정본 충돌]** = **선택지 2 — App Shell = 기본 레이아웃 정본.** 두 화면의 기본 구조를 일치시킴. dc 기본 트리를 App Shell에 맞춰 정정(code = 하단 전폭 독). README M에 "구조 동일" 규칙 명문화.
+- **R3 [기본 레이아웃] `[screen]`** = **선택지 2 — 현행 기본값 유지(앱 첫 화면 불변).** dc 기본 트리 = `col 0.717 [ row 0.587 [nodeEditor | row 0.556 [viewport | (inspector,assets)]] | code(하단 전폭, 접기 가능) ]`. C-7의 "기본 데모=첫 화면 비주얼 불변" 원칙과 동급. `layoutStore` 기본값 교체 불필요(트리로 동일 상태 표현).
+- **R4 [접기/최대화] `[component]`** = **선택지 1 — 병존.** 트리 모델 + 접기/최대화를 leaf 단위 속성으로 유지(기존 기능 + `m1-dock-header-collapse.spec.ts` 회귀 가드 보존). 접힌 leaf = split 방향 고정 34px strip(divider 비활성). 최대화 = leaf를 도크 body 전체로 오버레이. dc에 접힌 leaf 시안 + ⌄/⌃·⤢/⤡ 컨트롤 반영. → `Docking Prototype.dc.html`.
+- **R5 [problems/diagnostics] `[screen]`** = **선택지 1 — 5종만 도킹.** problems/diagnostics는 1급 도킹 탭 아님. `diagnostics`는 `debugUiStore.open` 단일 출처 유지 → 상태바 `◨ Diagnostics` 토글로 **하단 트랜지언트 오버레이**(172px, 탭 아님)로 열림. `problems`는 상태바 카운트(`⚠ N problems`). 배선 파괴 없음. dc에 오버레이 + 상태바 항목 시안 추가. → `Docking Prototype.dc.html`.
+- **R6 [헤더 ✕] `[component]`** = **선택지 3 — 헤더 ✕ = 패널 전체 닫기 + 탭별 ✕ 별도.** active 탭만 닫히던 혼란 해소(3번 클릭 문제 제거). 탭마다 작은 ✕(hover 강조)로 비활성 탭도 활성화 없이 닫힘. VSCode idiom. → `Docking Prototype.dc.html`.
+- **R7 [최소 크기] `[screen]`** = **선택지 1 — 전역 leaf 최소 240×160**(플로팅 리사이즈 최소값과 동일). divider 드래그가 픽셀 하한 아래로 못 가게 클램프(0.15~0.85 비율 클램프에 픽셀 하한 겹침). → `layoutStore.ts`, dc `MIN_W/MIN_H`.
+- **R8 [탭 오버플로] `[screen]`** = **선택지 1 — 가로 스크롤(스크롤바 숨김 + 우측 페이드 마스크).** 34px 헤더 높이 불변, 임계 폭/생략 로직 없이 최소 코드(번들 예산 고려). 탭 4개↑에서 마스크 노출. → `DockPanelHeader.tsx`, dc `.sp-tabs`.
+- **R9 [영속화] `[screen]`** = **선택지 2 — localStorage.** 레이아웃 = 사용자 작업 환경(프로젝트 데이터 아님). 프로젝트 `.json` 미포함 → `projectSanitize` 마이그레이션 회피. `Reset layout` = 기본 트리 복귀. → `autoSave.ts`(layout 키 신설), `serialization.ts` 미변경.
+- **R10 [접근성/입력] `[screen]`** = **선택지 1 + 선택지 3.** 도킹 재배치는 포인터 전용으로 확정(키보드 DnD 미도입 — 번들 예산, 대안으로 ＋Panel/접기/닫기 버튼은 키보드 도달 가능). 단 `mouse*` → `pointer*` 전환으로 **터치/펜 무상 지원**. dc는 pointer 이벤트로 이식. → `App.tsx`, `DockPanelHeader.tsx`.
+- **R11 [반응형] `[screen]`** = **선택지 3 + 선택지 2.** 밴드/존 픽셀은 규칙으로 전달(Q6 정신) · 비율만 이식. **컴팩트(<990px, C-6)에서는 트리 도킹 비활성 → 고정 스택 폴백**(좁은 화면 실수 도킹 방지). dc는 1440×826 고정 레퍼런스 유지. → `App.tsx`, `paneLayout.ts`.
+- **R12 [패널 dot] `[component]`** = **선택지 1 — 현행 승인.** 패널 dot 5색은 **장식적 식별자**일 뿐 노드 카테고리/포트 타입 의미축과 무관. 신규 토큰 없이 기존 값 재사용, "의미 아님"을 README 규칙으로 명시(Code 보라 dot ≠ resource 포트 보라). 코드 변경 0.
+- **R13 [Q9 잔여] `[screen]`** = **선택지 1 — 구현 select 라벨도 `Info+`로**(로직 0, 라벨만). Q9 의도(오독 방지)를 구현 쪽에도 적용. → `DiagnosticsPanel.tsx:267-271`.
+- **R14 [Q1-b 잔여] `[screen]`** = **선택지 1 — 육안 근사 승인.** 레시피(중앙 글로우 + 다크 비네트 + `u_time` 변조)만 정본, CSS stop↔GLSL smoothstep 곡선 정확 일치 불요(±4px는 픽셀 기하 규칙이라 미적용). Q6 "규칙으로 받는다" 정신. → `starter.frag`.
+- **R15 [Q7 잔여] `[screen]`** = **선택지 1 — 실측값이 정본, dc는 사후 정정.** stride 브라우저 실측이 26이 아니면(25/27 등) 구현이 실측값 확정 후 보고 → dc의 44/70/96 핸들을 그 값으로 재정정. 구현 CSS 불변.
+
+### Changed
+- `[screen]` **`Docking Prototype.dc.html` 전면 개정** — 플로팅 제거(R1) · 기본 트리 = App Shell(R2·R3) · 접기/최대화 leaf 속성(R4) · problems/diagnostics 상태바+오버레이(R5) · 헤더 ✕=패널·탭별 ✕(R6) · leaf 최소 240×160 divider 클램프(R7) · 탭바 가로 스크롤+페이드(R8) · pointer 이벤트(R10) · 패널 dot 규칙 주석(R12).
+- `[screen]` `README.md` §M을 v1.4 정본으로 갱신(기본 트리·접기/최대화·오버플로·최소크기·영속화·반응형·problems/diagnostics·패널 dot 규칙). §M 헤더에서 `[Unreleased]` 제거.
+
+### Docs (확답만 — dc/코드 변경은 구현 쪽)
+- R9 localStorage · R10 pointer/포인터 전용 · R11 <990px 도킹 비활성 · R13 select 라벨 · R14 GLSL 근사 · R15 실측 우선 — 구현 반영 항목(위 영향 파일 참조).
+
+> ⚠ 신규 토큰 0. breaking 코드 0(R1의 breaking은 dc 죽은 코드 제거에 한함). 근사: R7 최소값은 dc 플로팅 최소값 재사용, R11 컴팩트 폴백은 C-6 임계 재사용.
 
 ---
 

@@ -142,14 +142,23 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 ### K. Brand — `Brand.dc.html`, `Icon & Social.dc.html` (1180×900)
 - 로고/워드마크/앱 아이콘/파비콘 시스템 + 사용 규칙. 실파일은 `brand/` 폴더 참조.
 
-### M. Docking Prototype — `Docking Prototype.dc.html` (1440×900) [Unreleased]
-- **목적**: A. App Shell의 **정적** 도킹 레이아웃을 **실동작**으로 구현한 인터랙티브 참조 — 패널을 뗐다 붙였다 재배치하는 UX. App Shell이 룩앤필 정본, 이 화면이 도킹 동작 정본.
-- **모델**: 트리 기반 도크 레이아웃(`split`{dir,ratio,a,b} / `leaf`{tabs[],active}). BW×BH 영역을 재귀 배치 + divider 계산.
-- **드래그**: ⣿(헤더) → 패널 전체(모든 탭) 이동 · 개별 탭 드래그 → 그 탭만 분리 이동. 드래그 중에만 커서를 따라다니는 트랜지언트 프리뷰(=이동 중 패널).
-- **드롭 규칙**: 영역 가장자리(좌/우/상/하, ~22%) → 스플릿 · 헤더 탭바(상단 34px)·중앙·그 외 → 탭 병합 · 셸 바깥 가장자리(42px 밴드) → 전체 레이아웃 가장자리 도킹. **플로팅 상주 상태 없음** — 모든 탭은 항상 특정 패널에 도킹(빈 곳 드롭 시 최근접 패널로 병합).
+### M. Docking Prototype — `Docking Prototype.dc.html` (1440×900) — v1.4 정본
+- **목적**: A. App Shell의 도킹 레이아웃을 **실동작**으로 구현한 인터랙티브 정본. App Shell이 룩앤필 정본, 이 화면이 도킹 동작 정본 — **둘의 기본 레이아웃 구조는 동일해야 한다**(R2).
+- **모델**: 트리 기반 도크 레이아웃(`split`{dir,ratio,a,b} / `leaf`{tabs[],active,collapsed}). BW×BH 영역을 재귀 배치 + divider 계산.
+- **기본 트리 = App Shell 첫 화면(R2·R3)**: `col 0.717 [ row 0.587 [nodeEditor | row 0.556 [viewport | leaf(inspector,assets)]] | leaf(code) ]`. Code는 **하단 전폭 독**이며 접기 가능(App Shell `codeOpen`와 동치). **앱 첫 화면 불변** — dc 기본값이 현행 `layoutStore` 기본과 일치.
+- **드래그**: ⣿(헤더) → 패널 전체(모든 탭) 이동 · 개별 탭 드래그 → 그 탭만 분리 이동. `pointer*` 이벤트(마우스+터치/펜, R10). 드래그 중에만 커서를 따라다니는 **트랜지언트 고스트** 1개(release 시 반드시 도킹).
+- **플로팅 없음 확정(R1)**: 상주 플로팅 창 상태 없음. 이전 번들의 float 리사이즈/다중창/`tabInFloat` 코드는 **제거**됨 — 참조·구현 금지. Empty state 카피 = "No panels docked — add one with ＋ Panel".
+- **드롭 규칙**: 영역 가장자리(좌/우/상/하, ~22%) → 스플릿 · 헤더 탭바(상단 34px)·중앙·그 외 → 탭 병합 · 셸 바깥 가장자리(42px 밴드) → 전체 레이아웃 가장자리 도킹. 빈 곳/타깃 없음 → 최근접(첫) 패널로 병합.
+- **접기/최대화(R4)**: leaf 단위 속성. 접힌 leaf = split 방향으로 고정 34px strip(divider 비활성). 최대화 = 해당 leaf를 도크 body 전체로 오버레이(⤢↔⤡). 기존 `collapsed`/`maximized` 상태 + 접기 회귀 E2E 가드 보존.
+- **탭별 닫기(R6)**: 헤더 우측 `✕` = **패널 전체** 닫기. 탭마다 작은 `✕`(hover 시 강조) = 그 탭만 닫기 — 비활성 탭도 활성화 없이 닫힘.
+- **탭 오버플로(R8)**: 탭 4개↑이면 탭바 가로 스크롤(스크롤바 숨김) + 우측 페이드 마스크. 34px 헤더 높이 불변.
+- **최소 크기(R7)**: leaf 최소 `240×160`. divider 드래그가 어느 쪽도 이 픽셀값 아래로 못 가게 클램프(비율 0.15~0.85 클램프에 픽셀 하한을 겹침).
+- **problems / diagnostics(R5)**: 도킹 5종(nodeEditor·viewport·inspector·code·assets)에 **포함 안 됨**. Diagnostics는 `debugUiStore.open` 단일 출처 유지 — 상태바 `◨ Diagnostics` 토글로 **하단 트랜지언트 오버레이**(172px)로 열림, 탭 아님. Problems는 상태바 카운트(`⚠ N problems`). 레벨 필터 라벨 = `Info+/Warn+/Error+/Debug+`(Q9).
+- **영속화(R9)**: 레이아웃은 **localStorage**(사용자 작업 환경, 프로젝트 파일 아님). `↺ Reset layout` = 기본 트리로 복귀. 프로젝트 `.json`에는 미포함(마이그레이션 회피).
+- **반응형(R11)**: 비율은 이식, 픽셀 밴드/존은 **규칙**으로(Q6 정신). 컴팩트(<990px, C-6)에서는 **트리 도킹 비활성** → 고정 스택 폴백. dc는 1440×826 고정 레퍼런스.
 - **크롬**: 도킹 헤더는 A. App Shell 문법 그대로 — 높이 34, ⣿ `text.disabled`·13px, 메타 배지 박스형(surface.card + border.default), 탭은 E. Side Panel 밑줄형(active `border-bottom 2px accent`).
-- **부가**: split divider 드래그 비율 조절 · ＋ Panel(닫은 패널 재도킹) · ↺ Reset layout · 상태바 `N panels docked`.
-- 신규 토큰 없음(전부 기존 theme.ts). ⚠ v1.2 이후 개발자 피드백은 다음 세션에서 반영 예정.
+- **패널 dot(R12)**: dot 5색(accent/source/value/resource/vector)은 **장식적 패널 식별자** — 노드 카테고리/포트 타입 의미축과 무관. 신규 토큰 없이 기존 값 재사용, "의미 아님"을 규칙으로 명시.
+- 신규 토큰 없음(전부 기존 theme.ts).
 
 ### L. Motion Prototype — `Motion - Connect.dc.html` + `node-connect.jsx`
 - **핵심 여정 애니메이션**: 포트 드래그 → 호환 입력 팬아웃 하이라이트(비호환 dim) → 엣지 스냅 → 뷰포트 라이브 렌더. 8.5초 타임라인, 재생/스크럽 컨트롤. 마이크로 인터랙션 타이밍·이징의 구현 기준.

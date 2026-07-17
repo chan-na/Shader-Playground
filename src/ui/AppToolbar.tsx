@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphNode, ParamKind } from "../core/graph/types";
 import { MAX_OUTPUTS } from "../core/graph/validate";
 import { DEFAULT_EXPORT_BASE, exportFileName } from "../export/exportFileName";
@@ -17,6 +17,8 @@ import {
   SPLIT_DEMO_LAYOUT,
   TORUS_DEMO_LAYOUT,
 } from "../state/demoGraph";
+import { useDockStore } from "../state/dockStore";
+import { collectPanelIds, DOCK_PANEL_IDS } from "../state/dockTree";
 import { useExportShareStore } from "../state/exportShareStore";
 import { useGifRecorderStore } from "../state/gifRecorder";
 import { redoGraph, undoGraph, useGraphStore } from "../state/graphStore";
@@ -26,6 +28,7 @@ import { deserializeProject, serializeProject } from "../state/serialization";
 import { toast } from "../state/toastStore";
 import { tokens, withAlpha } from "../theme";
 import { nextId } from "../utils/id";
+import { PANEL_DOTS, PANEL_TITLES } from "./dockLayoutModel";
 import { useHelpModalStore } from "./NodeEditor/HelpModal";
 
 const isMac =
@@ -46,9 +49,11 @@ const BRAND_DOT_BORDER = `1.4px solid ${withAlpha("#ffffff", 0.95)}`;
 function ToolbarMenu({
   label,
   children,
+  testId,
 }: {
   label: React.ReactNode;
   children: (close: () => void) => React.ReactNode;
+  testId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -79,6 +84,7 @@ function ToolbarMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
+        data-testid={testId}
       >
         {label}
       </button>
@@ -145,6 +151,20 @@ export function AppToolbar() {
 
   const canUndo = useHistoryStore((s) => s.past.length > 0);
   const canRedo = useHistoryStore((s) => s.future.length > 0);
+
+  // B6-U2 (R9/R11/R1): ＋ Panel re-dock menu + Reset layout. Subscribe to
+  // `s.tree` (not a derived array) and derive `closedPanels` via useMemo —
+  // returning a fresh `collectPanelIds(s.tree)` array straight from the
+  // selector would give zustand a new reference on every store change and
+  // trigger unbounded re-renders.
+  const dockTree = useDockStore((s) => s.tree);
+  const addPanel = useDockStore((s) => s.addPanel);
+  const resetLayout = useDockStore((s) => s.resetLayout);
+  const closedPanels = useMemo(
+    () =>
+      DOCK_PANEL_IDS.filter((id) => !collectPanelIds(dockTree).includes(id)),
+    [dockTree],
+  );
 
   const onPickFiles = () => fileInputRef.current?.click();
   const onFilesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -641,6 +661,57 @@ export function AppToolbar() {
           </>
         )}
       </ToolbarMenu>
+
+      <div className="tb-divider" />
+
+      <ToolbarMenu
+        label={
+          <>
+            ＋ Panel
+            <span className="tb-caret" aria-hidden="true">
+              ▾
+            </span>
+          </>
+        }
+        testId="dock-add-panel"
+      >
+        {(close) =>
+          closedPanels.length === 0 ? (
+            <div className="tb-menu-empty">All panels are open</div>
+          ) : (
+            closedPanels.map((id) => (
+              <button
+                type="button"
+                role="menuitem"
+                className="tb-menu-item"
+                key={id}
+                data-testid={`dock-add-panel-${id}`}
+                onClick={() => {
+                  addPanel(id);
+                  close();
+                }}
+              >
+                <span
+                  className="panel-tab-dot"
+                  style={{ background: PANEL_DOTS[id] }}
+                  aria-hidden="true"
+                />
+                <span className="tb-menu-item-label">{PANEL_TITLES[id]}</span>
+                <span className="tb-menu-item-hint">dock</span>
+              </button>
+            ))
+          )
+        }
+      </ToolbarMenu>
+      <button
+        type="button"
+        className="tb-btn"
+        data-testid="dock-reset-layout"
+        onClick={resetLayout}
+        title="Reset dock layout to default"
+      >
+        ↺ Reset layout
+      </button>
 
       <div className="tb-spacer" />
 

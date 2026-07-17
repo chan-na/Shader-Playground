@@ -328,3 +328,154 @@ describe("DockLayout drag engine (B4-U3)", () => {
     expect(nodeEditorPath).toEqual(viewportPath);
   });
 });
+
+// R11: compact(≤990px, C-6 임계 재사용) 도킹 비활성 — 고정 세로 스택 폴백.
+// jsdom은 `window.matchMedia`를 아예 구현하지 않는다(위 모든 테스트가 이미
+// 그 경로를 탄다 — `typeof window.matchMedia !== "function"` → snapshot
+// false, 즉 compact=false 취급). 여기서만 페이크 MediaQueryList를 심어
+// compact=true 경로를 구동한다.
+describe("DockLayout compact shell (R11)", () => {
+  interface FakeMediaQueryList {
+    matches: boolean;
+    addEventListener: (type: "change", listener: () => void) => void;
+    removeEventListener: (type: "change", listener: () => void) => void;
+  }
+
+  let listeners: Set<() => void>;
+  let fakeMql: FakeMediaQueryList;
+
+  /** `window.matchMedia`를 최소 페이크로 교체한다 — 실제 `MediaQueryList`
+   * 전체 인터페이스(onchange/media/addListener 등 폐기 API 포함)를 구현할
+   * 필요 없이, DockLayout.tsx의 `subscribeCompactShell`/
+   * `getCompactShellSnapshot`이 실제로 쓰는 부분집합(matches +
+   * addEventListener("change", …)/removeEventListener)만 만족시킨다 — 이
+   * 캐스팅은 프로덕션 코드가 아니라 브라우저 API를 부분 구현하는 테스트
+   * 더블이다(같은 관례: AppToolbar.test.tsx의 URL.createObjectURL 스텁,
+   * WebcamNodeView.test.tsx의 MediaStream 스텁 등). */
+  function installMatchMediaStub(initialMatches: boolean): void {
+    listeners = new Set();
+    fakeMql = {
+      matches: initialMatches,
+      addEventListener: (_type, listener) => listeners.add(listener),
+      removeEventListener: (_type, listener) => listeners.delete(listener),
+    };
+    (
+      window as unknown as {
+        matchMedia: (query: string) => FakeMediaQueryList;
+      }
+    ).matchMedia = vi.fn(() => fakeMql);
+  }
+
+  /** 스텁 MQL의 `matches`를 바꾸고 등록된 모든 리스너에 `change`를
+   * 발화한다 — 실제 브라우저가 뷰포트 리사이즈로 미디어쿼리 매치 상태가
+   * 바뀔 때 하는 일과 동일. */
+  function fireMatchMediaChange(nextMatches: boolean): void {
+    fakeMql.matches = nextMatches;
+    act(() => {
+      for (const listener of listeners) listener();
+    });
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(window, "matchMedia");
+  });
+
+  it("1. compact=false(wide): no dock-root--compact class, splitters present", () => {
+    installMatchMediaStub(false);
+    const { container } = render(<DockLayout />);
+
+    expect(container.getElementsByClassName("dock-root--compact").length).toBe(
+      0,
+    );
+    expect(screen.getAllByRole("separator")).toHaveLength(3);
+  });
+
+  it("2. compact=true: dock-root--compact class, 0 splitters, every .dock-leaf inline flex is '0 0 auto'", () => {
+    installMatchMediaStub(true);
+    const { container } = render(<DockLayout />);
+
+    expect(container.getElementsByClassName("dock-root--compact").length).toBe(
+      1,
+    );
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+
+    const leaves = container.getElementsByClassName("dock-leaf");
+    expect(leaves.length).toBeGreaterThan(0);
+    for (const leaf of Array.from(leaves)) {
+      expect((leaf as HTMLElement).style.flex).toBe("0 0 auto");
+    }
+  });
+
+  it("3. compact=true: no ⣿ grab handle in the DOM, and a tab pointerdown→pointermove(>4px) creates no drag ghost", () => {
+    installMatchMediaStub(true);
+    const { container } = render(<DockLayout />);
+
+    expect(container.querySelector(".dock-header-grab")).toBeNull();
+
+    act(() => {
+      fireEvent(
+        screen.getByTestId("stub-drag-tab"),
+        new MouseEvent("pointerdown", {
+          clientX: 100,
+          clientY: 100,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    act(() => {
+      fireEvent(
+        window,
+        new MouseEvent("pointermove", { clientX: 110, clientY: 100 }),
+      );
+    });
+
+    expect(screen.queryByTestId("dock-drag-ghost")).toBeNull();
+  });
+
+  it("4. a matchMedia change event flips compact↔wide: splitters return and dockStore.tree keeps the same reference (tree preserved)", () => {
+    installMatchMediaStub(true);
+    const { container } = render(<DockLayout />);
+    const treeBefore = useDockStore.getState().tree;
+
+    expect(container.getElementsByClassName("dock-root--compact").length).toBe(
+      1,
+    );
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+
+    fireMatchMediaChange(false);
+
+    expect(container.getElementsByClassName("dock-root--compact").length).toBe(
+      0,
+    );
+    expect(screen.getAllByRole("separator")).toHaveLength(3);
+    expect(useDockStore.getState().tree).toBe(treeBefore);
+
+    fireMatchMediaChange(true);
+
+    expect(container.getElementsByClassName("dock-root--compact").length).toBe(
+      1,
+    );
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+    expect(useDockStore.getState().tree).toBe(treeBefore);
+  });
+
+  it("5. maximized state still hides sibling shell-slot--hidden leaves when rendered compact", () => {
+    installMatchMediaStub(true);
+    const { container } = render(<DockLayout />);
+
+    act(() => {
+      useDockStore.getState().toggleMaximized("l2"); // viewport leaf
+    });
+
+    const shellLeft = q(container, "shell-left");
+    const shellRightBottom = q(container, "shell-right-bottom");
+    const shellCode = q(container, "shell-code");
+    const shellRightTop = q(container, "shell-right-top");
+
+    expect(shellLeft.className).toContain("shell-slot--hidden");
+    expect(shellRightBottom.className).toContain("shell-slot--hidden");
+    expect(shellCode.className).toContain("shell-slot--hidden");
+    expect(shellRightTop.className).not.toContain("shell-slot--hidden");
+  });
+});

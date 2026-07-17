@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useDebugUiStore } from "../../state/debugUiStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useDockStore } from "../../state/dockStore";
+import { collectPanelIds } from "../../state/dockTree";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
@@ -75,8 +77,14 @@ export function StatusBar() {
   // The D1-era un-collapse dance (finding the inspector/assets dock leaf and
   // force-expanding it so the *tab* would be visible) no longer applies: the
   // overlay renders outside the dock tree entirely, so there's nothing to
-  // un-collapse. toggleDiag is wired directly; StatusBar no longer imports
-  // dockStore/dockTree at all.
+  // un-collapse. toggleDiag is wired directly.
+  // B6-U2 (R9): dockStore/dockTree are imported again, but only for the
+  // 'N panels docked' count below — `collectPanelIds(s.tree).length` is a
+  // number, so the selector is reference-stable and safe to subscribe
+  // directly (no useMemo needed, unlike AppToolbar's closedPanels array).
+  // Leaf-path traversal (the un-collapse logic removed above) still has no
+  // place here.
+  const dockedCount = useDockStore((s) => collectPanelIds(s.tree).length);
 
   // Sampled, not subscribed — see TIME_SAMPLE_INTERVAL_MS above.
   const [simTime, setSimTime] = useState(() => useTimeStore.getState().simTime);
@@ -118,6 +126,12 @@ export function StatusBar() {
           }
         />
         {summary.text}
+      </span>
+      <span
+        data-testid="status-docked"
+        title="Panels currently docked in the layout"
+      >
+        {dockedCount} panel{dockedCount === 1 ? "" : "s"} docked
       </span>
       <span title="Frames per second">{stats.fps} FPS</span>
       <span title="Draw calls per frame">{stats.drawCalls} draws</span>

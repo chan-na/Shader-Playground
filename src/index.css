@@ -109,6 +109,40 @@ textarea {
   min-height: 0;
 }
 
+/* R11 — 컴팩트(≤990px, C-6 임계 재사용) 고정 스택 폴백. 트리는 보존하고
+   렌더만 세로 스택으로: split은 display:contents로 투명해지고 leaf가
+   루트 column flex에 직접 쌓인다. 드롭 존/스플리터/고스트는 이 모드에서
+   렌더되지 않는다(DockLayout.tsx compact 분기). 높이값은 잠정(디자인 미정,
+   dc는 1440 고정 레퍼런스뿐이라 컴팩트 시안이 없다 — temp/design-followup-
+   v1.4.md 기록). 아래 `.dock-split`/`.dock-leaf` 기본 규칙보다 뒤에 둔다 —
+   명시도가 더 높은(2~3클래스) 셀렉터를 소스 순서상 나중에 둬야
+   noDescendingSpecificity(biome) 경고가 나지 않는다. */
+.dock-root--compact {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.dock-root--compact .dock-split {
+  display: contents;
+}
+/* display:contents가 최대화 숨김(display:none)을 덮지 않게 재정의 —
+   `.dock-root--compact .dock-split`(클래스 2개)이 `.shell-slot--hidden`
+   (클래스 1개)보다 명시도가 높아, 이 3클래스 셀렉터로 다시 덮어써야
+   display:none이 유지된다. */
+.dock-root--compact .dock-split.shell-slot--hidden {
+  display: none;
+}
+/* leaf의 flex는 JS 인라인 `0 0 auto`가 담당(DockLeafView) — 인라인
+   style이 CSS를 항상 이기므로 여기서 flex를 재정의하려 하지 않는다. */
+.dock-root--compact .dock-leaf {
+  height: 46vh;
+  min-height: 200px;
+}
+.dock-root--compact .dock-leaf.shell-slot--collapsed {
+  height: auto;
+  min-height: 0;
+}
+
 /* ── 빈 도크(모든 패널 닫힘, tree=null) — Docking Prototype.dc.html L69-76.
    R1 카피 정본. 색: #454c55=text.disabled · #2b3037=border.strong. ─── */
 .dock-empty {
@@ -924,6 +958,9 @@ textarea {
 .tb-menu-item {
   display: flex;
   align-items: center;
+  gap: 9px; /* dc "Docking Prototype.dc.html" L51 — ＋ Panel item dot/label/hint
+               spacing. +More/Presets items are single-text children so this
+               is a no-op for them (no visible change). */
   height: 28px;
   padding: 0 8px;
   background: transparent;
@@ -936,6 +973,24 @@ textarea {
 }
 .tb-menu-item:hover {
   background: var(--surface-hover);
+}
+.tb-menu-item-label {
+  flex: 1; /* dc L52 flex:1 */
+}
+/* dc L53 font:11px #565e68 — no matching token exists (between text.muted
+   #656d78 and text.disabled #454c55); approximated with text.muted per
+   temp/design-followup-v1.4.md §2 (designer confirmation requested). */
+.tb-menu-item-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+/* dc L57 padding:10px font:11.5px #565e68 text-align:center — same #565e68
+   approximation as .tb-menu-item-hint above. */
+.tb-menu-empty {
+  padding: 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-align: center;
 }
 .tb-menu-divider {
   height: 1px;

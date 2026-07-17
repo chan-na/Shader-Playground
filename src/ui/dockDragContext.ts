@@ -28,11 +28,15 @@ export interface DockDragStart {
   startLeafDrag: (path: DockPath, e: ReactPointerEvent) => void;
   /** 개별 탭에서 호출 — 그 탭 하나만 분리해 드래그를 시작한다. */
   startTabDrag: (id: DockPanelId, e: ReactPointerEvent) => void;
+  /** compact(R11)에서 false — 헤더가 grab handle을 숨기고 탭 드래그 시작을
+   * 막는 신호 */
+  dragEnabled: boolean;
 }
 
 export const DockDragContext = createContext<DockDragStart>({
   startLeafDrag: () => {},
   startTabDrag: () => {},
+  dragEnabled: true,
 });
 
 export function useDockDragStart(): DockDragStart {

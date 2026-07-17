@@ -74,7 +74,7 @@ export function DockPanelHeader({
   const closePanel = useDockStore((s) => s.closePanel);
 
   const isRail = collapsed === true && railCapable;
-  const { startLeafDrag, startTabDrag } = useDockDragStart();
+  const { startLeafDrag, startTabDrag, dragEnabled } = useDockDragStart();
 
   function selectTab(id: DockPanelId) {
     setActiveTab(path, id);
@@ -82,18 +82,24 @@ export function DockPanelHeader({
 
   return (
     <div className={isRail ? "dock-header dock-header--rail" : "dock-header"}>
-      <span
-        className="dock-header-grab"
-        aria-hidden="true"
-        // R10/B4-U4: ⣿ grab handle drags the whole leaf (every tab) — dc
-        // `grabDown` (Docking Prototype.dc.html L558). `aria-hidden` stays —
-        // R10 confirms docking rearrangement is pointer-only (no keyboard
-        // alternative needed), so this handler intentionally has no
-        // keyboard-reachable equivalent.
-        onPointerDown={(e) => startLeafDrag(path, e)}
-      >
-        ⣿
-      </span>
+      {dragEnabled && (
+        <span
+          className="dock-header-grab"
+          aria-hidden="true"
+          // R10/B4-U4: ⣿ grab handle drags the whole leaf (every tab) — dc
+          // `grabDown` (Docking Prototype.dc.html L558). `aria-hidden` stays —
+          // R10 confirms docking rearrangement is pointer-only (no keyboard
+          // alternative needed), so this handler intentionally has no
+          // keyboard-reachable equivalent.
+          //
+          // R11: compact(≤990px) sets dragEnabled:false — the handle is
+          // removed from the DOM entirely (not just visually hidden) so a
+          // narrow-screen tap can't accidentally arm a drag.
+          onPointerDown={(e) => startLeafDrag(path, e)}
+        >
+          ⣿
+        </span>
+      )}
       {!isRail && leaf !== null && leaf.type === "leaf" && (
         <div
           // R8: dc L557 tabMask 정본 — leaf.tabs(dock 탭) 개수만 센다. 이

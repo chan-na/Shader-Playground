@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useDebugUiStore } from "../../state/debugUiStore";
@@ -138,5 +144,49 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
         ? leafAfter.collapsed
         : undefined,
     ).toBe(true);
+  });
+});
+
+// B6-U2 (R9): 'N panels docked' — GL status pill's neighbor in the status
+// bar, tracking `collectPanelIds(dockStore.tree).length` in real time.
+describe("StatusBar — 'N panels docked' (B6-U2)", () => {
+  const initialDock = useDockStore.getState();
+
+  beforeEach(() => {
+    useDockStore.setState(
+      { ...initialDock, tree: createDefaultDockTree() },
+      true,
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    useDockStore.setState(initialDock, true);
+  });
+
+  it("renders '5 panels docked' for the default tree", () => {
+    render(<StatusBar />);
+    expect(screen.getByTestId("status-docked").textContent).toBe(
+      "5 panels docked",
+    );
+  });
+
+  it("tracks closeTab in real time — '3 panels docked' after two closes", () => {
+    render(<StatusBar />);
+    act(() => {
+      useDockStore.getState().closeTab("assets");
+      useDockStore.getState().closeTab("code");
+    });
+    expect(screen.getByTestId("status-docked").textContent).toBe(
+      "3 panels docked",
+    );
+  });
+
+  it("shows '0 panels docked' for an empty (all panels closed) tree", () => {
+    useDockStore.setState({ tree: null });
+    render(<StatusBar />);
+    expect(screen.getByTestId("status-docked").textContent).toBe(
+      "0 panels docked",
+    );
   });
 });

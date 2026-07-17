@@ -472,6 +472,7 @@ describe("DockPanelHeader", () => {
         withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
           startLeafDrag,
           startTabDrag,
+          dragEnabled: true,
         }),
       );
 
@@ -491,6 +492,7 @@ describe("DockPanelHeader", () => {
         withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
           startLeafDrag,
           startTabDrag,
+          dragEnabled: true,
         }),
       );
 
@@ -511,6 +513,7 @@ describe("DockPanelHeader", () => {
         withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
           startLeafDrag,
           startTabDrag,
+          dragEnabled: true,
         }),
       );
 
@@ -538,6 +541,32 @@ describe("DockPanelHeader", () => {
       expect(() =>
         fireEvent.pointerDown(screen.getByTestId("tab-assets")),
       ).not.toThrow();
+    });
+
+    // R11: a `dragEnabled:false` provider (DockLayout's compact branch) must
+    // remove the ⣿ grab handle from the DOM entirely — not just visually
+    // hide it — so a narrow-screen tap can't accidentally arm a drag. The
+    // default context (no provider, exercised just above) keeps
+    // `dragEnabled:true` so every pre-R11 test in this file — none of which
+    // wrap a provider — kept seeing the handle without modification.
+    it("R11: dragEnabled:false hides the ⣿ grab handle; the default context (no provider) still shows it", () => {
+      const { container } = render(
+        withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
+          startLeafDrag: vi.fn(),
+          startTabDrag: vi.fn(),
+          dragEnabled: false,
+        }),
+      );
+      expect(container.querySelector(".dock-header-grab")).toBeNull();
+
+      cleanup();
+
+      const { container: defaultContainer } = render(
+        withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />),
+      );
+      expect(
+        defaultContainer.querySelector(".dock-header-grab"),
+      ).not.toBeNull();
     });
   });
 });

@@ -4,8 +4,11 @@ import {
   createAutoSaveScheduler,
   loadSession,
   startAutoSave,
+  startDockLayoutPersistence,
   stopAutoSave,
 } from "./autoSave";
+import { useDockStore } from "./dockStore";
+import { createDefaultDockTree, type DockNode } from "./dockTree";
 import { useGraphStore } from "./graphStore";
 import type { SerializedProject } from "./serialization";
 import { useToastStore } from "./toastStore";
@@ -324,5 +327,146 @@ describe("startAutoSave error surfacing", () => {
       .getState()
       .toasts.filter((t) => t.kind === "error").length;
     expect(errorsAfterSecond).toBe(1); // still one — dedup
+  });
+});
+
+// ── Dock layout persistence (R9, B6-U1) ─────────────────────────────────────
+// localStorage 키는 autoSave.ts 내부 프라이빗 상수라 여기서 문자열로 재선언한다
+// (design/CHANGELOG.md §v1.4 R9 정본값과 동일 — autoSave.ts의 LAYOUT_KEY 참조).
+
+const LAYOUT_KEY = "shader-playground.dock-layout";
+
+describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
+  let stop: (() => void) | null = null;
+
+  beforeEach(() => {
+    localStorage.clear();
+    useDockStore.setState({
+      tree: createDefaultDockTree(),
+      maximized: null,
+      nextLeafId: 5,
+    });
+  });
+
+  afterEach(() => {
+    stop?.();
+    stop = null;
+    vi.useRealTimers();
+  });
+
+  it("hydrates dockStore from a valid seeded snapshot", () => {
+    const seededTree: DockNode = {
+      type: "leaf",
+      id: "l7",
+      tabs: ["viewport"],
+      active: "viewport",
+    };
+    localStorage.setItem(
+      LAYOUT_KEY,
+      JSON.stringify({
+        version: 1,
+        tree: seededTree,
+        maximized: null,
+        nextLeafId: 8,
+      }),
+    );
+
+    stop = startDockLayoutPersistence();
+
+    expect(useDockStore.getState().tree).toEqual(seededTree);
+    expect(useDockStore.getState().nextLeafId).toBe(8);
+  });
+
+  it("falls back to the default tree without throwing when the seed is broken JSON", () => {
+    localStorage.setItem(LAYOUT_KEY, "{not json");
+    const before = useDockStore.getState().tree;
+
+    expect(() => {
+      stop = startDockLayoutPersistence();
+    }).not.toThrow();
+    expect(useDockStore.getState().tree).toBe(before);
+  });
+
+  it("falls back to the default tree without throwing when the seed fails snapshot validation", () => {
+    localStorage.setItem(
+      LAYOUT_KEY,
+      JSON.stringify({
+        version: 1,
+        tree: { type: "leaf", id: "l1", tabs: ["bogus"], active: "bogus" },
+        maximized: null,
+        nextLeafId: 5,
+      }),
+    );
+    const before = useDockStore.getState().tree;
+
+    expect(() => {
+      stop = startDockLayoutPersistence();
+    }).not.toThrow();
+    expect(useDockStore.getState().tree).toBe(before);
+  });
+
+  it("writes a snapshot to localStorage once the debounce window elapses after a store change", () => {
+    vi.useFakeTimers();
+    stop = startDockLayoutPersistence(100);
+    expect(localStorage.getItem(LAYOUT_KEY)).toBeNull();
+
+    useDockStore.getState().closeTab("assets");
+    expect(localStorage.getItem(LAYOUT_KEY)).toBeNull(); // debounced, not immediate
+    vi.advanceTimersByTime(100);
+
+    expect(localStorage.getItem(LAYOUT_KEY)).not.toBeNull();
+  });
+
+  it("coalesces rapid divider-drag-style changes into a single write (no per-pointermove write)", () => {
+    vi.useFakeTimers();
+    stop = startDockLayoutPersistence(100);
+    // Spied on the instance (not `Storage.prototype`) — the jsdom-shadowing
+    // localStorage polyfill in `test-setup.ts` isn't a `Storage` instance.
+    const setItemSpy = vi.spyOn(localStorage, "setItem");
+
+    // ["a", "b"] is the viewport|inspector-assets split in the default tree
+    // (same fixture path used in dockTree.test.ts's insertDetachedLeaf specs).
+    for (let ratio = 0.3; ratio <= 0.6; ratio += 0.05) {
+      useDockStore.getState().setDividerRatio(["a", "b"], ratio, 1000, 800);
+      vi.advanceTimersByTime(10);
+    }
+    expect(setItemSpy).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(100);
+    expect(setItemSpy).toHaveBeenCalledTimes(1);
+
+    setItemSpy.mockRestore();
+  });
+
+  it("stop() unsubscribes — a later store change no longer writes", () => {
+    vi.useFakeTimers();
+    stop = startDockLayoutPersistence(100);
+    stop();
+    stop = null;
+
+    useDockStore.getState().closeTab("assets");
+    vi.advanceTimersByTime(500);
+
+    expect(localStorage.getItem(LAYOUT_KEY)).toBeNull();
+  });
+
+  it("persists the snapshot in the {version, tree, maximized, nextLeafId} shape", () => {
+    vi.useFakeTimers();
+    stop = startDockLayoutPersistence(100);
+    useDockStore.getState().closeTab("assets");
+    vi.advanceTimersByTime(100);
+
+    const raw = localStorage.getItem(LAYOUT_KEY);
+    if (raw === null) throw new Error("expected a persisted layout snapshot");
+    const parsed = JSON.parse(raw);
+    expect(Object.keys(parsed).sort()).toEqual(
+      ["maximized", "nextLeafId", "tree", "version"].sort(),
+    );
+    expect(parsed).toEqual({
+      version: 1,
+      tree: useDockStore.getState().tree,
+      maximized: useDockStore.getState().maximized,
+      nextLeafId: useDockStore.getState().nextLeafId,
+    });
   });
 });

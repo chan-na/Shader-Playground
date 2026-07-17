@@ -33,6 +33,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useDockStore } from "../state/dockStore";
 import {
@@ -82,6 +83,56 @@ function cx(...parts: Array<string | false | undefined>): string {
  * 드래그가 아니라 클릭(탭 선택)으로 그대로 통과한다. */
 const DRAG_THRESHOLD_PX = 4;
 
+/** R11(반응형) — 컴팩트 도킹 폴백의 임계값. C-6(`src/index.css`의
+ * `@container vp-body (max-width: 990px)`, 트랜스포트 바 컴팩트 변형)이 이미
+ * 확정한 990px·inclusive(`max-width`, ≤990) 시맨틱을 그대로 재사용한다 — 신규
+ * 임계 상수 도입 금지(CHANGELOG §v1.4 R11). C-6은 도킹 패널 내부 크기의
+ * container query이고 이건 셸 전체 폭의 media query라 셀렉터 종류는 다르지만
+ * 픽셀 값·경계 포함 여부는 동일해야 한다는 게 R11의 요구사항이다. */
+const COMPACT_MEDIA_QUERY = "(max-width: 990px)";
+
+/** `useCompactShell`의 `subscribe`. 함수 참조가 안정적이어야
+ * `useSyncExternalStore`가 매 렌더 재구독하지 않는다 — 모듈 레벨 함수로 빼서
+ * 보장한다. `matchMedia` 미지원 환경(SSR/구형 jsdom 안전망)에서는 구독할
+ * 것이 없으므로 빈 cleanup의 no-op. */
+function subscribeCompactShell(onChange: () => void): () => void {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return () => {};
+  }
+  const mql = window.matchMedia(COMPACT_MEDIA_QUERY);
+  mql.addEventListener("change", onChange);
+  return () => mql.removeEventListener("change", onChange);
+}
+
+/** `useCompactShell`의 `getSnapshot` — 매 호출 새 `MediaQueryList`를 만들어도
+ * 무방하다(`matches`만 읽고 버림, `subscribe`의 구독 인스턴스와는 별개). */
+function getCompactShellSnapshot(): boolean {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return false;
+  }
+  return window.matchMedia(COMPACT_MEDIA_QUERY).matches;
+}
+
+/** R11 — 셸 폭이 컴팩트(≤990px, C-6 임계 재사용) 밴드에 들어왔는지. 도킹
+ * 트리 자체(`dockStore.tree`)는 절대 건드리지 않는다 — `DockLayout`이 이
+ * 값을 읽어 **렌더만** 세로 스택으로 바꾸는 순수 폴백이다(넓어지면
+ * 사용자 레이아웃이 그대로 복원됨). export하지 않는다 — 이 파일(과
+ * `DockLayout` 함수) 밖에서 쓸 일이 없다. */
+function useCompactShell(): boolean {
+  return useSyncExternalStore(subscribeCompactShell, getCompactShellSnapshot);
+}
+
+/** compact(R11)에서 드래그 시작 트리거를 무력화하는 공유 no-op — 시그니처가
+ * 다른 `startLeafDrag`/`startTabDrag` 양쪽에 그대로 대입 가능하다(인자 0개
+ * 함수는 더 많은 인자를 받는 함수 타입에 항상 대입 가능). */
+function noopDragStart(): void {}
+
 /** `dockStore.detachForDrag`의 payload 유니온을 이 컴포넌트 로컬로 재선언한
  * 것(구조적으로 동일 — export된 타입이 없어 여기서 그대로 표현한다). */
 type DetachPayload =
@@ -111,6 +162,7 @@ interface GhostState {
 export function DockLayout() {
   const tree = useDockStore((s) => s.tree);
   const maximized = useDockStore((s) => s.maximized);
+  const compact = useCompactShell();
 
   const rootRef = useRef<HTMLDivElement>(null);
   // pending/ghost/drop의 "최신값"은 ref로 들고 있다가 window pointer
@@ -150,14 +202,68 @@ export function DockLayout() {
     setArmed(true);
   }, []);
 
+  // R11: compact(≤990px)에서는 grab handle/탭 pointerdown이 애초에
+  // startLeafDrag/startTabDrag를 호출하지 않도록(DockPanelHeader의
+  // dragEnabled 분기) 공유 no-op으로 교체한다 — 드래그 오케스트레이션
+  // 자체(아래 pointer 리스너)는 손대지 않고 "시작 트리거"만 차단한다.
   const dragContextValue = useMemo(
-    () => ({ startLeafDrag, startTabDrag }),
-    [startLeafDrag, startTabDrag],
+    () =>
+      compact
+        ? {
+            startLeafDrag: noopDragStart,
+            startTabDrag: noopDragStart,
+            dragEnabled: false,
+          }
+        : { startLeafDrag, startTabDrag, dragEnabled: true },
+    [compact, startLeafDrag, startTabDrag],
   );
 
   const hasGhost = ghost !== null;
 
-  // deps는 armed/hasGhost(둘 다 불리언 state) 뿐이다 — 리스너 내부에서
+  // pending/ghost/drop 세션을 전부 취소하는 공유 헬퍼. 아래 두 useEffect
+  // (pointer 리스너, 컴팩트 진입 정리) 양쪽에서 쓴다 — ref만 건드리고
+  // setState 세터는 stable이라 매 렌더 재생성돼도 참조상 문제는 없지만,
+  // deps 배열에 넣어 의도를 명시하기 위해 useCallback으로 안정화한다.
+  const endDragSession = useCallback((): void => {
+    pendingRef.current = null;
+    ghostRef.current = null;
+    dropRef.current = null;
+    setArmed(false);
+    setGhost(null);
+    setDrop(null);
+  }, []);
+
+  // R11: 좁은 화면으로 전환되는 순간 진행 중인 드래그 세션을 정리한다.
+  // pending뿐이면(고스트 미전환) 트리가 아직 안 건드려졌으므로 단순 취소로
+  // 충분하다. 이미 고스트로 전환됐다면(detachForDrag로 트리에서 분리된
+  // 상태) 단순 취소는 그 패널을 유실시킨다(R1 '플로팅/유실 없음' 불변식
+  // 위반) — dockDetached로 폴백 타깃에 강제 도킹한 뒤 세션을 정리한다.
+  // `compact`만 deps에 두면 되는 이유는 handleUp과 동일: region 계산에
+  // 필요한 tree/rect는 이 시점에 useDockStore.getState()/rootRef로 1회
+  // 읽으면 충분하고 구독할 필요가 없다.
+  useEffect(() => {
+    if (!compact) return;
+    const activeGhost = ghostRef.current;
+    if (activeGhost !== null) {
+      const rect = rootRef.current?.getBoundingClientRect();
+      const { regions } = layoutDockTree(
+        useDockStore.getState().tree,
+        rect?.width ?? 0,
+        rect?.height ?? 0,
+      );
+      useDockStore
+        .getState()
+        .dockDetached(
+          activeGhost.tabs,
+          activeGhost.active,
+          dropRef.current?.target ?? fallbackDropTarget(regions),
+        );
+    }
+    endDragSession();
+  }, [compact, endDragSession]);
+
+  // deps는 armed/hasGhost(둘 다 불리언 state) + endDragSession(useCallback으로
+  // 안정화된 함수, 빈 deps라 재생성되지 않음) 뿐이다 — 리스너 내부에서
   // 필요한 최신 pending/ghost/drop/tree는 전부 ref(pendingRef/ghostRef/
   // dropRef, 안정적)나 useDockStore.getState()(구독이 아닌 1회성 읽기)로
   // 읽으므로 useExhaustiveDependencies가 요구하는 의존성은 이미 이
@@ -166,15 +272,6 @@ export function DockLayout() {
   // 재부착하게 되므로 대신 hasGhost 불리언으로 변환해 넣는다.
   useEffect(() => {
     if (!armed && !hasGhost) return;
-
-    function endDragSession(): void {
-      pendingRef.current = null;
-      ghostRef.current = null;
-      dropRef.current = null;
-      setArmed(false);
-      setGhost(null);
-      setDrop(null);
-    }
 
     function handleMove(e: { clientX: number; clientY: number }): void {
       const pending = pendingRef.current;
@@ -293,7 +390,7 @@ export function DockLayout() {
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
     };
-  }, [armed, hasGhost]);
+  }, [armed, hasGhost, endDragSession]);
 
   const maxPath =
     tree === null || maximized === null ? null : findLeafPath(tree, maximized);
@@ -301,7 +398,11 @@ export function DockLayout() {
   return (
     <div
       ref={rootRef}
-      className={hasGhost ? "dock-root dock-root--dragging" : "dock-root"}
+      className={cx(
+        "dock-root",
+        compact && "dock-root--compact",
+        hasGhost && "dock-root--dragging",
+      )}
     >
       <DockDragContext.Provider value={dragContextValue}>
         {tree === null ? (
@@ -324,6 +425,7 @@ export function DockLayout() {
             flex="1"
             maxRemaining={maxPath}
             hidden={false}
+            compact={compact}
           />
         )}
       </DockDragContext.Provider>
@@ -411,6 +513,11 @@ interface DockNodeViewProps {
   maxRemaining: DockPath | null;
   /** 조상 split이 이 서브트리를 최대화 때문에 숨기기로 정했는지. */
   hidden: boolean;
+  /** R11 — 셸이 컴팩트(≤990px) 밴드인지. 트리 구조는 그대로 두고 렌더만
+   * 세로 스택으로 바꾼다(`DockSplitView`는 스플리터를 그리지 않고,
+   * `DockLeafView`는 flex를 `0 0 auto`로 고정 — 나머지는 `.dock-root--compact`
+   * CSS가 처리). */
+  compact: boolean;
 }
 
 function DockNodeView({
@@ -419,9 +526,18 @@ function DockNodeView({
   flex,
   maxRemaining,
   hidden,
+  compact,
 }: DockNodeViewProps) {
   if (node.type === "leaf") {
-    return <DockLeafView leaf={node} path={path} flex={flex} hidden={hidden} />;
+    return (
+      <DockLeafView
+        leaf={node}
+        path={path}
+        flex={flex}
+        hidden={hidden}
+        compact={compact}
+      />
+    );
   }
   return (
     <DockSplitView
@@ -430,6 +546,7 @@ function DockNodeView({
       flex={flex}
       maxRemaining={maxRemaining}
       hidden={hidden}
+      compact={compact}
     />
   );
 }
@@ -440,6 +557,7 @@ interface DockSplitViewProps {
   flex: string;
   maxRemaining: DockPath | null;
   hidden: boolean;
+  compact: boolean;
 }
 
 function DockSplitView({
@@ -448,6 +566,7 @@ function DockSplitView({
   flex,
   maxRemaining,
   hidden,
+  compact,
 }: DockSplitViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const setDividerRatio = useDockStore((s) => s.setDividerRatio);
@@ -479,8 +598,14 @@ function DockSplitView({
         flex={head === "a" ? "1" : aFlex}
         maxRemaining={head === "a" ? rest : null}
         hidden={head === "b"}
+        compact={compact}
       />
-      {showDivider && (
+      {/* R11: 컴팩트에서는 스플리터를 렌더하지 않는다 — 실수 드래그 방지
+          (드롭 프리뷰/고스트와 마찬가지로 재도킹 표면 전체가 사라진다).
+          자리(showDivider일 때의 placeholder)는 그대로 유지되므로 형제
+          leaf들의 React 위치는 안정적이다(리마운트 없음, 기존
+          showDivider 분기와 동일 메커니즘). */}
+      {!compact && showDivider && (
         <Splitter
           orientation={node.dir === "row" ? "vertical" : "horizontal"}
           label={splitterLabel(node)}
@@ -494,6 +619,7 @@ function DockSplitView({
         flex={head === "b" ? "1" : bFlex}
         maxRemaining={head === "b" ? rest : null}
         hidden={head === "a"}
+        compact={compact}
       />
     </div>
   );
@@ -504,9 +630,16 @@ interface DockLeafViewProps {
   path: DockPath;
   flex: string;
   hidden: boolean;
+  compact: boolean;
 }
 
-function DockLeafView({ leaf, path, flex, hidden }: DockLeafViewProps) {
+function DockLeafView({
+  leaf,
+  path,
+  flex,
+  hidden,
+  compact,
+}: DockLeafViewProps) {
   const kind = leafPanelKind(leaf);
   return (
     <div
@@ -516,7 +649,12 @@ function DockLeafView({ leaf, path, flex, hidden }: DockLeafViewProps) {
         leaf.collapsed === true && "shell-slot--collapsed",
         hidden && "shell-slot--hidden",
       )}
-      style={{ flex }}
+      // R11: 인라인 style이 CSS보다 우선 적용되므로(specificity와 무관하게
+      // 항상 이긴다), 컴팩트 고정 스택 flex는 CSS가 아니라 여기서 분기한다
+      // — `.dock-root--compact .dock-leaf { height: 46vh }`(index.css)는
+      // 세로 스택 각 항목의 높이만 담당하고, 폭 방향으로 늘어나지 않게
+      // 막는 `0 0 auto`는 이 인라인 값이 담당한다.
+      style={{ flex: compact ? "0 0 auto" : flex }}
     >
       <DockLeafContext.Provider value={{ leafId: leaf.id, path }}>
         {kind === "nodeEditor" && <NodeEditor />}

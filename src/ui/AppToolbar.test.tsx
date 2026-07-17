@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_OUTPUTS } from "../core/graph/validate";
 import { useCommandPaletteStore } from "../state/commandPaletteStore";
+import { useDockStore } from "../state/dockStore";
+import { collectPanelIds } from "../state/dockTree";
 import { useGifRecorderStore } from "../state/gifRecorder";
 import { useGraphStore } from "../state/graphStore";
 import { useHistoryStore } from "../state/historyStore";
@@ -14,6 +16,7 @@ beforeEach(() => {
   useGraphStore.getState().reset();
   useHistoryStore.getState().clear();
   useCommandPaletteStore.getState().setOpen(false);
+  useDockStore.getState().resetLayout();
 });
 
 afterEach(() => {
@@ -140,4 +143,40 @@ describe("AppToolbar", () => {
       createSpy.mockRestore();
     },
   );
+});
+
+describe("AppToolbar — ＋ Panel / Reset layout (B6-U2)", () => {
+  it("＋ Panel menu shows 'All panels are open' when every panel is docked", () => {
+    render(<AppToolbar />);
+    fireEvent.click(screen.getByTestId("dock-add-panel"));
+    expect(screen.getByText("All panels are open")).not.toBeNull();
+  });
+
+  it("＋ Panel menu lists a closed panel and re-docks it on click, closing the menu", () => {
+    useDockStore.getState().closeTab("assets");
+    render(<AppToolbar />);
+    fireEvent.click(screen.getByTestId("dock-add-panel"));
+
+    const item = screen.getByTestId("dock-add-panel-assets");
+    expect(item.textContent).toContain("Assets");
+
+    fireEvent.click(item);
+
+    expect(collectPanelIds(useDockStore.getState().tree)).toContain("assets");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("Reset layout restores the default 5-panel tree after closing several tabs", () => {
+    useDockStore.getState().closeTab("assets");
+    useDockStore.getState().closeTab("code");
+    render(<AppToolbar />);
+
+    fireEvent.click(screen.getByTestId("dock-reset-layout"));
+
+    const ids = collectPanelIds(useDockStore.getState().tree);
+    expect(new Set(ids)).toEqual(
+      new Set(["nodeEditor", "viewport", "inspector", "code", "assets"]),
+    );
+    expect(ids).toHaveLength(5);
+  });
 });

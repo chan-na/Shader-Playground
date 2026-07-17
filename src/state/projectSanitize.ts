@@ -30,33 +30,8 @@ import {
   GROUP_DEFAULT_WIDTH,
   GROUP_MIN_HEIGHT,
   GROUP_MIN_WIDTH,
+  SANITIZE_LIMITS,
 } from "../core/graph/types";
-
-/**
- * Hard caps for untrusted project payloads (share URL, imported JSON,
- * autosave). These bound the work that hydration / compileGraph will do
- * before touching the GPU. Numbers are generous relative to typical app
- * usage but tight enough to prevent quota / GPU memory blowups from
- * malicious or corrupted input.
- */
-export const SANITIZE_LIMITS = {
-  MAX_NODES: 2048,
-  MAX_EDGES: 8192,
-  MAX_SHADER_SOURCE_LEN: 64 * 1024,
-  MAX_COMPUTE_COUNT: 1_000_000,
-  MAX_COMPUTE_ATTRIBUTES: 16,
-  MAX_ATTRIBUTE_NAME_LEN: 128,
-  MAX_UNIFORM_KEYS: 64,
-  MAX_UNIFORM_KEY_LEN: 128,
-  MAX_UNIFORM_ARRAY_LEN: 16,
-  MAX_NODE_NAME_LEN: 256,
-  MAX_PARAM_LABEL_LEN: 256,
-  MAX_SWIZZLE_LEN: 4,
-  MAX_DEVICE_ID_LEN: 256,
-  MAX_GROUP_LABEL_LEN: 256,
-  MAX_GROUP_DIMENSION: 8192,
-  MAX_GROUP_COLOR_LEN: 16,
-} as const;
 
 const MESH_PRIMITIVES: ReadonlySet<MeshGraphNode["primitive"]> = new Set([
   "cube",

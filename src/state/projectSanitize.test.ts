@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  SANITIZE_LIMITS,
-  sanitizeGraphEdge,
-  sanitizeGraphNode,
-} from "./projectSanitize";
+import { SANITIZE_LIMITS } from "../core/graph/types";
+import { sanitizeGraphEdge, sanitizeGraphNode } from "./projectSanitize";
 
 describe("sanitizeGraphNode — base shape", () => {
   it("rejects non-object payloads", () => {

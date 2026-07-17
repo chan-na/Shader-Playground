@@ -5,6 +5,14 @@ export interface NodeDiagnostics {
   vertex: GLSLDiagnostic[];
   fragment: GLSLDiagnostic[];
   link: GLSLDiagnostic[];
+  /**
+   * The vertex source these diagnostics were actually produced from
+   * (ExecutionPlan.compiledVertexSource). Differs from the node's own
+   * `vertexSource` when the node compiled as a fullscreen pass, so anything
+   * resolving a vertex-stage line number to source text must prefer this.
+   * Absent for nodes that never reached the compiler.
+   */
+  compiledVertexSource?: string;
 }
 
 export interface DiagnosticsState {

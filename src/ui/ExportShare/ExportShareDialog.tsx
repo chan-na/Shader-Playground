@@ -104,6 +104,15 @@ interface RecordDoneInfo {
   metaLine: string;
 }
 
+/**
+ * 녹화 산출물 크기 표기 [D16]. 완료 카드 metaLine과 저장 토스트가 같은 값을
+ * 쓰도록 한 곳에 모아 둔다 — HTML은 KB, 녹화는 MB로 각 완료 카드의 단위를
+ * 따르되 토스트 형태는 `Exported {name} · {size}`로 공통.
+ */
+function recordSizeLabel(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function viewportCanvas(): HTMLCanvasElement | null {
   return document.querySelector(".viewport-canvas") as HTMLCanvasElement | null;
 }
@@ -686,7 +695,7 @@ export function ExportShareDialog() {
         kind: "gif",
         blob,
         fileName: exportFileName(DEFAULT_EXPORT_BASE, "gif"),
-        metaLine: `${(blob.size / (1024 * 1024)).toFixed(1)} MB · ${gifFps} fps · ${gifDuration.toFixed(1)}s`,
+        metaLine: `${recordSizeLabel(blob.size)} · ${gifFps} fps · ${gifDuration.toFixed(1)}s`,
       });
       setPhase("done");
     } else {
@@ -722,7 +731,7 @@ export function ExportShareDialog() {
         kind: "webm",
         blob,
         fileName: exportFileName(DEFAULT_EXPORT_BASE, "webm"),
-        metaLine: `${(blob.size / (1024 * 1024)).toFixed(1)} MB · ${webmFps} fps · ${elapsedLabel}`,
+        metaLine: `${recordSizeLabel(blob.size)} · ${webmFps} fps · ${elapsedLabel}`,
       });
       setPhase("done");
     } else {
@@ -836,7 +845,9 @@ export function ExportShareDialog() {
     a.href = url;
     a.download = recordDone.fileName;
     a.click();
-    toast.success(`Exported ${recordDone.fileName}`);
+    toast.success(
+      `Exported ${recordDone.fileName} · ${recordSizeLabel(recordDone.blob.size)}`,
+    );
   };
 
   const gifDurationLabel = `${gifDuration.toFixed(1)}s`;

@@ -33,6 +33,7 @@ import {
   GROUP_MIN_HEIGHT,
   GROUP_MIN_WIDTH,
   GROUP_SELECTION_PADDING,
+  SANITIZE_LIMITS,
 } from "../core/graph/types";
 import type { UniformHints } from "../core/graph/uniformParser";
 import { writeUniformHints } from "../core/graph/uniformParser";
@@ -278,10 +279,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     });
   },
   renameNode: (id, name) => {
-    // Clamp mirrors SANITIZE_LIMITS.MAX_NODE_NAME_LEN (projectSanitize.ts) —
-    // kept as a literal here rather than importing the sanitize module to
-    // avoid a state↔state-adjacent import for a single constant.
-    const trimmed = name.trim().slice(0, 256);
+    // Same cap the sanitizer re-applies when the project is reloaded, so a
+    // name that survives here round-trips unchanged.
+    const trimmed = name.trim().slice(0, SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
     const target = get().nodes.find((n) => n.id === id);
     if (!target) return;
     if (target.kind === "group") return;

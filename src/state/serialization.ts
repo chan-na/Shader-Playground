@@ -1,12 +1,9 @@
 import type { ParentsMap } from "../core/graph/parents";
 import type { Graph, GraphEdge, GraphNode } from "../core/graph/types";
+import { SANITIZE_LIMITS } from "../core/graph/types";
 import { validateGraph } from "../core/graph/validate";
 import { cloneGraphNode } from "../core/nodes/registry";
-import {
-  SANITIZE_LIMITS,
-  sanitizeGraphEdge,
-  sanitizeGraphNode,
-} from "./projectSanitize";
+import { sanitizeGraphEdge, sanitizeGraphNode } from "./projectSanitize";
 import type { NodePosition } from "./types";
 
 export const PROJECT_FORMAT_VERSION = 1;

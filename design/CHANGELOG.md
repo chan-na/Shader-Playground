@@ -12,10 +12,72 @@
 ---
 
 ## [Unreleased]
+> 다음 변경 대기 중.
 
 ---
 
-## v1.2 — 2026-07-16
+## v1.4 — 2026-07-17
+> design-request-v1.4.md의 15건(R1~R15)에 대한 디자이너 정본. Docking Prototype을 구현 스코프로 승격하면서 나온 모순·기능 삭제·사양 부재 결정. **모든 R ID 명시 인용**(무응답/보류 0). 신규 토큰 0 · breaking 코드 0 · 값 정본은 `theme.ts`. `Docking Prototype`을 `[Unreleased]`에서 **v1.4 정본으로 확정**(더 이상 "다음 세션" 보류 아님).
+
+### 결정 요약 (요청서 R ID 전부 인용)
+- **R1 [플로팅] `[breaking]`(dc)** = **선택지 1 — 플로팅 없음 확정.** 상주 플로팅 창 상태 없음. dc의 float 리사이즈 핸들/다중창/`floatWindow`·`tabInFloat`/`setFloatActive`/`closeFloatTab`/float 정지 스타일 분기 등 **죽은 코드 전부 제거**. 드래그는 트랜지언트 고스트 1개(release 시 반드시 도킹, `_fallbackTarget`=첫 region). Empty state 카피 정정: "drop a floating panel here" → **"No panels docked — add one with ＋ Panel"**. → `Docking Prototype.dc.html`.
+- **R2 [정본 충돌]** = **선택지 2 — App Shell = 기본 레이아웃 정본.** 두 화면의 기본 구조를 일치시킴. dc 기본 트리를 App Shell에 맞춰 정정(code = 하단 전폭 독). README M에 "구조 동일" 규칙 명문화.
+- **R3 [기본 레이아웃] `[screen]`** = **선택지 2 — 현행 기본값 유지(앱 첫 화면 불변).** dc 기본 트리 = `col 0.717 [ row 0.587 [nodeEditor | row 0.556 [viewport | (inspector,assets)]] | code(하단 전폭, 접기 가능) ]`. C-7의 "기본 데모=첫 화면 비주얼 불변" 원칙과 동급. `layoutStore` 기본값 교체 불필요(트리로 동일 상태 표현).
+- **R4 [접기/최대화] `[component]`** = **선택지 1 — 병존.** 트리 모델 + 접기/최대화를 leaf 단위 속성으로 유지(기존 기능 + `m1-dock-header-collapse.spec.ts` 회귀 가드 보존). 접힌 leaf = split 방향 고정 34px strip(divider 비활성). 최대화 = leaf를 도크 body 전체로 오버레이. dc에 접힌 leaf 시안 + ⌄/⌃·⤢/⤡ 컨트롤 반영. → `Docking Prototype.dc.html`.
+- **R5 [problems/diagnostics] `[screen]`** = **선택지 1 — 5종만 도킹.** problems/diagnostics는 1급 도킹 탭 아님. `diagnostics`는 `debugUiStore.open` 단일 출처 유지 → 상태바 `◨ Diagnostics` 토글로 **하단 트랜지언트 오버레이**(172px, 탭 아님)로 열림. `problems`는 상태바 카운트(`⚠ N problems`). 배선 파괴 없음. dc에 오버레이 + 상태바 항목 시안 추가. → `Docking Prototype.dc.html`.
+- **R6 [헤더 ✕] `[component]`** = **선택지 3 — 헤더 ✕ = 패널 전체 닫기 + 탭별 ✕ 별도.** active 탭만 닫히던 혼란 해소(3번 클릭 문제 제거). 탭마다 작은 ✕(hover 강조)로 비활성 탭도 활성화 없이 닫힘. VSCode idiom. → `Docking Prototype.dc.html`.
+- **R7 [최소 크기] `[screen]`** = **선택지 1 — 전역 leaf 최소 240×160**(플로팅 리사이즈 최소값과 동일). divider 드래그가 픽셀 하한 아래로 못 가게 클램프(0.15~0.85 비율 클램프에 픽셀 하한 겹침). → `layoutStore.ts`, dc `MIN_W/MIN_H`.
+- **R8 [탭 오버플로] `[screen]`** = **선택지 1 — 가로 스크롤(스크롤바 숨김 + 우측 페이드 마스크).** 34px 헤더 높이 불변, 임계 폭/생략 로직 없이 최소 코드(번들 예산 고려). 탭 4개↑에서 마스크 노출. → `DockPanelHeader.tsx`, dc `.sp-tabs`.
+- **R9 [영속화] `[screen]`** = **선택지 2 — localStorage.** 레이아웃 = 사용자 작업 환경(프로젝트 데이터 아님). 프로젝트 `.json` 미포함 → `projectSanitize` 마이그레이션 회피. `Reset layout` = 기본 트리 복귀. → `autoSave.ts`(layout 키 신설), `serialization.ts` 미변경.
+- **R10 [접근성/입력] `[screen]`** = **선택지 1 + 선택지 3.** 도킹 재배치는 포인터 전용으로 확정(키보드 DnD 미도입 — 번들 예산, 대안으로 ＋Panel/접기/닫기 버튼은 키보드 도달 가능). 단 `mouse*` → `pointer*` 전환으로 **터치/펜 무상 지원**. dc는 pointer 이벤트로 이식. → `App.tsx`, `DockPanelHeader.tsx`.
+- **R11 [반응형] `[screen]`** = **선택지 3 + 선택지 2.** 밴드/존 픽셀은 규칙으로 전달(Q6 정신) · 비율만 이식. **컴팩트(<990px, C-6)에서는 트리 도킹 비활성 → 고정 스택 폴백**(좁은 화면 실수 도킹 방지). dc는 1440×826 고정 레퍼런스 유지. → `App.tsx`, `paneLayout.ts`.
+- **R12 [패널 dot] `[component]`** = **선택지 1 — 현행 승인.** 패널 dot 5색은 **장식적 식별자**일 뿐 노드 카테고리/포트 타입 의미축과 무관. 신규 토큰 없이 기존 값 재사용, "의미 아님"을 README 규칙으로 명시(Code 보라 dot ≠ resource 포트 보라). 코드 변경 0.
+- **R13 [Q9 잔여] `[screen]`** = **선택지 1 — 구현 select 라벨도 `Info+`로**(로직 0, 라벨만). Q9 의도(오독 방지)를 구현 쪽에도 적용. → `DiagnosticsPanel.tsx:267-271`.
+- **R14 [Q1-b 잔여] `[screen]`** = **선택지 1 — 육안 근사 승인.** 레시피(중앙 글로우 + 다크 비네트 + `u_time` 변조)만 정본, CSS stop↔GLSL smoothstep 곡선 정확 일치 불요(±4px는 픽셀 기하 규칙이라 미적용). Q6 "규칙으로 받는다" 정신. → `starter.frag`.
+- **R15 [Q7 잔여] `[screen]`** = **선택지 1 — 실측값이 정본, dc는 사후 정정.** stride 브라우저 실측이 26이 아니면(25/27 등) 구현이 실측값 확정 후 보고 → dc의 44/70/96 핸들을 그 값으로 재정정. 구현 CSS 불변.
+
+### Changed
+- `[screen]` **`Docking Prototype.dc.html` 전면 개정** — 플로팅 제거(R1) · 기본 트리 = App Shell(R2·R3) · 접기/최대화 leaf 속성(R4) · problems/diagnostics 상태바+오버레이(R5) · 헤더 ✕=패널·탭별 ✕(R6) · leaf 최소 240×160 divider 클램프(R7) · 탭바 가로 스크롤+페이드(R8) · pointer 이벤트(R10) · 패널 dot 규칙 주석(R12).
+- `[screen]` `README.md` §M을 v1.4 정본으로 갱신(기본 트리·접기/최대화·오버플로·최소크기·영속화·반응형·problems/diagnostics·패널 dot 규칙). §M 헤더에서 `[Unreleased]` 제거.
+
+### Docs (확답만 — dc/코드 변경은 구현 쪽)
+- R9 localStorage · R10 pointer/포인터 전용 · R11 <990px 도킹 비활성 · R13 select 라벨 · R14 GLSL 근사 · R15 실측 우선 — 구현 반영 항목(위 영향 파일 참조).
+
+> ⚠ 신규 토큰 0. breaking 코드 0(R1의 breaking은 dc 죽은 코드 제거에 한함). 근사: R7 최소값은 dc 플로팅 최소값 재사용, R11 컴팩트 폴백은 C-6 임계 재사용.
+
+---
+
+## v1.3 — 2026-07-17
+> design-request-v1.3.md의 남은 12건(Q1~Q11 + 하위항목)에 대한 디자이너 정본. 모든 Q ID를 명시 인용(무응답/보류 없음). 신규 토큰 0 · breaking 0 · 값 정본은 `theme.ts`.
+
+### 결정 요약 (요청서 Q ID 전부 인용)
+- **Q1 [C-7]** `[screen]` starter.frag 채택(선택지 2) **승인**. 잔존 이슈(명시적 "Add Shader: Unlit" = 여전히 링크 에러)는 **선택지 2**: Command Palette의 `Shader: Unlit` 항목에 **`⚠ needs Mesh` 앰버 배지 + 보조텍스트**를 추가해 팔레트에서 미리 알린다(코드 에러 허용은 유지, UX로 예방). → `Command Palette.dc.html`.
+- **Q1-b** `[screen]` starter 노드 **기본 출력 비주얼 정본 제시**: `u_baseColor` 중앙 소프트 글로우 + 다크 비네트 + `u_time` 미세 변조, mesh 유무 양쪽 링크(valid @ birth). 시안 = `Node Editor.dc.html` 우측 'New Shader' 데모 카드. 구현 임시 비주얼(틴트+글로우)을 정본으로 승격·구체화.
+- **Q2 [C-4]** `[screen]` Video 재생 글리프 = **`node.playing`(사용자 의도) 유지**. 코드 변경 0. dc 불변.
+- **Q3 [C-5]** `[screen]` Audio 파형 = **FFT bin 연속 바 유지**(정보량 최대). dc의 청키 6바는 정적 데모로 유지. 코드 변경 0.
+- **Q4 [C-8]** `[component]` `metaAlign="end"` 메타 배지 = **배지 박스 유지**(공통 컴포넌트 일관성). dc 정정: App Shell 'GLSL · ES 3.0'을 plain mono → **배지 박스**로. → `App Shell.dc.html`, README [D13].
+- **Q5 [C-3]** `[screen]` README 공식 vs dc 모순 → **dc 실측(96/176) 채택**(A-5 선례). v1.2 공식 `max(96,(n−1)·30+56)` **폐기**, README를 규칙 서술로 정정.
+- **Q6 [C-3]** `[breaking]`(문서 규칙) 포트 좌표계 재발방지 = **규칙으로 전달**(선택지 1). dc 픽셀 상수 이식 금지 명문화 — 포트 기하는 "본체가 span 덮도록 확장·2px 꼬리·96 floor"로 주고 구현이 `PORT_TOP_PAD` 좌표계에서 유도. README §도메인/§B 갱신.
+- **Q7 [C-3]** `[screen]` Math/Combine stride = **26(필드 행 리듬)**. dc의 24 → 26 정정(Combine 핸들 44/70/96, 출력 70 + 엣지 재정렬). 구현이 실측해 정확값 확정. → `Node Editor.dc.html`.
+- **Q8 [C-3]** `[screen]` Compute 다포트 = **현행 승인**(썸네일 없음 → 96 floor 없이 body minHeight만 포트 span 따라 확장). README §B에 규칙 명문화. 코드 변경 0.
+- **Q9 [C-9]** `[screen]` Diagnostics 레벨 필터 = **누적 유지 + dc 라벨 정정**(선택지 1): `Info/Warn/Error/Debug` → `Info+/Warn+/Error+/Debug+`. 툴바 아이콘(⧉ ⌧ ✕) 정본, 카테고리 필터 유지. 코드 변경 0(시각/라벨만). → `Side Panel.dc.html`.
+- **Q10 [B-7]** `[token]` standalone 웹폰트 번들 = **취소**(선택지 1). 번들 예산 2.1 KiB 여유 + woff2 산출물 부재 → `system-ui` 폴백 유지, 브랜드 타이포는 앱 UI 에만. README H 갱신.
+- **Q10-b** `[token]` `fontBundle.standalone`(소비 불가 서술 문자열) **제거** → `theme.ts`에서 삭제(src 미포팅).
+- **Q11 [A-8]** `[screen]` standalonePlayer.js 폴백 토큰화 = **현행 유지**(선택지 1). `?raw` 인라인이라 보간 지점 없음 + D6(폴백은 토큰 비의존)을 standalone 폴백에도 적용. 코드 변경 0.
+
+### Changed
+- `[token]` `theme.ts` — `fontBundle` 트리 제거(Q10/Q10-b). font.ui/mono 불변.
+- `[screen]` `Command Palette.dc.html` — Shader 항목을 starter/Unlit 2종으로 분화 + `⚠ needs Mesh` 배지(Q1).
+- `[screen]` `Node Editor.dc.html` — Combine stride 26 정정 + 엣지 재정렬(Q7), 'New Shader' starter 데모 카드 신설(Q1-b).
+- `[component]` `App Shell.dc.html` — 코드 도킹 헤더 'GLSL · ES 3.0' 메타 배지 박스화(Q4).
+- `[screen]` `Side Panel.dc.html` — Diagnostics 레벨 필터 라벨 누적 표기(Q9).
+- `[screen]` `README.md` — §도메인(포트 좌표계 Q6·stride Q7·metaAlign Q4)·§B(previewH 규칙 Q5·Compute Q8·starter Q1-b)·§E(Q9)·§F(Q1)·§H(Q10/Q11) 정정.
+- `[screen]` **`Docking Prototype.dc.html` 핸드오프 폴더 포함** + `screens/14-docking-prototype.png` 추가. Q4 검증: 도킹 헤더 메타 배지(5N·4E/single/Fresnel/GLSL/6)가 이미 배지 박스형이라 정본과 일치 — 변경 0. 그 외 Q항목은 이 화면에 해당 UI 없음.
+
+> ⚠ 신규 토큰 0 · breaking 코드 0(Q6는 문서 규칙 정정). 근사 없음.
+
+---
+
 > v1.1 구현 중 나온 "시안/README/토큰만으로 결정 못 하는 지점" 27건(design-request.md A/B/C)에 대한 디자이너 정본 확정. 마이너 범프(신규 토큰 6종 + 시안 보완, breaking 없음). 값 정본은 여전히 `theme.ts`.
 
 ### Added

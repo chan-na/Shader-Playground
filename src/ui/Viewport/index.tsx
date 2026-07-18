@@ -582,11 +582,7 @@ export function Viewport() {
 
   return (
     <div className="panel panel--viewport">
-      <DockPanelHeader
-        panelId="viewport"
-        label="Viewport"
-        meta={`${outputCount} · ${splitLabel(outputCount)}`}
-      />
+      <DockPanelHeader meta={`${outputCount} · ${splitLabel(outputCount)}`} />
       <div className="panel-body">
         <canvas
           ref={canvasRef}

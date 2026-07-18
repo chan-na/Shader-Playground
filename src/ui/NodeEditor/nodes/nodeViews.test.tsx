@@ -19,6 +19,7 @@ import { ImageNodeView } from "./ImageNodeView";
 import { MeshNodeView } from "./MeshNodeView";
 import { OutputNodeView } from "./OutputNodeView";
 import { ParamNodeView } from "./ParamNodeView";
+import { PORT_STRIDE, PORT_TOP_PAD } from "./PortHandle";
 import { ShaderNodeView } from "./ShaderNodeView";
 import {
   CombineNodeView,
@@ -414,5 +415,56 @@ describe("CombineNodeView", () => {
     };
     const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
     expect(html).not.toContain("cb1");
+  });
+});
+
+describe("fixed-arity port stride [Q7·R15]", () => {
+  it("PORT_STRIDE is the CHANGELOG §v1.3 Q7 / §v1.4 R15 canonical value (27)", () => {
+    expect(PORT_STRIDE).toBe(27);
+  });
+
+  it("steps Math binary op inputs by PORT_STRIDE, not the old 18-stride offset", () => {
+    const node: MathGraphNode = {
+      id: "m1",
+      kind: "math",
+      op: "add",
+      a: 1,
+      b: 2,
+    };
+    const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
+    expect(html).toContain(`top:${PORT_TOP_PAD}px`);
+    expect(html).toContain(`top:${PORT_TOP_PAD + PORT_STRIDE}px`);
+    // Pre-fix artifact (PORT_STRIDE=18): 38 + 18 = 56.
+    expect(html).not.toContain("top:56px");
+  });
+
+  it("steps Combine arity-4 inputs by PORT_STRIDE at every row, not the old 18-stride offsets", () => {
+    const node: CombineGraphNode = {
+      id: "cb1",
+      kind: "combine",
+      arity: 4,
+      values: [0.1, 0.2, 0.3, 0.4],
+    };
+    const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
+    for (let i = 0; i < 4; i++) {
+      expect(html).toContain(`top:${PORT_TOP_PAD + i * PORT_STRIDE}px`);
+    }
+    // Pre-fix artifacts (PORT_STRIDE=18): 38 + 18 = 56, 38 + 2*18 = 74.
+    expect(html).not.toContain("top:56px");
+    expect(html).not.toContain("top:74px");
+  });
+
+  it("keeps the output port at PORT_TOP_PAD regardless of PORT_STRIDE (single-port convention)", () => {
+    const node: CombineGraphNode = {
+      id: "cb1",
+      kind: "combine",
+      arity: 4,
+      values: [0.1, 0.2, 0.3, 0.4],
+    };
+    const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
+    // The out port renders once at PORT_TOP_PAD; dc's centered dc handle
+    // (70, midway of 44-96) is a dc presentation detail pending designer
+    // follow-up, not ported into this implementation's convention.
+    expect(html).toContain(`top:${PORT_TOP_PAD}px`);
   });
 });

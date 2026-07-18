@@ -60,6 +60,8 @@ interface Command {
   /** kind === "node"일 때만 의미 있음 — 아이콘 색 계열(source/process/…). */
   iconCategory?: NodeIconCategory;
   sub?: string;
+  /** [Q1] 앰버 경고 배지 텍스트 — dc Command Palette L105의 ⚠ needs Mesh. */
+  warn?: string;
   keys?: string[];
   run: () => void;
 }
@@ -72,6 +74,9 @@ const GLYPH = {
   video: "▷",
   audio: "♪",
   shader: "◆",
+  // [Q1] Shader: Unlit's glyph — dc Command Palette L203 (U+25C7, distinct
+  // from the starter's U+25C6 shader glyph above).
+  shaderVariant: "◇",
   compute: "⚙",
   output: "◎",
   paramFloat: "∙",
@@ -205,8 +210,44 @@ function buildCommands(): Command[] {
     },
   });
 
-  const shaderTemplates: Array<{ name: string; frag: string }> = [
-    { name: "Unlit", frag: unlitFrag },
+  // [Q1] Palette starter item — dc Command Palette L202. CTA·AppToolbar와 동일하게
+  // starter.frag를 쓴다(mesh 유무 양쪽 링크, [C-7]).
+  cmds.push({
+    id: "add-shader-starter",
+    kind: "node",
+    glyph: GLYPH.shader, // ◆
+    iconCategory: "process",
+    label: "Add Shader",
+    sub: "starter · links with or without a mesh",
+    keywords: "add node shader starter new default fragment glsl",
+    run: () => {
+      const id = nextId("shader");
+      const node: GraphNode = {
+        id,
+        kind: "shader",
+        vertexSource: basicVert,
+        fragmentSource: starterFrag,
+        uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
+      };
+      addNode(node, { x: 100, y: 0 });
+      select(id);
+    },
+  });
+
+  const shaderTemplates: Array<{
+    name: string;
+    frag: string;
+    glyph?: string;
+    sub?: string;
+    warn?: string;
+  }> = [
+    {
+      name: "Unlit",
+      frag: unlitFrag,
+      glyph: GLYPH.shaderVariant,
+      sub: "reads surface normals",
+      warn: "needs Mesh",
+    },
     { name: "Noise", frag: noiseFrag },
     { name: "Blur", frag: blurFrag },
     { name: "Tonemap", frag: tonemapFrag },
@@ -219,9 +260,11 @@ function buildCommands(): Command[] {
     cmds.push({
       id: `add-shader-${tpl.name.toLowerCase()}`,
       kind: "node",
-      glyph: GLYPH.shader,
+      glyph: tpl.glyph ?? GLYPH.shader,
       iconCategory: "process",
       label: `Add Shader: ${tpl.name}`,
+      ...(tpl.sub !== undefined ? { sub: tpl.sub } : {}),
+      ...(tpl.warn !== undefined ? { warn: tpl.warn } : {}),
       keywords: `add node shader ${tpl.name} fragment glsl`,
       run: () => {
         const id = nextId("shader");
@@ -746,6 +789,9 @@ export function CommandPalette() {
                       </span>
                       {cmd.sub && <span className="cmdk-sub">{cmd.sub}</span>}
                     </span>
+                    {cmd.warn && (
+                      <span className="cmdk-warn-badge">⚠ {cmd.warn}</span>
+                    )}
                     <span
                       className={`cmdk-tag${cmd.kind === "preset" ? " cmdk-tag--preset" : ""}`}
                     >

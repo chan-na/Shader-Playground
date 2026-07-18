@@ -30,10 +30,12 @@ export function buildExportedHtml(
   // 쓸 수 없다 — canvas 2D가 tokens를 직접 import하는 것[D7]과 같은 원리로
   // 여기서도 tokens 값을 직접 참조한다. 항목별 근사 사유:
   //  - html/body background·color: surface.app / text.primary [D5 확정값]
-  //  - font-family: tokens.font.ui 그대로 사용. IBM Plex Sans는 산출물에
-  //    번들되지 않으므로 실제로는 system-ui 폴백으로 렌더된다 — 토큰의
-  //    폴백 체인을 그대로 신뢰한다 [D5]. tokens.font.ui 안의 작은따옴표는
-  //    유효한 CSS 값이므로 보간에 문제 없다.
+  //  - font-family: tokens.font.ui 그대로 사용. IBM Plex Sans 서브셋 번들은
+  //    CHANGELOG §v1.3 Q10에서 공식 취소됐다(번들 예산 385 KiB 여유 ~2.1 KiB
+  //    충돌 + woff2 산출물 부재) — system-ui 폴백이 정본이고 브랜드 타이포는
+  //    앱 UI 에만 로드한다(design/README.md §H). 산출물은 실제로 system-ui
+  //    폴백으로 렌더된다 — 토큰의 폴백 체인을 그대로 신뢰한다 [D5].
+  //    tokens.font.ui 안의 작은따옴표는 유효한 CSS 값이므로 보간에 문제 없다.
   //  - #canvas background: surface.letterbox(=appDarker) — 레터박스 성격의
   //    캔버스 바탕으로 근사 [D5/D8].
   //  - .badge background: overlay.scrim(rgba(0,0,0,0.5)) — 구 값 0.45를

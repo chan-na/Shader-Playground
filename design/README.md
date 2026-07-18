@@ -51,6 +51,8 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 **포트 지오메트리** (React Flow Handle 배치 규칙 — `theme.ts` 하단 주석에 코드로도 명시):
 - input x = `node.left`, output x = `node.left + node.width`, center y = `node.top + portTop + 5.5`.
 - `portTop`은 노드 실제 높이(header 30 + pad 9 + previewH + pad 9) 안에 들 것. 엣지 path는 이 중심 좌표에 맞춘 베지어.
+- **좌표계 주의 (Q6)**: dc는 카드별 첫 포트 y를 다르게 그리지만, 구현은 v1부터 `PORT_TOP_PAD` 하나로 통일한다. dc의 픽셀 상수를 구현에 **그대로 이식하지 말 것** — 포트 기하는 항상 **규칙**("본체가 포트 span을 덮도록 확장 · 꼬리 여유 2px · 96 floor")으로 전달하고 구현이 자기 좌표계에서 유도한다. dc 픽셀은 검수용 참고값이지 이식용 상수가 아니다.
+- **포트 stride (Q7)**: uniform 구동 카드(Shader/Compute) = **stride 30**. 고정 arity + 입력 행이 있는 카드(Math/Combine 등) = **stride 26** — 포트가 자기 `.node-card__field` 행과 정렬돼야 하는 종속변수(구현이 실측해 확정). dc의 24는 26으로 정정.
 
 **Typography**: UI = IBM Plex Sans(400/500/600/700), 코드/메타 = JetBrains Mono(400/500/600). 배지 8–11px · 본문 11–13px · 화면 제목 14–15px. 패널 헤더 라벨은 대문자 + letterSpacing 0.8~0.9px.
 
@@ -58,7 +60,7 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 
 **Inspector 타입 배지 = 포트 패밀리 색** [D18]: Inspector의 `Output type` 배지 색은 `portTypeToFamily`를 따른다 — float/time → scalar(초록), vec2/3/4·color → vector(노랑). 그래프 포트 색과 항상 일치.
 
-**도킹 헤더 메타 배지 정렬** [D13]: 메타 배지는 헤더 **우측**(spacer 뒤) 정렬이 정본. 공통 `DockPanelHeader`에 `metaAlign="end"` 옵션으로 지원.
+**도킹 헤더 메타 배지 정렬** [D13]: 메타 배지는 헤더 **우측**(spacer 뒤) 정렬이 정본. 공통 `DockPanelHeader`에 `metaAlign="end"` 옵션으로 지원. **배지 박스 정본(Q4)**: `metaAlign="end"`에서도 배경+보더 배지 박스를 유지한다(plain mono 텍스트 변형 없음 — 공통 컴포넌트 일관성 우선). App Shell의 'GLSL · ES 3.0'을 배지 박스로 정정.
 
 **컴파일 에러 카운트** [D19]: CompileErrorOverlay는 **항상 단일(첫 실패) 노드 기준**으로 카운트를 표시. 여러 노드 동시 실패 시 StatusBar(전 노드 합산)와 수가 다를 수 있으며, 오버레이에 `(+N more)`를 병기해 차이를 설명한다.
 
@@ -81,7 +83,7 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 - **목적**: 노드 그래프 캔버스. 시각 정체성의 절반.
 - **캔버스**: 배경 `#0b0c0e` + 도트 그리드 `radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)` / `background-size: 22px 22px`.
 - **노드 카드 구조**: 헤더(아이콘 박스 + 타이틀 + 우측 메타칩) + 본체(썸네일 96px 또는 값/메타). Shader/Image 노드는 **라이브 썸네일**(96×96, radius 7, inset shadow). Compute는 썸네일 대신 메타(particles/dispatch/buffer). 포트 라벨은 카드 좌/우 **포트 rail**(폭 ~46px)에 두고 썸네일을 rail만큼 안쪽(`margin:0 46px`)으로 밀어 걹침 방지. 라벨 = 포트 타입 패밀리 색, mono 8.5px, max-width ~30–34px ellipsis. 라벨은 축약하지 않고 **raw 포트명**(`texture`, `color` 등) 그대로 사용(단축 매핑 없음) [C-2]. Output 노드는 좌 rail 입력 라벨(raw `texture`) + 본체 메타(`→ viewport`, **pane 문자 미노출** — 카드가 뷰포트 레이아웃을 모름)를 함께 표기, paddingLeft 46(raw 포트명 폭 확보). [D2·C-1·C-2]
-- **포트 지오메트리 (구현 시 정밀도 필수)**: 포트 절대위치 `top`은 노드 실제 높이(header 30 + pad 9 + previewH + pad 9) 안에 들어와야 한다. 엣지 path는 포트 중심 좌표에 맞춘다: 입력 x = `node.left`, 출력 x = `node.left + node.width`; y = `node.top + portTop + 5.5`. React Flow에선 각 노드 타입의 Handle 위치를 이 규칙으로 배치. **다포트 카드**(uniform 수만큼 입력 증가)는 **stride 30 고정 + 카드 본체(previewH) 동적 확장**: `previewH = max(96, (nPorts−1)·30 + 56)`, 실용 상한 ~10 포트. 포트가 3개를 넘으면 카드가 세로로 늘어 프리뷰가 포트 span을 덮는다(시안은 Node Editor의 우상단 'Noise' 데모 노드). 구 시안의 stride 30 3-포트 고정 가정이 실물에서 카드를 넘친 건을 해소. [C-3]
+- **포트 지오메트리 (구현 시 정밀도 필수)**: 포트 절대위치 `top`은 노드 실제 높이(header 30 + pad 9 + previewH + pad 9) 안에 들어와야 한다. 엣지 path는 포트 중심 좌표에 맞춘다: 입력 x = `node.left`, 출력 x = `node.left + node.width`; y = `node.top + portTop + 5.5`. React Flow에선 각 노드 타입의 Handle 위치를 이 규칙으로 배치. **다포트 Shader 카드**(uniform 수만큼 입력 증가)는 **stride 30 + 카드 본체(previewH) 동적 확장**. dc 실측 정본(Q5): 3-포트 previewH=**96**, 6-포트=**176**(시안은 우상단 'Noise' 데모). v1.2 README 공식 `max(96,(n−1)·30+56)`은 두 데이터포인트와 불일치라 **폐기** — 규칙으로만 유지("본체가 포트 span을 덮도록 확장 · 96 floor · 꼬리 여유 2px"), 픽셀 상수는 구현 좌표계(§도메인 규칙 Q6)에서 재유도. 실용 상한 ~10 포트. **Compute 다포트(Q8)**: 썸네일이 없어 96 floor 없이 body `minHeight`만 포트 span 따라 확장(포트가 적으면 kv 콘텐츠가 높이를 정함). **Math/Combine = stride 26(Q7)**. **New Shader = starter 기본 출력(Q1-b)**: 갓 생성된 Shader는 `v_uv`만 소비하는 `starter.frag`로 태어나 mesh 유무 양쪽에 링크(= 에러 없이 valid). 기본 출력 비주얼 = `u_baseColor` 중앙 소프트 글로우 + 다크 비네트 + `u_time` 미세 변조(정본 레시피는 파일 우측 'New Shader' 데모 카드 참조). [C-3·C-7]
 - **엣지**: 베지어 곡선, stroke 2.5, 색=소스 포트 패밀리. 상태별 — 유효(실선), 무효(빨강 점선), 1:N 팬아웃(분기점 dot), 드래그 중(점선 애니메이션 `stroke-dashoffset`).
 - **노드 상태**: default / selected(파랑 링) / multi-select(파랑 테두리+마퀴) / error(빨강 테두리+우상단 빨강 카운트 뱃지).
 - **오버레이**: 미니맵(우하단, 168×112, 카테고리 색 미니 블록 + 뷰포트 프레임), 줌 컨트롤(좌하단, − / % / + / fit).
@@ -113,11 +115,12 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 - **Inspector**: uniform 자동 컨트롤 — `float`→슬라이더, `vec2/3/4`→다축 슬라이더, 색→컬러 피커, `bool`→토글. 노드 종류별 8종 인스펙터. 상단 공통 **`Name` 필드**로 노드 rename(그래프 더블클릭 인라인과 동일 값)[D15]. **모든 노드 종류(param·group 포함)가 이 공통 Name 하나로 rename** — param의 Label 필드·group의 Group label 필드는 제거해 단일 소스화 [A-1·A-2]. `Output type` 배지 색 = 포트 패밀리[D18].
 - **Assets**: 썸네일 그리드, 드래그&드롭 임포트, "노드로 추가".
 - **Problems**: 전 노드 에러 목록, 클릭 시 노드 선택 + 코드 라인 점프, 탭 헤더 카운트 뱃지.
-- **Diagnostics** [D1]: 런타임 진단 — GPU/Frame/Draw calls/**Shaders** 메트릭 카드 + 레벨 로그. `Shaders`는 실제 GL 링크 카운터가 없어 **error 진단 없는 shader/compute 노드 수 프록시**("N compiled") [A-6]. 레벨 태그 색(dc 실측값이 정본) = **INFO `accent.hover` · WARN `warning` · ERROR `error` · DEBUG `text.secondary`** [A-5]. 로그 행 = **카테고리 접두**(gl/shader/mem, `text.muted`) + 레벨 태그 + 메시지 + 시간. 상단 **툴바**(Copy/Clear/Close) + **레벨 필터**(All/Info/Warn/Error/Debug, All 기본) [C-9]. 카드 = surface.card, 배경 = surface.panel. (Problems=컴파일 에러 목록과 별개.)
+- **Diagnostics** [D1]: 런타임 진단 — GPU/Frame/Draw calls/**Shaders** 메트릭 카드 + 레벨 로그. `Shaders`는 실제 GL 링크 카운터가 없어 **error 진단 없는 shader/compute 노드 수 프록시**("N compiled") [A-6]. 레벨 태그 색(dc 실측값이 정본) = **INFO `accent.hover` · WARN `warning` · ERROR `error` · DEBUG `text.secondary`** [A-5]. 로그 행 = **카테고리 접두**(gl/shader/mem, `text.muted`) + 레벨 태그 + 메시지 + 시간. 상단 **툴바**(Copy/Clear/Close, 24×24 아이콘 `⧉ ⌧ ✕`) + **레벨 필터**(All/Info+/Warn+/Error+/Debug+, All 기본) [C-9]. **필터 의미 = 누적(Q9)**: `Info+` = info 이상 전부(구현 `<select>` 누적 의미와 일치) — dc 라벨에 `+`를 붙여 '정확히 그 레벨만'으로 오독되지 않게 정정. 카테고리 필터(gl/shader/mem)는 기존 기능이라 유지. 카드 = surface.card, 배경 = surface.panel. (Problems=컴파일 에러 목록과 별개.)
 - 폼 컨트롤 라이브러리(슬라이더·다축·컬러·토글·셀렉트·숫자입력)가 여기 대량 등장.
 
 ### F. Command Palette — `Command Palette.dc.html` (1440×900)
 - ⌘K 퍼지 검색 오버레이(Linear/Raycast 스타일). 노드 추가·프리셋·명령 실행. 결과 그룹핑 + 키보드 네비 + 우측 단축키 힌트.
+- **Shader 템플릿 항목 (Q1)**: `Shader`(starter — mesh 유무 양쪽 링크, 보조텍스트 "links with or without a mesh") + `Shader: Unlit`(surface normals 사용 → **`⚠ needs Mesh` 앰버 배지** + 보조텍스트). Unlit을 mesh 없이 만들면 링크 에러가 나므로 팔레트에서 미리 필요조건을 알린다. 배지 = `warning` 패밀리 알파(bg 0.12 / border 0.35).
 
 ### G. Welcome — `Welcome.dc.html` (1440×900)
 - 첫 진입 화면. 데모 그래프/프리셋 진입점 + 온보딩.
@@ -125,7 +128,7 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 ### H. Export & Share — `Export & Share.dc.html` (1440×900)
 - 단일 HTML export, URL 공유 인코딩, 녹화(WebM/GIF) 흐름.
 - **파일명 규칙** [D16·C-10·C-11]: export 파일명 = `{base}-{timestamp}.{ext}`(예: `untitled-project-20260716-1532.html`) — 덮어쓰기 방지. **앱에 projectTitle 상태 없음** → `{base}`는 HTML 다이얼로그의 **편집형 File name 필드**에서 옴(퀵 저장·비HTML 경로는 `DEFAULT_EXPORT_BASE`=`untitled-project` 고정) [C-10·C-11a]. timestamp는 다운로드 시점 확정(다이얼로그 프리뷰엔 `-{timestamp}.html` 자리표시). 완료 카드·토스트 표시명 = 실제 저장명. **성공 토스트 = `Exported {name} · {size}`**(HTML·GIF·WebM 동일 포맷, 크기 표기 포함) [C-11b].
-- **standalone HTML 산출물** [D5·B-7·A-8]: export되어 나가는 HTML은 앱 토큰 그대로 이식 — 배경 `surface.app`, 텍스트 `text.primary`, badge 배경=`overlay.scrim`, 링크=`text.primary`, `#canvas` 배경=`surface.letterbox`(근사 3건 승인). **IBM Plex Sans 서브셋을 data URI로 번들**(브랜드 타이포 일관, 파일 +수십 KB) [B-7]. 폴백 에러 div의 `color:white`는 D6 크래시 폴백과 같은 '토큰 비의존' 예외지만 빌드타임 상수로 토큰화 [A-8].
+- **standalone HTML 산출물** [D5·B-7·A-8]: export되어 나가는 HTML은 앱 토큰 그대로 이식 — 배경 `surface.app`, 텍스트 `text.primary`, badge 배경=`overlay.scrim`, 링크=`text.primary`, `#canvas` 배경=`surface.letterbox`(근사 3건 승인). **웹폰트 번들은 취소(Q10)** — 번들 예산(385 KiB, 여유 ~2.1 KiB) 충돌 + woff2 산출물 부재로, standalone은 `system-ui` 폴백을 유지하고 브랜드 타이포는 앱 UI 에만 로드(export 에 싣지 않음). `fontBundle` 토큰은 제거(Q10-b). 폴백 에러 div의 `color:white`는 **현행 유지(Q11)** — `?raw` 인라인이라 보간 지점이 없고, D6('폴백은 토큰 비의존')을 standalone 폴백에도 그대로 적용(크래시 폴백에 빌드 파이프라인 의존을 늘리지 않음).
 
 ### I. System States — `System States.dc.html` (1440×900)
 - 좌측 스위처 레일 + 공유 앱 크롬으로 **8개** 상태 시연: Empty(빈 그래프/빈 뷰포트) · Loading(스피너·진행바·스켈레톤 시머) · Permission(카메라/마이크 권한) · Error(컴파일 에러 오버레이 / WebGL2 unavailable 블로킹 / **App crashed 폴백**). 상태별로 노드 그래프·엣지·상태바·툴바가 문맥에 맞게 변함.
@@ -138,6 +141,24 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 
 ### K. Brand — `Brand.dc.html`, `Icon & Social.dc.html` (1180×900)
 - 로고/워드마크/앱 아이콘/파비콘 시스템 + 사용 규칙. 실파일은 `brand/` 폴더 참조.
+
+### M. Docking Prototype — `Docking Prototype.dc.html` (1440×900) — v1.4 정본
+- **목적**: A. App Shell의 도킹 레이아웃을 **실동작**으로 구현한 인터랙티브 정본. App Shell이 룩앤필 정본, 이 화면이 도킹 동작 정본 — **둘의 기본 레이아웃 구조는 동일해야 한다**(R2).
+- **모델**: 트리 기반 도크 레이아웃(`split`{dir,ratio,a,b} / `leaf`{tabs[],active,collapsed}). BW×BH 영역을 재귀 배치 + divider 계산.
+- **기본 트리 = App Shell 첫 화면(R2·R3)**: `col 0.717 [ row 0.587 [nodeEditor | row 0.556 [viewport | leaf(inspector,assets)]] | leaf(code) ]`. Code는 **하단 전폭 독**이며 접기 가능(App Shell `codeOpen`와 동치). **앱 첫 화면 불변** — dc 기본값이 현행 `layoutStore` 기본과 일치.
+- **드래그**: ⣿(헤더) → 패널 전체(모든 탭) 이동 · 개별 탭 드래그 → 그 탭만 분리 이동. `pointer*` 이벤트(마우스+터치/펜, R10). 드래그 중에만 커서를 따라다니는 **트랜지언트 고스트** 1개(release 시 반드시 도킹).
+- **플로팅 없음 확정(R1)**: 상주 플로팅 창 상태 없음. 이전 번들의 float 리사이즈/다중창/`tabInFloat` 코드는 **제거**됨 — 참조·구현 금지. Empty state 카피 = "No panels docked — add one with ＋ Panel".
+- **드롭 규칙**: 영역 가장자리(좌/우/상/하, ~22%) → 스플릿 · 헤더 탭바(상단 34px)·중앙·그 외 → 탭 병합 · 셸 바깥 가장자리(42px 밴드) → 전체 레이아웃 가장자리 도킹. 빈 곳/타깃 없음 → 최근접(첫) 패널로 병합.
+- **접기/최대화(R4)**: leaf 단위 속성. 접힌 leaf = split 방향으로 고정 34px strip(divider 비활성). 최대화 = 해당 leaf를 도크 body 전체로 오버레이(⤢↔⤡). 기존 `collapsed`/`maximized` 상태 + 접기 회귀 E2E 가드 보존.
+- **탭별 닫기(R6)**: 헤더 우측 `✕` = **패널 전체** 닫기. 탭마다 작은 `✕`(hover 시 강조) = 그 탭만 닫기 — 비활성 탭도 활성화 없이 닫힘.
+- **탭 오버플로(R8)**: 탭 4개↑이면 탭바 가로 스크롤(스크롤바 숨김) + 우측 페이드 마스크. 34px 헤더 높이 불변.
+- **최소 크기(R7)**: leaf 최소 `240×160`. divider 드래그가 어느 쪽도 이 픽셀값 아래로 못 가게 클램프(비율 0.15~0.85 클램프에 픽셀 하한을 겹침).
+- **problems / diagnostics(R5)**: 도킹 5종(nodeEditor·viewport·inspector·code·assets)에 **포함 안 됨**. Diagnostics는 `debugUiStore.open` 단일 출처 유지 — 상태바 `◨ Diagnostics` 토글로 **하단 트랜지언트 오버레이**(172px)로 열림, 탭 아님. Problems는 상태바 카운트(`⚠ N problems`). 레벨 필터 라벨 = `Info+/Warn+/Error+/Debug+`(Q9).
+- **영속화(R9)**: 레이아웃은 **localStorage**(사용자 작업 환경, 프로젝트 파일 아님). `↺ Reset layout` = 기본 트리로 복귀. 프로젝트 `.json`에는 미포함(마이그레이션 회피).
+- **반응형(R11)**: 비율은 이식, 픽셀 밴드/존은 **규칙**으로(Q6 정신). 컴팩트(<990px, C-6)에서는 **트리 도킹 비활성** → 고정 스택 폴백. dc는 1440×826 고정 레퍼런스.
+- **크롬**: 도킹 헤더는 A. App Shell 문법 그대로 — 높이 34, ⣿ `text.disabled`·13px, 메타 배지 박스형(surface.card + border.default), 탭은 E. Side Panel 밑줄형(active `border-bottom 2px accent`).
+- **패널 dot(R12)**: dot 5색(accent/source/value/resource/vector)은 **장식적 패널 식별자** — 노드 카테고리/포트 타입 의미축과 무관. 신규 토큰 없이 기존 값 재사용, "의미 아님"을 규칙으로 명시.
+- 신규 토큰 없음(전부 기존 theme.ts).
 
 ### L. Motion Prototype — `Motion - Connect.dc.html` + `node-connect.jsx`
 - **핵심 여정 애니메이션**: 포트 드래그 → 호환 입력 팬아웃 하이라이트(비호환 dim) → 엣지 스냅 → 뷰포트 라이브 렌더. 8.5초 타임라인, 재생/스크럽 컨트롤. 마이크로 인터랙션 타이밍·이징의 구현 기준.
@@ -182,6 +203,7 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 - `screens/*.png` — 각 화면 스냅샷(시각 회귀 diff용).
 - `App Shell.dc.html` · `Node Editor.dc.html` · `Viewport.dc.html` · `Code Editor.dc.html` · `Side Panel.dc.html` · `Command Palette.dc.html` · `Welcome.dc.html` · `Export & Share.dc.html` · `System States.dc.html` · `Foundations.dc.html` · `Brand.dc.html` · `Icon & Social.dc.html`
 - `Motion - Connect.dc.html` + `node-connect.jsx` (모션 프로토타입)
+- `Docking Prototype.dc.html` (도킹 인터랙션 프로토타입 — 트리 레이아웃/드래그-도킹/탭 병합. [Unreleased])
 - `animations.jsx`, `support.js` (레퍼런스 런타임 — 브라우저에서 파일을 직접 열어보기 위한 것. 재구현엔 불필요)
 - `brand/` (브랜드 실파일)
 - `DESIGN_BRIEF.md` (원본 요청서)

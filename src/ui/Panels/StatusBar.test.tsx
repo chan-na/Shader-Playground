@@ -1,8 +1,20 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useDebugUiStore } from "../../state/debugUiStore";
-import { useLayoutStore } from "../../state/layoutStore";
+import {
+  emptyDiagnostics,
+  useDiagnosticsStore,
+} from "../../state/diagnosticsStore";
+import { useDockStore } from "../../state/dockStore";
+import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
+import { useRendererStore } from "../../state/rendererStore";
 import { StatusBar } from "./StatusBar";
 
 // NOTE: zustand v5 + useSyncExternalStore returns the *initial* store snapshot
@@ -23,9 +35,9 @@ describe("StatusBar", () => {
     expect(html).toMatch(/\d+N · \d+E/);
   });
 
-  it("shows the 'no errors' label when the error list is empty", () => {
+  it("shows the 'no problems' label when there are no diagnostics or runtime errors", () => {
     const html = renderToStaticMarkup(<StatusBar />);
-    expect(html).toContain("no errors");
+    expect(html).toContain("no problems");
   });
 
   it("annotates the FPS / draws / counters with title tooltips", () => {
@@ -43,9 +55,10 @@ describe("StatusBar", () => {
     expect(html).toContain("t 0.00s");
   });
 
-  it("renders the Diagnostics toggle button", () => {
+  it("renders the ◨ Diagnostics toggle button", () => {
     const html = renderToStaticMarkup(<StatusBar />);
     expect(html).toContain('data-testid="open-diagnostics"');
+    expect(html).toContain("◨ Diagnostics");
   });
 
   it("renders the left status pill with a stable testid", () => {
@@ -54,30 +67,126 @@ describe("StatusBar", () => {
   });
 });
 
-// D1: Diagnostics moved into the Side Panel as its 4th tab, so opening it
-// from StatusBar must also un-collapse a collapsed side panel — otherwise
-// the toggle flips debugUiStore.open with no visible effect. This needs a
-// live DOM (fireEvent) rather than the static-markup snapshots above, so it
-// gets its own describe/afterEach pair.
-describe("StatusBar — Diagnostics entry point un-collapses the side panel (D1)", () => {
-  const initialLayout = useLayoutStore.getState();
+// B5-U3 (R5): diagnostics/problems are no longer Side Panel tabs — they're
+// bottom transient overlays toggled purely by debugUiStore. These tests need
+// a live DOM (fireEvent) rather than the static-markup snapshots above, so
+// they get their own describe/afterEach pair (initial-snapshot reset pattern
+// from SidePanel.test.tsx).
+describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
+  const initialDock = useDockStore.getState();
   const initialDebugUi = useDebugUiStore.getState();
+  const initialDiagnostics = useDiagnosticsStore.getState();
+  const initialRenderer = useRendererStore.getState();
+
+  beforeEach(() => {
+    useDockStore.setState(
+      { ...initialDock, tree: createDefaultDockTree() },
+      true,
+    );
+  });
 
   afterEach(() => {
     cleanup();
-    useLayoutStore.setState(initialLayout, true);
+    useDockStore.setState(initialDock, true);
     useDebugUiStore.setState(initialDebugUi, true);
+    useDiagnosticsStore.setState(initialDiagnostics, true);
+    useRendererStore.setState(initialRenderer, true);
   });
 
-  it("expands a collapsed side panel and opens diagnostics on click", () => {
-    useLayoutStore.setState((s) => ({
-      collapsed: { ...s.collapsed, sidePanel: true },
+  it("sums shader diagnostics (all severities) + runtime errors into the status-problems count", () => {
+    useDiagnosticsStore.getState().set("s1", {
+      ...emptyDiagnostics(),
+      vertex: [{ line: 1, severity: "error", message: "a" }],
+      fragment: [{ line: 2, severity: "warning", message: "b" }],
+    });
+    useRendererStore.setState((s) => ({
+      stats: { ...s.stats, errors: ["boom"] },
     }));
+
+    render(<StatusBar />);
+
+    const problems = screen.getByTestId("status-problems");
+    expect(problems.textContent).toBe("⚠ 3 problems");
+  });
+
+  it("clicking status-problems opens the problems overlay without opening diagnostics", () => {
+    render(<StatusBar />);
+
+    fireEvent.click(screen.getByTestId("status-problems"));
+
+    expect(useDebugUiStore.getState().problemsOpen).toBe(true);
+    expect(useDebugUiStore.getState().open).toBe(false);
+  });
+
+  it("clicking open-diagnostics opens diagnostics without touching the dock tree", () => {
+    useDockStore.getState().toggleCollapsed(["a", "b", "b"]);
+    const treeBefore = useDockStore.getState().tree;
+    const leafBefore =
+      treeBefore === null ? null : getNodeAt(treeBefore, ["a", "b", "b"]);
+    expect(leafBefore !== null && leafBefore.type === "leaf").toBe(true);
+    expect(
+      leafBefore !== null && leafBefore.type === "leaf"
+        ? leafBefore.collapsed
+        : undefined,
+    ).toBe(true);
 
     render(<StatusBar />);
     fireEvent.click(screen.getByTestId("open-diagnostics"));
 
     expect(useDebugUiStore.getState().open).toBe(true);
-    expect(useLayoutStore.getState().collapsed.sidePanel).toBe(false);
+    // Regression guard for the un-collapse removal (R5): the leaf stays
+    // collapsed — StatusBar no longer touches dockStore at all.
+    const treeAfter = useDockStore.getState().tree;
+    const leafAfter =
+      treeAfter === null ? null : getNodeAt(treeAfter, ["a", "b", "b"]);
+    expect(
+      leafAfter !== null && leafAfter.type === "leaf"
+        ? leafAfter.collapsed
+        : undefined,
+    ).toBe(true);
+  });
+});
+
+// B6-U2 (R9): 'N panels docked' — GL status pill's neighbor in the status
+// bar, tracking `collectPanelIds(dockStore.tree).length` in real time.
+describe("StatusBar — 'N panels docked' (B6-U2)", () => {
+  const initialDock = useDockStore.getState();
+
+  beforeEach(() => {
+    useDockStore.setState(
+      { ...initialDock, tree: createDefaultDockTree() },
+      true,
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    useDockStore.setState(initialDock, true);
+  });
+
+  it("renders '5 panels docked' for the default tree", () => {
+    render(<StatusBar />);
+    expect(screen.getByTestId("status-docked").textContent).toBe(
+      "5 panels docked",
+    );
+  });
+
+  it("tracks closeTab in real time — '3 panels docked' after two closes", () => {
+    render(<StatusBar />);
+    act(() => {
+      useDockStore.getState().closeTab("assets");
+      useDockStore.getState().closeTab("code");
+    });
+    expect(screen.getByTestId("status-docked").textContent).toBe(
+      "3 panels docked",
+    );
+  });
+
+  it("shows '0 panels docked' for an empty (all panels closed) tree", () => {
+    useDockStore.setState({ tree: null });
+    render(<StatusBar />);
+    expect(screen.getByTestId("status-docked").textContent).toBe(
+      "0 panels docked",
+    );
   });
 });

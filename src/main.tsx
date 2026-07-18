@@ -28,8 +28,10 @@ import { getCurrentView, getCursorLine } from "./ui/CodeEditor/currentView";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
 import { getAudioBlob, getVideoBlob, useAssetStore } from "./state/assetStore";
+import { startDockLayoutPersistence } from "./state/autoSave";
 import { useCameraStore } from "./state/cameraStore";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
+import { useDockStore } from "./state/dockStore";
 import { useEditorStore } from "./state/editorStore";
 import { useGifRecorderStore } from "./state/gifRecorder";
 import { useGpuTimerStore } from "./state/gpuTimerStore";
@@ -69,6 +71,12 @@ document.head.appendChild(themeStyle);
 setVideoBlobResolver(getVideoBlob);
 setAudioBlobResolver(getAudioBlob);
 
+// 도킹 레이아웃 하이드레이션(R9) — createRoot 렌더 전에 동기 실행해 기본
+// 트리 → 저장된 트리로 바뀌는 첫 프레임 플래시를 막는다. 그래프 세션
+// 복구(BootstrapGate의 startAutoSave)와는 별개 — 레이아웃은 recovery
+// 다이얼로그 없이 무조건 즉시 복원된다.
+startDockLayoutPersistence();
+
 if (import.meta.env.DEV) {
   // Expose stores for debugging / Playwright-style verification.
   (window as unknown as { __sp: unknown }).__sp = {
@@ -77,6 +85,8 @@ if (import.meta.env.DEV) {
     assets: useAssetStore,
     assetActions,
     diagnostics: useDiagnosticsStore,
+    // B7 — E2E dock-tree setup/inspection (m5-dock-chrome.spec.ts R8).
+    dock: useDockStore,
     time: useTimeStore,
     viewport: useViewportStore,
     history: useHistoryStore,

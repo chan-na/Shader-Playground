@@ -121,6 +121,11 @@ export function VideoNodeView({ id, data }: NodeProps) {
                   opacity: status.ready ? 1 : 0.4,
                 }}
               />
+              {/* 재생 글리프 노출 조건 = `node.playing`(그래프 상태 = 사용자 의도)이 정본 —
+                  CHANGELOG §v1.3 Q2 [C-4] 확정. `videoRef.current.paused`(DOM 실측)는
+                  로딩/버퍼링/자동 일시정지에서 갈리므로 채택하지 않는다(디바운스 규칙이
+                  따로 필요해짐). v1.2 무응답으로 잠정 유지하던 조건이 v1.3에서 현행
+                  승인됐다 — 코드 변경 0. */}
               {!node.playing && (
                 <div
                   data-testid="video-play-glyph"

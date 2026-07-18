@@ -44,3 +44,21 @@ export interface Diagnostics {
   fragment: Diagnostic[];
   link: Diagnostic[];
 }
+
+// Loose mirror of src/state/dockTree.ts's DockNode (DockLeaf | DockSplit).
+// We deliberately avoid importing the real type — see file header comment.
+export type DockTreeNodeMinimal =
+  | {
+      type: "leaf";
+      id: string;
+      tabs: string[];
+      active: string;
+      collapsed?: boolean;
+    }
+  | {
+      type: "split";
+      dir: "row" | "col";
+      ratio: number;
+      a: DockTreeNodeMinimal;
+      b: DockTreeNodeMinimal;
+    };

@@ -177,9 +177,11 @@ function drawSpectrum(
   // canvas 2D can't read CSS variables, so tokens.* is imported directly
   // here instead of going through var(--*) like the rest of the UI [D7].
   ctx.fillStyle = tokens.nodeCategory.source;
-  // dc's bars use border-radius:1px, but at this scale (bar width often
-  // ~1px) a 1px corner radius isn't visually distinguishable from a flat
-  // rect, so fillRect below is a reasonable approximation.
+  // FFT bin 연속 바가 정본 — CHANGELOG §v1.3 Q3 [C-5] 확정(정보량 최대). dc
+  // (design/Node Editor.dc.html L96-104)의 청키한 6바는 정적 데모일 뿐 스펙이
+  // 아니다 — 다운샘플/radius 매칭을 하지 않는다. dc는 bar에 border-radius:1px을
+  // 쓰지만, 이 스케일에서는 바 폭이 종종 ~1px라 radius가 flat rect와 시각적으로
+  // 구분되지 않으므로 fillRect(무 radius)로도 정본과 등가다.
   const barWidth = Math.max(1, w / bins.length);
   for (let i = 0; i < bins.length; i++) {
     const raw = bins[i] ?? 0;

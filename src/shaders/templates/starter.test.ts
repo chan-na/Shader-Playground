@@ -60,3 +60,34 @@ describe("new-node shader template varying contract [C-7]", () => {
     }
   });
 });
+
+/**
+ * [Q1-b] starter.frag's default output was promoted from an interim visual
+ * to the design-canon recipe in v1.3 (the 'New Shader' demo card in
+ * design/Node Editor.dc.html): a u_baseColor central soft glow + a dark
+ * vignette + a subtle u_time modulation. [R14] The dc CSS gradient stops are
+ * ported as a recipe, not matched stop-for-stop, so these are text
+ * assertions pinning the recipe's presence rather than a pixel/GL
+ * comparison — same rationale as the varying-contract tests above: jsdom has
+ * no WebGL2 context to actually link/render against.
+ */
+describe("starter.frag default-output recipe [Q1-b]", () => {
+  it("still consumes only u_time and u_baseColor (uniform contract with palette/toolbar/CTA)", () => {
+    expect(starterFrag).toMatch(/\bu_baseColor\b/);
+    expect(starterFrag).toMatch(/\bu_time\b/);
+  });
+
+  it("keeps the central glow term (smoothstep-based)", () => {
+    expect(starterFrag).toMatch(/\bsmoothstep\s*\(/);
+  });
+
+  it("adds the dark vignette term without introducing new uniforms", () => {
+    expect(starterFrag).toMatch(/\bvignette\b/);
+  });
+
+  it("does not widen the varying contract — starter.frag still declares only v_uv as `in`", () => {
+    // Stronger than the [C-7] "contains v_uv" checks above: pins the exact
+    // set so the vignette recipe can't accidentally grow the varying list.
+    expect(declaredVaryings(starterFrag, "in")).toEqual(["v_uv"]);
+  });
+});

@@ -118,11 +118,10 @@ export const tokens = {
     ui: "'IBM Plex Sans', system-ui, sans-serif",     // 400/500/600/700
     mono: "'JetBrains Mono', monospace",               // 400/500/600
   },
-  // [B-7] standalone HTML export: IBM Plex Sans 서브셋을 data URI 로 번들해
-  // system-ui 폴백이 아니라 실제 브랜드 타이포로 렌더한다(파일 크기 +수십 KB 감수).
-  fontBundle: {
-    standalone: "IBM Plex Sans (subset, woff2, data-URI inline)",
-  },
+  // [B-7 / Q10] standalone 웹폰트 번들은 취소(v1.3). 번들 예산(385 KiB, 여유 ~2.1 KiB)
+  // 충돌 + woff2 산출물 부재로, standalone export 는 system-ui 폴백을 그대로 유지한다.
+  // 브랜드 타이포(IBM Plex Sans)는 앱 UI 에만 웹폰트로 로드되고 export 에는 싣지 않는다.
+  // → fontBundle 토큰은 소비 불가한 서술 문자열이라 제거(src/theme.ts 미포팅, Q10-b).
   // 대표 사이즈(px): 배지 8-11 · 본문 11-13 · 화면 제목 14-15
   // 패널 헤더 라벨: 대문자 + letterSpacing 0.8~0.9px
 

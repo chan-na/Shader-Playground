@@ -440,12 +440,7 @@ export function NodeEditor() {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the toolbar Import button
     <div className="panel panel--graph" onDragOver={onDragOver} onDrop={onDrop}>
-      <DockPanelHeader
-        panelId="nodeEditor"
-        label="Node Editor"
-        meta={`${graphNodes.length}N · ${graphEdges.length}E`}
-        collapsedRail
-      />
+      <DockPanelHeader meta={`${graphNodes.length}N · ${graphEdges.length}E`} />
       <div className="panel-body" style={{ background: "var(--surface-app)" }}>
         <ReactFlow
           nodes={rfNodes}

@@ -6,6 +6,7 @@ import {
   screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import starterFrag from "../../shaders/templates/starter.frag?raw";
 import { useCommandPaletteStore } from "../../state/commandPaletteStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
@@ -177,5 +178,50 @@ describe("CommandPalette", () => {
     expect(screen.getByText("Nodes")).not.toBeNull();
     expect(screen.getByText("Commands")).not.toBeNull();
     expect(screen.getByText("Presets")).not.toBeNull();
+  });
+
+  // [Q1] Palette starter item — dc Command Palette L202.
+  it("starter 'Add Shader' item renders with its sub text and runs starter.frag", () => {
+    openPalette();
+    render(<CommandPalette />);
+
+    const sub = screen.getByText("starter · links with or without a mesh");
+    const button = sub.closest("button");
+    expect(button).not.toBeNull();
+
+    fireEvent.click(button as HTMLButtonElement);
+
+    const created = useGraphStore
+      .getState()
+      .nodes.find((n) => n.kind === "shader");
+    expect(created).not.toBeUndefined();
+    expect(created?.kind === "shader" ? created.fragmentSource : "").toBe(
+      starterFrag,
+    );
+    expect(useCommandPaletteStore.getState().open).toBe(false);
+  });
+
+  // [Q1] Unlit-only ⚠ needs Mesh amber badge — dc Command Palette L105.
+  it("only the Unlit row shows the ⚠ needs Mesh amber badge", () => {
+    openPalette();
+    const { container } = render(<CommandPalette />);
+
+    const badges = container.querySelectorAll(".cmdk-warn-badge");
+    expect(badges).toHaveLength(1);
+    const badge = badges[0];
+    expect(badge?.textContent).toBe("⚠ needs Mesh");
+
+    const unlitRow = badge?.closest("button");
+    expect(unlitRow).not.toBeNull();
+    expect(unlitRow?.textContent).toContain("Add Shader: Unlit");
+    expect(unlitRow?.textContent).toContain("reads surface normals");
+    expect(unlitRow?.textContent).toContain("◇");
+
+    const starterSub = screen.getByText(
+      "starter · links with or without a mesh",
+    );
+    const starterRow = starterSub.closest("button");
+    expect(starterRow?.textContent).toContain("◆");
+    expect(starterRow?.querySelector(".cmdk-warn-badge")).toBeNull();
   });
 });

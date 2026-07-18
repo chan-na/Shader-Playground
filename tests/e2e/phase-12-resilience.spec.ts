@@ -55,7 +55,16 @@ test.describe("Phase 12 — resilience & expressiveness", () => {
       )
       .toBeGreaterThan(0);
 
-    await page.getByTestId("tab-problems").click();
+    // R5: problems is a status-bar-triggered bottom overlay, not a Side
+    // Panel tab — `tab-problems` no longer exists (SidePanel/
+    // DockPanelHeader legacy problems/diagnostics tabs were removed). Assert
+    // the status bar surfaces the count (new-path signal) before opening,
+    // then confirm the overlay itself mounts on click.
+    await expect(page.getByTestId("status-problems")).toHaveText(
+      /\d+ problems?/,
+    );
+    await page.getByTestId("status-problems").click();
+    await expect(page.getByTestId("problems-overlay")).toBeVisible();
     const row = page.getByTestId("problem-row").first();
     await expect(row).toBeVisible();
     await row.click();

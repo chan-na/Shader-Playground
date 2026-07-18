@@ -149,15 +149,26 @@ export function PortHandle({ port, side, top, dimmed }: PortHandleProps) {
 /**
  * Port stride (px) for fixed-arity cards (Math / Combine).
  *
- * NOT changed by C-3: that rule is scoped to cards that "grow one input per
- * uniform" (shader/compute — see PORT_STRIDE_MULTI). These cards pair each
- * port with a `.node-card__field` row, so their stride answers to the field
- * rhythm (~26px: input 21 + body gap 5), not to the dc's shader cards. The dc
- * steps its Combine card by 24 (handles at 44/68/92) while this file has used
- * 18 since v1 — a pre-existing gap that v1.2 does not respec, so it is left
- * alone here and logged as a v1.3 question rather than "fixed" on a guess.
+ * NOT governed by C-3/PORT_STRIDE_MULTI: that rule is scoped to cards that
+ * "grow one input per uniform" (shader/compute). These cards instead pair
+ * each port with a `.node-card__field` row, so their stride is a *dependent
+ * variable* of the field row rhythm, not an independent constant — CHANGELOG
+ * §v1.3 Q7.
+ *
+ * Canonical value 27, per CHANGELOG §v1.4 R15 (selection 1: the browser
+ * measurement is canonical, the dc is corrected after the fact). Measured
+ * 2026-07-17 in Chromium (zoom-normalized getBoundingClientRect,
+ * cross-checked with transform-free offsetTop): field row 22
+ * (`.node-card__input` = 22 = ~14 content + 3+3 padding + 1+1 border) + body
+ * gap 5 = exactly 27 on both Math (2 rows) and Combine (4 rows); the request
+ * doc's 26 assumed an input height of 21 (off by one).
+ *
+ * Coordinate system (Q6): the dc's own Combine handles (44/70/96, stepping
+ * by its now-superseded 26) are themselves a pending correction target for
+ * this measurement and are not ported here — only the *stride* crosses into
+ * this file's `PORT_TOP_PAD`(38) coordinate system, never dc pixel offsets.
  */
-export const PORT_STRIDE = 18;
+export const PORT_STRIDE = 27;
 
 /**
  * Port stride (px) for uniform-driven cards (Shader / Compute) [C-3].
@@ -171,6 +182,22 @@ export const PORT_STRIDE = 18;
  */
 export const PORT_STRIDE_MULTI = 30;
 
+/**
+ * First port's y (px), relative to the card's top edge — the single anchor
+ * every port's `top` is computed from. Implementation has used one shared
+ * constant since v1, even though the dc draws it differently per card kind:
+ * Output 40 / Combine 44 / Webcam·Video 50 / Shader 64.
+ *
+ * That gap was v1's "accepted deviation" from the dc — CHANGELOG §v1.3 Q6
+ * promoted it to the canonical rule: port geometry is always handed down as
+ * a *rule* ("body expands to cover the port span · 2px tail slack · 96
+ * floor"), never as per-card dc pixel offsets, and the implementation
+ * derives everything from this one constant's coordinate system. dc pixels
+ * (including the 40/44/50/64 above) are review/verification values only —
+ * porting them as constants is explicitly forbidden (design/README.md
+ * §도메인 "좌표계 주의 (Q6)"). See `PORT_STRIDE`(above) and `portSpanBodyH`
+ * (below) for how the rest of the geometry is derived from this anchor.
+ */
 export const PORT_TOP_PAD = 38;
 
 /** Slack (px) between the last port's bottom and the card's bottom edge —
@@ -193,16 +220,16 @@ function portSpanBottom(nPorts: number): number {
  * vertical padding), so the result is exactly the body height at which the
  * last port clears the card's bottom edge by `PORT_TAIL_SLACK`.
  *
- * NOTE on the spec: README v1.2 states `previewH = max(96,(n−1)·30+56)`, but
- * that constant is expressed in the *dc's* geometry, where port 0 sits at
- * top:64. This implementation has always placed port 0 at PORT_TOP_PAD(38) —
- * a v1 simplification (the dc varies 40/50/64 per card type; the impl uses one
- * value) — so the dc's constant can't be transplanted literally. Deriving from
- * this file's own constants instead reproduces the dc's *rule* (body grows with
- * the port span, ~2px tail slack, 96 floor) rather than its coordinates. Cross
- * -check: the dc's own cards are 96px @3 ports and 176px @6 — which its stated
- * +56 formula (116 / 206) matches at neither point, so the pixel values, not
- * the formula text, are what this follows [A-5 precedent: dc pixels win].
+ * This implements the CHANGELOG §v1.3 Q5 canonical rule: body grows to cover
+ * the port span, ~2px tail slack, 96 floor for thumbnails (README §B). The
+ * v1.2 README formula `max(96,(n−1)·30+56)` was officially retired by Q5 —
+ * the rule above is the spec now, not that formula.
+ *
+ * Coordinate system (Q6): the rule is derived here from this file's own
+ * `PORT_TOP_PAD`(38), never from the dc. The dc's per-card first-port y
+ * (40/44/50/64) and its pixel constants — including the Q5 verification
+ * values (96 @3 ports, 176 @6) — are reference/check values only and are not
+ * ported into this coordinate system (README's domain rules, Q6).
  */
 function portSpanBodyH(nPorts: number, chromeH: number): number {
   return portSpanBottom(nPorts) + PORT_TAIL_SLACK - chromeH;
@@ -217,7 +244,9 @@ export function multiPortPreviewH(nPorts: number): number {
 /** Compute card body min-height — same rule, but the body is a kv list with
  *  no thumbnail, so there is no 96 floor: content sizes the card until the
  *  port span exceeds it. Chrome is header 30 + `.node-card__body` padding
- *  8(top)+9(bottom) = 47 [C-3]. */
+ *  8(top)+9(bottom) = 47 [C-3]. This "no 96 floor" handling was the
+ *  implementation team's provisional call until CHANGELOG §v1.3 Q8 made it
+ *  the current-approved rule, codified in design/README.md §B. */
 export function multiPortBodyMinH(nPorts: number): number {
   return Math.max(0, portSpanBodyH(nPorts, 47));
 }

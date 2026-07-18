@@ -9,6 +9,7 @@ describe("debugUiStore", () => {
   beforeEach(() => {
     const s = useDebugUiStore.getState();
     s.setOpen(false);
+    s.setProblemsOpen(false);
     s.setLevelFilter("all");
     s.setCategoryFilter("all");
   });
@@ -37,5 +38,37 @@ describe("debugUiStore", () => {
     snapshot().setCategoryFilter("gl");
     expect(snapshot().levelFilter).toBe("warn");
     expect(snapshot().categoryFilter).toBe("gl");
+  });
+
+  it("defaults problemsOpen to false", () => {
+    expect(snapshot().problemsOpen).toBe(false);
+  });
+
+  it("toggleProblems flips the problemsOpen flag", () => {
+    snapshot().toggleProblems();
+    expect(snapshot().problemsOpen).toBe(true);
+    snapshot().toggleProblems();
+    expect(snapshot().problemsOpen).toBe(false);
+  });
+
+  it("setOpen(true) closes the problems overlay (mutual exclusion, R5)", () => {
+    snapshot().setProblemsOpen(true);
+    snapshot().setOpen(true);
+    expect(snapshot().open).toBe(true);
+    expect(snapshot().problemsOpen).toBe(false);
+  });
+
+  it("toggleProblems() opening closes diagnostics (mutual exclusion, R5)", () => {
+    snapshot().setOpen(true);
+    snapshot().toggleProblems();
+    expect(snapshot().problemsOpen).toBe(true);
+    expect(snapshot().open).toBe(false);
+  });
+
+  it("setOpen(false) does not touch the problems overlay", () => {
+    snapshot().setProblemsOpen(true);
+    snapshot().setOpen(false);
+    expect(snapshot().open).toBe(false);
+    expect(snapshot().problemsOpen).toBe(true);
   });
 });

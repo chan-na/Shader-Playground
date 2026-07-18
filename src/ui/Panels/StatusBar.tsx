@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useDebugUiStore } from "../../state/debugUiStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useDockStore } from "../../state/dockStore";
+import { collectPanelIds } from "../../state/dockTree";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
-import { useLayoutStore } from "../../state/layoutStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
@@ -53,21 +54,37 @@ export function StatusBar() {
     }
     return n;
   });
+  // R5: shader diagnostics count across all severities (not just errors) —
+  // mirrors the former SidePanel Problems badge total (SidePanel.tsx
+  // problemCount selector, pre-B5-U3). Combined with runtime errors below
+  // into the status-problems count. Distinct from compileErrorCount above
+  // (errors only, feeds statusSummary) — left untouched per B5-U3 scope.
+  const diagnosticsProblemCount = useDiagnosticsStore((s) => {
+    let n = 0;
+    for (const d of Object.values(s.byNode)) {
+      n += d.vertex.length + d.fragment.length + d.link.length;
+    }
+    return n;
+  });
   const gpuSupported = useGpuTimerStore((s) => s.supported);
   const gpuEnabled = useGpuTimerStore((s) => s.enabled);
   const gpuTotalMs = useGpuTimerStore((s) => s.totalMs);
   const diagOpen = useDebugUiStore((s) => s.open);
   const toggleDiag = useDebugUiStore((s) => s.toggleOpen);
-  // D1: Diagnostics는 이제 Side Panel의 4번째 탭이다 — side panel이 접혀
-  // 있으면 open을 true로 만들어도 탭 본문이 보이지 않는다. 진입 경로의
-  // 가시성을 보장하기 위해 열 때는 접힘도 함께 풀어준다(닫을 때는 건드리지
-  // 않음 — 사용자가 의도적으로 접었을 수 있으므로).
-  const sidePanelCollapsed = useLayoutStore((s) => s.collapsed.sidePanel);
-  const toggleCollapsed = useLayoutStore((s) => s.toggleCollapsed);
-  const handleDiagClick = () => {
-    if (!diagOpen && sidePanelCollapsed) toggleCollapsed("sidePanel");
-    toggleDiag();
-  };
+  const toggleProblems = useDebugUiStore((s) => s.toggleProblems);
+  // R5 (B5-U3): diagnostics is no longer a Side Panel tab — it's a bottom
+  // transient overlay (StatusOverlays) toggled purely by debugUiStore.open.
+  // The D1-era un-collapse dance (finding the inspector/assets dock leaf and
+  // force-expanding it so the *tab* would be visible) no longer applies: the
+  // overlay renders outside the dock tree entirely, so there's nothing to
+  // un-collapse. toggleDiag is wired directly.
+  // B6-U2 (R9): dockStore/dockTree are imported again, but only for the
+  // 'N panels docked' count below — `collectPanelIds(s.tree).length` is a
+  // number, so the selector is reference-stable and safe to subscribe
+  // directly (no useMemo needed, unlike AppToolbar's closedPanels array).
+  // Leaf-path traversal (the un-collapse logic removed above) still has no
+  // place here.
+  const dockedCount = useDockStore((s) => collectPanelIds(s.tree).length);
 
   // Sampled, not subscribed — see TIME_SAMPLE_INTERVAL_MS above.
   const [simTime, setSimTime] = useState(() => useTimeStore.getState().simTime);
@@ -79,6 +96,7 @@ export function StatusBar() {
   }, []);
 
   const errorCount = stats.errors.length;
+  const problemCount = diagnosticsProblemCount + errorCount;
   const showGpu = gpuSupported && gpuEnabled;
 
   const summary = statusSummary({
@@ -109,6 +127,12 @@ export function StatusBar() {
         />
         {summary.text}
       </span>
+      <span
+        data-testid="status-docked"
+        title="Panels currently docked in the layout"
+      >
+        {dockedCount} panel{dockedCount === 1 ? "" : "s"} docked
+      </span>
       <span title="Frames per second">{stats.fps} FPS</span>
       <span title="Draw calls per frame">{stats.drawCalls} draws</span>
       {showGpu ? (
@@ -129,22 +153,32 @@ export function StatusBar() {
         t {simTime.toFixed(2)}s
       </span>
       <div className="statusbar-spacer" />
-      {errorCount > 0 ? (
-        <span className="statusbar-error" title={stats.errors.join("\n")}>
-          ⚠ {errorCount} error{errorCount === 1 ? "" : "s"}
-        </span>
-      ) : (
-        <span className="statusbar-muted">no errors</span>
-      )}
+      <button
+        type="button"
+        className={
+          problemCount > 0
+            ? "statusbar-problems"
+            : "statusbar-problems statusbar-muted"
+        }
+        onClick={toggleProblems}
+        title={
+          errorCount > 0 ? stats.errors.join("\n") : "Open the problems list"
+        }
+        data-testid="status-problems"
+      >
+        {problemCount > 0
+          ? `⚠ ${problemCount} problem${problemCount === 1 ? "" : "s"}`
+          : "no problems"}
+      </button>
       <button
         type="button"
         className="statusbar-diag"
-        onClick={handleDiagClick}
+        onClick={toggleDiag}
         title="Toggle the developer diagnostics panel"
         data-testid="open-diagnostics"
         aria-pressed={diagOpen}
       >
-        Diagnostics
+        ◨ Diagnostics
       </button>
     </div>
   );

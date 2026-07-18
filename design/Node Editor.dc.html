@@ -55,11 +55,11 @@
       <!-- Blend out -> Combine in1 (gold) -->
       <path d="M696 399.5 C 726 399.5, 740 349.5, 770 349.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
       <!-- Math out -> Combine in2 (green) -->
-      <path d="M409 375.5 C 560 375.5, 620 375.5, 770 375.5" stroke="#7ed957" stroke-width="2.5" fill="none"/>
+      <path d="M409 375.5 C 560 375.5, 620 375.5, 770 376.5" stroke="#7ed957" stroke-width="2.5" fill="none"/>
       <!-- Compute out -> Combine in3 (violet) -->
-      <path d="M696 555.5 C 728 500, 742 401.5, 770 401.5" stroke="#a06bff" stroke-width="2.5" fill="none"/>
+      <path d="M696 555.5 C 728 500, 742 403.5, 770 403.5" stroke="#a06bff" stroke-width="2.5" fill="none"/>
       <!-- Combine out -> Output B (gold) -->
-      <path d="M920 375.5 C 952 375.5, 972 365.5, 1000 365.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
+      <path d="M920 349.5 C 952 349.5, 972 365.5, 1000 365.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
       <!-- DRAG IN PROGRESS: Swizzle out -> floating cursor (gold dashed) -->
       <path d="M409 515.5 C 520 515.5, 560 470, 632 452" stroke="#f0b429" stroke-width="2.5" fill="none" stroke-dasharray="6 6" style="animation:neDash 0.6s linear infinite;" opacity="0.9"/>
     </svg>
@@ -248,11 +248,11 @@
         <div style="height:4px;border-radius:2px;background:linear-gradient(90deg,#3d9bff,#f0b429);"></div>
         <div style="text-align:right;"><span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;">vec4 ▸</span></div>
       </div>
-      <!-- Q7: Combine port stride 26 (aligns to .node-card__field row rhythm) -->
+      <!-- S2: Combine port stride 27 (browser-measured 27px; aligns to .node-card__field row rhythm). Output disc sits at first row (PORT_TOP_PAD convention) matching impl — dc's earlier centered top:70 was presentation only. -->
       <div style="position:absolute;left:-6px;top:44px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
-      <div style="position:absolute;left:-6px;top:70px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
-      <div style="position:absolute;left:-6px;top:96px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;"></div>
-      <div style="position:absolute;right:-6px;top:70px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 7px rgba(240,180,41,0.6);"></div>
+      <div style="position:absolute;left:-6px;top:71px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
+      <div style="position:absolute;left:-6px;top:98px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;"></div>
+      <div style="position:absolute;right:-6px;top:44px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 7px rgba(240,180,41,0.6);"></div>
     </div>
 
     <!-- ══ Output A ══ -->

@@ -16,13 +16,47 @@
 
 ---
 
+## v1.5 — 2026-07-18
+> design-request-v1.5.md의 25건(S1~S25)에 대한 디자이너 정본. v1.4 도킹 구현 후속 — 정본 결함 정정(§A) · 미정의 UX 코너 확정(§B) · 토큰 근사 승인(§C). **모든 S ID 명시 인용**(무응답/보류 0). 신규 토큰 0 · breaking 0 · 값 정본은 `theme.ts`.
+
+### 결정 요약 (요청서 S ID 전부 인용)
+- **S1 [트리 dir 결함] `[screen]` ★** = **정정 승인 — 중앙 split은 `col`.** `_defaultTree()` 가운데 split을 `row 0.556`→`col 0.556`으로 정정(viewport 위 / inspector·assets 아래). 근거: 0.556=viewportFrac(높이 비율) · `.shell-right{flex-direction:column}` · R2/R3(앱 첫 화면 불변). dc·CHANGELOG(§v1.4 R3)·README §M **3곳 정정**. 코드는 이미 `col`(`dockTree.ts`).
+- **S2 [Combine stride 27] `[screen]`** = **실측 27 승인 + dc 정정.** R15("실측값 정본, dc 사후 정정") 조건 충족. Combine 입력 핸들 44/70/96(stride 26)→**44/71/98(stride 27)** + 엣지 y 갱신. **출력 disc = 프레젠테이션 판정** → dc의 중앙(top:70)을 **첫 행(top:44)**으로 정정(전 카드 공통 PORT_TOP_PAD 관례, 구현과 일치). "중앙 정렬 의도" 아님 — 버도 구현 없음. → `Node Editor.dc.html`.
+- **S3 [문서 stride 26→27] `[screen]`** = **정정 승인.** README §도메인·§B "stride 26"→27, CHANGELOG §v1.3 Q7·v1.3 Changed의 26 표기에 정정 노트(S2와 동일 사안의 문서 액션).
+- **S4 [fontBundle 잔존] `[screen]`** = **삭제 승인.** README §토큰 목록의 `fontBundle.standalone` 잔존 문구 제거(Q10-b에서 이미 취소된 토큰).
+- **S5 [이종 탭 병합] `[screen]` ★** = **선택지 1 — 탭 = 완전한 도킹 단위.** 이종 kind 병합 시 active 탭을 바꾸면 본문도 그 kind로 전환(진짜 도킹 UX). leaf는 단일 kind 비고정. 구현: `DockLeafView`를 active 탭 kind 기반 렌더로 재작성(번들 여유 ~4.5 KiB 사용). README §M 명문화. → `DockLayout.tsx`, `dockLayoutModel.ts`.
+- **S6 [Problems 거처] `[screen]`** = **선택지 1 — 현행 승인.** 상태바 `⚠ N problems` 카운트 클릭 → 172px 하단 오버레이(에러 클릭→노드 선택+코드 점프). 0건 카피 "no problems". README §M 반영.
+- **S7 [Diagnostics 오버레이] `[screen]`** = **선택지 1 — 컴트롤 단일화 승인 + 메트릭 스트립.** 진단 컴트롤은 한 곳(호스팅 DiagnosticsPanel 툴바)에만 — 오버레이 크롬은 중복 안 함. 172px 부작용(로그가 초기 스크롤 밖) 해소: 전체 메트릭 카드 대신 **단일 행 메트릭 스트립**(GPU/Frame/Draws/Shaders, ~26px)을 헤더 아래 배치. dc 오버레이에 스트립 추가. 전체 카드는 Side Panel Diagnostics 탭에만. → `Docking Prototype.dc.html`, `StatusOverlays.tsx`.
+- **S8 [컴팩트 폴백] `[screen]`** = **선택지 1 — 현행 승인 정본화.** 컴팩트(<990px) 고정 스택 = leaf 46vh(min 200px) + 세로 스크롤. README §M 정본화.
+- **S9 [접힌 leaf 최대화] `[screen]`** = **선택지 1 — 현행 승인.** 최대화가 접힘을 강제 해제(헤더만 남는 빈 화면 방지). README §M 반영.
+- **S10 [일괄 잠정 결정] `[screen/component]`** = **a~k 전부 현행 승인.** 단 **S10-d**: App Shell.dc.html 헤더 버튼 순서(최대화→접기)를 도킹 크롬 정본(**접기 ⌄ → 최대화 ⤢ → 닫기 ✕**)으로 사후 정정(3개 패널 헤더, 뷰포트 장식 ⊞ 제거 — split은 Output 수 자동). 나머지(a 클램프 · b rail 탭존 · c 메타배지 미구현 · e splitter 채색+6px · f 재귀 라벨 · g 스냅샷 범위 · h ＋Panel 배치 · i 팔레트 ◇ 범위 · j 카테고리 select 표기 · k 도킹 카운트 단수)는 현행 유지. → `App Shell.dc.html`.
+- **S11 [closeTab reconcile] `[screen]`** = **현행 승인.** dc `closeTab`의 `maximized===id`(leaf id vs panel id) 타입 불일치 결함 확인 — 구현의 `reconcileMaximized`("leaf 실존 여부") 일반화가 정본. 코드 변경 0.
+- **S12~S19 [토큰 근사] `[token]`** = **전부 근사 승인**(신규 토큰 0). S12 배지 `#f5c778`→`warning` · S13 탭✕/메타 `#565e68`→`text.muted`+opacity 0.55 · S14 ＋Panel hint `#565e68`→`text.muted`(opacity 미병용) · S15 드롭 라벨 `#7dbcff`→`accent.hover` · S16 고스트/프리뷰 radius 9/8 · S17 고스트 shadow=`modal`+accent 링 · S18 빈 도크 아이콘 radius 16 · S19 오버레이 배경 `panel`/shadow `scrim`. **S13/S14 근사 방식 차이는 의도적 유지**: 탭✕(S13)은 장식적 보조 글리프라 opacity 0.55로 dim, ＋Panel hint(S14)는 기능 안내 텍스트라 가독성 위해 opacity 미병용.
+- **S25 [theme.ts 버전 표기] `[token]`** = **현행 승인.** "신규 토큰 0 — 병합분 없음" 방식 유지. `theme.ts` 헤더에 v1.5 라인 추가.
+- **S20~S24** = 요청서 미할당(빈 ID). 해당 없음.
+
+### Changed
+- `[screen]` `Docking Prototype.dc.html` — `_defaultTree()` 중앙 split `row`→`col`(S1) · 진단 오버레이에 단일 행 메트릭 스트립 추가(S7) · **Code 패널 본문에 `vertex`/`fragment` 스테이지 탭 서브바 추가**(사용자 리뷰): 셰이더는 vertex+fragment 쌍으로 컴파일되므로 단일 코드 뷰는 오표현 — App Shell Code 독 + `CodeEditor` StageTabs와 일치시킴(fragment active + 에러 닷, Fresnel 컨텍스트) + 하단 인라인 에러 스트립(line 8:37 undeclared identifier)도 App Shell과 파리티.
+- `[screen]` `Node Editor.dc.html` — Combine 입력 핸들 stride 27(44/71/98) + 출력 disc 첫 행 정정 + 관련 엣지 y 갱신(S2).
+- `[component]` `App Shell.dc.html` — 3개 패널 도킹 헤더 버튼 순서를 접기 ⌄→최대화 ⤢→닫기 ✕로 정정, 뷰포트 장식 ⊞ 제거(S10-d).
+- `[screen]` `README.md` — 버전 v1.5 · §M 기본 트리 col(S1)·이종 탭 병합(S5)·접힌 leaf 최대화(S9)·problems/diagnostics 오버레이+메트릭 스트립(S6·S7)·컴팩트 폴백(S8) · §도메인/§B stride 27(S3) · §토큰 fontBundle 제거(S4).
+- `[token]` `theme.ts` — 헤더 v1.5 라인(신규 토큰 0, S25). 값 불변.
+- `[screen]` `CHANGELOG.md` — §v1.4 R3 트리 서술 col 정정(S1) · §v1.3 Q7/Changed stride 26 정정 노트(S3).
+
+### Docs (확답만 — 코드 변경은 구현 쪽)
+- S3 문서 정정 · S11 dc 결함 확인 · S12~S19 근사 승인 · S25 버전 표기 — 구현 반영 항목은 각 §영향 파일 참조.
+
+> ⚠ 신규 토큰 0. breaking 0. 근사: S12~S19(기존 토큰 재사용). S5는 기능 갭 해소로 구현 작업 필요(dc/토큰 불변).
+
+---
+
 ## v1.4 — 2026-07-17
 > design-request-v1.4.md의 15건(R1~R15)에 대한 디자이너 정본. Docking Prototype을 구현 스코프로 승격하면서 나온 모순·기능 삭제·사양 부재 결정. **모든 R ID 명시 인용**(무응답/보류 0). 신규 토큰 0 · breaking 코드 0 · 값 정본은 `theme.ts`. `Docking Prototype`을 `[Unreleased]`에서 **v1.4 정본으로 확정**(더 이상 "다음 세션" 보류 아님).
 
 ### 결정 요약 (요청서 R ID 전부 인용)
 - **R1 [플로팅] `[breaking]`(dc)** = **선택지 1 — 플로팅 없음 확정.** 상주 플로팅 창 상태 없음. dc의 float 리사이즈 핸들/다중창/`floatWindow`·`tabInFloat`/`setFloatActive`/`closeFloatTab`/float 정지 스타일 분기 등 **죽은 코드 전부 제거**. 드래그는 트랜지언트 고스트 1개(release 시 반드시 도킹, `_fallbackTarget`=첫 region). Empty state 카피 정정: "drop a floating panel here" → **"No panels docked — add one with ＋ Panel"**. → `Docking Prototype.dc.html`.
 - **R2 [정본 충돌]** = **선택지 2 — App Shell = 기본 레이아웃 정본.** 두 화면의 기본 구조를 일치시킴. dc 기본 트리를 App Shell에 맞춰 정정(code = 하단 전폭 독). README M에 "구조 동일" 규칙 명문화.
-- **R3 [기본 레이아웃] `[screen]`** = **선택지 2 — 현행 기본값 유지(앱 첫 화면 불변).** dc 기본 트리 = `col 0.717 [ row 0.587 [nodeEditor | row 0.556 [viewport | (inspector,assets)]] | code(하단 전폭, 접기 가능) ]`. C-7의 "기본 데모=첫 화면 비주얼 불변" 원칙과 동급. `layoutStore` 기본값 교체 불필요(트리로 동일 상태 표현).
+- **R3 [기본 레이아웃] `[screen]`** = **선택지 2 — 현행 기본값 유지(앱 첫 화면 불변).** dc 기본 트리 = `col 0.717 [ row 0.587 [nodeEditor | col 0.556 [viewport / (inspector,assets)]] | code(하단 전폭, 접기 가능) ]`. C-7의 "기본 데모=첫 화면 비주얼 불변" 원칙과 동급. `layoutStore` 기본값 교체 불필요(트리로 동일 상태 표현).
 - **R4 [접기/최대화] `[component]`** = **선택지 1 — 병존.** 트리 모델 + 접기/최대화를 leaf 단위 속성으로 유지(기존 기능 + `m1-dock-header-collapse.spec.ts` 회귀 가드 보존). 접힌 leaf = split 방향 고정 34px strip(divider 비활성). 최대화 = leaf를 도크 body 전체로 오버레이. dc에 접힌 leaf 시안 + ⌄/⌃·⤢/⤡ 컨트롤 반영. → `Docking Prototype.dc.html`.
 - **R5 [problems/diagnostics] `[screen]`** = **선택지 1 — 5종만 도킹.** problems/diagnostics는 1급 도킹 탭 아님. `diagnostics`는 `debugUiStore.open` 단일 출처 유지 → 상태바 `◨ Diagnostics` 토글로 **하단 트랜지언트 오버레이**(172px, 탭 아님)로 열림. `problems`는 상태바 카운트(`⚠ N problems`). 배선 파괴 없음. dc에 오버레이 + 상태바 항목 시안 추가. → `Docking Prototype.dc.html`.
 - **R6 [헤더 ✕] `[component]`** = **선택지 3 — 헤더 ✕ = 패널 전체 닫기 + 탭별 ✕ 별도.** active 탭만 닫히던 혼란 해소(3번 클릭 문제 제거). 탭마다 작은 ✕(hover 강조)로 비활성 탭도 활성화 없이 닫힘. VSCode idiom. → `Docking Prototype.dc.html`.
@@ -58,7 +92,7 @@
 - **Q4 [C-8]** `[component]` `metaAlign="end"` 메타 배지 = **배지 박스 유지**(공통 컴포넌트 일관성). dc 정정: App Shell 'GLSL · ES 3.0'을 plain mono → **배지 박스**로. → `App Shell.dc.html`, README [D13].
 - **Q5 [C-3]** `[screen]` README 공식 vs dc 모순 → **dc 실측(96/176) 채택**(A-5 선례). v1.2 공식 `max(96,(n−1)·30+56)` **폐기**, README를 규칙 서술로 정정.
 - **Q6 [C-3]** `[breaking]`(문서 규칙) 포트 좌표계 재발방지 = **규칙으로 전달**(선택지 1). dc 픽셀 상수 이식 금지 명문화 — 포트 기하는 "본체가 span 덮도록 확장·2px 꼬리·96 floor"로 주고 구현이 `PORT_TOP_PAD` 좌표계에서 유도. README §도메인/§B 갱신.
-- **Q7 [C-3]** `[screen]` Math/Combine stride = **26(필드 행 리듬)**. dc의 24 → 26 정정(Combine 핸들 44/70/96, 출력 70 + 엣지 재정렬). 구현이 실측해 정확값 확정. → `Node Editor.dc.html`.
+- **Q7 [C-3]** `[screen]` Math/Combine stride = **26(필드 행 리듬)**. dc의 24 → 26 정정(Combine 핸들 44/70/96, 출력 70 + 엣지 재정렬 — [v1.5 S2·S3] 브라우저 실측 stride **27**로 정정: 44/71/98, 출력 disc=첫 행). 구현이 실측해 정확값 확정. → `Node Editor.dc.html`.
 - **Q8 [C-3]** `[screen]` Compute 다포트 = **현행 승인**(썸네일 없음 → 96 floor 없이 body minHeight만 포트 span 따라 확장). README §B에 규칙 명문화. 코드 변경 0.
 - **Q9 [C-9]** `[screen]` Diagnostics 레벨 필터 = **누적 유지 + dc 라벨 정정**(선택지 1): `Info/Warn/Error/Debug` → `Info+/Warn+/Error+/Debug+`. 툴바 아이콘(⧉ ⌧ ✕) 정본, 카테고리 필터 유지. 코드 변경 0(시각/라벨만). → `Side Panel.dc.html`.
 - **Q10 [B-7]** `[token]` standalone 웹폰트 번들 = **취소**(선택지 1). 번들 예산 2.1 KiB 여유 + woff2 산출물 부재 → `system-ui` 폴백 유지, 브랜드 타이포는 앱 UI 에만. README H 갱신.
@@ -68,7 +102,7 @@
 ### Changed
 - `[token]` `theme.ts` — `fontBundle` 트리 제거(Q10/Q10-b). font.ui/mono 불변.
 - `[screen]` `Command Palette.dc.html` — Shader 항목을 starter/Unlit 2종으로 분화 + `⚠ needs Mesh` 배지(Q1).
-- `[screen]` `Node Editor.dc.html` — Combine stride 26 정정 + 엣지 재정렬(Q7), 'New Shader' starter 데모 카드 신설(Q1-b).
+- `[screen]` `Node Editor.dc.html` — Combine stride 26 정정 + 엣지 재정렬(Q7·→v1.5 S3: 실측 27), 'New Shader' starter 데모 카드 신설(Q1-b).
 - `[component]` `App Shell.dc.html` — 코드 도킹 헤더 'GLSL · ES 3.0' 메타 배지 박스화(Q4).
 - `[screen]` `Side Panel.dc.html` — Diagnostics 레벨 필터 라벨 누적 표기(Q9).
 - `[screen]` `README.md` — §도메인(포트 좌표계 Q6·stride Q7·metaAlign Q4)·§B(previewH 규칙 Q5·Compute Q8·starter Q1-b)·§E(Q9)·§F(Q1)·§H(Q10/Q11) 정정.

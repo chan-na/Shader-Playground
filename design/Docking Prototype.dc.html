@@ -151,7 +151,15 @@
           </sc-if>
 
           <sc-if value="{{ p.isCode }}" hint-placeholder-val="{{ false }}">
-          <div class="sp-scroll" style="position:absolute;inset:0;overflow:auto;background:#0d0f12;display:flex;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;background:#0d0f12;">
+            <!-- stage tabs: a shader compiles a vertex + fragment pair — each stage edited separately (matches App Shell Code dock + CodeEditor StageTabs) -->
+            <div style="display:flex;align-items:center;gap:2px;height:30px;flex-shrink:0;padding:0 8px;background:#101216;border-bottom:1px solid #17191e;">
+              <button style="display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;background:transparent;border:none;color:#8f97a1;font-size:11.5px;font-weight:500;cursor:pointer;font-family:'JetBrains Mono',monospace;">vertex</button>
+              <button style="display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;background:#0d0f12;border:none;color:#e7eaee;font-size:11.5px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;">fragment<span style="width:6px;height:6px;border-radius:50%;background:#f0555c;box-shadow:0 0 6px #f0555c;"></span></button>
+              <div style="width:1px;height:14px;background:#20242a;margin:0 8px;"></div>
+              <span style="font-size:10.5px;color:#656d78;">Fresnel</span>
+            </div>
+            <div class="sp-scroll" style="flex:1;min-height:0;overflow:auto;display:flex;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;">
             <div style="flex-shrink:0;padding:10px 10px 10px 12px;text-align:right;color:#3c434c;user-select:none;background:#0b0c0e;border-right:1px solid #17191e;"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div style="color:#f0555c;">8</div><div>9</div></div>
             <pre style="margin:0;padding:10px 14px;flex:1;white-space:pre;"><span style="color:#c586c0;">#version</span> <span style="color:#b5cea8;">300</span> es
 <span style="color:#c586c0;">uniform</span> <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">u_intensity</span>;
@@ -162,6 +170,14 @@
   <span style="color:#4ec9b0;">float</span> <span style="color:#9cdcfe;">f</span> = <span style="color:#dcdcaa;">pow</span>(<span style="color:#b5cea8;">1.0</span>-<span style="color:#dcdcaa;">dot</span>(<span style="color:#9cdcfe;">N</span>,<span style="color:#9cdcfe;">V</span>)<span style="text-decoration:wavy underline #f0555c;">,u_intensty</span>);
   <span style="color:#9cdcfe;">fragColor</span> = <span style="color:#4ec9b0;">vec4</span>(<span style="color:#9cdcfe;">u_baseColor</span>*<span style="color:#9cdcfe;">f</span>,<span style="color:#b5cea8;">1.0</span>);
 }</pre>
+            </div>
+            <!-- inline error strip (matches App Shell Code dock) -->
+            <div style="flex-shrink:0;display:flex;align-items:center;gap:9px;padding:6px 12px;background:rgba(240,85,92,0.08);border-top:1px solid rgba(240,85,92,0.25);">
+              <span style="color:#f0555c;font-size:12px;">✕</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#f5a0a4;">line 8:37</span>
+              <span style="font-size:11px;color:#e7eaee;">'u_intensty' : undeclared identifier</span>
+              <span style="font-size:10.5px;color:#656d78;margin-left:6px;">— did you mean <span style="color:#7dbcff;">u_intensity</span>?</span>
+            </div>
           </div>
           </sc-if>
 
@@ -221,6 +237,13 @@
         <span style="font-size:11px;color:#656d78;cursor:pointer;" style-hover="color:#c4cad2;">⌧ Clear</span>
         <span onClick="{{ toggleDiag }}" style="font-size:12px;color:#656d78;cursor:pointer;padding-left:2px;" style-hover="color:#f0555c;">✕</span>
       </div>
+      <!-- S7: compact metric strip (single row) replaces full metric cards at 172px so logs stay in initial view. Full metric cards live only in the Side Panel Diagnostics tab. -->
+      <div style="display:flex;align-items:center;gap:16px;height:26px;flex-shrink:0;padding:0 12px;background:#0f1114;border-bottom:1px solid #17191e;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#9aa2ac;">
+        <span><span style="color:#656d78;">GPU </span>0.82 ms</span>
+        <span><span style="color:#656d78;">Frame </span>16.7 ms</span>
+        <span><span style="color:#656d78;">Draws </span>142</span>
+        <span><span style="color:#656d78;">Shaders </span>3 compiled</span>
+      </div>
       <div class="sp-scroll" style="flex:1;overflow-y:auto;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.9;">
         <div><span style="color:#565e68;">12:04:02 </span><span style="color:#656d78;">gl </span><span style="color:#57a9ff;">INFO </span><span style="color:#c4cad2;">context restored (WebGL2)</span></div>
         <div><span style="color:#565e68;">12:04:05 </span><span style="color:#656d78;">shader </span><span style="color:#f5b13d;">WARN </span><span style="color:#c4cad2;">u_intensty undeclared — did you mean u_intensity?</span></div>
@@ -272,7 +295,7 @@ class Component extends DCLogic {
   ALL = ["nodeEditor", "viewport", "inspector", "code", "assets"];
 
   // Default = App Shell first-screen, expressed as a tree (R2/R3):
-  // node editor left · viewport + inspector/assets center-right · code full-width bottom dock.
+  // node editor left · right column = viewport TOP / inspector+assets BOTTOM (col split, S1) · code full-width bottom dock.
   _defaultTree() {
     return {
       type: "split", dir: "col", ratio: 0.717,
@@ -280,7 +303,7 @@ class Component extends DCLogic {
         type: "split", dir: "row", ratio: 0.587,
         a: { type: "leaf", id: "l1", tabs: ["nodeEditor"], active: "nodeEditor" },
         b: {
-          type: "split", dir: "row", ratio: 0.556,
+          type: "split", dir: "col", ratio: 0.556,
           a: { type: "leaf", id: "l2", tabs: ["viewport"], active: "viewport" },
           b: { type: "leaf", id: "l3", tabs: ["inspector", "assets"], active: "inspector" },
         },

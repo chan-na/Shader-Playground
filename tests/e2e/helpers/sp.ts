@@ -347,11 +347,18 @@ export async function readSp<R>(
   }, src) as Promise<R>;
 }
 
-/** Wait until window.__sp is available (dev build flag). */
+/** Wait until window.__sp is available (dev build flag).
+ *
+ * Timeout is generous (30s) because the dock specs (m3/m6) call this again
+ * after `page.reload()`, and a cold re-boot of the WebGL app under full-suite
+ * load has occasionally needed >15s — a rare, load-induced flake in
+ * `bootApp`-after-reload, not a product bug. The poll returns the instant
+ * `__sp` appears, so raising the ceiling never slows a passing test; it only
+ * widens the margin before a genuinely-stuck boot is reported. */
 export async function waitForApp(page: Page): Promise<void> {
   await expect
     .poll(() => page.evaluate(() => typeof window.__sp !== "undefined"), {
-      timeout: 15_000,
+      timeout: 30_000,
       message: "window.__sp never became available",
     })
     .toBe(true);

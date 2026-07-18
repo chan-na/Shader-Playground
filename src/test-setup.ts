@@ -32,47 +32,57 @@ if (typeof globalThis.ImageData === "undefined") {
     ImageDataPolyfill;
 }
 
-// Node 22+ ships an experimental global `localStorage` accessor that returns
-// `undefined` unless the process is started with `--localstorage-file`
-// (Node's webstorage feature) — and under vitest-environment-jsdom,
-// `window === globalThis`, so this accessor shadows jsdom's own Storage
-// implementation entirely (`window.localStorage` resolves to the same
-// non-functional accessor, not jsdom's). Replace it with a small
-// spec-compatible in-memory Storage so tests that exercise real localStorage
-// (R9 dock layout persistence, `src/state/autoSave.test.ts`) observe the same
-// behavior as a real browser. `.nvmrc` pins Node 22 — CI hits this too, it's
-// not a sandbox-only quirk.
-if (typeof globalThis.localStorage === "undefined") {
-  class MemoryStorage implements Storage {
-    #data = new Map<string, string>();
+// Node 22+ ships an experimental global `localStorage` accessor (Node's
+// webstorage feature). Without `--localstorage-file` it is non-functional, and
+// — critically — its behavior differs by Node version: on some versions the
+// accessor is present but returns a fresh object per access, so a test's
+// `vi.spyOn(localStorage, "setItem")` wraps a *different* instance than the one
+// `saveDockLayout()` writes through, and the spy observes zero calls (this bit
+// CI on Node 22 while passing locally on Node 26). Under vitest-jsdom
+// `window === globalThis`, so this global also shadows jsdom's own Storage.
+//
+// So we install a small spec-compatible in-memory Storage *unconditionally* —
+// a version-sniffing guard (`typeof globalThis.localStorage === "undefined"`)
+// is exactly what made this fragile. Tests that exercise real localStorage (R9
+// dock layout persistence, `src/state/autoSave.test.ts`) then always see one
+// stable instance, matching a real browser. `.nvmrc` pins Node 22.
+class MemoryStorage implements Storage {
+  #data = new Map<string, string>();
 
-    get length(): number {
-      return this.#data.size;
-    }
-
-    clear(): void {
-      this.#data.clear();
-    }
-
-    getItem(key: string): string | null {
-      return this.#data.get(key) ?? null;
-    }
-
-    key(index: number): string | null {
-      return [...this.#data.keys()][index] ?? null;
-    }
-
-    removeItem(key: string): void {
-      this.#data.delete(key);
-    }
-
-    setItem(key: string, value: string): void {
-      this.#data.set(key, String(value));
-    }
+  get length(): number {
+    return this.#data.size;
   }
-  Object.defineProperty(globalThis, "localStorage", {
-    value: new MemoryStorage(),
-    configurable: true,
-    writable: true,
-  });
+
+  clear(): void {
+    this.#data.clear();
+  }
+
+  getItem(key: string): string | null {
+    return this.#data.get(key) ?? null;
+  }
+
+  key(index: number): string | null {
+    return [...this.#data.keys()][index] ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.#data.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.#data.set(key, String(value));
+  }
+}
+// Install unless a non-configurable `localStorage` already exists (Node's
+// experimental global is configurable, so this replaces it; the guard only
+// avoids a throw in the theoretical case it isn't).
+{
+  const desc = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  if (!desc || desc.configurable) {
+    Object.defineProperty(globalThis, "localStorage", {
+      value: new MemoryStorage(),
+      configurable: true,
+      writable: true,
+    });
+  }
 }

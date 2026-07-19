@@ -14,8 +14,9 @@
  * 헬퍼(withAlpha · 확장 cssVars)를 더한 상위집합이다. 번들 갱신 시 design/theme.ts로
  * 이 파일을 덮어쓰지 말 것 — 위 파생분이 사라진다(v1.1 실사고). 신규 토큰만 병합한다.
  *
- * 버전: v1.2 · 2026-07-16 (design/theme.ts v1.2 = 0080f37 기준 병합)
+ * 버전: v2.0 · 2026-07-19 (design/theme.ts v2.0 = 4b430a7+d11c83a 기준 병합)
  * v1.3(b6ef934)·v1.4(3a1981d): 신규 토큰 0 — 병합분 없음. fontBundle 트리는 design 쪽에서 제거됐고(src 원래 미포팅, Q10-b) 이 파일 기준 변화 없다.
+ * v2.0(S26): 신규 토큰 6종 병합 — accent.bright · semantic.successBright · nodeCategory.processBright/valueBright/outputBright · gradient.viewportActive/shaderSphere. 그 외 드리프트는 기존 토큰으로 흡수(신규 0).
  */
 
 export const tokens = {
@@ -54,6 +55,12 @@ export const tokens = {
   gradient: {
     // 뷰포트 빈 상태 배경 (surface.app 근처 2종점 radial)
     emptyState: "radial-gradient(circle at 50% 40%, #10131a 0%, #0a0b0e 70%)",
+    // 활성 뷰포트 navy 백드롭 (셰이더 구체 뒤) [S26-E].
+    viewportActive:
+      "radial-gradient(circle at 50% 42%, #12325e 0%, #0c1c38 40%, #080a10 80%)",
+    // 셰이더 프리뷰 구체(디폴트 미리보기 렌더). 5종점, 복붙 금지 — 이 문자열이 정본 [S26-E].
+    shaderSphere:
+      "radial-gradient(circle at 40% 32%, #bcdcff 0%, #4ba3ff 26%, #2b6fe0 52%, #12336b 78%, #08152e 100%)",
   },
 
   // ── Border ──────────────────────────────────────────────────────────
@@ -69,6 +76,8 @@ export const tokens = {
   accent: {
     default: "#3d9bff",
     hover: "#57a9ff",
+    // hover보다 밝은 단계 — 틴트 배경 위 아이콘/텍스트·a:hover [S26-B].
+    bright: "#7dbcff",
     active: "#2b6fe0",
     muted: "#1c3452",
   },
@@ -87,6 +96,8 @@ export const tokens = {
   // ── Semantic ────────────────────────────────────────────────────────
   semantic: {
     success: "#34d399",
+    // 밝은 success — GPU active 표시·Shader perf 배지 [S26-D].
+    successBright: "#6fe3b8",
     warning: "#f5b13d",
     error: "#f0555c",
     info: "#3d9bff",
@@ -103,6 +114,10 @@ export const tokens = {
     // source 카테고리의 밝은 변형(Webcam 렌즈 링 등). source 알파 파생 근사에
     // 이름을 부여한 것 [B-3].
     sourceBright: "#6fd6a3",
+    // [S26-D] 카테고리 밝은 변형 — 선택/호버/아이콘·배지의 lighten 변형(기존엔 source만 있었음).
+    processBright: "#7dbcff", // = accent.bright
+    valueBright: "#e2ba57", // value 아이콘·perf 배지 yellow 통합(#f4d774 흡수)
+    outputBright: "#ee7fac",
   },
 
   // ── Port type families ★ (형태=방향, 색=타입 패밀리) ─────────────────
@@ -237,7 +252,10 @@ export function cssVars(): string {
     ...Object.entries(t.border).map(([k, v]) => `--border-${kebab(k)}: ${v};`),
     ...Object.entries(t.accent).map(([k, v]) => `--accent-${kebab(k)}: ${v};`),
     ...Object.entries(t.text).map(([k, v]) => `--text-${kebab(k)}: ${v};`),
-    ...Object.entries(t.semantic).map(([k, v]) => `--${k}: ${v};`),
+    // kebab(k): semantic 키가 전부 단일 단어(success/warning/error/info)였을
+    // 때는 무영향이었으나, successBright(S26) 추가로 camelCase 키가 처음
+    // 생겨 kebab 변환 누락이 노출됐다 — 기존 단일 단어 키의 출력은 불변.
+    ...Object.entries(t.semantic).map(([k, v]) => `--${kebab(k)}: ${v};`),
     ...Object.entries(t.nodeCategory).map(
       ([k, v]) => `--node-cat-${kebab(k)}: ${v};`,
     ),

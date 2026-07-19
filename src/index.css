@@ -3437,6 +3437,81 @@ textarea {
   animation: sp-spin 0.7s linear infinite;
 }
 
+/* ── Add-node pill (W4, design/App Shell.dc.html L131-136) — floating
+   quick-add palette centered above the Node Editor canvas. AddNodePill.tsx.
+   dc `background:rgba(19,21,25,0.92)` == tokens.surface.panel(#131519) at
+   92% alpha; color-mix pattern follows the .graph-skeleton-status (L3416)
+   convention above. dc `border-radius:10px` + `box-shadow:0 8px
+   24px rgba(0,0,0,0.5)` match radius/shadow.skeletonStatus exactly — reused
+   rather than adding a new token (S26 adds exactly 6, no more). `blur(8px)`
+   is a non-tokenized literal (see .graph-skeleton-status's blur(6px)
+   convention, L3423).
+
+   z-index:11, NOT the dc's z-index:6 — the dc's App Shell mockup has no
+   welcome-overlay layer to sit above, so 6 was only ever "above the ReactFlow
+   pane". In this codebase the pill and .welcome-overlay (z-index:10,
+   pointer-events:auto, inset:0 — see its comment above) share the same
+   .panel-body stacking context, and the pill's whole purpose is adding the
+   *first* node to an empty graph, i.e. exactly when the welcome overlay is
+   mounted. At z-index:6 the overlay's pointer-events:auto (load-bearing for
+   its own wheel-scroll, see L2211-2221) swallows every click before it
+   reaches the pill, even though the pill paints on top visually in some
+   browsers' z-fighting — Playwright caught this as "welcome-content subtree
+   intercepts pointer events". 11 keeps the pill clickable in both the empty
+   (welcome overlay) and populated (bare ReactFlow pane) states without
+   touching welcome-overlay's pointer-events. */
+.add-node-pill {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-skeleton-status);
+  padding: 4px;
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-skeleton-status);
+}
+.add-node-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-button);
+  color: var(--text-bright-body);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.add-node-pill-btn:hover {
+  background: var(--surface-input);
+}
+.add-node-pill-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.add-node-pill-btn:disabled:hover {
+  background: transparent;
+}
+.add-node-pill-btn--more {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.add-node-pill-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-strong);
+  margin: 0 2px;
+}
+
 .panel-skeleton {
   padding: 16px;
   display: flex;

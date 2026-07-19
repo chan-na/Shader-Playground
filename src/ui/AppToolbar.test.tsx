@@ -1,6 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_OUTPUTS } from "../core/graph/validate";
 import { useCommandPaletteStore } from "../state/commandPaletteStore";
 import { useDockStore } from "../state/dockStore";
 import { collectPanelIds } from "../state/dockTree";
@@ -24,28 +23,30 @@ afterEach(() => {
 });
 
 describe("AppToolbar", () => {
-  it("Mesh button adds a mesh node to the graph store", () => {
+  it("toolbar no longer renders node-add buttons (W4 — moved to the canvas pill)", () => {
     render(<AppToolbar />);
-    fireEvent.click(screen.getByRole("button", { name: "Mesh" }));
-    const nodes = useGraphStore.getState().nodes;
-    expect(nodes.filter((n) => n.kind === "mesh")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Mesh" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "＋ More" })).toBeNull();
   });
 
-  it("+ More menu lists Webcam…Time, and Float adds a param node and closes the menu", () => {
+  it("File menu lists Load…/Import JSON/Export JSON/Snap PNG", () => {
     render(<AppToolbar />);
-    fireEvent.click(screen.getByRole("button", { name: "＋ More" }));
+    fireEvent.click(screen.getByRole("button", { name: "File" }));
 
-    expect(screen.getByRole("menuitem", { name: "Webcam" })).not.toBeNull();
-    expect(screen.getByRole("menuitem", { name: "Time" })).not.toBeNull();
-
-    fireEvent.click(screen.getByRole("menuitem", { name: "Float" }));
-
-    const nodes = useGraphStore.getState().nodes;
     expect(
-      nodes.some((n) => n.kind === "param" && n.paramKind === "float"),
-    ).toBe(true);
-    // Menu closed after the click.
-    expect(screen.queryByRole("menuitem", { name: "Float" })).toBeNull();
+      screen.getByRole("menuitem", {
+        name: "Import OBJ, GLTF, image, video, or audio files",
+      }),
+    ).not.toBeNull();
+    expect(
+      screen.getByRole("menuitem", { name: "Import project from JSON" }),
+    ).not.toBeNull();
+    expect(
+      screen.getByRole("menuitem", { name: "Export project as JSON" }),
+    ).not.toBeNull();
+    expect(
+      screen.getByRole("menuitem", { name: "Save viewport as PNG" }),
+    ).not.toBeNull();
   });
 
   it("Presets menu → Chain loads the chain demo graph (tonemap1 present)", () => {
@@ -55,17 +56,6 @@ describe("AppToolbar", () => {
 
     const nodes = useGraphStore.getState().nodes;
     expect(nodes.some((n) => n.id === "tonemap1")).toBe(true);
-  });
-
-  it("Output button is disabled once MAX_OUTPUTS is reached", () => {
-    for (let i = 0; i < MAX_OUTPUTS; i++) {
-      useGraphStore
-        .getState()
-        .addNode({ id: `output-${i}`, kind: "output" }, { x: 0, y: i * 10 });
-    }
-    render(<AppToolbar />);
-    const outputBtn = screen.getByRole("button", { name: "Output" });
-    expect(outputBtn.hasAttribute("disabled")).toBe(true);
   });
 
   it("Undo/Redo are disabled when history is empty", () => {
@@ -132,7 +122,7 @@ describe("AppToolbar", () => {
         });
 
       render(<AppToolbar />);
-      fireEvent.click(screen.getByRole("button", { name: "＋ More" }));
+      fireEvent.click(screen.getByRole("button", { name: "File" }));
       fireEvent.click(
         screen.getByRole("menuitem", { name: "Export project as JSON" }),
       );

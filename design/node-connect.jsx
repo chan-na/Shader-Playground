@@ -245,7 +245,7 @@ function Choreo() {
         headerTint="linear-gradient(180deg,rgba(61,155,255,0.3),rgba(61,155,255,0.12))"
         icon="◆" iconColor="#7dbcff" iconBg="rgba(61,155,255,0.25)" iconBorder={C.accent}
         title="Fresnel" glow={fresnelGlow} dim={1}
-        meta={<span style={{ fontFamily: MONO, fontSize: 9, color: "#f4d774", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(244,215,116,0.35)", borderRadius: 5, padding: "1px 5px" }}>0.31ms</span>}>
+        meta={<span style={{ fontFamily: MONO, fontSize: 9, color: "#e2ba57", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(226,186,87,0.35)", borderRadius: 5, padding: "1px 5px" }}>0.31ms</span>}>
         <div style={{ padding: 10 }}>
           <div style={{ width: "100%", height: 96, borderRadius: 7,
             background: "radial-gradient(circle at 42% 34%,#8fc7ff 0%,#3d9bff 34%,#1a3d7a 68%,#0a1730 100%)",
@@ -317,7 +317,7 @@ function Choreo() {
         <div style={{
           position: "absolute", inset: 0, display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center", gap: 20, opacity: emptyOp,
-          background: "radial-gradient(circle at 50% 40%,#0f1218 0%,#0a0b0e 70%)",
+          background: "radial-gradient(circle at 50% 40%,#10131a 0%,#0a0b0e 70%)",
         }}>
           <div style={{ width: 64, height: 64, borderRadius: 16, background: C.panel, border: "1px solid " + C.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: C.txtDim }}>◵</div>
           <div style={{ textAlign: "center", maxWidth: 340 }}>

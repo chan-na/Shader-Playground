@@ -26,9 +26,9 @@
   <!-- ══ header ══ -->
   <div style="display:flex;align-items:center;gap:12px;height:44px;flex-shrink:0;padding:0 14px;background:#131519;border-bottom:1px solid #20242a;">
     <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Side Panel</span>
-    <span style="font-size:11px;color:#565e68;">— inspector, assets, problems &amp; controls</span>
+    <span style="font-size:11px;color:#656d78;">— inspector, assets, problems &amp; controls</span>
     <div style="flex:1;"></div>
-    <span style="font-size:10.5px;color:#565e68;margin-right:2px;">Selected node</span>
+    <span style="font-size:10.5px;color:#656d78;margin-right:2px;">Selected node</span>
     <div style="display:flex;gap:4px;">
       <sc-for list="{{ nodeChips }}" as="c" hint-placeholder-count="6">
         <button onClick="{{ c.set }}" style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;background:{{ c.bg }};border:1px solid {{ c.border }};border-radius:7px;color:{{ c.fg }};font-size:11px;font-weight:500;cursor:pointer;"><span style="width:8px;height:8px;border-radius:2px;background:{{ c.dot }};"></span>{{ c.label }}</button>
@@ -49,7 +49,7 @@
         <button onClick="{{ tabProblems }}" style="display:flex;align-items:center;gap:7px;height:34px;padding:0 4px;background:transparent;border:none;border-bottom:2px solid {{ prbTop }};color:{{ prbColor }};font-size:11.5px;font-weight:500;cursor:pointer;">Problems<span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;color:#fff;background:#f0555c;border-radius:8px;min-width:16px;height:15px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px;">2</span></button>
         <button onClick="{{ tabDiagnostics }}" style="display:flex;align-items:center;gap:6px;height:34px;padding:0 4px;background:transparent;border:none;border-bottom:2px solid {{ dgTop }};color:{{ dgColor }};font-size:11.5px;font-weight:500;cursor:pointer;">Diagnostics</button>
         <div style="flex:1;"></div>
-        <span style="font-size:14px;color:#565e68;cursor:pointer;" style-hover="color:#c4cad2;">⤢</span>
+        <span style="font-size:14px;color:#656d78;cursor:pointer;" style-hover="color:#c4cad2;">⤢</span>
       </div>
 
       <div class="sp-scroll" style="flex:1;overflow-y:auto;min-height:0;">
@@ -93,15 +93,15 @@
               <div style="margin-bottom:15px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#9cdcfe;">u_intensity</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e7eaee;background:#22262c;border:1px solid #2b3037;border-radius:5px;padding:2px 8px;">1.35</span></div>
                 <div style="height:6px;border-radius:3px;background:#2b3037;position:relative;"><div style="position:absolute;left:0;top:0;height:100%;width:67%;background:#3d9bff;border-radius:3px;"></div><div style="position:absolute;left:67%;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.6);"></div></div>
-                <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:#565e68;margin-top:4px;"><span>0.0</span><span>2.0</span></div>
+                <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:#656d78;margin-top:4px;"><span>0.0</span><span>2.0</span></div>
               </div>
 
               <!-- color picker (open) -->
               <div style="margin-bottom:15px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#9cdcfe;">u_baseColor</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;">vec3</span></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#9cdcfe;">u_baseColor</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;">vec3</span></div>
                 <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px;"><span style="width:30px;height:30px;border-radius:7px;background:#3d9bff;border:1px solid rgba(255,255,255,0.12);box-shadow:0 0 12px rgba(61,155,255,0.4);"></span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e7eaee;background:#22262c;border:1px solid #2b3037;border-radius:6px;padding:5px 9px;">#3D9BFF</span></div>
                 <!-- picker popover -->
-                <div style="background:#0e1013;border:1px solid #20242a;border-radius:9px;padding:10px;">
+                <div style="background:#0f1114;border:1px solid #20242a;border-radius:9px;padding:10px;">
                   <div style="height:96px;border-radius:6px;margin-bottom:8px;background:linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,#3d9bff);position:relative;"><div style="position:absolute;left:74%;top:26%;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,0.5);"></div></div>
                   <div style="height:12px;border-radius:6px;margin-bottom:9px;background:linear-gradient(to right,#f0555c,#f5b13d,#7ed957,#2dd4bf,#3d9bff,#a06bff,#e05c93);position:relative;"><div style="position:absolute;left:62%;top:50%;transform:translate(-50%,-50%);width:6px;height:16px;border-radius:3px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,0.5);"></div></div>
                   <div style="display:flex;gap:6px;">
@@ -112,7 +112,7 @@
 
               <!-- vec2 multi-axis -->
               <div style="margin-bottom:15px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#9cdcfe;">u_offset</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;">vec2</span></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#9cdcfe;">u_offset</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;">vec2</span></div>
                 <div style="display:flex;flex-direction:column;gap:8px;">
                   <div style="display:flex;align-items:center;gap:9px;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#f0555c;width:12px;">X</span><div style="flex:1;height:5px;border-radius:3px;background:#2b3037;position:relative;"><div style="position:absolute;left:0;top:0;height:100%;width:58%;background:#f0555c;border-radius:3px;"></div><div style="position:absolute;left:58%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#fff;"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c4cad2;background:#22262c;border:1px solid #2b3037;border-radius:5px;padding:2px 6px;width:48px;text-align:right;">0.16</span></div>
                   <div style="display:flex;align-items:center;gap:9px;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#7ed957;width:12px;">Y</span><div style="flex:1;height:5px;border-radius:3px;background:#2b3037;position:relative;"><div style="position:absolute;left:0;top:0;height:100%;width:40%;background:#7ed957;border-radius:3px;"></div><div style="position:absolute;left:40%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#fff;"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c4cad2;background:#22262c;border:1px solid #2b3037;border-radius:5px;padding:2px 6px;width:48px;text-align:right;">-0.20</span></div>
@@ -121,7 +121,7 @@
 
               <!-- select -->
               <div style="margin-bottom:15px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#9cdcfe;">u_blendMode</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;">int</span></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#9cdcfe;">u_blendMode</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;">int</span></div>
                 <div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 11px;background:#22262c;border:1px solid #2b3037;border-radius:7px;cursor:pointer;"><span style="font-size:12px;color:#e7eaee;">Additive</span><span style="color:#656d78;font-size:10px;">▾</span></div>
               </div>
 
@@ -156,7 +156,7 @@
             <div style="padding:13px 14px;display:flex;flex-direction:column;gap:15px;">
               <div><div style="font-size:11px;color:#9aa2ac;margin-bottom:8px;">Input</div><div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 11px;background:#22262c;border:1px solid #2b3037;border-radius:7px;cursor:pointer;"><span style="font-size:12px;color:#e7eaee;">Built-in Microphone</span><span style="color:#656d78;font-size:10px;">▾</span></div></div>
               <div style="display:flex;gap:10px;"><div style="flex:1;"><div style="font-size:11px;color:#9aa2ac;margin-bottom:8px;">FFT size</div><div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 11px;background:#22262c;border:1px solid #2b3037;border-radius:7px;cursor:pointer;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e7eaee;">2048</span><span style="color:#656d78;font-size:10px;">▾</span></div></div><div style="flex:1;"><div style="font-size:11px;color:#9aa2ac;margin-bottom:8px;">Smoothing</div><div style="height:32px;display:flex;align-items:center;"><div style="flex:1;height:5px;border-radius:3px;background:#2b3037;position:relative;"><div style="position:absolute;left:0;top:0;height:100%;width:80%;background:#3d9bff;border-radius:3px;"></div><div style="position:absolute;left:80%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#fff;"></div></div></div></div></div>
-              <div><div style="font-size:11px;color:#9aa2ac;margin-bottom:9px;">Frequency bands</div><div style="display:flex;align-items:flex-end;gap:3px;height:52px;padding:8px;background:#0e1013;border:1px solid #20242a;border-radius:7px;"><sc-for list="{{ bands }}" as="b" hint-placeholder-count="16"><div style="flex:1;border-radius:1px 1px 0 0;background:linear-gradient(to top,#3d9bff,#57a9ff);height:{{ b }};"></div></sc-for></div></div>
+              <div><div style="font-size:11px;color:#9aa2ac;margin-bottom:9px;">Frequency bands</div><div style="display:flex;align-items:flex-end;gap:3px;height:52px;padding:8px;background:#0f1114;border:1px solid #20242a;border-radius:7px;"><sc-for list="{{ bands }}" as="b" hint-placeholder-count="16"><div style="flex:1;border-radius:1px 1px 0 0;background:linear-gradient(to top,#3d9bff,#57a9ff);height:{{ b }};"></div></sc-for></div></div>
             </div>
           </sc-if>
 
@@ -232,7 +232,7 @@
                 <button style="width:24px;height:24px;background:#1a1d22;border:1px solid #20242a;border-radius:5px;color:#9aa2ac;font-size:11px;cursor:pointer;" style-hover="background:#22262c;color:#c4cad2;" title="Close panel">✕</button>
               </div>
             </div>
-            <div style="display:flex;gap:2px;background:#0e1013;border:1px solid #20242a;border-radius:7px;padding:2px;margin-bottom:10px;">
+            <div style="display:flex;gap:2px;background:#0f1114;border:1px solid #20242a;border-radius:7px;padding:2px;margin-bottom:10px;">
               <sc-for list="{{ diagFilters }}" as="f" hint-placeholder-count="5">
                 <button style="flex:1;height:23px;border:none;border-radius:5px;background:{{ f.bg }};color:{{ f.fg }};font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:500;cursor:pointer;">{{ f.label }}</button>
               </sc-for>
@@ -242,7 +242,7 @@
                 <div style="display:flex;gap:9px;align-items:flex-start;padding:8px 10px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;">
                   <span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;color:{{ d.hex }};background:{{ d.bg }};border:1px solid {{ d.bd }};border-radius:4px;padding:1px 5px;min-width:44px;text-align:center;flex-shrink:0;">{{ d.level }}</span>
                   <div style="min-width:0;flex:1;"><div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#c4cad2;line-height:1.4;"><span style="color:#656d78;">{{ d.cat }}</span> {{ d.msg }}</div></div>
-                  <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#565e68;flex-shrink:0;">{{ d.time }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#656d78;flex-shrink:0;">{{ d.time }}</span>
                 </div>
               </sc-for>
             </div>
@@ -273,7 +273,7 @@
         <div>
           <div style="font-size:11px;color:#9aa2ac;margin-bottom:10px;">Segmented · toggle</div>
           <div style="display:flex;align-items:center;gap:12px;">
-            <div style="display:flex;gap:2px;background:#0e1013;border:1px solid #20242a;border-radius:8px;padding:2px;"><button style="height:26px;padding:0 12px;border:none;border-radius:6px;background:#3d9bff;color:#fff;font-size:11px;cursor:pointer;">Solid</button><button style="height:26px;padding:0 12px;border:none;border-radius:6px;background:transparent;color:#9aa2ac;font-size:11px;cursor:pointer;">Wire</button><button style="height:26px;padding:0 12px;border:none;border-radius:6px;background:transparent;color:#9aa2ac;font-size:11px;cursor:pointer;">Points</button></div>
+            <div style="display:flex;gap:2px;background:#0f1114;border:1px solid #20242a;border-radius:8px;padding:2px;"><button style="height:26px;padding:0 12px;border:none;border-radius:6px;background:#3d9bff;color:#fff;font-size:11px;cursor:pointer;">Solid</button><button style="height:26px;padding:0 12px;border:none;border-radius:6px;background:transparent;color:#9aa2ac;font-size:11px;cursor:pointer;">Wire</button><button style="height:26px;padding:0 12px;border:none;border-radius:6px;background:transparent;color:#9aa2ac;font-size:11px;cursor:pointer;">Points</button></div>
             <span style="width:38px;height:22px;border-radius:11px;background:#3d9bff;position:relative;cursor:pointer;"><span style="position:absolute;right:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;"></span></span>
           </div>
         </div>
@@ -407,7 +407,7 @@ class Component extends DCLogic {
       { level: "INFO",  cat: "gl",     hex: "#57a9ff", bg: "rgba(61,155,255,0.1)",  bd: "#1c3452",              msg: "7 programs linked · 0 cache miss",     time: "0.3s" },
       { level: "WARN",  cat: "shader", hex: "#f5b13d", bg: "rgba(245,177,61,0.1)",  bd: "rgba(245,177,61,0.3)", msg: "Blend: mediump precision fallback",   time: "1.2s" },
       { level: "ERROR", cat: "shader", hex: "#f0555c", bg: "rgba(240,85,92,0.1)",   bd: "rgba(240,85,92,0.35)", msg: "Blend: program link failed · 2 errors", time: "1.2s" },
-      { level: "DEBUG", cat: "mem",    hex: "#9aa2ac", bg: "#0e1013",               bd: "#20242a",              msg: "GC pause 3 ms · buffers reclaimed",   time: "4.8s" },
+      { level: "DEBUG", cat: "mem",    hex: "#9aa2ac", bg: "#0f1114",               bd: "#20242a",              msg: "GC pause 3 ms · buffers reclaimed",   time: "4.8s" },
     ];
 
     return {

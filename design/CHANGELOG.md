@@ -13,6 +13,49 @@
 
 ## [Unreleased]
 > 다음 변경 대기 중.
+- `[component]` `Node Editor.dc.html` — **Noise(멀티포트) 입력 정렬 수정**: 6개 입력 포트(stride 30)가 프리뷰 하단으로 치우쳐 위가 비고 마지막 `mask`가 프리뷰 밖으로 내려가던 문제 → 포트를 프리뷰 중심(≈130)에 대칭 정렬(dot top 50~200), 출력 `color`도 중심에 맞춤.
+- `[component]` `Node Editor.dc.html` — **Combine·Output 포트 정렬 수정**: Combine은 입력 dot 3개(rgb/alpha/mask, stride 27)·출력 dot(vec4)에 대응하는 라벨을 dot 위치(top 44/71/98)에 정렬하고 본문 높이를 확보(3번째 포트가 카드 밖으로 나가던 문제 해소, 중앙 채널 스와치 추가). Output은 "texture" 포트명과 "→ viewport" 값을 한 행(flex, dot 중심 정렬)으로 묶어 어긋남 제거.
+- `[component]` `Node Editor.dc.html` — **노드 폭이 포트 라벨에 맞춰 커지도록**: 좌/우 레일 폭 = 가장 긴 라벨 수용, 카드 폭 = 좌레일+본문+우레일. Fresnel(geometry/baseColor/u_time/fragColor, 196→220px)·Blend(textureA/textureB/mixAmount, 196→208px)를 실제 긴 라벨로 넓혀 규칙 시연, 두 노드의 출력 엣지 시작 x를 새 폭에 맞춰 재계산. README §B에 "포트 라벨 + 노드 폭" 규칙 갱신.
+- `[component]` `Node Editor.dc.html` — **포트 라벨 잘림 제거**: 모든 포트 이름의 `max-width`(34/30/40px)·`overflow:hidden`·`text-overflow:ellipsis` 클램프 제거, `white-space:nowrap`만 유지 → 이름이 길어도 전부 노출(참고: Unreal 블루프린트 스타일). README §B에 포트 라벨 규칙 추가.
+
+---
+
+## v2.0 — 2026-07-19
+> `design-request-v1.9.md`(V1~V5) 응답. **V1이 게이트였고 U2를 확정하지 않았다** — 대신 노드 그래프 비중을 키운 **v2.0 기본 레이아웃으로 재설계·확정**(버전 범프). breaking 유지. (S26 정합성 정리에서 accent.bright·successBright·nodeCategory.*Bright·gradient 토큰 신규.)
+
+### 정합성 정리 (S26)
+- `[token]` `[screen]` **S26 — 크로스 화면 드리프트 정리 (v2.0 완성도).** 12개 화면이 `theme.ts`에 없는 색을 각자 만들어 쓰며 "같은 역할·다른 값"으로 갈라진 것을 정본에 맞춰 통일.
+  - **A 중간 회색 흡수** `[token]` — 유령 회색을 기존 text 단계로 스냅(신규 토큰 0): `#565e68`·`#59626c`·`#5f7488`→`muted`, `#8f97a1`·`#8890a0`→`secondary`, `#c2c8d0`→`brightBody`. (9개 화면 영향, 가장 광범위)
+  - **B accent.bright 신설** `[token]` — 11개 화면 전부가 쓰던 `#7dbcff`(hover보다 밝은 accent)를 `accent.bright`로 정식 토큰화.
+  - **C 근-검정 표면 스냅** `[token]` — `#0e1013`·`#0e1116`·`#0d0f12`→`surface.rail(#0f1114)`, `#0a0c10`→`surface.app(#0b0c0e)`.
+  - **D 카테고리 bright 정식화** `[token]` — `nodeCategory.processBright(#7dbcff)`·`valueBright(#e2ba57)`·`outputBright(#ee7fac)` + `semantic.successBright(#6fe3b8)` 신설. perf 배지 yellow `#f4d774`→`valueBright`, warn `#f5c778`→`warning`으로 흡수. (green `#6fe3b8`은 scalar가 아니라 success 계열이었음 — GPU active·Shader perf 배지.)
+  - **E 그라디언트 단일화** `[token]` — `gradient.viewportActive`·`shaderSphere` 신설. App Shell만 어긋나던 navy 백드롭 `38%/78%`→`40%/80%`, empty-state 3종점(node-connect `#0f1218`, Welcome/System States `#0e1116/#0a0c10`)을 `gradient.emptyState` 하나로 통일.
+  - **F 국소 정리** `[component]` — Code Editor의 `#3c434c`(35회)→`border.stronger(#3a414a)`.
+
+### V1~V5 결정 (요청서 인용)
+- **V1 [U2 최종 여부] `[breaking]` ★게이트** = **U2 미확정.** U1(v1.7)→U2(v1.8) 당일 교체 이력을 감안, U2(우하단 노드)를 정본으로 굳히지 않고 **v2.0으로 한 번 더 개선해 확정.** 이후 breaking 구현·E2E 개편 착수 가능.
+- **V2 [U2-b Code 접기] `[component]`** = **접기 가능 → 34px 좌측 세로 레일** 채택. R4(접힌 leaf=split 방향 34px strip)를 좌측 세로로 적용. chevron 가로화(`‹` 접기 / 레일의 `›` 펼치기). 스테일 `codeH` 계산 **제거**, `toggleCode`가 실제로 컬럼을 접도록 배선.
+- **V3 [U2-a 노드 그래프 격하] `[screen]`** = **재조정 — 노드 그래프 비중 확대**(사실상 V1 재검토). U2의 "우하단 소형 노드"를 폐기하고 노드 그래프를 **화면 중앙 대형 컬럼**으로 승격. "하단 전폭" 문구 이슈는 레이아웃 자체를 바꿔 해소.
+- **V4 [U2-c 마이그레이션] `[breaking]`** = **조용한 폴백.** localStorage 스키마 **버전 키** 신설, 불일치 시 경고/배너 없이 v2.0 기본 트리로 폴백.
+- **V5 [U2-d 컴팩트 순서] `[screen]`** = **기능 우선순위 순**: Viewport → Node Editor → Code → Inspector·Assets.
+
+### 결정 요약
+- **v2.0 [기본 레이아웃 재설계] `[screen]` `[breaking]` ★** 기본 트리 = `row 0.25 [ code | row 0.60 [ nodeEditor | col 0.52 [viewport / (inspector,assets)] ] ]` — 좌 Code(25%, 접기 가능) · 중앙 Node Editor(주역 그래프, 대형) · 우 col[Viewport(상) / Inspector·Assets(하)]. 대략 25/45/30 비율.
+
+### Changed
+- `[component]` `App Shell.dc.html` `[breaking]` — **App Shell을 도킹 시스템 SSoT로 통합.** Docking Prototype의 도킹 엔진(트리 레이아웃·pointer 드래그/드롭·edge-split/tab-merge·divider 리사이즈·collapse/maximize·＋Panel 재도킹·Reset·트랜지언트 고스트·diagnostics 오버레이)을 App Shell 로직 클래스로 흡수하고, 각 leaf 본문은 App Shell의 리치 패널(Node Editor·Viewport·Inspector·Code·Assets)을 렌더. 노드 선택→Code 자동 접힘(req3)은 이제 **도킹 트리의 code leaf `collapsed` 플래그**를 토글해 구현. 별도 `Docking Prototype.dc.html`은 **삭제**(더 이상 두 파일 정합 불필요 — App Shell이 룩앤필+도킹 동작 단일 출처). Problems는 도킹 탭이 아니라 상태바→diagnostics 오버레이(R5).
+- `[component]` `App Shell.dc.html` — **패널 탭 헤더를 Docking Prototype 형식으로 통일**: 모든 패널 헤더가 `⣿` + [색 dot + 제목 + 탭 `✕`] 탭 pill(활성 = 하단 2px accent) + 메타 배지 + 박스형(22×22) collapse/maximize/close 아이콘. Viewport/Node Editor의 대문자 라벨 → 탭 pill로 교체, Side Panel 언더라인 탭에 dot·탭✕·메타 배지 추가, Code는 [● Code] 탭 + GLSL 배지 헤더 + vertex/fragment 스테이지 탭을 본문 하위 스트립으로 이동. dot 색 = Docking META(nodeEditor #3d9bff·viewport #4bbf89·inspector #d4a53c·assets #f0b429·code #a06bff·problems #77828f). 단, Side Panel(~431px 우측 컬럼)은 3개 탭+배지가 이미 폭을 채워 탭별 `✕`·메타 배지는 생략(close `✕` 노출 확보).
+- `[component]` `App Shell.dc.html` — BODY 재구성: 좌측 Code 컬럼 25%(접힘 시 34px 세로 레일 + 세로 `Code · GLSL` 라벨 + 에러 dot + `›`), 중앙 Node Editor(order:1, flex:1.5, border-right), 우측 col[Viewport(border-bottom) / Side Panel]. 노드 그래프 좌표·엣지·svg viewBox를 세로형 대형 캔버스(680×780)에 맞춰 재배치. 로직: 스테일 `codeH` 제거, `codeOpen`/`codeCollapsed` 노출, `codeChevron`=`‹`.
+- `[component]` `App Shell.dc.html` — **노드 추가 메뉴를 툴바에서 제거하고 Node Editor에 부착**(툴바는 brand·Presets·transport만). 배치는 **`floating` 고정** — 캔버스 상단 중앙 떠 있는 pill 바(카테고리 색 타일+글리프 + `＋ More`), `z-index:6`. (header/rail 대안은 검토 후 폐기.)
+- `[component]` `App Shell.dc.html` — **Code 자동 접기/펼침**(req3): 노드 선택 상태(`sel`)로 구동 — Shader 노드 선택 시 Code 자동 펼침, 그 외 노드 선택 시 자동 접힘(rail). 5개 노드 클릭 가능, 선택 노드에 파란 링. `selectNode(id)`가 `codeOpen = (id === "shader")` 설정.
+- `[screen]` `Docking Prototype.dc.html` — `_defaultTree()`를 v2.0 트리(좌 Code · 중앙 NodeEditor · 우 col[Viewport/Inspector])로 교체. **App Shell과 크롬 정합(R2)**: Code 스테이지 탭 스트립의 중복 "Fresnel" 라벨 제거. **접기 chevron은 패널 종류가 아니라 위치로 결정(req1)** — 부모 split 방향(`parentDir`) + 그 패널이 a/b 어느 쪽 자식인지(`childSide`)로 계산: row-a=`‹`(열림)/`›`(접힘), row-b=`›`/`‹`, col-a(상)=`⌃`/`⌄`, col-b(하)=`⌄`/`⌃`. 패널을 다른 위치로 도킹하면 chevron 방향도 따라 바뀜. App Shell 정적 chevron도 기본 위치에 맞춰 동일 규칙 적용(Code·Node Editor=`‹`, Viewport(col 상)=`⌃`, Inspector(col 하)=`⌄`).
+- `[screen]` `README.md` — 버전 v2.0 · §A App Shell 레이아웃 · §M 기본 트리 · R9 마이그레이션(조용한 폴백) · R11 컴팩트 스택 순서를 v2.0으로 갱신.
+
+### Docs / 구현
+- `breaking`: `dockTree.createDefaultDockTree` + `layoutStore` 기본값을 v2.0 트리로 교체 → **v1.5 S1(옛 트리 dir 정정)은 무의미**(옛 기본 트리 소멸). localStorage **스키마 버전 키 신설** + 조용한 폴백(V4). E2E 1440×900 스냅샷/도킹 스펙 대개편 — **CLAUDE.md상 사용자 합의 후 착수**. 번들 393 KiB 예산 재측정(순수 구조 변경, 순증 작음).
+- v1.6(T1~T6)은 이 문서와 독립 착수 가능(breaking 아님).
+
+> ⚠ 신규 토큰: S26 정합성 정리에서 accent.bright·semantic.successBright·nodeCategory.*Bright·gradient.viewportActive·shaderSphere 추가(그 외 드리프트는 기존 토큰으로 흡수). `breaking`: 기본 레이아웃 U2→v2.0(노드 그래프 중앙 대형화). 근사 없음.
 
 ---
 

@@ -23,8 +23,16 @@ import { StageTabs } from "./StageTabs";
 
 /** Node breadcrumb chip (Code Editor.dc.html L39-43) — accent-tinted pill
  * showing the currently-edited node's category glyph, display name, and
- * kind, rendered in the DockPanelHeader children slot right after the stage
- * tabs. */
+ * kind. Rendered in the Code body's own stage-tab sub-strip (`.code-stage-
+ * strip`, below `DockPanelHeader`), right after the stage tabs — **not**
+ * the dock header's `children` slot anymore (design/CHANGELOG.md §v2.0
+ * Changed: "Code는 [● Code] 탭 + GLSL 배지 헤더 + vertex/fragment 스테이지
+ * 탭을 본문 하위 스트립으로 이동"). At the v2.0 25%-width Code column, the
+ * dock header alone (grab + `[● Code ✕]` tab + `GLSL · ES 3.0` meta +
+ * collapse/maximize/close) already fills the ~359px panel; keeping the
+ * stage tabs + this chip in that same row pushed the trailing buttons past
+ * the panel's right edge (clipped by `.panel`'s `overflow:hidden`, real
+ * pointer unreachable even though the DOM node was technically present). */
 const BREADCRUMB_CONTAINER_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -352,7 +360,14 @@ export function CodeEditor() {
 
   return (
     <div className="panel panel--code">
-      <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end">
+      <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end" />
+      {/* Stage-tab sub-strip (design/CHANGELOG.md §v2.0 Changed) — a direct
+          `.panel` child, so the existing collapsed-rail rule
+          (`.shell-slot--collapsed .panel > :not(.dock-header)`, index.css)
+          hides it automatically along with the editor body; no extra
+          isRail check needed here (unlike when it lived inside
+          DockPanelHeader's children slot, gated by `!isRail`). */}
+      <div className="code-stage-strip">
         <StageTabs
           active={stage}
           onChange={setStage}
@@ -365,7 +380,7 @@ export function CodeEditor() {
             <NodeBreadcrumb name={displayNodeName(node)} kind={node.kind} />
           </>
         )}
-      </DockPanelHeader>
+      </div>
       <div className="panel-body">
         <div
           ref={containerRef}

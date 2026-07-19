@@ -364,7 +364,7 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
     localStorage.setItem(
       LAYOUT_KEY,
       JSON.stringify({
-        version: 1,
+        version: 2,
         tree: seededTree,
         maximized: null,
         nextLeafId: 8,
@@ -391,7 +391,7 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
     localStorage.setItem(
       LAYOUT_KEY,
       JSON.stringify({
-        version: 1,
+        version: 2,
         tree: { type: "leaf", id: "l1", tabs: ["bogus"], active: "bogus" },
         maximized: null,
         nextLeafId: 5,
@@ -403,6 +403,62 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
       stop = startDockLayoutPersistence();
     }).not.toThrow();
     expect(useDockStore.getState().tree).toBe(before);
+  });
+
+  it("V4 (v2.0 quiet fallback): a version:1 (pre-v2.0 schema) snapshot is silently discarded — the v2.0 default tree is kept, no banner/throw", () => {
+    // A well-formed *old* v1.x-shaped tree — the shape/leaf ids don't matter,
+    // the version gate rejects it before the tree is ever inspected.
+    const oldSchemaTree: DockNode = {
+      type: "split",
+      dir: "col",
+      ratio: 0.717,
+      a: {
+        type: "split",
+        dir: "row",
+        ratio: 0.587,
+        a: {
+          type: "leaf",
+          id: "l1",
+          tabs: ["nodeEditor"],
+          active: "nodeEditor",
+        },
+        b: {
+          type: "split",
+          dir: "col",
+          ratio: 0.556,
+          a: { type: "leaf", id: "l2", tabs: ["viewport"], active: "viewport" },
+          b: {
+            type: "leaf",
+            id: "l3",
+            tabs: ["inspector", "assets"],
+            active: "inspector",
+          },
+        },
+      },
+      b: {
+        type: "leaf",
+        id: "l4",
+        tabs: ["code"],
+        active: "code",
+        collapsed: false,
+      },
+    };
+    localStorage.setItem(
+      LAYOUT_KEY,
+      JSON.stringify({
+        version: 1,
+        tree: oldSchemaTree,
+        maximized: null,
+        nextLeafId: 5,
+      }),
+    );
+
+    expect(() => {
+      stop = startDockLayoutPersistence();
+    }).not.toThrow();
+
+    // no banner/warning surfaced — just a quiet fallback to the v2.0 default.
+    expect(useDockStore.getState().tree).toEqual(createDefaultDockTree());
   });
 
   it("writes a snapshot to localStorage once the debounce window elapses after a store change", () => {
@@ -424,10 +480,11 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
     // localStorage polyfill in `test-setup.ts` isn't a `Storage` instance.
     const setItemSpy = vi.spyOn(localStorage, "setItem");
 
-    // ["a", "b"] is the viewport|inspector-assets split in the default tree
-    // (same fixture path used in dockTree.test.ts's insertDetachedLeaf specs).
+    // ["b", "b"] is the viewport|inspector-assets col split in the v2.0
+    // default tree (same fixture path used in dockTree.test.ts's
+    // insertDetachedLeaf specs).
     for (let ratio = 0.3; ratio <= 0.6; ratio += 0.05) {
-      useDockStore.getState().setDividerRatio(["a", "b"], ratio, 1000, 800);
+      useDockStore.getState().setDividerRatio(["b", "b"], ratio, 1000, 800);
       vi.advanceTimersByTime(10);
     }
     expect(setItemSpy).not.toHaveBeenCalled();
@@ -463,7 +520,7 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
       ["maximized", "nextLeafId", "tree", "version"].sort(),
     );
     expect(parsed).toEqual({
-      version: 1,
+      version: 2,
       tree: useDockStore.getState().tree,
       maximized: useDockStore.getState().maximized,
       nextLeafId: useDockStore.getState().nextLeafId,

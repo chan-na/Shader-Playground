@@ -13,6 +13,19 @@
  * 뿐 컴포넌트는 항상 마운트 유지(WebGL/CodeMirror 보존). 트리 모양은
  * 리사이즈/접기/최대화/드래그 재도킹 어떤 조작에서도 재귀 위치가 안정적인
  * 한 React가 리마운트하지 않는다.
+ * ⚠ S5 각주(v2.0, 이 불변식의 유일한 완화 지점): `leafPanelKind`가
+ * `leaf.active` 기준으로 바뀌면서, **이종 탭을 가진 leaf**에서 active를
+ * 전환하면 `DockLeafView`가 렌더하는 컴포넌트 자체가 바뀐다(예:
+ * `tabs:["nodeEditor","assets"]`에서 active가 assets→nodeEditor로 바뀌면
+ * SidePanel이 언마운트되고 NodeEditor가 마운트된다) — 이건 CSS
+ * display:none이 아니라 진짜 조건부 렌더링 분기 전환이라 위 불변식이 지키는
+ * "컴포넌트는 항상 마운트 유지"가 그 leaf 내부에서는 깨진다. 다만 T1
+ * (`dockTree.ts`의 `canMergeDockTabs`)이 viewport/code를 이종 병합
+ * 자체에서 배제하므로, WebGL(Viewport)·CodeMirror(CodeEditor)처럼 재초기화
+ * 비용이 큰 두 패널은 애초에 이종 leaf에 들어갈 수 없다 — 이 완화가 실제로
+ * 영향을 주는 건 nodeEditor/inspector/assets 조합뿐이고, 그중 재마운트
+ * 비용이 큰 건 없다(ReactFlow도 매 마운트 상태를 그래프 스토어에서 다시
+ * 읽으므로 안전).
  *
  * B4-U3(드래그 엔진 + 고스트/프리뷰 오버레이): `DockLayout` 루트가 드래그
  * 오케스트레이션 전체(pending → 고스트 전환 임계값, 고스트 추적, 드롭

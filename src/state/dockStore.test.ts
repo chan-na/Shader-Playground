@@ -8,9 +8,23 @@ import {
   type DockDropTarget,
   type DockNode,
   type DockPath,
-  firstLeafPath,
   getNodeAt,
+  OUTER_DOCK_RATIO,
 } from "./dockTree";
+
+/** 테스트 전용 순회 헬퍼 — 이전엔 `firstLeafPath`(무조건 첫 leaf)로 이
+ * 루프들을 구동했지만, v2.0에서 그 함수는 병합 대상만 찾는
+ * `firstMergeableLeafPath`로 대체됐다(S5/T1, addPanel 전용). 여기 테스트들은
+ * "병합 가능 여부"와 무관하게 트리를 완전히 비울 때까지(또는 전부
+ * detach할 때까지) *아무* leaf나 하나 골라 반복하면 되므로, 옛 동작을 그대로
+ * 복제한 모듈-로컬 헬퍼를 둔다(프로덕션 export가 아니므로 knip 대상이
+ * 아니다). */
+function anyLeafPath(node: DockNode | null): DockPath | null {
+  if (node === null) return null;
+  if (node.type === "leaf") return [];
+  const sub = anyLeafPath(node.a);
+  return sub === null ? null : ["a", ...sub];
+}
 
 const initial = useDockStore.getState();
 
@@ -34,12 +48,12 @@ describe("initial state", () => {
 });
 
 describe("setActiveTab", () => {
-  it("switches the active tab of the l3 leaf (inspector/assets)", () => {
-    useDockStore.getState().setActiveTab(["a", "b", "b"], "assets");
-    const node = nodeAt(useDockStore.getState().tree, ["a", "b", "b"]);
+  it("switches the active tab of the l2 leaf (inspector/assets)", () => {
+    useDockStore.getState().setActiveTab(["b", "b", "b"], "assets");
+    const node = nodeAt(useDockStore.getState().tree, ["b", "b", "b"]);
     expect(node).toEqual({
       type: "leaf",
-      id: "l3",
+      id: "l2",
       tabs: ["inspector", "assets"],
       active: "assets",
     });
@@ -47,13 +61,14 @@ describe("setActiveTab", () => {
 
   it("is a no-op for an invalid path", () => {
     const before = useDockStore.getState().tree;
-    useDockStore.getState().setActiveTab(["a", "a", "a"], "assets");
+    // root.a is the code leaf — a further step past it is invalid.
+    useDockStore.getState().setActiveTab(["a", "a"], "assets");
     expect(useDockStore.getState().tree).toBe(before);
   });
 
   it("is a no-op when the tab isn't hosted by that leaf", () => {
     const before = useDockStore.getState().tree;
-    useDockStore.getState().setActiveTab(["a", "b", "b"], "code");
+    useDockStore.getState().setActiveTab(["b", "b", "b"], "code");
     expect(useDockStore.getState().tree).toBe(before);
   });
 });
@@ -61,8 +76,8 @@ describe("setActiveTab", () => {
 describe("setDividerRatio", () => {
   it("clamps the root divider ratio via clampDividerRatio", () => {
     useDockStore.getState().setDividerRatio([], 0.1, 1440, 826);
-    const expected = clampDividerRatio("col", 1440, 826, 0.1);
-    expect(expected).toBeCloseTo(160 / 820, 5);
+    const expected = clampDividerRatio("row", 1440, 826, 0.1);
+    expect(expected).toBeCloseTo(240 / 1434, 5);
     const root = useDockStore.getState().tree;
     expect(root?.type).toBe("split");
     if (root?.type === "split") {
@@ -72,7 +87,8 @@ describe("setDividerRatio", () => {
 
   it("is a no-op for a path that isn't a split", () => {
     const before = useDockStore.getState().tree;
-    useDockStore.getState().setDividerRatio(["a", "a"], 0.1, 1440, 826);
+    // root.a resolves to the code leaf, not a split.
+    useDockStore.getState().setDividerRatio(["a"], 0.1, 1440, 826);
     expect(useDockStore.getState().tree).toBe(before);
   });
 });
@@ -82,21 +98,22 @@ describe("toggleCollapsed", () => {
     useDockStore.getState().toggleMaximized("l1");
     expect(useDockStore.getState().maximized).toBe("l1");
 
-    useDockStore.getState().toggleCollapsed(["b"]);
-    expect(nodeAt(useDockStore.getState().tree, ["b"])).toMatchObject({
+    useDockStore.getState().toggleCollapsed(["a"]);
+    expect(nodeAt(useDockStore.getState().tree, ["a"])).toMatchObject({
       collapsed: true,
     });
     expect(useDockStore.getState().maximized).toBeNull();
 
-    useDockStore.getState().toggleCollapsed(["b"]);
-    expect(nodeAt(useDockStore.getState().tree, ["b"])).toMatchObject({
+    useDockStore.getState().toggleCollapsed(["a"]);
+    expect(nodeAt(useDockStore.getState().tree, ["a"])).toMatchObject({
       collapsed: false,
     });
   });
 
   it("is a no-op for a path that isn't a leaf", () => {
     const before = useDockStore.getState().tree;
-    useDockStore.getState().toggleCollapsed(["a"]);
+    // the root path resolves to the root split itself, not a leaf.
+    useDockStore.getState().toggleCollapsed([]);
     expect(useDockStore.getState().tree).toBe(before);
   });
 });
@@ -116,14 +133,14 @@ describe("toggleMaximized", () => {
   });
 
   it("force-expands a collapsed leaf being maximized (legacy layout store parity)", () => {
-    useDockStore.getState().toggleCollapsed(["b"]);
-    expect(nodeAt(useDockStore.getState().tree, ["b"])).toMatchObject({
+    useDockStore.getState().toggleCollapsed(["a"]);
+    expect(nodeAt(useDockStore.getState().tree, ["a"])).toMatchObject({
       collapsed: true,
     });
 
     useDockStore.getState().toggleMaximized("l4");
     expect(useDockStore.getState().maximized).toBe("l4");
-    expect(nodeAt(useDockStore.getState().tree, ["b"])).toMatchObject({
+    expect(nodeAt(useDockStore.getState().tree, ["a"])).toMatchObject({
       collapsed: false,
     });
   });
@@ -137,11 +154,11 @@ describe("toggleMaximized", () => {
 });
 
 describe("closeTab", () => {
-  it("removes a non-active tab from the l3 leaf, keeping the leaf alive", () => {
+  it("removes a non-active tab from the l2 leaf, keeping the leaf alive", () => {
     useDockStore.getState().closeTab("assets");
-    expect(nodeAt(useDockStore.getState().tree, ["a", "b", "b"])).toEqual({
+    expect(nodeAt(useDockStore.getState().tree, ["b", "b", "b"])).toEqual({
       type: "leaf",
-      id: "l3",
+      id: "l2",
       tabs: ["inspector"],
       active: "inspector",
     });
@@ -150,18 +167,18 @@ describe("closeTab", () => {
   it("collapses the tree when the sole tab of a leaf is removed", () => {
     useDockStore.getState().closeTab("nodeEditor");
     const root = useDockStore.getState().tree;
-    // the l1/rowSplit shrinks away — root.a is now directly the middle col split
+    // the l3/innerRowSplit shrinks away — root.b is now directly the col split
     expect(root?.type).toBe("split");
     if (root?.type === "split") {
-      expect(root.a.type).toBe("split");
-      if (root.a.type === "split") {
-        expect(root.a.dir).toBe("col");
+      expect(root.b.type).toBe("split");
+      if (root.b.type === "split") {
+        expect(root.b.dir).toBe("col");
       }
     }
   });
 
   it("clears maximized when the last tab of the maximized leaf closes", () => {
-    useDockStore.getState().toggleMaximized("l1");
+    useDockStore.getState().toggleMaximized("l3");
     useDockStore.getState().closeTab("nodeEditor");
     expect(useDockStore.getState().maximized).toBeNull();
   });
@@ -176,41 +193,41 @@ describe("closeTab", () => {
 });
 
 describe("closePanel", () => {
-  it("closes both tabs of the l3 leaf; viewport inherits its slot", () => {
-    useDockStore.getState().closePanel(["a", "b", "b"]);
+  it("closes both tabs of the l2 leaf; viewport inherits its slot", () => {
+    useDockStore.getState().closePanel(["b", "b", "b"]);
     const root = useDockStore.getState().tree;
     expect(root).toEqual({
       type: "split",
-      dir: "col",
-      ratio: 0.717,
+      dir: "row",
+      ratio: 0.25,
       a: {
-        type: "split",
-        dir: "row",
-        ratio: 0.587,
-        a: {
-          type: "leaf",
-          id: "l1",
-          tabs: ["nodeEditor"],
-          active: "nodeEditor",
-        },
-        b: { type: "leaf", id: "l2", tabs: ["viewport"], active: "viewport" },
-      },
-      b: {
         type: "leaf",
         id: "l4",
         tabs: ["code"],
         active: "code",
         collapsed: false,
       },
+      b: {
+        type: "split",
+        dir: "row",
+        ratio: 0.6,
+        a: {
+          type: "leaf",
+          id: "l3",
+          tabs: ["nodeEditor"],
+          active: "nodeEditor",
+        },
+        b: { type: "leaf", id: "l1", tabs: ["viewport"], active: "viewport" },
+      },
     });
   });
 
   it("closing every panel in sequence reaches the empty state (tree: null)", () => {
-    let path = firstLeafPath(useDockStore.getState().tree);
+    let path = anyLeafPath(useDockStore.getState().tree);
     let guard = 0;
     while (path !== null && guard < 10) {
       useDockStore.getState().closePanel(path);
-      path = firstLeafPath(useDockStore.getState().tree);
+      path = anyLeafPath(useDockStore.getState().tree);
       guard += 1;
     }
     expect(useDockStore.getState().tree).toBeNull();
@@ -218,12 +235,22 @@ describe("closePanel", () => {
 });
 
 describe("addPanel", () => {
-  it("re-docks a closed panel into the first leaf", () => {
+  it("re-docks a closed panel by merging into the nodeEditor leaf — T1 skips the exclusive code leaf (l4) even though it's in-order first", () => {
     useDockStore.getState().closeTab("assets");
     useDockStore.getState().addPanel("assets");
-    expect(nodeAt(useDockStore.getState().tree, ["a", "a"])).toEqual({
+    // root.a (l4, code) fails the T1 merge gate (assets ∪ code contains the
+    // exclusive "code" kind and neither side is a solo match), so
+    // firstMergeableLeafPath walks past it to root.b.a (l3, nodeEditor).
+    expect(nodeAt(useDockStore.getState().tree, ["a"])).toEqual({
       type: "leaf",
-      id: "l1",
+      id: "l4",
+      tabs: ["code"],
+      active: "code",
+      collapsed: false,
+    });
+    expect(nodeAt(useDockStore.getState().tree, ["b", "a"])).toEqual({
+      type: "leaf",
+      id: "l3",
       tabs: ["nodeEditor", "assets"],
       active: "assets",
       collapsed: false,
@@ -236,12 +263,28 @@ describe("addPanel", () => {
     expect(useDockStore.getState().tree).toBe(before);
   });
 
+  it("T1: re-docking viewport finds no mergeable leaf (viewport/code never merge into anything else) and falls back to a new outer-right leaf", () => {
+    useDockStore.getState().closeTab("viewport");
+    const treeAfterClose = useDockStore.getState().tree;
+
+    useDockStore.getState().addPanel("viewport");
+
+    expect(useDockStore.getState().tree).toEqual({
+      type: "split",
+      dir: "row",
+      ratio: 1 - OUTER_DOCK_RATIO,
+      a: treeAfterClose,
+      b: { type: "leaf", id: "l5", tabs: ["viewport"], active: "viewport" },
+    });
+    expect(useDockStore.getState().nextLeafId).toBe(6);
+  });
+
   it("creates a fresh leaf and bumps nextLeafId when the tree is empty", () => {
-    let path = firstLeafPath(useDockStore.getState().tree);
+    let path = anyLeafPath(useDockStore.getState().tree);
     let guard = 0;
     while (path !== null && guard < 10) {
       useDockStore.getState().closePanel(path);
-      path = firstLeafPath(useDockStore.getState().tree);
+      path = anyLeafPath(useDockStore.getState().tree);
       guard += 1;
     }
     expect(useDockStore.getState().tree).toBeNull();
@@ -271,48 +314,48 @@ describe("resetLayout", () => {
 });
 
 describe("detachForDrag", () => {
-  it("detaches the entire l3 leaf (inspector+assets) via leaf mode, promoting the sibling l2", () => {
+  it("detaches the entire l2 leaf (inspector+assets) via leaf mode, promoting the sibling l1", () => {
     const result = useDockStore
       .getState()
-      .detachForDrag({ mode: "leaf", path: ["a", "b", "b"] });
+      .detachForDrag({ mode: "leaf", path: ["b", "b", "b"] });
     expect(result).toEqual({
       tabs: ["inspector", "assets"],
       active: "inspector",
     });
     expect(useDockStore.getState().tree).toEqual({
       type: "split",
-      dir: "col",
-      ratio: 0.717,
+      dir: "row",
+      ratio: 0.25,
       a: {
-        type: "split",
-        dir: "row",
-        ratio: 0.587,
-        a: {
-          type: "leaf",
-          id: "l1",
-          tabs: ["nodeEditor"],
-          active: "nodeEditor",
-        },
-        b: { type: "leaf", id: "l2", tabs: ["viewport"], active: "viewport" },
-      },
-      b: {
         type: "leaf",
         id: "l4",
         tabs: ["code"],
         active: "code",
         collapsed: false,
       },
+      b: {
+        type: "split",
+        dir: "row",
+        ratio: 0.6,
+        a: {
+          type: "leaf",
+          id: "l3",
+          tabs: ["nodeEditor"],
+          active: "nodeEditor",
+        },
+        b: { type: "leaf", id: "l1", tabs: ["viewport"], active: "viewport" },
+      },
     });
   });
 
-  it("detaches a single tab via tab mode, leaving the sibling tab on l3", () => {
+  it("detaches a single tab via tab mode, leaving the sibling tab on l2", () => {
     const result = useDockStore
       .getState()
       .detachForDrag({ mode: "tab", id: "inspector" });
     expect(result).toEqual({ tabs: ["inspector"], active: "inspector" });
-    expect(nodeAt(useDockStore.getState().tree, ["a", "b", "b"])).toEqual({
+    expect(nodeAt(useDockStore.getState().tree, ["b", "b", "b"])).toEqual({
       type: "leaf",
-      id: "l3",
+      id: "l2",
       tabs: ["assets"],
       active: "assets",
     });
@@ -328,9 +371,10 @@ describe("detachForDrag", () => {
 
   it("is a no-op (null result, unchanged tree reference) for an invalid path", () => {
     const before = useDockStore.getState().tree;
+    // root.a is the code leaf — a further step past it is invalid.
     const result = useDockStore
       .getState()
-      .detachForDrag({ mode: "leaf", path: ["a", "a", "a"] });
+      .detachForDrag({ mode: "leaf", path: ["a", "a"] });
     expect(result).toBeNull();
     expect(useDockStore.getState().tree).toBe(before);
   });
@@ -346,11 +390,11 @@ describe("detachForDrag", () => {
   });
 
   it("reaches the empty state (tree: null) when every leaf is detached in sequence", () => {
-    let path = firstLeafPath(useDockStore.getState().tree);
+    let path = anyLeafPath(useDockStore.getState().tree);
     let guard = 0;
     while (path !== null && guard < 10) {
       useDockStore.getState().detachForDrag({ mode: "leaf", path });
-      path = firstLeafPath(useDockStore.getState().tree);
+      path = anyLeafPath(useDockStore.getState().tree);
       guard += 1;
     }
     expect(useDockStore.getState().tree).toBeNull();
@@ -385,23 +429,62 @@ describe("dockDetached", () => {
     const target: DockDropTarget = {
       kind: "region",
       zone: "center",
-      path: ["a", "b", "b"],
+      path: ["b", "b", "b"],
     };
-    useDockStore.getState().dockDetached(["code"], "code", target);
-    expect(nodeAt(useDockStore.getState().tree, ["a", "b", "b"])).toEqual({
+    // "inspector" is a non-exclusive kind (T1 only gates viewport/code), so
+    // this exercises the plain tab-merge path.
+    useDockStore.getState().detachForDrag({ mode: "tab", id: "inspector" });
+    useDockStore.getState().dockDetached(["inspector"], "inspector", target);
+    expect(nodeAt(useDockStore.getState().tree, ["b", "b", "b"])).toEqual({
       type: "leaf",
-      id: "l3",
-      tabs: ["inspector", "assets", "code"],
-      active: "code",
+      id: "l2",
+      tabs: ["assets", "inspector"],
+      active: "inspector",
     });
   });
 
+  it("T1: merging code into a region center target that isn't already code-only falls back to a right-split instead (no panel lost)", () => {
+    const detached = useDockStore
+      .getState()
+      .detachForDrag({ mode: "tab", id: "code" });
+    expect(detached).toEqual({ tabs: ["code"], active: "code" });
+    // Detaching "code" (the sole tab of the root-level l4 leaf) collapses
+    // the whole root into its former sibling branch (dc's split-collapse
+    // rule) — so l2 (inspector/assets), which lived at ["b","b","b"] in the
+    // pre-detach tree, now lives one level shallower at ["b","b"].
+    const target: DockDropTarget = {
+      kind: "region",
+      zone: "center",
+      path: ["b", "b"], // l2: inspector/assets, post-collapse path
+    };
+
+    useDockStore.getState().dockDetached(["code"], "code", target);
+
+    expect(nodeAt(useDockStore.getState().tree, ["b", "b"])).toEqual({
+      type: "split",
+      dir: "row",
+      ratio: 0.6,
+      a: {
+        type: "leaf",
+        id: "l2",
+        tabs: ["inspector", "assets"],
+        active: "inspector",
+      },
+      b: { type: "leaf", id: "l5", tabs: ["code"], active: "code" },
+    });
+    const ids = collectPanelIds(useDockStore.getState().tree);
+    expect(ids).toHaveLength(DOCK_PANEL_IDS.length);
+    for (const id of DOCK_PANEL_IDS) {
+      expect(ids).toContain(id);
+    }
+  });
+
   it("becomes the new root when the tree is empty and the target is {kind: 'empty'}", () => {
-    let path = firstLeafPath(useDockStore.getState().tree);
+    let path = anyLeafPath(useDockStore.getState().tree);
     let guard = 0;
     while (path !== null && guard < 10) {
       useDockStore.getState().closePanel(path);
-      path = firstLeafPath(useDockStore.getState().tree);
+      path = anyLeafPath(useDockStore.getState().tree);
       guard += 1;
     }
     expect(useDockStore.getState().tree).toBeNull();
@@ -421,7 +504,7 @@ describe("dockDetached", () => {
   it("round-trips detachForDrag -> dockDetached without losing any panel (R1)", () => {
     const result = useDockStore
       .getState()
-      .detachForDrag({ mode: "leaf", path: ["a", "b", "b"] });
+      .detachForDrag({ mode: "leaf", path: ["b", "b", "b"] });
     expect(result).not.toBeNull();
     if (result === null) throw new Error("expected a detach payload");
 

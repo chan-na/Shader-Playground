@@ -31,7 +31,7 @@ afterEach(() => {
   cleanup();
 });
 
-/** 기본 트리의 nodeEditor leaf(l1, path ["a","a"])로 감싼 정적 provider —
+/** 기본 트리의 nodeEditor leaf(l3, path ["b","a"])로 감싼 정적 provider —
  * B2-U1: leaf 데이터(collapsed/active)는 컨텍스트가 아니라 dockStore에서
  * path로 직접 구독하므로, provider는 라우팅 정보(leafId/path)만 고정해도
  * 스토어 변경에 반응한다. */
@@ -66,8 +66,8 @@ describe("DockPanelHeader", () => {
   it("renders a children slot (e.g. tabs) alongside the grab handle", () => {
     render(
       withLeaf(
-        "l3",
-        ["a", "b", "b"],
+        "l2",
+        ["b", "b", "b"],
         <DockPanelHeader>
           <button type="button">Inspector</button>
         </DockPanelHeader>,
@@ -77,12 +77,12 @@ describe("DockPanelHeader", () => {
   });
 
   it("renders the meta badge", () => {
-    render(withLeaf("l1", ["a", "a"], <DockPanelHeader meta="5N · 4E" />));
+    render(withLeaf("l3", ["b", "a"], <DockPanelHeader meta="5N · 4E" />));
     expect(screen.getByText("5N · 4E").className).toBe("dock-header-meta");
   });
 
   it("toggles the leaf's collapsed flag in dockStore and flips aria-expanded on Collapse click", () => {
-    render(withLeaf("l2", ["a", "b", "a"], <DockPanelHeader />));
+    render(withLeaf("l1", ["b", "b", "a"], <DockPanelHeader />));
     const collapseBtn = screen.getByRole("button", { name: "Collapse panel" });
     expect(collapseBtn.getAttribute("aria-expanded")).toBe("true");
 
@@ -90,7 +90,7 @@ describe("DockPanelHeader", () => {
 
     const treeAfter = useDockStore.getState().tree;
     if (treeAfter === null) throw new Error("unreachable");
-    expect(getNodeAt(treeAfter, ["a", "b", "a"])).toMatchObject({
+    expect(getNodeAt(treeAfter, ["b", "b", "a"])).toMatchObject({
       collapsed: true,
     });
     const expandBtn = screen.getByRole("button", { name: "Expand panel" });
@@ -99,13 +99,13 @@ describe("DockPanelHeader", () => {
     fireEvent.click(expandBtn);
     const treeAfter2 = useDockStore.getState().tree;
     if (treeAfter2 === null) throw new Error("unreachable");
-    expect(getNodeAt(treeAfter2, ["a", "b", "a"])).toMatchObject({
+    expect(getNodeAt(treeAfter2, ["b", "b", "a"])).toMatchObject({
       collapsed: false,
     });
   });
 
   it("sets maximized to this leaf's id on Maximize click, and clears it back to null on a second click", () => {
-    render(withLeaf("l4", ["b"], <DockPanelHeader />));
+    render(withLeaf("l4", ["a"], <DockPanelHeader />));
     const maximizeBtn = screen.getByRole("button", { name: "Maximize panel" });
 
     fireEvent.click(maximizeBtn);
@@ -119,7 +119,7 @@ describe("DockPanelHeader", () => {
   // dc `maxIcon: full ? "⤡" : "⤢"` (Docking Prototype.dc.html L562)
   // — the glyph itself toggles with maximized state, not just the aria-label.
   it("shows ⤢ (U+2922) when idle and flips to ⤡ (U+2921) once maximized", () => {
-    render(withLeaf("l4", ["b"], <DockPanelHeader />));
+    render(withLeaf("l4", ["a"], <DockPanelHeader />));
     const maximizeBtn = screen.getByRole("button", { name: "Maximize panel" });
     expect(maximizeBtn.textContent).toBe("⤢");
 
@@ -131,8 +131,8 @@ describe("DockPanelHeader", () => {
   // R6: the header ✕ closes the whole panel (every tab on the leaf), unlike
   // a per-tab ✕ (tab-level close is covered by the "dock tabs" describe below).
   describe("Close panel", () => {
-    it("removes every tab of this leaf from the tree (l3 sidePanel: inspector + assets)", () => {
-      render(withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />));
+    it("removes every tab of this leaf from the tree (l2 sidePanel: inspector + assets)", () => {
+      render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
       fireEvent.click(screen.getByRole("button", { name: "Close panel" }));
 
       const ids = collectPanelIds(useDockStore.getState().tree);
@@ -140,10 +140,10 @@ describe("DockPanelHeader", () => {
       expect(ids).not.toContain("assets");
     });
 
-    it("clears maximized back to null when the header ✕ closes the maximized leaf (l2)", () => {
-      render(withLeaf("l2", ["a", "b", "a"], <DockPanelHeader />));
+    it("clears maximized back to null when the header ✕ closes the maximized leaf (l1)", () => {
+      render(withLeaf("l1", ["b", "b", "a"], <DockPanelHeader />));
       fireEvent.click(screen.getByRole("button", { name: "Maximize panel" }));
-      expect(useDockStore.getState().maximized).toBe("l2");
+      expect(useDockStore.getState().maximized).toBe("l1");
 
       fireEvent.click(screen.getByRole("button", { name: "Close panel" }));
       expect(useDockStore.getState().maximized).toBeNull();
@@ -171,26 +171,26 @@ describe("DockPanelHeader", () => {
   // (dot + title + per-tab ✕) instead of taking a `label` prop — the label
   // prop is retired because the tab(s) occupy that slot instead.
   describe("dock tabs (leaf.tabs → panel-tab, R6/R12)", () => {
-    it("renders one dock tab per leaf.tabs entry, active tab underlined (l3: inspector + assets)", () => {
-      render(withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />));
+    it("renders one dock tab per leaf.tabs entry, active tab underlined (l2: inspector + assets)", () => {
+      render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
 
       const inspectorTab = screen.getByTestId("tab-inspector");
       const assetsTab = screen.getByTestId("tab-assets");
       expect(inspectorTab).not.toBeNull();
       expect(assetsTab).not.toBeNull();
-      // default tree: l3.active === "inspector"
+      // default tree: l2.active === "inspector"
       expect(inspectorTab.className).toContain("panel-tab--active");
       expect(assetsTab.className).not.toContain("panel-tab--active");
     });
 
     it("clicking a tab sets it active in dockStore", () => {
-      render(withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />));
+      render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
 
       fireEvent.click(screen.getByTestId("tab-assets"));
 
       const tree = useDockStore.getState().tree;
       if (tree === null) throw new Error("unreachable");
-      expect(getNodeAt(tree, ["a", "b", "b"])).toMatchObject({
+      expect(getNodeAt(tree, ["b", "b", "b"])).toMatchObject({
         active: "assets",
       });
     });
@@ -198,7 +198,7 @@ describe("DockPanelHeader", () => {
     // R6 core: closing an *inactive* tab's ✕ must not first activate it —
     // only that tab leaves the tree, and the leaf's active tab is untouched.
     it("closing an inactive tab's ✕ removes only that tab and leaves the active tab unchanged", () => {
-      render(withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />));
+      render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
 
       const closeAssets = within(screen.getByTestId("tab-assets")).getByRole(
         "button",
@@ -211,7 +211,7 @@ describe("DockPanelHeader", () => {
       expect(ids).toContain("inspector");
       expect(ids).not.toContain("assets");
       if (tree === null) throw new Error("unreachable");
-      expect(getNodeAt(tree, ["a", "b", "b"])).toMatchObject({
+      expect(getNodeAt(tree, ["b", "b", "b"])).toMatchObject({
         active: "inspector",
       });
     });
@@ -223,7 +223,7 @@ describe("DockPanelHeader", () => {
       const onPointerDown = vi.fn();
       render(
         <div onPointerDown={onPointerDown}>
-          {withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />)}
+          {withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />)}
         </div>,
       );
       const closeAssets = within(screen.getByTestId("tab-assets")).getByRole(
@@ -239,8 +239,8 @@ describe("DockPanelHeader", () => {
     it("renders a per-tab count badge from the `badges` prop", () => {
       render(
         withLeaf(
-          "l3",
-          ["a", "b", "b"],
+          "l2",
+          ["b", "b", "b"],
           <DockPanelHeader badges={{ assets: 2 }} />,
         ),
       );
@@ -252,7 +252,7 @@ describe("DockPanelHeader", () => {
     });
 
     it("gives each panel dot a token-backed background (nodeEditor → --accent-default)", () => {
-      render(withLeaf("l1", ["a", "a"], <DockPanelHeader />));
+      render(withLeaf("l3", ["b", "a"], <DockPanelHeader />));
 
       const dot = screen
         .getByTestId("tab-nodeEditor")
@@ -261,19 +261,19 @@ describe("DockPanelHeader", () => {
     });
 
     it("Enter on a tab activates it (keyboard equivalent of click)", () => {
-      render(withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />));
+      render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
 
       fireEvent.keyDown(screen.getByTestId("tab-assets"), { key: "Enter" });
 
       const tree = useDockStore.getState().tree;
       if (tree === null) throw new Error("unreachable");
-      expect(getNodeAt(tree, ["a", "b", "b"])).toMatchObject({
+      expect(getNodeAt(tree, ["b", "b", "b"])).toMatchObject({
         active: "assets",
       });
     });
 
     it("renders no dock tabs while collapsed into a rail", () => {
-      render(withLeaf("l1", ["a", "a"], <DockPanelHeader />));
+      render(withLeaf("l3", ["b", "a"], <DockPanelHeader />));
       fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
 
       expect(screen.queryByTestId("tab-nodeEditor")).toBeNull();
@@ -311,8 +311,8 @@ describe("DockPanelHeader", () => {
       expect(container.querySelectorAll('[role="tab"]')).toHaveLength(4);
     });
 
-    it("does not mask the default l3 leaf (2 tabs: inspector + assets)", () => {
-      render(withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />));
+    it("does not mask the default l2 leaf (2 tabs: inspector + assets)", () => {
+      render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
 
       const inspectorTab = screen.getByTestId("tab-inspector");
       const tabsEl = inspectorTab.parentElement;
@@ -331,11 +331,12 @@ describe("DockPanelHeader", () => {
   // B3-U1: whether a collapsed leaf renders as a vertical rail is no longer a
   // prop — it's derived from the tree (collapsesToRail: does this leaf's
   // direct parent split run row-direction, i.e. does it collapse to a
-  // *width* strip?). l1 (nodeEditor, parent row split) does; l4 (code,
-  // parent is the col-direction root split) doesn't.
+  // *width* strip?). In the v2.0 default tree, l3 (nodeEditor, parent is the
+  // inner row split) and l4 (code, parent is the row-direction root split)
+  // both do; l1 (viewport, parent is the col-direction split) doesn't.
   describe("rail derivation from the tree", () => {
-    it("renders the normal horizontal header while expanded (l1, rail-capable)", () => {
-      render(withLeaf("l1", ["a", "a"], <DockPanelHeader meta="5N · 4E" />));
+    it("renders the normal horizontal header while expanded (l3, rail-capable)", () => {
+      render(withLeaf("l3", ["b", "a"], <DockPanelHeader meta="5N · 4E" />));
       expect(screen.getByText("Node Editor")).not.toBeNull();
       expect(screen.getByText("5N · 4E")).not.toBeNull();
       expect(
@@ -347,13 +348,13 @@ describe("DockPanelHeader", () => {
       expect(header?.className).toBe("dock-header");
     });
 
-    it("switches to a vertical rail — hiding tabs/meta/maximize/close — once collapsed (l1), and the restore button un-collapses it", () => {
-      render(withLeaf("l1", ["a", "a"], <DockPanelHeader meta="5N · 4E" />));
+    it("switches to a vertical rail — hiding tabs/meta/maximize/close — once collapsed (l3), and the restore button un-collapses it", () => {
+      render(withLeaf("l3", ["b", "a"], <DockPanelHeader meta="5N · 4E" />));
 
       fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
       const tree = useDockStore.getState().tree;
       if (tree === null) throw new Error("unreachable");
-      expect(getNodeAt(tree, ["a", "a"])).toMatchObject({ collapsed: true });
+      expect(getNodeAt(tree, ["b", "a"])).toMatchObject({ collapsed: true });
 
       expect(screen.queryByTestId("tab-nodeEditor")).toBeNull();
       expect(screen.queryByText("5N · 4E")).toBeNull();
@@ -369,23 +370,25 @@ describe("DockPanelHeader", () => {
       fireEvent.click(restoreBtn);
       const treeAfter = useDockStore.getState().tree;
       if (treeAfter === null) throw new Error("unreachable");
-      expect(getNodeAt(treeAfter, ["a", "a"])).toMatchObject({
+      expect(getNodeAt(treeAfter, ["b", "a"])).toMatchObject({
         collapsed: false,
       });
       expect(screen.getByTestId("tab-nodeEditor")).not.toBeNull();
     });
 
-    it("stays a horizontal header even once collapsed (l4, parent is the col-direction root — not rail-capable)", () => {
-      render(withLeaf("l4", ["b"], <DockPanelHeader />));
+    it("stays a horizontal header even once collapsed (l1 viewport, parent is the col-direction split — not rail-capable)", () => {
+      render(withLeaf("l1", ["b", "b", "a"], <DockPanelHeader />));
 
       fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
       const tree = useDockStore.getState().tree;
       if (tree === null) throw new Error("unreachable");
-      expect(getNodeAt(tree, ["b"])).toMatchObject({ collapsed: true });
+      expect(getNodeAt(tree, ["b", "b", "a"])).toMatchObject({
+        collapsed: true,
+      });
 
       const expandBtn = screen.getByRole("button", { name: "Expand panel" });
       expect(expandBtn.parentElement?.className).toBe("dock-header");
-      expect(screen.getByTestId("tab-code")).not.toBeNull();
+      expect(screen.getByTestId("tab-viewport")).not.toBeNull();
       expect(
         screen.getByRole("button", { name: "Maximize panel" }),
       ).not.toBeNull();
@@ -395,12 +398,39 @@ describe("DockPanelHeader", () => {
     });
   });
 
+  // req1: the collapse button's glyph is position-based (parent split dir +
+  // a/b side), not tied to panel kind — see `dockLayoutModel.collapseChevron`
+  // for the full 8-combination unit coverage. This just asserts the rendered
+  // button actually consumes that helper (no leftover literal `⌄`/`⌃`
+  // branch) on a couple of v2.0 default-tree positions.
+  describe("collapse chevron glyph is position-based (req1)", () => {
+    it("row-a (l4 code, path [a]): ‹ while open, › once collapsed", () => {
+      render(withLeaf("l4", ["a"], <DockPanelHeader />));
+      const collapseBtn = screen.getByRole("button", {
+        name: "Collapse panel",
+      });
+      expect(collapseBtn.textContent).toBe("‹");
+
+      fireEvent.click(collapseBtn);
+      const expandBtn = screen.getByRole("button", { name: "Expand panel" });
+      expect(expandBtn.textContent).toBe("›");
+    });
+
+    it("col-b (l2 sidePanel, path [b,b,b]): ⌄ while open", () => {
+      render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
+      const collapseBtn = screen.getByRole("button", {
+        name: "Collapse panel",
+      });
+      expect(collapseBtn.textContent).toBe("⌄");
+    });
+  });
+
   // D13: 메타 배지 정렬. 기본은 spacer *앞*(좌측, 기존 패널 보존), "end"는
   // App Shell.dc.html L361-369의 Code Editor 정본 순서인 spacer *뒤*(우측).
   describe("metaAlign", () => {
     it("defaults to start — meta renders before the spacer", () => {
       const { container } = render(
-        withLeaf("l1", ["a", "a"], <DockPanelHeader meta="5N · 4E" />),
+        withLeaf("l3", ["b", "a"], <DockPanelHeader meta="5N · 4E" />),
       );
       const metaEl = screen.getByText("5N · 4E");
       const spacerEl = container.querySelector(".dock-header-spacer");
@@ -418,7 +448,7 @@ describe("DockPanelHeader", () => {
       const { container } = render(
         withLeaf(
           "l4",
-          ["b"],
+          ["a"],
           <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end" />,
         ),
       );
@@ -447,8 +477,8 @@ describe("DockPanelHeader", () => {
     it('hides metaAlign="end" meta the same as start once collapsed in a rail', () => {
       render(
         withLeaf(
-          "l1",
-          ["a", "a"],
+          "l3",
+          ["b", "a"],
           <DockPanelHeader meta="5N · 4E" metaAlign="end" />,
         ),
       );
@@ -456,7 +486,7 @@ describe("DockPanelHeader", () => {
       fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
       const tree = useDockStore.getState().tree;
       if (tree === null) throw new Error("unreachable");
-      expect(getNodeAt(tree, ["a", "a"])).toMatchObject({ collapsed: true });
+      expect(getNodeAt(tree, ["b", "a"])).toMatchObject({ collapsed: true });
 
       expect(screen.queryByText("5N · 4E")).toBeNull();
     });
@@ -469,7 +499,7 @@ describe("DockPanelHeader", () => {
       const startLeafDrag = vi.fn();
       const startTabDrag = vi.fn();
       const { container } = render(
-        withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
+        withLeafAndDrag("l2", ["b", "b", "b"], <DockPanelHeader />, {
           startLeafDrag,
           startTabDrag,
           dragEnabled: true,
@@ -481,7 +511,7 @@ describe("DockPanelHeader", () => {
       fireEvent.pointerDown(grab);
 
       expect(startLeafDrag).toHaveBeenCalledTimes(1);
-      expect(startLeafDrag.mock.calls[0]?.[0]).toEqual(["a", "b", "b"]);
+      expect(startLeafDrag.mock.calls[0]?.[0]).toEqual(["b", "b", "b"]);
       expect(startTabDrag).not.toHaveBeenCalled();
     });
 
@@ -489,7 +519,7 @@ describe("DockPanelHeader", () => {
       const startLeafDrag = vi.fn();
       const startTabDrag = vi.fn();
       render(
-        withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
+        withLeafAndDrag("l2", ["b", "b", "b"], <DockPanelHeader />, {
           startLeafDrag,
           startTabDrag,
           dragEnabled: true,
@@ -510,7 +540,7 @@ describe("DockPanelHeader", () => {
       const startLeafDrag = vi.fn();
       const startTabDrag = vi.fn();
       render(
-        withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
+        withLeafAndDrag("l2", ["b", "b", "b"], <DockPanelHeader />, {
           startLeafDrag,
           startTabDrag,
           dragEnabled: true,
@@ -532,7 +562,7 @@ describe("DockPanelHeader", () => {
     // asserts the pointerdown wiring doesn't throw/crash without one.
     it("renders and handles pointerdown fine without a DockDragContext.Provider (default no-op)", () => {
       const { container } = render(
-        withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />),
+        withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />),
       );
 
       const grab = container.querySelector(".dock-header-grab");
@@ -551,7 +581,7 @@ describe("DockPanelHeader", () => {
     // wrap a provider — kept seeing the handle without modification.
     it("R11: dragEnabled:false hides the ⣿ grab handle; the default context (no provider) still shows it", () => {
       const { container } = render(
-        withLeafAndDrag("l3", ["a", "b", "b"], <DockPanelHeader />, {
+        withLeafAndDrag("l2", ["b", "b", "b"], <DockPanelHeader />, {
           startLeafDrag: vi.fn(),
           startTabDrag: vi.fn(),
           dragEnabled: false,
@@ -562,7 +592,7 @@ describe("DockPanelHeader", () => {
       cleanup();
 
       const { container: defaultContainer } = render(
-        withLeaf("l3", ["a", "b", "b"], <DockPanelHeader />),
+        withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />),
       );
       expect(
         defaultContainer.querySelector(".dock-header-grab"),

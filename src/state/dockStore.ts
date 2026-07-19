@@ -10,7 +10,7 @@
  * 이 스토어는 dc `onMove`/`dockGhost`의 트리 변형 절반만 담당한다.
  *
  * 모든 트리 갱신은 `./dockTree`의 불변 함수(`getNodeAt`/`setNodeAt`/
- * `removePanel`/`findLeafPath`/`findTabLeafPath`/`firstLeafPath`/
+ * `removePanel`/`findLeafPath`/`findTabLeafPath`/`firstMergeableLeafPath`/
  * `collectPanelIds`/`clampDividerRatio`/`insertDetachedLeaf`) 경유 — 이
  * 파일 안에서 트리 노드를 직접 변이하지 않는다. 순환 의존성 방지를 위해
  * 다른 store는 import하지 않는다.
@@ -28,7 +28,7 @@ import {
   type DockPath,
   findLeafPath,
   findTabLeafPath,
-  firstLeafPath,
+  firstMergeableLeafPath,
   getNodeAt,
   insertDetachedLeaf,
   removePanel,
@@ -70,7 +70,12 @@ export interface DockState {
   /** 지정 경로 leaf의 모든 탭을 제거한다. dc `closePanel`(L497-504) 이식. */
   closePanel: (path: DockPath) => void;
   /** 닫힌 패널을 재도킹한다(R1: 재오픈은 항상 도킹, 플로팅 없음). dc
-   * `addPanel`(L512-523) 이식. */
+   * `addPanel`(L512-523) 이식 — v2.0에서 T1 게이트가 추가됐다:
+   * `firstMergeableLeafPath`로 찾은, `id`를 병합해도 viewport/code 이종
+   * leaf가 생기지 않는 첫 leaf에만 병합한다. 그런 leaf가 없으면(트리에
+   * viewport/code leaf뿐이거나 `id` 자체가 viewport/code인 경우 — 실사용의
+   * 기본 케이스) outer-right에 새 leaf를 만들어 패널을 유실 없이
+   * 재도킹한다. */
   addPanel: (id: DockPanelId) => void;
   /** 트리/최대화/leaf id 카운터를 기본값으로 되돌린다. dc
    * `resetLayout`(L524-526) 이식. */
@@ -215,8 +220,21 @@ export const useDockStore = create<DockState>((set, get) => ({
       });
       return;
     }
-    const path = firstLeafPath(tree);
-    if (path === null) return; // tree !== null이면 항상 leaf가 존재 — 방어적 가드
+    const path = firstMergeableLeafPath(tree, id);
+    if (path === null) {
+      // T1: 병합 가능한 leaf가 트리에 없다(viewport/code는 이종 leaf를
+      // 만들지 않으므로 사실상 항상 이 분기다) — outer-right에 새 leaf를
+      // 만들어 패널을 유실 없이 재도킹한다(insertDetachedLeaf, R1).
+      set({
+        tree: insertDetachedLeaf(
+          tree,
+          { kind: "outer", side: "right" },
+          { type: "leaf", id: `l${nextLeafId}`, tabs: [id], active: id },
+        ),
+        nextLeafId: nextLeafId + 1,
+      });
+      return;
+    }
     const leaf = getNodeAt(tree, path);
     if (leaf === null || leaf.type !== "leaf") return;
     set({

@@ -171,8 +171,17 @@ textarea {
 .shell-left {
   border-right: 1px solid var(--border-default);
 }
+/* v2.0 BODY reorg (design/CHANGELOG.md §v2.0 "BODY 재구성"): code moved from
+   the bottom dock to the left column, so its accent border moves from
+   border-top to border-right (it now sits beside Node Editor, not above
+   it). */
 .shell-code {
-  border-top: 1px solid var(--border-default);
+  border-right: 1px solid var(--border-default);
+}
+/* v2.0: right column is `col[Viewport / Inspector·Assets]` — Viewport (top)
+   gets the accent border on its bottom edge, against Inspector/Assets. */
+.shell-right-top {
+  border-bottom: 1px solid var(--border-default);
 }
 
 /* ── Splitter (resize handle between docked panels) ──────────────── */
@@ -410,15 +419,19 @@ textarea {
 }
 
 /* ── Width-collapsed rail (M1-U2 fix, B3-U1 derivation update) ────────────
-   shell-left/Node Editor is the one docked slot that collapses to a 34px
-   *width* strip instead of a 34px *height* strip (App.tsx shellLeftFlex).
-   Left as a horizontal row, the header's spacer + maximize/collapse/close
-   buttons would be pushed past the 34px strip and clipped by the panel's
-   overflow:hidden — unclickable by a real pointer even though the DOM node
-   is technically present. Stack the header vertically instead so the
-   restore button stays inside the strip's own bounds. Whether a given
-   collapsed leaf gets this class is no longer a `collapsedRail` prop — it's
-   derived from the tree (`dockLayoutModel.collapsesToRail`, B3-U1). */
+   A leaf collapses to a 34px *width* strip (instead of a 34px *height*
+   strip) whenever its direct parent split runs row-direction — in the v2.0
+   default tree that's `.shell-code` (root row's left child), not
+   `.shell-left`/Node Editor as it was pre-v2.0. Left as a horizontal row,
+   the header's spacer + maximize/collapse/close buttons would be pushed
+   past the 34px strip and clipped by the panel's overflow:hidden —
+   unclickable by a real pointer even though the DOM node is technically
+   present. Stack the header vertically instead so the restore button stays
+   inside the strip's own bounds. Whether a given collapsed leaf gets this
+   class is no longer a `collapsedRail` prop — it's derived from the tree
+   (`dockLayoutModel.collapsesToRail`, B3-U1), so it keeps tracking whichever
+   leaf sits under a row-direction parent, position not panel kind, with V2:
+   zero new logic needed here. */
 .dock-header--rail {
   flex-direction: column;
   flex: 1 1 auto;
@@ -592,8 +605,35 @@ textarea {
   color: var(--text-primary);
 }
 
-/* ── Code editor stage tabs (rendered inside DockPanelHeader's children
-   slot, Code Editor.dc.html L360-370) ────────────────────────────── */
+/* ── Code editor stage-tab sub-strip (v2.0 — moved out of DockPanelHeader's
+   children slot into the Code panel's own body, `CodeEditor/index.tsx`,
+   design/CHANGELOG.md §v2.0 Changed: "vertex/fragment 스테이지 탭을 본문
+   하위 스트립으로 이동"). At the v2.0 25%-width Code column the dock
+   header alone (grab + `[● Code ✕]` tab + `GLSL · ES 3.0` meta +
+   collapse/maximize/close, ~359px available) already fills the row — the
+   stage tabs + node breadcrumb chip used to share that same row and pushed
+   the trailing icon buttons past the panel's right edge, clipped by
+   `.panel`'s `overflow: hidden` (unreachable by a real pointer even though
+   the DOM node was technically present). A direct `.panel` child, so the
+   existing collapsed-rail rule (`.shell-slot--collapsed .panel > :not(.dock-
+   header)` above) hides it along with the editor body automatically.
+   Height/padding/bg/border reuse `.dock-header`'s own values (34px · 0 12px
+   · surface.docking-header · border.header-divider) for visual continuity
+   with the strip directly above it — dc's own reference row uses a
+   slightly different 30px/0 8px (App Shell.dc.html L313), approximated here
+   to the value already established codebase-wide for every other header/
+   strip row (`.dock-header`, `.dock-drag-ghost-header`), a layout-px choice
+   rather than a color/radius/shadow token this repo constrains. */
+.code-stage-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--surface-docking-header);
+  border-bottom: 1px solid var(--border-header-divider);
+}
 .stage-tabs {
   display: flex;
   align-items: center;

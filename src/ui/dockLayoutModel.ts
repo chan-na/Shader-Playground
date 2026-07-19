@@ -28,19 +28,28 @@ export type LeafPanelKind =
   | "code"
   | null;
 
-/** leaf가 렌더할 패널 컴포넌트 종류를 판정한다. `tabs`에 "inspector" 또는
- * "assets"가 하나라도 있으면 무조건 "sidePanel"(B2: 두 탭을 한 컴포넌트가
- * 담당) — 그 외에는 `tabs[0]` 기준으로 매핑한다. `tabs`가 빈 배열이면
- * `tabs[0]`이 `undefined`이므로(noUncheckedIndexedAccess) `null`을 반환한다. */
+/** leaf가 렌더할 패널 컴포넌트 종류를 판정한다(S5, v2.0 — 이전엔
+ * `tabs[0]` 기준이었다). **`leaf.active` 기준**으로 판정하므로, 이종 탭을
+ * 가진 leaf(예: `tabs:["nodeEditor","assets"]`)에서 active가 전환되면
+ * kind도 함께 전환된다 — 진짜 도킹 UX(본문·`legacyLeafClass`가 탭 선택에
+ * 따라 실제로 바뀐다). `tabs`가 빈 배열이면(방어적 케이스) `active`가 그
+ * leaf의 실제 탭이 아니므로 이 스위치로 판정할 근거가 없다 — `null`.
+ *
+ * exhaustive switch — `DockPanelId`는 닫힌 5종 유니온이라 `default` 없이도
+ * (noFallthroughCasesInSwitch 하에서) 전수 커버된다. */
 export function leafPanelKind(leaf: DockLeaf): LeafPanelKind {
-  if (leaf.tabs.includes("inspector") || leaf.tabs.includes("assets")) {
-    return "sidePanel";
+  if (leaf.tabs.length === 0) return null;
+  switch (leaf.active) {
+    case "nodeEditor":
+      return "nodeEditor";
+    case "viewport":
+      return "viewport";
+    case "inspector":
+    case "assets":
+      return "sidePanel";
+    case "code":
+      return "code";
   }
-  const first = leaf.tabs[0];
-  if (first === "nodeEditor") return "nodeEditor";
-  if (first === "viewport") return "viewport";
-  if (first === "code") return "code";
-  return null;
 }
 
 /** leaf의 레거시(현행 App.tsx 하드코딩) 셀렉터 클래스명.
@@ -80,13 +89,13 @@ export function splitChildFlex(split: DockSplit): SplitChildFlex {
   if (aCol && !bCol) {
     return {
       a: `0 0 ${COLLAPSED_STRIP_PX}px`,
-      b: `${1 - split.ratio} 1 0px`,
+      b: "1 1 0px",
       showDivider: false,
     };
   }
   if (bCol && !aCol) {
     return {
-      a: `${split.ratio} 1 0px`,
+      a: "1 1 0px",
       b: `0 0 ${COLLAPSED_STRIP_PX}px`,
       showDivider: false,
     };
@@ -117,6 +126,47 @@ export function collapsesToRail(
   if (tree === null || path.length === 0) return false;
   const parent = getNodeAt(tree, path.slice(0, -1));
   return parent !== null && parent.type === "split" && parent.dir === "row";
+}
+
+/** dc `_buildPanel`'s `collapseIcon` (App Shell.dc.html L800-801, 821-823,
+ * req1) — the collapse chevron's *direction* is decided by the leaf's
+ * **position** (parent split `dir` + which side — `a`/`b` — it is), not by
+ * which panel kind it renders. Moving a panel to a new dock position
+ * re-derives a new chevron automatically (design/CHANGELOG.md §v2.0 req1 ·
+ * design/README.md §M R4).
+ *
+ * dc's 8-combination table, `open`/`collapsed` glyphs (U+2039 `‹`, U+203A
+ * `›`, U+2303 `⌃`, U+2304 `⌄`):
+ * - row + a: `‹` / `›`
+ * - row + b: `›` / `‹`
+ * - col + a (top):    `⌃` / `⌄`
+ * - col + b (bottom): `⌄` / `⌃`
+ *
+ * dc derives `parentDir`/`childSide` with `r.path.length ? … : ("row", "a")`
+ * (L800-801) — a root-leaf-only tree (`path.length === 0`), a `null` tree,
+ * or an invalid path (parent lookup misses) all fall back to that same
+ * default: `parentDir = "row"`, `childSide = "a"` (the row-a rule). */
+export function collapseChevron(
+  tree: DockNode | null,
+  path: DockPath,
+  collapsed: boolean,
+): string {
+  let parentDir: DockSplit["dir"] = "row";
+  let childSide: "a" | "b" = "a";
+  if (tree !== null && path.length > 0) {
+    const parent = getNodeAt(tree, path.slice(0, -1));
+    const lastStep = path[path.length - 1];
+    if (parent !== null && parent.type === "split" && lastStep !== undefined) {
+      parentDir = parent.dir;
+      childSide = lastStep;
+    }
+  }
+  if (parentDir === "row") {
+    if (childSide === "a") return collapsed ? "›" : "‹";
+    return collapsed ? "‹" : "›";
+  }
+  if (childSide === "a") return collapsed ? "⌄" : "⌃";
+  return collapsed ? "⌃" : "⌄";
 }
 
 /** dc `META`(L265-271)의 title 필드 이식 — 도킹 가능한 5종 패널의 표시명.

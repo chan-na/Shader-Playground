@@ -13,10 +13,6 @@
 
 ## [Unreleased]
 > 다음 변경 대기 중.
-- `[component]` `Node Editor.dc.html` — **Noise(멀티포트) 입력 정렬 수정**: 6개 입력 포트(stride 30)가 프리뷰 하단으로 치우쳐 위가 비고 마지막 `mask`가 프리뷰 밖으로 내려가던 문제 → 포트를 프리뷰 중심(≈130)에 대칭 정렬(dot top 50~200), 출력 `color`도 중심에 맞춤.
-- `[component]` `Node Editor.dc.html` — **Combine·Output 포트 정렬 수정**: Combine은 입력 dot 3개(rgb/alpha/mask, stride 27)·출력 dot(vec4)에 대응하는 라벨을 dot 위치(top 44/71/98)에 정렬하고 본문 높이를 확보(3번째 포트가 카드 밖으로 나가던 문제 해소, 중앙 채널 스와치 추가). Output은 "texture" 포트명과 "→ viewport" 값을 한 행(flex, dot 중심 정렬)으로 묶어 어긋남 제거.
-- `[component]` `Node Editor.dc.html` — **노드 폭이 포트 라벨에 맞춰 커지도록**: 좌/우 레일 폭 = 가장 긴 라벨 수용, 카드 폭 = 좌레일+본문+우레일. Fresnel(geometry/baseColor/u_time/fragColor, 196→220px)·Blend(textureA/textureB/mixAmount, 196→208px)를 실제 긴 라벨로 넓혀 규칙 시연, 두 노드의 출력 엣지 시작 x를 새 폭에 맞춰 재계산. README §B에 "포트 라벨 + 노드 폭" 규칙 갱신.
-- `[component]` `Node Editor.dc.html` — **포트 라벨 잘림 제거**: 모든 포트 이름의 `max-width`(34/30/40px)·`overflow:hidden`·`text-overflow:ellipsis` 클램프 제거, `white-space:nowrap`만 유지 → 이름이 길어도 전부 노출(참고: Unreal 블루프린트 스타일). README §B에 포트 라벨 규칙 추가.
 
 ---
 
@@ -31,6 +27,14 @@
   - **D 카테고리 bright 정식화** `[token]` — `nodeCategory.processBright(#7dbcff)`·`valueBright(#e2ba57)`·`outputBright(#ee7fac)` + `semantic.successBright(#6fe3b8)` 신설. perf 배지 yellow `#f4d774`→`valueBright`, warn `#f5c778`→`warning`으로 흡수. (green `#6fe3b8`은 scalar가 아니라 success 계열이었음 — GPU active·Shader perf 배지.)
   - **E 그라디언트 단일화** `[token]` — `gradient.viewportActive`·`shaderSphere` 신설. App Shell만 어긋나던 navy 백드롭 `38%/78%`→`40%/80%`, empty-state 3종점(node-connect `#0f1218`, Welcome/System States `#0e1116/#0a0c10`)을 `gradient.emptyState` 하나로 통일.
   - **F 국소 정리** `[component]` — Code Editor의 `#3c434c`(35회)→`border.stronger(#3a414a)`.
+
+### v2.0-fix 응답 (W1~W6, `temp/design-request-v2.0-fix.md` 전부 인용)
+- **W1 [v2.0 최종 여부] `[breaking]` ★게이트** = **확정 정본.** U1→U2→v2.0 재설계 종료 — v2.0 레이아웃/툴바 구성을 확정 정본으로 굳힘. breaking 구현·마이그레이션·E2E 1440×900 대개편·토큰 병합·툴바 재구성 착수 가능(E2E 대개편은 CLAUDE.md상 사용자 합의 후).
+- **W2 [D1 문서 모순] `[screen]`** = **정정함.** README v2.0 문단 "신규 토큰 0" → "신규 토큰 6종(S26)" + 6종 열거. `theme.ts` 헤더 버전 `v1.5·2026-07-18` → `v2.0·2026-07-19`.
+- **W3 [D2 문서 모순] `[screen]`** = **정정함.** 삭제된 `Docking Prototype.dc.html`에 달려있던 "Changed"(req1 chevron·R2 정합·중복 Fresnel 제거) 항목을 **App Shell(SSoT) 귀속**으로 이관하고 "삭제 전 최종 상태"임을 명시. chevron 위치 규칙(`parentDir`+`childSide`)은 App Shell 도킹 로직이 소유.
+- **W4 [U1 노드 추가 메뉴] `[component]`** = **선택지 1 — 캔버스 상단 중앙 플로팅 pill 확정 + ⌘K 팔레트 유지.** 플로팅 pill = 빠른 접근, ⌘K CommandPalette = 전체 검색으로 역할 분리. header/rail 대안 폐기 유지. 구현 시 보강: pill이 상단 중앙 상시 점유하므로 노드 배치/패닝/줌·미니맵과 겹치지 않게 캔버스 상단 여백 확보(pill 뒤 노드는 패닝 오프셋으로 회피), `＋ More`는 카테고리 오버플로 드롭다운.
+- **W5 [U2 Code 자동 접기] `[component]`** = **옵션 토글 채택.** **Code 패널 헤더 우측에 인라인 `⤢ Auto-open: ON/OFF` 토글 신설**. **Auto → W5-(a)**: 노드 선택이 항상 Code 접힘/펼침을 구동(Shader→펼침, 그 외→접힘), 수동보다 우선. **Manual → 자동 구동 정지**, 수동 토글(헤더 chevron)만 적용. 빈 캔버스 클릭(선택 해제) 시 현 상태 유지. 다중 선택 시 Shader 포함이면 펼침(Auto 한정). `state.autoCode`가 게이트, `selectNode`가 참조.
+- **W6 [S1 Unreleased 포트 정렬 4건 스코프]** = **v2.0에 포함.** Noise 멀티포트 정렬·Combine/Output 정렬·노드 폭 포트 라벨 확장·포트 라벨 ellipsis 제거 4건을 `[Unreleased]`에서 v2.0 Changed로 이관(위 `[W6]` 항목).
 
 ### V1~V5 결정 (요청서 인용)
 - **V1 [U2 최종 여부] `[breaking]` ★게이트** = **U2 미확정.** U1(v1.7)→U2(v1.8) 당일 교체 이력을 감안, U2(우하단 노드)를 정본으로 굳히지 않고 **v2.0으로 한 번 더 개선해 확정.** 이후 breaking 구현·E2E 개편 착수 가능.
@@ -47,8 +51,12 @@
 - `[component]` `App Shell.dc.html` — **패널 탭 헤더를 Docking Prototype 형식으로 통일**: 모든 패널 헤더가 `⣿` + [색 dot + 제목 + 탭 `✕`] 탭 pill(활성 = 하단 2px accent) + 메타 배지 + 박스형(22×22) collapse/maximize/close 아이콘. Viewport/Node Editor의 대문자 라벨 → 탭 pill로 교체, Side Panel 언더라인 탭에 dot·탭✕·메타 배지 추가, Code는 [● Code] 탭 + GLSL 배지 헤더 + vertex/fragment 스테이지 탭을 본문 하위 스트립으로 이동. dot 색 = Docking META(nodeEditor #3d9bff·viewport #4bbf89·inspector #d4a53c·assets #f0b429·code #a06bff·problems #77828f). 단, Side Panel(~431px 우측 컬럼)은 3개 탭+배지가 이미 폭을 채워 탭별 `✕`·메타 배지는 생략(close `✕` 노출 확보).
 - `[component]` `App Shell.dc.html` — BODY 재구성: 좌측 Code 컬럼 25%(접힘 시 34px 세로 레일 + 세로 `Code · GLSL` 라벨 + 에러 dot + `›`), 중앙 Node Editor(order:1, flex:1.5, border-right), 우측 col[Viewport(border-bottom) / Side Panel]. 노드 그래프 좌표·엣지·svg viewBox를 세로형 대형 캔버스(680×780)에 맞춰 재배치. 로직: 스테일 `codeH` 제거, `codeOpen`/`codeCollapsed` 노출, `codeChevron`=`‹`.
 - `[component]` `App Shell.dc.html` — **노드 추가 메뉴를 툴바에서 제거하고 Node Editor에 부착**(툴바는 brand·Presets·transport만). 배치는 **`floating` 고정** — 캔버스 상단 중앙 떠 있는 pill 바(카테고리 색 타일+글리프 + `＋ More`), `z-index:6`. (header/rail 대안은 검토 후 폐기.)
-- `[component]` `App Shell.dc.html` — **Code 자동 접기/펼침**(req3): 노드 선택 상태(`sel`)로 구동 — Shader 노드 선택 시 Code 자동 펼침, 그 외 노드 선택 시 자동 접힘(rail). 5개 노드 클릭 가능, 선택 노드에 파란 링. `selectNode(id)`가 `codeOpen = (id === "shader")` 설정.
-- `[screen]` `Docking Prototype.dc.html` — `_defaultTree()`를 v2.0 트리(좌 Code · 중앙 NodeEditor · 우 col[Viewport/Inspector])로 교체. **App Shell과 크롬 정합(R2)**: Code 스테이지 탭 스트립의 중복 "Fresnel" 라벨 제거. **접기 chevron은 패널 종류가 아니라 위치로 결정(req1)** — 부모 split 방향(`parentDir`) + 그 패널이 a/b 어느 쪽 자식인지(`childSide`)로 계산: row-a=`‹`(열림)/`›`(접힘), row-b=`›`/`‹`, col-a(상)=`⌃`/`⌄`, col-b(하)=`⌄`/`⌃`. 패널을 다른 위치로 도킹하면 chevron 방향도 따라 바뀜. App Shell 정적 chevron도 기본 위치에 맞춰 동일 규칙 적용(Code·Node Editor=`‹`, Viewport(col 상)=`⌃`, Inspector(col 하)=`⌄`).
+- `[component]` `App Shell.dc.html` — **Code 자동 접기/펼침**(req3): 노드 선택 상태(`sel`)로 구동 — Shader 노드 선택 시 Code 자동 펼침, 그 외 노드 선택 시 자동 접힘(rail). 5개 노드 클릭 가능, 선택 노드에 파란 링. `selectNode(id)`가 `codeOpen = (id === "shader")` 설정. **(W5-U2 확정: Code 패널 헤더 우측에 인라인 `Auto`/`Manual` 토글 신설 — ON이면 이 자동 구동(W5-a, 선택이 항상 우선), OFF이면 자동 구동 정지·수동 토글만. `state.autoCode`가 게이트. 툴바가 아니라 동작을 소유한 Code 헤더에 배치.)**
+- `[component]` `Node Editor.dc.html` `[W6]` — **Noise(멀티포트) 입력 정렬 수정**: 6개 입력 포트(stride 30)가 프리뷰 하단으로 치우쳐 위가 비고 마지막 `mask`가 프리뷰 밖으로 내려가던 문제 → 포트를 프리뷰 중심(≈130)에 대칭 정렬(dot top 50~200), 출력 `color`도 중심에 맞춤.
+- `[component]` `Node Editor.dc.html` `[W6]` — **Combine·Output 포트 정렬 수정**: Combine은 입력 dot 3개(rgb/alpha/mask, stride 27)·출력 dot(vec4)에 대응하는 라벨을 dot 위치(top 44/71/98)에 정렬하고 본문 높이를 확보(3번째 포트가 카드 밖으로 나가던 문제 해소, 중앙 채널 스와치 추가). Output은 "texture" 포트명과 "→ viewport" 값을 한 행(flex, dot 중심 정렬)으로 묶어 어긋남 제거.
+- `[component]` `Node Editor.dc.html` `[W6]` — **노드 폭이 포트 라벨에 맞춰 커지도록**: 좌/우 레일 폭 = 가장 긴 라벨 수용, 카드 폭 = 좌레일+본문+우레일. Fresnel(196→220px)·Blend(196→208px)를 실제 긴 라벨로 넓혀 규칙 시연, 두 노드의 출력 엣지 시작 x를 새 폭에 맞춰 재계산. README §B에 "포트 라벨 + 노드 폭" 규칙 갱신.
+- `[component]` `Node Editor.dc.html` `[W6]` — **포트 라벨 잘림 제거**: 모든 포트 이름의 `max-width`·`overflow:hidden`·`text-overflow:ellipsis` 클램프 제거, `white-space:nowrap`만 유지 → 이름이 길어도 전부 노출(Unreal 블루프린트 스타일). README §B에 포트 라벨 규칙 추가.
+- `[component]` `App Shell.dc.html` (req1) — **접기 chevron은 패널 종류가 아니라 위치로 결정**: 부모 split 방향(`parentDir`) + 그 패널이 a/b 어느 쪽 자식인지(`childSide`)로 계산 — row-a=`‹`(열림)/`›`(접힘), row-b=`›`/`‹`, col-a(상)=`⌃`/`⌄`, col-b(하)=`⌄`/`⌃`. 패널을 다른 위치로 도킹하면 chevron 방향도 따라 바뀜. App Shell 정적 chevron도 기본 위치에 맞춰 동일 규칙 적용(Code·Node Editor=`‹`, Viewport(col 상)=`⌃`, Inspector(col 하)=`⌄`). 이 규칙은 SSoT인 App Shell 도킹 로직이 소유한다(구현 귀속처). *(W3-D2 정정: 이 항목은 원래 삭제된 `Docking Prototype.dc.html`에 잘못 귀속돼 있었음 — 삭제 전 최종 상태였던 `_defaultTree()` v2.0 트리 교체·R2 크롬 정합·중복 "Fresnel" 라벨 제거를 포함해 App Shell로 이관.)*
 - `[screen]` `README.md` — 버전 v2.0 · §A App Shell 레이아웃 · §M 기본 트리 · R9 마이그레이션(조용한 폴백) · R11 컴팩트 스택 순서를 v2.0으로 갱신.
 
 ### Docs / 구현

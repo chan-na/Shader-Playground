@@ -8,7 +8,7 @@
  * 재구현 시 이 파일을 src/theme.ts 로 옮기고, 필요하면 :root CSS 변수로도
  * 파생(예: --surface-panel: #131519). 아래 cssVars() 참고.
  *
- * 버전: v1.5 · 2026-07-18
+ * 버전: v2.0 · 2026-07-19
  * v1.3/v1.4/v1.5: 신규 토큰 0 — 병합분 없음(S25). 값 정본은 이 파일, 변경 사유는 CHANGELOG.md.
  * S26(v2.0 완성도): 드리프트 정리 — accent.bright / semantic.successBright / nodeCategory.*Bright / gradient.viewportActive·shaderSphere 신규, 중간 회색·근-검정 표면·yellow 변형 흡수. 버전 번호 유지(v2.0).
  */

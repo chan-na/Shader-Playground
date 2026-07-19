@@ -154,8 +154,8 @@
           <div style="position:absolute;inset:0;display:flex;flex-direction:column;background:#0d0f12;">
             <!-- stage tabs: a shader compiles a vertex + fragment pair — each stage edited separately (matches App Shell Code dock + CodeEditor StageTabs) -->
             <div style="display:flex;align-items:center;gap:2px;height:30px;flex-shrink:0;padding:0 8px;background:#101216;border-bottom:1px solid #17191e;">
-              <button style="display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;background:transparent;border:none;color:#8f97a1;font-size:11.5px;font-weight:500;cursor:pointer;font-family:'JetBrains Mono',monospace;">vertex</button>
-              <button style="display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;background:#0d0f12;border:none;color:#e7eaee;font-size:11.5px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;">fragment<span style="width:6px;height:6px;border-radius:50%;background:#f0555c;box-shadow:0 0 6px #f0555c;"></span></button>
+              <button style="display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;background:transparent;border:none;color:#8f97a1;font-size:11.5px;font-weight:500;cursor:pointer;font-family:'JetBrains Mono',monospace;">vertex.glsl</button>
+              <button style="display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;background:#0d0f12;border:none;color:#e7eaee;font-size:11.5px;font-weight:600;cursor:pointer;font-family:'JetBrains Mono',monospace;">fragment.glsl<span style="width:6px;height:6px;border-radius:50%;background:#f0555c;box-shadow:0 0 6px #f0555c;"></span></button>
               <div style="width:1px;height:14px;background:#20242a;margin:0 8px;"></div>
               <span style="font-size:10.5px;color:#656d78;">Fresnel</span>
             </div>
@@ -294,21 +294,20 @@ class Component extends DCLogic {
   };
   ALL = ["nodeEditor", "viewport", "inspector", "code", "assets"];
 
-  // Default = App Shell first-screen, expressed as a tree (R2/R3):
-  // node editor left · right column = viewport TOP / inspector+assets BOTTOM (col split, S1) · code full-width bottom dock.
+  // Default = v1.8 layout (U2): left column = Code (30%) · right column (70%) = top row [Viewport | Inspector+Assets] / bottom row Node Editor.
   _defaultTree() {
     return {
-      type: "split", dir: "col", ratio: 0.717,
-      a: {
-        type: "split", dir: "row", ratio: 0.587,
-        a: { type: "leaf", id: "l1", tabs: ["nodeEditor"], active: "nodeEditor" },
-        b: {
-          type: "split", dir: "col", ratio: 0.556,
-          a: { type: "leaf", id: "l2", tabs: ["viewport"], active: "viewport" },
-          b: { type: "leaf", id: "l3", tabs: ["inspector", "assets"], active: "inspector" },
+      type: "split", dir: "row", ratio: 0.30,
+      a: { type: "leaf", id: "l4", tabs: ["code"], active: "code", collapsed: false },
+      b: {
+        type: "split", dir: "col", ratio: 0.50,
+        a: {
+          type: "split", dir: "row", ratio: 0.55,
+          a: { type: "leaf", id: "l1", tabs: ["viewport"], active: "viewport" },
+          b: { type: "leaf", id: "l2", tabs: ["inspector", "assets"], active: "inspector" },
         },
+        b: { type: "leaf", id: "l3", tabs: ["nodeEditor"], active: "nodeEditor" },
       },
-      b: { type: "leaf", id: "l4", tabs: ["code"], active: "code", collapsed: false },
     };
   }
 

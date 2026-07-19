@@ -1,6 +1,6 @@
 # Handoff: ShaderPlayground — UI 전면 리디자인
 
-> **버전 v1.5** · 2026-07-18 (이전: v1.4 2026-07-17). v1.5 = v1.4 도킹 구현 후속 정본 정정(design-request-v1.5.md S1~S25) 반영 — 정본 결함 정정(기본 트리 dir·stride 27·fontBundle) + 미정의 UX 코너 확정(이종 탭 병합·진단 오버레이). 신규 토큰 0. 자세한 변경 사유는 `CHANGELOG.md` 참조.
+> **버전 v1.8** · 2026-07-19 (이전: v1.7 2026-07-19). v1.8 = 패널 기본 레이아웃 재조정(design chat U2, `breaking`) — Code를 **좌측 컬럼(30%)**로, 우측 70%를 상하 2단(상: Viewport|Inspector·Assets / 하: Node Editor)으로. v1.7 = 패널 기본 레이아웃 전면 재설계(design chat U1, `breaking`) — Code를 하단 전폭 독에서 **우측 풀하이트 컬럼**으로, 좌측은 Viewport/Inspector 세로 스택, 중앙 Node Editor(Unreal/Blender 계열). R3 "첫 화면 불변" 폐기. v1.6 = v1.5 S5·S7 구현 착수 전 확답(design-request-v1.6.md T1~T6) — 이종 탭 병합에서 viewport·code 제외(T1) · 진단 스트립 범위(T3·T4) · 스테이지 탭 `.glsl` 표기(T5) · 오타 정정(T6). v1.5 = v1.4 도킹 구현 후속 정본 정정(design-request-v1.5.md S1~S25) 반영 — 정본 결함 정정(기본 트리 dir·stride 27·fontBundle) + 미정의 UX 코너 확정(이종 탭 병합·진단 오버레이). 신규 토큰 0. 자세한 변경 사유는 `CHANGELOG.md` 참조.
 
 ## Overview
 ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레이그라운드**다. 세 주역 — **① 노드 그래프(React Flow) · ② GLSL 코드 에디터(CodeMirror 6) · ③ 실시간 WebGL2 3D 뷰포트** — 가 한 화면에 공존하는 전문가용 크리에이티브 도구. 이 번들은 기존 임시 UI를 폐기하고 처음부터 다시 만든 하이파이 리디자인의 결과물이다.
@@ -74,7 +74,7 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 
 ### A. App Shell — `App Shell.dc.html` (1440×900)
 - **목적**: 앱 프레임 전체. 툴바 + 도킹 패널 배치의 기준.
-- **레이아웃**: 세로 flex. `Top toolbar 48px` → `content(flex:1)` → `status bar`. content는 도킹 영역: 좌측 Node Editor, 우측 상단 Viewport, 우측 하단 Side Panel, 하단 Code Editor.
+- **레이아웃**: 세로 flex. `Top toolbar 48px` → `content(flex:1)` → `status bar`. content는 도킹 영역(v1.8 U2): 좌측 컬럼(30%) = Code Editor(풀하이트), 우측 컬럼(70%) = 상단 row [Viewport | Inspector·Assets] / 하단 row Node Editor.
 - **툴바 구성(좌→우)**: 브랜드 마크+워드마크 → 구분선 → 노드 추가 팔레트 버튼들(카테고리 색 타일+글리프) → `＋ More` → 구분선 → Presets ▾ → (flex spacer) → Undo/Redo → 녹화/Export/Share → Clear.
 - **도킹 헤더 패턴** (모든 패널 공통): `⣿`(grab dots, `#656d78`) + 대문자 라벨(`#9aa2ac`, letter-spacing 0.9) + 메타 배지(mono, 배경 `#191c21`, border `#20242a`, radius 5) + (spacer) + `⤢`(팝아웃) + `⌄`(접기). 헤더 배경 `#101216`, 높이 34px, 하단 border `#17191e`.
 - **상태바**: 높이 ~34px, 배경 `#101216`, mono 11px. `● compiled`/`○ idle`(색=semantic) · 노드 수 · 엣지 수 · GPU ms · fps · u_time.
@@ -145,16 +145,16 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 ### M. Docking Prototype — `Docking Prototype.dc.html` (1440×900) — v1.4 정본
 - **목적**: A. App Shell의 도킹 레이아웃을 **실동작**으로 구현한 인터랙티브 정본. App Shell이 룩앤필 정본, 이 화면이 도킹 동작 정본 — **둘의 기본 레이아웃 구조는 동일해야 한다**(R2).
 - **모델**: 트리 기반 도크 레이아웃(`split`{dir,ratio,a,b} / `leaf`{tabs[],active,collapsed}). BW×BH 영역을 재귀 배치 + divider 계산.
-- **기본 트리 = App Shell 첫 화면(R2·R3)**: `col 0.717 [ row 0.587 [nodeEditor | col 0.556 [viewport / leaf(inspector,assets)]] | leaf(code) ]` (중앙 split은 **col** — viewport 위 / inspector·assets 아래, S1). Code는 **하단 전폭 독**이며 접기 가능(App Shell `codeOpen`와 동치). **앱 첫 화면 불변** — dc 기본값이 현행 `layoutStore` 기본과 일치.
+- **기본 트리 = App Shell 첫 화면(R2 · U2[v1.8])**: `row 0.30 [ leaf(code) | col 0.50 [ row 0.55 [viewport | leaf(inspector,assets)] / leaf(nodeEditor) ] ]` — **좌 컬럼(30%)**=Code(풀하이트, 세로로 긴 GLSL), **우 컬럼(70%)**=상단 row[Viewport | Inspector·Assets] / 하단 row Node Editor. 편집(코드)를 좌측 읽기 흐름 기줍으로 고정하고, 미리보기(Viewport)·속성(Inspector)을 상단에 나란히, 노드 그래프를 하단 전폭으로. **v1.7 U1(3-컬럼)은 폐기**. `breaking`: `layoutStore`/`createDefaultDockTree` 기본값 교체 + 기존 저장 레이아웃 마이그레이션(또는 Reset 유도) 필요.
 - **드래그**: ⣿(헤더) → 패널 전체(모든 탭) 이동 · 개별 탭 드래그 → 그 탭만 분리 이동. `pointer*` 이벤트(마우스+터치/펜, R10). 드래그 중에만 커서를 따라다니는 **트랜지언트 고스트** 1개(release 시 반드시 도킹).
 - **플로팅 없음 확정(R1)**: 상주 플로팅 창 상태 없음. 이전 번들의 float 리사이즈/다중창/`tabInFloat` 코드는 **제거**됨 — 참조·구현 금지. Empty state 카피 = "No panels docked — add one with ＋ Panel".
 - **드롭 규칙**: 영역 가장자리(좌/우/상/하, ~22%) → 스플릿 · 헤더 탭바(상단 34px)·중앙·그 외 → 탭 병합 · 셸 바깥 가장자리(42px 밴드) → 전체 레이아웃 가장자리 도킹. 빈 곳/타깃 없음 → 최근접(첫) 패널로 병합.
 - **접기/최대화(R4)**: leaf 단위 속성. 접힌 leaf = split 방향으로 고정 34px strip(divider 비활성). 최대화 = 해당 leaf를 도크 body 전체로 오버레이(⤢↔⤡). 기존 `collapsed`/`maximized` 상태 + 접기 회귀 E2E 가드 보존. 접힌 leaf를 최대화하면 접힘이 강제 해제된다(헤더만 남는 빈 화면 방지, S9).
-- **이종 탭 병합 = 완전한 도킹 단위(S5)**: 서로 다른 kind의 패널도 한 leaf에 탭으로 병합 가능하고, active 탭을 바꾸면 **본문도 그 탭의 kind로 전환**된다(진짜 도킹 UX). leaf는 단일 kind에 고정되지 않음 — 구현은 `DockLeafView`를 active 탭 kind 기반 렌더로 배선.
+- **이종 탭 병합 = 완전한 도킹 단위(S5·T1)**: side-panel류(inspector·assets·problems·diagnostics류)는 한 leaf에 이종 탭으로 자유 병합 가능하고, active 탭을 바꾸면 **본문도 그 kind로 전환**된다(진짜 도킹 UX). 단 **viewport·code는 이종 병합에서 제외**(항상 자기 leaf 유지) — active 전환마다 WebGL/CodeMirror 재초기화 플래시가 캐주얼 클릭 비용으로 격상되는 것을 피함(T1 선택지 b, 번들 경량). 드롭 규칙은 같은 kind 또는 side-panel류끼리만 탭 병합 허용. 구현: `leafPanelKind`를 `leaf.active` 기준, `DockLeafView`를 active 탭 kind 렌더로 배선.
 - **탭별 닫기(R6)**: 헤더 우측 `✕` = **패널 전체** 닫기. 탭마다 작은 `✕`(hover 시 강조) = 그 탭만 닫기 — 비활성 탭도 활성화 없이 닫힘.
 - **탭 오버플로(R8)**: 탭 4개↑이면 탭바 가로 스크롤(스크롤바 숨김) + 우측 페이드 마스크. 34px 헤더 높이 불변.
 - **최소 크기(R7)**: leaf 최소 `240×160`. divider 드래그가 어느 쪽도 이 픽셀값 아래로 못 가게 클램프(비율 0.15~0.85 클램프에 픽셀 하한을 겹침).
-- **problems / diagnostics(R5)**: 도킹 5종(nodeEditor·viewport·inspector·code·assets)에 **포함 안 됨**. Diagnostics는 `debugUiStore.open` 단일 출처 유지 — 상태바 `◨ Diagnostics` 토글로 **하단 트랜지언트 오버레이**(172px)로 열림, 탭 아님. 오버레이는 진단 컴트롤(레벨 필터·Copy·Clear)을 **한 곳에만** 두고(중복 제거, S7) ✕로 닫는다 — 실구현은 호스팅한 DiagnosticsPanel 내부 툴바가 컴트롤을 제공하므로 오버레이 크롬은 중복하지 않는다. 172px에서는 전체 메트릭 카드 대신 **단일 행 메트릭 스트립**(GPU/Frame/Draws/Shaders, ~26px)을 두어 로그가 초기 뷰에 보이게 한다(S7); 전체 메트릭 카드는 Side Panel Diagnostics 탭에만. Problems는 상태바 카운트(`⚠ N problems`)로 표시하고, 카운트 클릭 시 동일한 172px 하단 오버레이로 목록을 열다(에러 클릭 → 노드 선택 + 코드 점프, 0건 카피 "no problems", S6). 레벨 필터 라벨 = `Info+/Warn+/Error+/Debug+`(Q9).
+- **problems / diagnostics(R5)**: 도킹 5종(nodeEditor·viewport·inspector·code·assets)에 **포함 안 됨**. Diagnostics는 `debugUiStore.open` 단일 출처 유지 — 상태바 `◨ Diagnostics` 토글로 **하단 트랜지언트 오버레이**(172px)로 열림, 탭 아님. 오버레이는 진단 컨트롤(레벨 필터·Copy·Clear)을 **한 곳에만** 두고(중복 제거, S7) ✕로 닫는다 — 실구현은 호스팅한 DiagnosticsPanel 내부 툴바가 컨트롤을 제공하므로 오버레이 크롬은 중복하지 않는다. 172px에서는 전체 메트릭 카드 대신 **단일 행 메트릭 스트립**(GPU/Frame/Draws/Shaders, ~26px)을 두어 로그가 초기 뷰에 보이게 한다(S7); 전체 메트릭 카드는 Side Panel Diagnostics 탭에만. **메트릭 스트립은 diagnostics 오버레이 전용 — problems 오버레이엔 없음(T4).** Problems는 상태바 카운트(`⚠ N problems`)로 표시하고, 카운트 클릭 시 동일한 172px 하단 오버레이로 목록을 연다(에러 클릭 → 노드 선택 + 코드 점프, 0건 카피 "no problems", S6). 레벨 필터 라벨 = `Info+/Warn+/Error+/Debug+`(Q9).
 - **영속화(R9)**: 레이아웃은 **localStorage**(사용자 작업 환경, 프로젝트 파일 아님). `↺ Reset layout` = 기본 트리로 복귀. 프로젝트 `.json`에는 미포함(마이그레이션 회피).
 - **반응형(R11)**: 비율은 이식, 픽셀 밴드/존은 **규칙**으로(Q6 정신). 컴팩트(<990px, C-6)에서는 **트리 도킹 비활성** → 고정 스택 폴백. 고정 스택 = leaf 높이 46vh(min 200px) + 세로 스크롤(S8). dc는 1440×826 고정 레퍼런스.
 - **크롬**: 도킹 헤더는 A. App Shell 문법 그대로 — 높이 34, ⣿ `text.disabled`·13px, 메타 배지 박스형(surface.card + border.default), 탭은 E. Side Panel 밑줄형(active `border-bottom 2px accent`).

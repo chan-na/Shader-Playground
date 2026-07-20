@@ -8,9 +8,10 @@
  * 재구현 시 이 파일을 src/theme.ts 로 옮기고, 필요하면 :root CSS 변수로도
  * 파생(예: --surface-panel: #131519). 아래 cssVars() 참고.
  *
- * 버전: v2.0 · 2026-07-19
+ * 버전: v2.1 · 2026-07-20
  * v1.3/v1.4/v1.5: 신규 토큰 0 — 병합분 없음(S25). 값 정본은 이 파일, 변경 사유는 CHANGELOG.md.
  * S26(v2.0 완성도): 드리프트 정리 — accent.bright / semantic.successBright / nodeCategory.*Bright / gradient.viewportActive·shaderSphere 신규, 중간 회색·근-검정 표면·yellow 변형 흡수. 버전 번호 유지(v2.0).
+ * v2.1: 신규 토큰 0. radius/shadow.skeletonStatus → floatingPill 개명(그래프 스켈레톤 상태 필 + 캔버스 add-node pill 공용, X14). 나머지는 현행 승인/문서 정정.
  */
 
 export const tokens = {
@@ -152,7 +153,7 @@ export const tokens = {
     overlay: 9,                // 풀 뷰포트 오버레이 버튼
     transportBarCompact: 11,   // 컴팩트(≤990px) 트랜스포트 바 [B-5]
     overlayCompact: 8,         // 컴팩트 오버레이 버튼 [B-5]
-    skeletonStatus: 10,        // 그래프 스켈레톤 상태 필 [B-6]
+    floatingPill: 10,          // 캔버스 플로팅 필 (그래프 스켈레톤 상태 + add-node pill 공용) [B-6·X14]
   },
 
   // ── Shadow ──────────────────────────────────────────────────────────
@@ -163,8 +164,8 @@ export const tokens = {
     errorRing: "0 0 0 1.5px rgba(240,85,92,0.7), 0 0 18px rgba(240,85,92,0.35)",
     // 권한 차단 카드 링. errorRing 과 동일한 0.7 알파 패밀리 일관성 유지 [D12].
     warnRing: "0 0 0 1.5px rgba(245,177,61,0.7), 0 0 14px rgba(245,177,61,0.3)",
-    // 그래프 스켈레톤 상태 필. nodeCard 패밀리 + blur 24 [B-6].
-    skeletonStatus: "0 8px 24px rgba(0,0,0,0.5)",
+    // 캔버스 플로팅 필 (그래프 스켈레톤 상태 + add-node pill 공용). nodeCard 패밀리 + blur 24 [B-6·X14].
+    floatingPill: "0 8px 24px rgba(0,0,0,0.5)",
     portOutputGlow: (famHex: string) => `0 0 7px ${famHex}aa`,
   },
 

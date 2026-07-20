@@ -16,6 +16,48 @@
 
 ---
 
+## v2.1 — 2026-07-20
+> `temp/design-request-v2.1.md`(X1~X17) 응답. v2.0 구현(PR #72, 머지 `3d9168f`)이 dc/CHANGELOG 미정의 코너에서 내린 **잠정 결정 확정 + 문서 정합** 라운드(breaking 아님). **X1~X17 전부 인용.** 신규 토큰 0(X14는 기존 토큰 개명 — 무비용). 코드 변경은 X13 소비처 2곳 + X14 참조 2곳뿐, 나머지는 현행 승인/문서 정정. dc 반영: File ▾ 메뉴·＋More=팔레트·pill z-11·스테이지 스트립 규격·접힌 레일 인테리어·죽은 코드 제거.
+
+### A. 자동 접기(W5) 후속
+- **X1 [자동 펼침 대상 kind] `[component]`** = **현행 승인(a).** `shader | compute` 채택 — compute 노드도 CodeEditor 편집 대상이라 dc의 shader 단독이면 compute 선택 시 편집할 패널이 자동으로 숨는 모순. README §A `selectNode` 문구를 `shader|compute`로 갱신.
+- **X2 [Auto-open 토글 도달성 + 라벨] `[component]` `[screen]`** = **현행 승인(a) + 도달 경로/라벨 규칙 확정.** 접힌 34px 레일에선 토글이 숨는 것을 "접힘=비활성 시그널"로 간주(펼쳐야 끔). 도달성 코너는 **⌘K 팔레트에 `Toggle Code auto-open` 명령**을 신설해 접힘과 무관하게 도달 가능(공간 비용 0, `Command Palette.dc.html`). **라벨 규칙**: `Auto-open: ON/OFF` → **`Auto: ON/OFF`**로 단축 + `white-space:nowrap`(34px/0 12px 스트립에서도 안 넘침, 정상 상태 완전 해소). vertex+fragment 동시 에러(dot 2개)로 극한 폭이 될 때만 ellipsis.
+- **X3 [자동 접기 × 최대화] `[component]`** = **잠정 규칙 정본 채택.** 자동 구동이 code leaf를 접을 때 최대화는 **접히는 leaf 자신이 최대화 중일 때만** 해제(사용자가 최대화해 둔 무관 패널은 안 풀림). 수동 `toggleCollapse`는 기존대로 무조건 해제. 테스트 2건으로 고정.
+- **X4 [autoCode 영속화] `[component]`** = **현행 승인(a) — 비영속.** activeStage 등 다른 세션 UI 상태와 동일하게 리로드마다 ON 복귀(E2E 격리 유리). 레이아웃 트리만 autoSave 영속.
+
+### B. 도킹 폴백 규칙(T1) 후속
+- **X5 [T1 차단 center 폴백] `[component]`** = **잠정 규칙 승인.** viewport/code 대상 center 드롭이 T1로 차단되면 원본 트리 반환(패널 유실, R1 위반) 대신 **`zone:right` 동일 기하 스플릿(대상 60% / 신규 40%)**. 커서 위치 미고려(커서 기반은 `computeDropTarget` 시그니처 확장 필요 — 범위 큼, 반려).
+- **X6 [＋Panel 재도킹 타깃] `[component]`** = **잠정 규칙 승인.** dc `addPanel`의 `regions[0]` 무조건 병합이 v2.0 첫 leaf=code라 이종 병합 충돌 → **in-order 첫 `canMerge` 통과 leaf에 병합**(v2.0에선 nodeEditor = 옛 착지점 동일), 없으면 outer-right 스플릿.
+
+### C. 노드 추가 pill(W4) 후속
+- **X7 [＋More 동작] `[screen]`** = **현행 승인(a) — ⌘K 팔레트 오픈으로 정본화.** README §A·CHANGELOG §v2.0 W4의 "카테고리 오버플로 드롭다운"을 정정 — 구 오버플로 노드 7종(Webcam/Video/Audio/Blend/Float/Color/Time)이 팔레트 명령에 전부 존재해 기능 손실 0, 역할 분리(W4) 취지와 합치. dc ＋More 버튼에 `openPalette` 배선 + title.
+- **X8 [File ▾ 메뉴] `[screen]`** = **위치·명칭 확정.** 구 ＋More에 섞여 있던 Load…/Import JSON/Export JSON/Snap PNG 4항목을 **브랜드 divider 직후 `File ▾` 메뉴**로 배치. dc 툴바에 File ▾ 추가(Presets 앞), README §A 툴바 구성에 반영.
+- **X9 [pill z-index/클리어런스] `[screen]`** = **z-index 11 승인 + 상단 클리어런스 현행 승인.** dc L131 z-6은 `.welcome-overlay`(z-10)에 "첫 노드 추가" 클릭을 뺏겨 **z-11**로(근거 주석 병기). 고정 상단 클리어런스는 두지 않고 기존 fitView padding(0.15/0.2) + 패닝 회피로 마무리(pill 뒤 노드는 패닝).
+
+### D. 진단 오버레이(S7/T3) 후속
+- **X10 [오버레이 배경] `[token]` `[screen]`** = **(a) `surface.rail` 통일.** dc L405 오버레이 본문+스트립 bg `#0f1114`가 `surface.rail`과 정확히 일치 — rail 톤 통일이 의도. 재구현은 `.status-overlay` 배경을 `var(--surface-rail)`로(1줄). dc는 값이 이미 일치해 무변경.
+- **X11 [스트립 GPU/Frame 값] `[screen]`** = **카드=스트립 동일 값 확정.** GPU-time 계측이 없어 카드와 같은 값(GPU=renderer 문자열, Frame=16.7 ms·60 fps)을 단일 헬퍼로 공유. 라벨만 dc대로 카드 "Draw calls"/스트립 "Draws". 진짜 GPU-time은 GL 타이머 쿼리 신규 계측(스코프 밖).
+- **X12 [2×2 메트릭 카드 거취] `[screen]` `[component]`** = **(b) 카드 제거 — 스트립 단일화.** R5로 Side Panel diagnostics 탭이 없어 2×2 카드 그리드는 렌더 호스트가 없는 잠복 코드(단위 테스트로만 소비) → **메트릭 카드 컴포넌트/분기 제거**, 오버레이 메트릭 스트립을 유일 경로로 확정. 카드 전용 단위 테스트도 함께 정리(번들 소폭 감소).
+
+### E. 토큰/스타일 확답
+- **X13 [S26 소비처 잔여 2곳] `[token]`** = **정본 토큰 교체 승인.** `src/index.css:361`(라벨색 → `--accent-bright`) · `src/ui/Panels/DiagnosticsPanel.tsx:167`(값색 → `--success-bright`) 2곳을 다음 라운드에 정본 토큰으로 교체 + stale 주석 갱신(기계적). theme.ts 값 불변.
+- **X14 [pill radius/shadow 개명] `[token]`** = **개명 승인.** dc pill의 radius 10 · shadow `0 8px 24px rgba(0,0,0,0.5)`가 `skeletonStatus`와 동일해 재사용 중 → 의미가 '캔버스 플로팅 필 + 그래프 스켈레톤 상태' 공용이라 **`radius/shadow.skeletonStatus` → `floatingPill`로 개명**(theme.ts). 참조 2곳 교체(무비용), 값 불변.
+- **X15 [Code 스테이지 스트립 규격/active] `[screen]`** = **①② 현행 승인(dc 정정).** ① 스트립을 전역 도킹 헤더 규격(**34px · padding 0 12px**)으로 통일(도킹 헤더와 시각 연속성). ② active 표시 = **accent `border-top 2px`**(v1.x 유지, dc의 bg 스왑+weight를 정정). dc `App Shell` Code 헤더 스트립/스테이지 탭을 구현 값으로 정정.
+
+### F. dc 정리
+- **X16 [`autoCodeStyle` 죽은 코드] `[component]`** = **제거.** `App Shell.dc.html`의 미사용 `autoCodeStyle`(실 바인딩은 `autoCodeHdrStyle`뿐) 삭제(문서 위생, 구현 영향 0).
+- **X17 [접힌 Code 레일 인테리어] `[component]`** = **(b) 정식 채택.** 접힌 34px 레일이 크롬(grip)만 렌더돼 정체성/에러/펼침 어포던스가 없던 것을 정식 인테리어로: **⣿ grip + 패널 dot + 세로 라벨("Code · GLSL", writing-mode) + (에러 시) 빨강 에러 dot + 위치 기반 펼침 chevron**. 접힘 상태에서도 컴파일 에러가 보여야 하므로 에러 dot 채택(소스=diagnosticsStore, 번들 소폭 증가). dc `App Shell`에 접힘 레일 오버레이 추가 — 구현도 이 시안대로 빌드.
+
+### Changed
+- `[component]` `App Shell.dc.html` — File ▾ 메뉴 툴바 추가(X8) · ＋More `openPalette` 배선(X7) · add-node pill z-index 6→11 + 근거 주석(X9) · Code 스테이지 스트립 30→34px·padding 0 8px→0 12px, active bg 스왑→accent border-top 2px(X15) · Auto-open 토글 라벨 `Auto: ON/OFF` + nowrap(X2) · 접힌 leaf 34px 세로 레일 인테리어(grip+dot+세로 라벨+에러 dot+펼침 chevron, X17) · `autoCodeStyle` 죽은 코드 제거(X16).
+- `[component]` `Command Palette.dc.html` — `Toggle Code auto-open` 명령 추가(X2 도달성 경로).
+- `[token]` `theme.ts` — `radius.skeletonStatus`/`shadow.skeletonStatus` → `floatingPill` 개명(X14, 값 불변) · 헤더 버전 v2.1.
+- `[screen]` `README.md` — 버전 v2.1 · §A 툴바(File ▾·＋More=팔레트)·Code 자동 접기(shader|compute·라벨·도달성·×최대화·비영속·스트립 규격)·§토큰(floatingPill) · §M 드롭 폴백(T1·＋Panel)·접힌 레일 인테리어·diagnostics 오버레이 bg/스트립/카드 갱신.
+
+> ⚠ 신규 토큰 0(X14는 개명). breaking 0. 코드 변경: X13 소비처 2곳 + X14 참조 2곳 + X12 메트릭 카드 제거(스트립 단일화), 나머지 현행 승인/문서 정정. 근사 없음.
+
+---
+
 ## v2.0 — 2026-07-19
 > `design-request-v1.9.md`(V1~V5) 응답. **V1이 게이트였고 U2를 확정하지 않았다** — 대신 노드 그래프 비중을 키운 **v2.0 기본 레이아웃으로 재설계·확정**(버전 범프). breaking 유지. (S26 정합성 정리에서 accent.bright·successBright·nodeCategory.*Bright·gradient 토큰 신규.)
 

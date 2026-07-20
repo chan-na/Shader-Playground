@@ -1,20 +1,23 @@
 import { useBootstrapStore } from "../../state/bootstrapStore";
 import { useDebugUiStore } from "../../state/debugUiStore";
 import { tokens } from "../../theme";
+import { DiagnosticsMetricStrip } from "./DiagnosticsMetricStrip";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { PanelSkeleton } from "./PanelSkeleton";
 import { ProblemsPanel } from "./ProblemsPanel";
 
 /**
  * 하단 트랜지언트 오버레이 (design/CHANGELOG.md §v1.4 R5,
- * `Docking Prototype.dc.html` L210-222): problems/diagnostics는 도킹 5종에
+ * `App Shell.dc.html` L403-433): problems/diagnostics는 도킹 5종에
  * 속하지 않는 상태바 트리거 오버레이다 — `.shell-content` 하단에 절대 배치되는
  * 172px 영역 하나를 diagnostics 또는 problems가 번갈아 차지한다.
+ * 순서(T3/T4): 헤더 → 26px 메트릭 스트립(diagnostics 전용, T4) → 패널 본문
+ * (카드 억제 variant, T3).
  *
  * 상호 배타는 debugUiStore(U1, R5)가 스토어 레벨에서 보장하지만(open을 켜면
  * problemsOpen이 꺼지고 그 반대도 동일), 여기서는 방어적으로 open을 우선한다.
  *
- * 헤더는 제목 텍스트만 그린다 — dc L211-222에 보이는 필터칩/Copy/Clear/✕는
+ * 헤더는 제목 텍스트만 그린다 — dc L406-417에 보이는 필터칩/Copy/Clear/✕는
  * 콘텐츠 정본인 `Side Panel.dc.html` 기반 DiagnosticsPanel 내부 툴바
  * (diagnostics-copy/clear/close testid)에 이미 있어 중복 렌더하지 않는다
  * (잠정 결정, temp/design-followup-v1.4.md 기록).
@@ -40,6 +43,7 @@ export function StatusOverlays() {
       <div className="status-overlay-header">
         {open ? "◨ Diagnostics" : "⚠ Problems"}
       </div>
+      {open ? <DiagnosticsMetricStrip /> : null}
       {/* B5-U4 fix: `flex`/`minHeight:0` alone only size *this* wrapper as a
           flex item of `.status-overlay` — they don't make it a flex
           *container*, so DiagnosticsPanel/ProblemsPanel's own `.panel-body`
@@ -64,7 +68,7 @@ export function StatusOverlays() {
         {bootPhase !== "done" ? (
           <PanelSkeleton />
         ) : open ? (
-          <DiagnosticsPanel />
+          <DiagnosticsPanel variant="overlay" />
         ) : (
           <ProblemsPanel />
         )}

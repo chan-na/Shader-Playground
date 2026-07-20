@@ -37,6 +37,14 @@ test.describe("Phase 16 — diagnostics panel", () => {
       "true",
     );
     await expect(page.getByTestId("diagnostics-overlay")).toBeVisible();
+    // S7/T3 (design/CHANGELOG.md §v1.6): 오버레이는 헤더 아래 26px 단일 행
+    // 메트릭 스트립만 — 전체 2×2 카드는 억제된다.
+    const strip = page.getByTestId("diagnostics-metric-strip");
+    await expect(strip).toBeVisible();
+    await expect(strip).toHaveCSS("height", "26px");
+    await expect(strip).toContainText("Draws");
+    await expect(strip).toContainText("compiled"); // Shaders 값 (linkedProgramsValue)
+    await expect(page.getByTestId("diagnostics-metric-cards")).toHaveCount(0);
     await expect(page.getByTestId("diagnostics-log-list")).toContainText(
       "e2e-diagnostic-marker",
     );
@@ -53,5 +61,19 @@ test.describe("Phase 16 — diagnostics panel", () => {
     // lingering (e.g. StatusOverlays still rendering a stale open/problemsOpen
     // state) while the inner DiagnosticsPanel disappears.
     await expect(page.getByTestId("diagnostics-overlay")).toHaveCount(0);
+    await expect(strip).toHaveCount(0);
+  });
+
+  test("metric strip is diagnostics-only — absent from the problems overlay (T4)", async ({
+    page,
+  }) => {
+    await page.getByTestId("status-problems").click();
+    await expect(page.getByTestId("problems-overlay")).toBeVisible();
+    await expect(page.getByTestId("diagnostics-metric-strip")).toHaveCount(0);
+    await expect(page.getByTestId("diagnostics-metric-cards")).toHaveCount(0);
+    // 같은 172px 영역이 diagnostics로 전환되면 스트립이 나타난다 (debugUiStore 상호 배타).
+    await page.getByTestId("open-diagnostics").click();
+    await expect(page.getByTestId("diagnostics-overlay")).toBeVisible();
+    await expect(page.getByTestId("diagnostics-metric-strip")).toBeVisible();
   });
 });

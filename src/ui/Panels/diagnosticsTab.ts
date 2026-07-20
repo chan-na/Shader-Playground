@@ -3,10 +3,12 @@
  * (design/Side Panel.dc.html L217-238, diagStats/diagLog L384-396).
  * Kept separate from DiagnosticsPanel so the value-formatting logic has a
  * unit-testable surface independent of store wiring / DOM.
+ * + overlay metric strip (S7).
  */
 
 import type { GraphNode } from "../../core/graph/types";
 import type { NodeDiagnostics } from "../../state/diagnosticsStore";
+import type { GlInfo } from "../../state/rendererStore";
 
 /** "Frame" metric card value: `<ms> ms · <fps> fps` (dc L386), or "—" when idle. */
 export function frameMetricValue(fps: number): string {
@@ -49,4 +51,27 @@ export function linkedProgramsValue(
 /** Runtime log row's relative time column: seconds since the buffer's first entry (dc L391-395 "time"). */
 export function relativeLogTime(ts: number, baseTs: number): string {
   return `${(Math.max(0, ts - baseTs) / 1000).toFixed(1)}s`;
+}
+
+/** Card/strip shared metric values (S7 single source — design/CHANGELOG.md §v1.5 S7, §v1.6 T3). */
+export interface DiagnosticsMetricValues {
+  gpu: string;
+  frame: string;
+  draws: string;
+  shaders: string;
+}
+
+export function diagnosticsMetricValues(input: {
+  glInfo: GlInfo | null;
+  fps: number;
+  drawCalls: number;
+  nodes: readonly GraphNode[];
+  byNode: Record<string, NodeDiagnostics>;
+}): DiagnosticsMetricValues {
+  return {
+    gpu: input.glInfo ? input.glInfo.renderer : "—",
+    frame: frameMetricValue(input.fps),
+    draws: String(input.drawCalls),
+    shaders: linkedProgramsValue(input.nodes, input.byNode),
+  };
 }

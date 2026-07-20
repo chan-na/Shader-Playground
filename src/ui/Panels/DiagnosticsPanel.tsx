@@ -17,11 +17,7 @@ import {
   subscribeLog,
 } from "../../utils/log";
 import { buildDiagnosticsReport } from "./diagnosticsReport";
-import {
-  frameMetricValue,
-  linkedProgramsValue,
-  relativeLogTime,
-} from "./diagnosticsTab";
+import { diagnosticsMetricValues, relativeLogTime } from "./diagnosticsTab";
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 0,
@@ -124,7 +120,11 @@ async function copyDiagnostics(): Promise<void> {
   }
 }
 
-export function DiagnosticsPanel() {
+export function DiagnosticsPanel({
+  variant = "full",
+}: {
+  variant?: "full" | "overlay";
+}) {
   const setOpen = useDebugUiStore((s) => s.setOpen);
   const levelFilter = useDebugUiStore((s) => s.levelFilter);
   const categoryFilter = useDebugUiStore((s) => s.categoryFilter);
@@ -155,11 +155,18 @@ export function DiagnosticsPanel() {
     return true;
   });
 
+  const mv = diagnosticsMetricValues({
+    glInfo,
+    fps: stats.fps,
+    drawCalls: stats.drawCalls,
+    nodes,
+    byNode,
+  });
   // design/Side Panel.dc.html L221-225 (diagStats): 4 metric cards, 2×2 grid.
   const metrics: Array<{ k: string; v: string; color: string }> = [
     {
       k: "GPU",
-      v: glInfo ? glInfo.renderer : "—",
+      v: mv.gpu,
       color: "var(--text-bright-body)",
     },
     {
@@ -167,19 +174,19 @@ export function DiagnosticsPanel() {
       // dc L386의 값 색 #6fe3b8은 대응 토큰이 없어 semantic.success(#34d399)로
       // 근사 — 근사 5건 일괄 승인 [B-8]. (v1.1에서 이 건만 사유 주석이 누락돼
       // 있던 것을 보완.)
-      v: frameMetricValue(stats.fps),
+      v: mv.frame,
       color: "var(--success)",
     },
     {
       k: "Draw calls",
-      v: String(stats.drawCalls),
+      v: mv.draws,
       color: "var(--text-primary)",
     },
     {
       // "Programs: N linked" → "Shaders: N compiled" [A-6] — 실제 GL 링크
       // 카운터가 없어 값이 프록시이므로 라벨을 측정 대상에 맞췄다.
       k: "Shaders",
-      v: linkedProgramsValue(nodes, byNode),
+      v: mv.shaders,
       color: "var(--text-primary)",
     },
   ];
@@ -195,61 +202,69 @@ export function DiagnosticsPanel() {
         fontSize: 11,
       }}
     >
-      <div style={{ padding: "12px 14px" }}>
+      {/* T3(§v1.6): 172px 오버레이 호스팅 시 2×2 카드 억제 — 전체 카드는
+          Side Panel Diagnostics 탭 전용(구현엔 아직 해당 호스트 없음,
+          followup 참조). */}
+      {variant === "full" ? (
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 8,
-            marginBottom: 14,
-          }}
+          style={{ padding: "12px 14px" }}
+          data-testid="diagnostics-metric-cards"
         >
-          {metrics.map((m) => (
-            <div
-              key={m.k}
-              style={{
-                background: "var(--surface-card)",
-                border: "1px solid var(--border-default)",
-                // dc L222 radius 8 — no exact token; approximated with
-                // radius.button (7), same D11 precedent as the multi-select
-                // chip radius. Followup logged.
-                borderRadius: tokens.radius.button,
-                padding: "9px 11px",
-                // Grid items default to min-width:auto, so a long nowrap
-                // value (e.g. a real GPU renderer string) forces this track
-                // to its intrinsic width and collapses the 2x2 layout.
-                // minWidth:0 lets the item shrink to the grid track so the
-                // value div's existing nowrap+ellipsis (below) can clip it.
-                minWidth: 0,
-              }}
-            >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+              marginBottom: 14,
+            }}
+          >
+            {metrics.map((m) => (
               <div
+                key={m.k}
                 style={{
-                  fontSize: 9,
-                  letterSpacing: 0.6,
-                  textTransform: "uppercase",
-                  color: "var(--text-muted)",
-                  marginBottom: 5,
+                  background: "var(--surface-card)",
+                  border: "1px solid var(--border-default)",
+                  // dc L222 radius 8 — no exact token; approximated with
+                  // radius.button (7), same D11 precedent as the multi-select
+                  // chip radius. Followup logged.
+                  borderRadius: tokens.radius.button,
+                  padding: "9px 11px",
+                  // Grid items default to min-width:auto, so a long nowrap
+                  // value (e.g. a real GPU renderer string) forces this track
+                  // to its intrinsic width and collapses the 2x2 layout.
+                  // minWidth:0 lets the item shrink to the grid track so the
+                  // value div's existing nowrap+ellipsis (below) can clip it.
+                  minWidth: 0,
                 }}
               >
-                {m.k}
+                <div
+                  style={{
+                    fontSize: 9,
+                    letterSpacing: 0.6,
+                    textTransform: "uppercase",
+                    color: "var(--text-muted)",
+                    marginBottom: 5,
+                  }}
+                >
+                  {m.k}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11.5,
+                    color: m.color,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {m.v}
+                </div>
               </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11.5,
-                  color: m.color,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {m.v}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
       <div
         style={{
           display: "flex",

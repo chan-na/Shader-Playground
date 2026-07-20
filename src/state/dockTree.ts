@@ -1,33 +1,22 @@
 /**
  * 도킹 트리 — 순수 데이터 모델(React/zustand 의존 없음, JSON 직렬화 가능).
  *
- * 정본 출처: `design/Docking Prototype.dc.html`(v1.4) + `design/CHANGELOG.md`
- * §v1.4 R1·R2·R3·R4·R7·R9. 이 파일은 dc의 `_defaultTree()` / `_getAt` /
- * `_setAt` / `_collect` / `MIN_W`·`MIN_H`를 순수 TS로 이식한 B1-1 산출물(+
- * B1-3에서 `_layout`/divider 클램프 이식 추가, + B4-U1에서 `computeDrop`/
- * `_fallbackTarget`/`dockGhost`/`_samePath` 이식 추가, + B6-U1에서
- * `sanitizeDockLayoutSnapshot` 추가 — 이 함수는 dc 이식이 아니라 R9
- * localStorage 영속화를 위한 구현 전용 검증기다. dc는 인메모리 프로토타입이라
- * "저장된 값이 손상되어 있을 수 있다"는 문제가 없지만, localStorage는 신뢰할
- * 수 없는 입력(구버전 스키마·수동 편집·쿼터 손상)이므로 하이드레이션 전
- * 반드시 이 검증기를 통과시켜야 한다)이다.
+ * 정본 출처: `design/App Shell.dc.html`(v2.0 SSoT) + `design/CHANGELOG.md`
+ * §v2.0. 도킹 엔진(트리 레이아웃·드래그/드롭·divider·collapse/maximize·
+ * ＋Panel·Reset·diagnostics 오버레이)은 v2.0에서 App Shell 로직 클래스로
+ * 흡수됐다 — 별도 `Docking Prototype.dc.html`은 삭제됐다(CHANGELOG §v2.0 W3).
+ * 이 파일은 App Shell의 `_defaultTree()` / `_getAt` / `_setAt` / `_collect` /
+ * `MIN_W`·`MIN_H`를 순수 TS로 이식한 B1-1 산출물(+ B1-3에서 `_layout`/divider
+ * 클램프 이식 추가, + B4-U1에서 `computeDrop`/`_fallbackTarget`/`dockGhost`/
+ * `_samePath` 이식 추가, + B6-U1에서 `sanitizeDockLayoutSnapshot` 추가 — 이
+ * 함수는 dc 이식이 아니라 R9 localStorage 영속화를 위한 구현 전용
+ * 검증기다. dc는 인메모리 프로토타입이라 "저장된 값이 손상되어 있을 수
+ * 있다"는 문제가 없지만, localStorage는 신뢰할 수 없는 입력(구버전
+ * 스키마·수동 편집·쿼터 손상)이므로 하이드레이션 전 반드시 이 검증기를
+ * 통과시켜야 한다)이다.
  * 이전의 고정 4분할 레이아웃 스토어는 B2에서 이 트리 모델로 교체 완료·삭제됨
  * — 마지막 소비자였던 StatusBar가 B2-U2에서 `dockStore`/`findTabLeafPath`
  * 경유로 이관되었다.
- *
- * ⚠ 결함 정정: dc `_defaultTree()`(L276-290)는 가운데 split(viewport ↔
- * inspector/assets)을 `dir:"row"`로 정의하지만, 이는 **정본 결함**이다.
- * R2("App Shell = 기본 레이아웃 정본") 타이브레이크에 따라 아래
- * `createDefaultDockTree()`는 `dir:"col"`로 구현한다. 근거:
- *   - 0.556 = 1.25/2.25 = 이전 고정 레이아웃 스토어의 뷰포트:사이드패널
- *     **높이** 비율.
- *   - `src/index.css` `.shell-right { flex-direction: column }`.
- *   - `design/App Shell.dc.html` L208 `flex-direction:column`(RIGHT COLUMN).
- * 즉 viewport/inspector는 세로로 쌓이는 관계이며, 가로(row)로 나란히
- * 두는 dc 표기는 오타다. `temp/design-followup-v1.4.md` §2-1에 기록됨 —
- * 미래에 이 파일을 dc와 대조하다가 "row로 고쳐야 하나?" 싶어진다면 그
- * 문서와 위 근거부터 먼저 확인할 것. dc의 다른 부분(`_getAt`/`_setAt`/
- * `_collect` 등)은 결함이 아니므로 그대로 이식한다.
  */
 
 /** 도킹 가능한 5종 패널. R5: problems/diagnostics는 포함하지 않는다 —
@@ -81,40 +70,44 @@ export const MIN_LEAF_WIDTH = 240;
 export const MIN_LEAF_HEIGHT = 160;
 
 /**
- * 기본 도킹 트리 — App Shell 첫 화면과 동치(R2/R3): 좌측 Node Editor,
- * 우측 상단 Viewport, 우측 하단 Inspector/Assets 탭, 하단 전폭 Code 독.
- * dc `_defaultTree()`(L276-290) 이식 — 가운데 split만 `col`로 정정(파일
- * 헤더 결함 정정 주석 참조). 매 호출마다 새 객체를 반환한다(공유 참조 없음).
+ * 기본 도킹 트리 — App Shell 첫 화면과 동치(v2.0, CHANGELOG §v2.0 결정 요약 +
+ * README §M): **좌측 컬럼(25%) = Code**(풀하이트, 접기 가능) · **중앙 =
+ * Node Editor**(주역 그래프, 최대 면적) · **우측 컬럼 = col[Viewport(상) /
+ * Inspector·Assets(하)]**. 노드 그래프를 화면 주역으로 승격한 v2.0 재설계
+ * (V3) — v1.7 U1(3-컬럼)·v1.8 U2(우하단 소형 노드)는 모두 폐기됐다. App
+ * Shell `_defaultTree()` 이식 그대로(정정 없음). 매 호출마다 새 객체를
+ * 반환한다(공유 참조 없음). leaf id는 dc와 동일하게 유지(l1~l4, load-bearing
+ * — `sanitizeDockLayoutSnapshot`의 `nextLeafId` 하한 5와 맞물림).
  */
 export function createDefaultDockTree(): DockNode {
   return {
     type: "split",
-    dir: "col",
-    ratio: 0.717,
+    dir: "row",
+    ratio: 0.25,
     a: {
-      type: "split",
-      dir: "row",
-      ratio: 0.587,
-      a: { type: "leaf", id: "l1", tabs: ["nodeEditor"], active: "nodeEditor" },
-      b: {
-        type: "split",
-        dir: "col", // ← dc는 row지만 정본 결함(파일 헤더 주석 참조)
-        ratio: 0.556,
-        a: { type: "leaf", id: "l2", tabs: ["viewport"], active: "viewport" },
-        b: {
-          type: "leaf",
-          id: "l3",
-          tabs: ["inspector", "assets"],
-          active: "inspector",
-        },
-      },
-    },
-    b: {
       type: "leaf",
       id: "l4",
       tabs: ["code"],
       active: "code",
       collapsed: false,
+    },
+    b: {
+      type: "split",
+      dir: "row",
+      ratio: 0.6,
+      a: { type: "leaf", id: "l3", tabs: ["nodeEditor"], active: "nodeEditor" },
+      b: {
+        type: "split",
+        dir: "col",
+        ratio: 0.52,
+        a: { type: "leaf", id: "l1", tabs: ["viewport"], active: "viewport" },
+        b: {
+          type: "leaf",
+          id: "l2",
+          tabs: ["inspector", "assets"],
+          active: "inspector",
+        },
+      },
     },
   };
 }
@@ -198,18 +191,59 @@ export function findTabLeafPath(
   return inB === null ? null : ["b", ...inB];
 }
 
+/** T1(v2.0) — viewport/code는 이종 leaf 병합에서 배제된다. 정본:
+ * `design/CHANGELOG.md` §v1.6 T1(선택지 b) "viewport·code는 같은 kind끼리만
+ * 병합". 두 tabs 집합의 합집합에 viewport/code가 하나도 없으면 무조건
+ * 허용(대부분의 실사용 케이스 — 예: inspector↔nodeEditor). 합집합에
+ * 하나라도 있으면, 두 집합이 **동일한 단일 exclusive kind**일 때만
+ * 허용한다 — 즉 `targetTabs`/`draggedTabs` 둘 다 정확히 `["viewport"]`
+ * 이거나 둘 다 정확히 `["code"]`인 경우뿐이다. 이 "동일 kind끼리" 분기는
+ * 실사용에서 도달하지 않는다(그 kind의 패널은 트리에 최대 하나뿐이므로 병합
+ * 대상이 이미 그 kind를 담고 있으면 dragged 쪽엔 애초에 그 kind가 없다) —
+ * 그래도 두 집합 비교라는 술어를 총함수로 완결하기 위해 대칭적으로 남겨둔다
+ * (테스트는 공개 API인 `insertDetachedLeaf`/`firstMergeableLeafPath` 경유로
+ * 검증 — 이 함수 자체는 export하지 않는다). */
+function canMergeDockTabs(
+  targetTabs: readonly DockPanelId[],
+  draggedTabs: readonly DockPanelId[],
+): boolean {
+  const EXCLUSIVE_KINDS: readonly DockPanelId[] = ["viewport", "code"];
+  const union = new Set<DockPanelId>([...targetTabs, ...draggedTabs]);
+  const hasExclusive = EXCLUSIVE_KINDS.some((kind) => union.has(kind));
+  if (!hasExclusive) return true;
+  return EXCLUSIVE_KINDS.some((kind) => {
+    const targetIsSoloKind = targetTabs.length === 1 && targetTabs[0] === kind;
+    const draggedIsSoloKind =
+      draggedTabs.length === 1 && draggedTabs[0] === kind;
+    return targetIsSoloKind && draggedIsSoloKind;
+  });
+}
+
 /**
- * in-order(a 우선) 첫 leaf의 경로를 반환한다. dc `addPanel`(L512-523)이
- * `this.dc.regions[0]`(`_layout`이 a-먼저 재귀로 채운 배치 순회 첫
- * region)을 새 탭의 삽입 대상으로 쓰는 것과 동치 — `_layout`도 각 split에서
- * a를 먼저 순회하므로 regions[0]은 항상 in-order 첫 leaf다. `null` 입력은
- * `null`을 반환한다(B1-4 addPanel에서 호출).
+ * `id` 패널이 병합 가능한 첫 leaf(in-order, a 우선)의 경로를 반환한다. dc
+ * `addPanel`(L512-523)이 `this.dc.regions[0]`을 새 탭의 삽입 대상으로 쓰는
+ * 것의 v2.0 일반화 — T1(`canMergeDockTabs`)에 따라 **`id`를 병합해도
+ * viewport/code 이종 leaf가 생기지 않는 leaf만** 후보로 삼는다(대상 leaf의
+ * `tabs`와 `[id]` 두 집합으로 판정). 그런 leaf가 트리에 하나도 없으면(예:
+ * 트리가 code/viewport leaf뿐이고 `id`가 그 어느 것도 아닌 경우, 또는
+ * `id` 자체가 viewport/code라 애초에 기존 leaf 어디에도 솔로 매치가 없는
+ * 경우 — 실사용에서는 사실상 항상 이 경우) `null` — 호출부
+ * (`dockStore.addPanel`)가 outer-right에 새 leaf를 만들어 폴백한다.
+ * 이전의 `firstLeafPath`(무조건 첫 leaf)를 대체한다(S5/T1). `null` 입력은
+ * `null`을 반환한다.
  */
-export function firstLeafPath(node: DockNode | null): DockPath | null {
+export function firstMergeableLeafPath(
+  node: DockNode | null,
+  id: DockPanelId,
+): DockPath | null {
   if (node === null) return null;
-  if (node.type === "leaf") return [];
-  const sub = firstLeafPath(node.a);
-  return sub === null ? null : ["a", ...sub];
+  if (node.type === "leaf") {
+    return canMergeDockTabs(node.tabs, [id]) ? [] : null;
+  }
+  const inA = firstMergeableLeafPath(node.a, id);
+  if (inA !== null) return ["a", ...inA];
+  const inB = firstMergeableLeafPath(node.b, id);
+  return inB === null ? null : ["b", ...inB];
 }
 
 /**
@@ -647,8 +681,22 @@ export function fallbackDropTarget(regions: DockRegion[]): DockDropTarget {
  *   `first`(좌/상)이면 `leaf`가 `a`(비율 `OUTER_DOCK_RATIO`), 아니면
  *   `tree`가 `a`(비율 `1 - OUTER_DOCK_RATIO`) — 즉 새 leaf는 항상 지정된
  *   쪽에, 기존 트리는 반대쪽에 온다.
- * - `{kind:"region", zone:"center"}` → 해당 경로의 노드에 탭을 병합
+ * - `{kind:"region", zone:"center"}` → **T1(S5, v2.0) 게이트**: 대상 leaf의
+ *   `tabs`와 `leaf.tabs`가 `canMergeDockTabs`를 통과하면 종전대로 탭을 병합
  *   (`tabs`에 `leaf.tabs`를 이어붙이고 `active`는 `leaf.active`로 갱신).
+ *   통과하지 못하면(viewport/code가 관여하는 이종 병합) **탭 병합 대신
+ *   `zone:"right"`와 동일한 기하의 스플릿으로 폴백**한다(대상 leaf가 `a`
+ *   비율 `1 - REGION_SPLIT_RATIO`, 새 leaf가 `b` 비율 `REGION_SPLIT_RATIO`
+ *   — 새 leaf가 우측 40%). ⚠ 여기서 원본 `tree`를 그대로 반환하면 이미
+ *   트리에서 분리된 leaf가 통째로 유실된다(R1 위반 — 드래그 중이던 leaf는
+ *   반드시 어딘가에 다시 도킹돼야 한다) — 그래서 not-found 방어 가드(아래)와
+ *   달리 이 분기는 "포기"가 아니라 "폴백"이다. `m2-dock-dragdrop.spec.ts`
+ *   Test2(툴바 위에서 release → `fallbackDropTarget`이 `regions[0]`인 code
+ *   leaf의 center를 고르는 케이스)가 이 스플릿 폴백 덕에 여전히 패널을
+ *   잃지 않고 green을 유지한다 — 잠정 결정(정본에 명시된 폴백 형태가 아니라
+ *   구현판단, `temp/design-followup-v2.0.md` 대상). 정본: `design/
+ *   CHANGELOG.md` §v2.0 "이종 탭 병합 = 완전한 도킹 단위(S5·T1)" +
+ *   §v1.6 T1(선택지 b).
  *   경로가 leaf를 가리키지 않으면(존재하지 않거나 split이면) **방어적으로
  *   원본 `tree`를 그대로 반환**한다 — 스토어 액션들의 방어 가드 관례(예:
  *   `removePanel`의 not-found 분기)를 따름. dc 자체는 이 케이스를 다루지
@@ -687,6 +735,18 @@ export function insertDetachedLeaf(
   const node = getNodeAt(tree, target.path);
   if (target.zone === "center") {
     if (node === null || node.type !== "leaf") return tree;
+    if (!canMergeDockTabs(node.tabs, leaf.tabs)) {
+      // T1: viewport/code 이종 병합 금지 — zone "right"와 동치인 스플릿으로
+      // 흡수한다(위 함수 doc 주석 참고). setNodeAt으로 흡수해야 분리된
+      // leaf가 유실되지 않는다.
+      return setNodeAt(tree, target.path, {
+        type: "split",
+        dir: "row",
+        ratio: 1 - REGION_SPLIT_RATIO,
+        a: node,
+        b: leaf,
+      });
+    }
     return setNodeAt(tree, target.path, {
       ...node,
       tabs: [...node.tabs, ...leaf.tabs],
@@ -732,7 +792,7 @@ export function dockPathsEqual(a: DockPath, b: DockPath): boolean {
  * "사용자 작업 환경"이기 때문(위 파일 헤더 R9 주석 참조). `autoSave.ts`의
  * `loadDockLayout`/`saveDockLayout`이 이 형태로 직렬화한다. */
 export interface DockLayoutSnapshot {
-  version: 1;
+  version: 2;
   tree: DockNode | null;
   maximized: string | null;
   nextLeafId: number;
@@ -833,8 +893,12 @@ function sanitizeDockNode(
  * 정본: `design/CHANGELOG.md` §v1.4 R9. **하나라도 어긋나면 `null`** —
  * 호출측(`autoSave.ts`의 `loadDockLayout`)이 조용히 기본 트리로 폴백한다.
  *
+ * V4(v2.0, 조용한 폴백): `version`이 `2`로 범프됐다 — 옛 `version:1`
+ * 스냅샷(v1.x 트리 형태)은 이 게이트에서 즉시 `null`이 되어, 배너/경고 없이
+ * `createDefaultDockTree()`(v2.0 트리)로 조용히 대체된다(CHANGELOG §v2.0 V4).
+ *
  * 검증 순서:
- * 1. `raw`가 non-null object(배열 아님)이고 `version === 1`.
+ * 1. `raw`가 non-null object(배열 아님)이고 `version === 2`.
  * 2. `tree`: `null`이면 통과. 아니면 `sanitizeDockNode`로 재귀 검증 —
  *    실패 시 전체 무효.
  * 3. `maximized`: `null` 또는 `string`만 허용(다른 타입 → 전체 무효).
@@ -852,7 +916,7 @@ function sanitizeDockNode(
 export function sanitizeDockLayoutSnapshot(
   raw: unknown,
 ): DockLayoutSnapshot | null {
-  if (!isRecord(raw) || raw.version !== 1) return null;
+  if (!isRecord(raw) || raw.version !== 2) return null;
 
   const leafIds = new Set<string>();
   const panelIds = new Set<DockPanelId>();
@@ -882,5 +946,5 @@ export function sanitizeDockLayoutSnapshot(
   }
   const nextLeafId = Math.max(maxLeafIdSuffix(tree) + 1, 5, rawNextLeafId);
 
-  return { version: 1, tree, maximized, nextLeafId };
+  return { version: 2, tree, maximized, nextLeafId };
 }

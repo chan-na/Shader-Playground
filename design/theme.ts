@@ -8,7 +8,9 @@
  * 재구현 시 이 파일을 src/theme.ts 로 옮기고, 필요하면 :root CSS 변수로도
  * 파생(예: --surface-panel: #131519). 아래 cssVars() 참고.
  *
- * 버전: v1.2 · 2026-07-16
+ * 버전: v2.0 · 2026-07-19
+ * v1.3/v1.4/v1.5: 신규 토큰 0 — 병합분 없음(S25). 값 정본은 이 파일, 변경 사유는 CHANGELOG.md.
+ * S26(v2.0 완성도): 드리프트 정리 — accent.bright / semantic.successBright / nodeCategory.*Bright / gradient.viewportActive·shaderSphere 신규, 중간 회색·근-검정 표면·yellow 변형 흡수. 버전 번호 유지(v2.0).
  */
 
 export const tokens = {
@@ -37,8 +39,13 @@ export const tokens = {
 
   // ── Gradients (종점을 토큰으로) [D10] ────────────────────────────────
   gradient: {
-    // 뷰포트 빈 상태 배경 (surface.app 근처 2종점 radial)
+    // 뷰포트 빈/오프 상태 배경 (surface.app 근처 2종점 radial). 정본 — 모든 empty/off
+    // 뷰포트가 이 값을 쓴다(Viewport/Welcome/System States/node-connect empty). [S26-E]
     emptyState: "radial-gradient(circle at 50% 40%, #10131a 0%, #0a0b0e 70%)",
+    // 활성 뷰포트 navy 백드롭 (셰이더 구체 뒤). [S26-E]
+    viewportActive: "radial-gradient(circle at 50% 42%, #12325e 0%, #0c1c38 40%, #080a10 80%)",
+    // 셰이더 프리뷰 구체(디폴트 미리보기 렌더). 5종점, 복붙 금지 — 이 문자열이 정본. [S26-E]
+    shaderSphere: "radial-gradient(circle at 40% 32%, #bcdcff 0%, #4ba3ff 26%, #2b6fe0 52%, #12336b 78%, #08152e 100%)",
   },
 
   // ── Border ──────────────────────────────────────────────────────────
@@ -54,12 +61,15 @@ export const tokens = {
   accent: {
     default: "#3d9bff",
     hover: "#57a9ff",
+    bright: "#7dbcff",   // hover보다 밝은 단계 — 틴트 배경 위 아이콘/텍스트·a:hover. [S26-B]
     active: "#2b6fe0",
     muted: "#1c3452",
   },
 
   // ── Text ────────────────────────────────────────────────────────────
   text: {
+    // [S26-A] 중간 회색 유령값 흡수 — 새 토큰 없이 기존 단계로 통일:
+    //   #565e68 / #59626c / #5f7488 → muted   ·   #8f97a1 / #8890a0 → secondary   ·   #c2c8d0 → brightBody
     primary: "#e7eaee",
     emphasis: "#ffffff",    // 순백 강조 — 인라인 rename 편집 중 상태 [B-2]
     brightBody: "#c4cad2",
@@ -71,6 +81,7 @@ export const tokens = {
   // ── Semantic ────────────────────────────────────────────────────────
   semantic: {
     success: "#34d399",
+    successBright: "#6fe3b8",  // 밝은 success — GPU active 표시·Shader perf 배지. [S26-D]
     warning: "#f5b13d",
     error: "#f0555c",
     info: "#3d9bff",
@@ -85,6 +96,10 @@ export const tokens = {
     value: "#d4a53c",      // Param · Math · Swizzle · Combine
     container: "#77828f",  // Group
     sourceBright: "#6fd6a3", // source 카테고리의 밝은 변형 (Webcam 렌즈 링 등) [B-3]
+    // [S26-D] 카테고리 밝은 변형 — 선택/호버/아이콘·배지의 lighten 변형(기존엔 source만 있었음).
+    processBright: "#7dbcff", // = accent.bright
+    valueBright: "#e2ba57",   // value 아이콘·perf 배지 yellow 통합(#f4d774 흡수)
+    outputBright: "#ee7fac",
   },
 
   // ── Port type families ★ (형태=방향, 색=타입 패밀리) ─────────────────

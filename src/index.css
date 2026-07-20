@@ -171,8 +171,17 @@ textarea {
 .shell-left {
   border-right: 1px solid var(--border-default);
 }
+/* v2.0 BODY reorg (design/CHANGELOG.md §v2.0 "BODY 재구성"): code moved from
+   the bottom dock to the left column, so its accent border moves from
+   border-top to border-right (it now sits beside Node Editor, not above
+   it). */
 .shell-code {
-  border-top: 1px solid var(--border-default);
+  border-right: 1px solid var(--border-default);
+}
+/* v2.0: right column is `col[Viewport / Inspector·Assets]` — Viewport (top)
+   gets the accent border on its bottom edge, against Inspector/Assets. */
+.shell-right-top {
+  border-bottom: 1px solid var(--border-default);
 }
 
 /* ── Splitter (resize handle between docked panels) ──────────────── */
@@ -410,15 +419,19 @@ textarea {
 }
 
 /* ── Width-collapsed rail (M1-U2 fix, B3-U1 derivation update) ────────────
-   shell-left/Node Editor is the one docked slot that collapses to a 34px
-   *width* strip instead of a 34px *height* strip (App.tsx shellLeftFlex).
-   Left as a horizontal row, the header's spacer + maximize/collapse/close
-   buttons would be pushed past the 34px strip and clipped by the panel's
-   overflow:hidden — unclickable by a real pointer even though the DOM node
-   is technically present. Stack the header vertically instead so the
-   restore button stays inside the strip's own bounds. Whether a given
-   collapsed leaf gets this class is no longer a `collapsedRail` prop — it's
-   derived from the tree (`dockLayoutModel.collapsesToRail`, B3-U1). */
+   A leaf collapses to a 34px *width* strip (instead of a 34px *height*
+   strip) whenever its direct parent split runs row-direction — in the v2.0
+   default tree that's `.shell-code` (root row's left child), not
+   `.shell-left`/Node Editor as it was pre-v2.0. Left as a horizontal row,
+   the header's spacer + maximize/collapse/close buttons would be pushed
+   past the 34px strip and clipped by the panel's overflow:hidden —
+   unclickable by a real pointer even though the DOM node is technically
+   present. Stack the header vertically instead so the restore button stays
+   inside the strip's own bounds. Whether a given collapsed leaf gets this
+   class is no longer a `collapsedRail` prop — it's derived from the tree
+   (`dockLayoutModel.collapsesToRail`, B3-U1), so it keeps tracking whichever
+   leaf sits under a row-direction parent, position not panel kind, with V2:
+   zero new logic needed here. */
 .dock-header--rail {
   flex-direction: column;
   flex: 1 1 auto;
@@ -592,8 +605,36 @@ textarea {
   color: var(--text-primary);
 }
 
-/* ── Code editor stage tabs (rendered inside DockPanelHeader's children
-   slot, Code Editor.dc.html L360-370) ────────────────────────────── */
+/* ── Code editor stage-tab sub-strip (v2.0 — moved out of DockPanelHeader's
+   children slot into the Code panel's own body, `CodeEditor/index.tsx`,
+   design/CHANGELOG.md §v2.0 Changed: "vertex/fragment 스테이지 탭을 본문
+   하위 스트립으로 이동"). At the v2.0 25%-width Code column the dock
+   header alone (grab + `[● Code ✕]` tab + `GLSL · ES 3.0` meta +
+   collapse/maximize/close, ~359px available) already fills the row — the
+   stage tabs + node breadcrumb chip used to share that same row and pushed
+   the trailing icon buttons past the panel's right edge, clipped by
+   `.panel`'s `overflow: hidden` (unreachable by a real pointer even though
+   the DOM node was technically present). A direct `.panel` child, so the
+   existing collapsed-rail rule (`.shell-slot--collapsed .panel > :not(.dock-
+   header)` above) hides it along with the editor body automatically.
+   M3 regression fix (verifier-measured 1440×900 default layout: toggle box
+   right edge 387.6px vs strip's own right edge 358.25px, ~29px clipped —
+   the OFF label, being longer, clips further): padding/gap tightened to
+   dc's own reference row (30px/0 8px, App Shell.dc.html L313) instead of
+   reusing `.dock-header`'s 34px/0 12px, and the height stays at 34px only
+   (dc's 30px would also require shrinking `.stage-tab`'s own height, out of
+   this fix's blast radius) for visual continuity with the header directly
+   above. `.code-stage-strip-meta` below absorbs the rest of the squeeze. */
+.code-stage-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 8px;
+  background: var(--surface-docking-header);
+  border-bottom: 1px solid var(--border-header-divider);
+}
 .stage-tabs {
   display: flex;
   align-items: center;
@@ -604,7 +645,7 @@ textarea {
   align-items: center;
   gap: 8px;
   height: 34px;
-  padding: 0 14px;
+  padding: 0 12px;
   background: transparent;
   border: none;
   border-top: 2px solid transparent;
@@ -628,6 +669,86 @@ textarea {
   border-radius: 50%;
   background: var(--error);
   box-shadow: 0 0 6px var(--error);
+}
+
+/* M3 regression fix — wraps the divider + NodeBreadcrumb pair (CodeEditor/
+   index.tsx) as a single flex item of `.code-stage-strip`, replacing the
+   bare `<>...</>` fragment they used to render as (2 direct strip children).
+   `.stage-tabs` hits its own min-content floor (two single-token labels,
+   "vertex.glsl"/"fragment.glsl", can't wrap) well before the strip runs out
+   of room, and `.code-auto-toggle`'s `flex-shrink:0` + `white-space:nowrap`
+   (below) mean it never gives up space either — so this pair is the only
+   remaining slack in the row. Giving *this wrapper* (not just the
+   breadcrumb chip inside it) `min-width:0` lets the flex algorithm size it
+   all the way down to 0 instead of floor-ing at the divider's 1px + the
+   chip's own padding/border (~19px) — and `overflow:hidden` clips whatever
+   of the divider/chip's content still wants to render at that point cleanly
+   (no stray icon/text spilling into the toggle's space). Un-wrapped, this
+   pair used to survive at a fixed ~19-30px even when there was no room left
+   for it, which was exactly the slack the toggle needed back. */
+.code-stage-strip-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* W5 — Code 헤더 Auto-open 토글 (App Shell.dc.html L943-945). dc hex →
+   토큰 매핑: #2b6fe0=accent-active · #1c3452=accent-muted · #7dbcff=
+   accent-bright(S26) · #20242a=border-default · #1a1d22=surface-card ·
+   #9aa2ac=text-secondary · dot #3d9bff=accent-default · #454c55=
+   text-disabled. glow rgba(61,155,255,.6)는 color-mix 60% 근사(기존
+   L1091+ 관례). radius 6 = var(--radius-chip). */
+.code-auto-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 9px;
+  border-radius: var(--radius-chip);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  /* M3 regression fix: this is a trailing, fixed-purpose control in
+     `.code-stage-strip` (same "right-side control must not shrink"
+     principle as the strip-overflow note below at L~636). Without
+     `flex-shrink:0`, the flex algorithm's default `min-width:auto` on
+     this item is only the *largest unbreakable word* ("Auto-open:" or
+     "ON") — not the full label — so the strip was willing to squeeze
+     this button down to a near-zero width, wrapping the label onto
+     multiple lines that then got clipped by the fixed 20px height,
+     leaving only the always-`flex-shrink:0` dot visible (a "sliver").
+     `white-space:nowrap` additionally forces this item's min-content
+     size to the full label width so it never wraps in the first place;
+     `flex-shrink:0` then guarantees the strip never asks it to go
+     narrower than that. The breadcrumb (NodeBreadcrumb, CodeEditor/
+     index.tsx) is the one that yields space instead, via its own
+     `min-width:0` + ellipsis truncation. */
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.code-auto-toggle--on {
+  border-color: var(--accent-active);
+  background: var(--accent-muted);
+  color: var(--accent-bright);
+}
+.code-auto-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-disabled);
+  flex-shrink: 0;
+}
+.code-auto-toggle--on .code-auto-toggle-dot {
+  background: var(--accent-default);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent-default) 60%, transparent);
 }
 
 /* ── Problems tab (Side Panel.dc.html L188-205, M5-U5 reskin) ────────── */
@@ -3395,6 +3516,81 @@ textarea {
   border: 2px solid var(--border-strong);
   border-top-color: var(--accent-default);
   animation: sp-spin 0.7s linear infinite;
+}
+
+/* ── Add-node pill (W4, design/App Shell.dc.html L131-136) — floating
+   quick-add palette centered above the Node Editor canvas. AddNodePill.tsx.
+   dc `background:rgba(19,21,25,0.92)` == tokens.surface.panel(#131519) at
+   92% alpha; color-mix pattern follows the .graph-skeleton-status (L3416)
+   convention above. dc `border-radius:10px` + `box-shadow:0 8px
+   24px rgba(0,0,0,0.5)` match radius/shadow.skeletonStatus exactly — reused
+   rather than adding a new token (S26 adds exactly 6, no more). `blur(8px)`
+   is a non-tokenized literal (see .graph-skeleton-status's blur(6px)
+   convention, L3423).
+
+   z-index:11, NOT the dc's z-index:6 — the dc's App Shell mockup has no
+   welcome-overlay layer to sit above, so 6 was only ever "above the ReactFlow
+   pane". In this codebase the pill and .welcome-overlay (z-index:10,
+   pointer-events:auto, inset:0 — see its comment above) share the same
+   .panel-body stacking context, and the pill's whole purpose is adding the
+   *first* node to an empty graph, i.e. exactly when the welcome overlay is
+   mounted. At z-index:6 the overlay's pointer-events:auto (load-bearing for
+   its own wheel-scroll, see L2211-2221) swallows every click before it
+   reaches the pill, even though the pill paints on top visually in some
+   browsers' z-fighting — Playwright caught this as "welcome-content subtree
+   intercepts pointer events". 11 keeps the pill clickable in both the empty
+   (welcome overlay) and populated (bare ReactFlow pane) states without
+   touching welcome-overlay's pointer-events. */
+.add-node-pill {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-skeleton-status);
+  padding: 4px;
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-skeleton-status);
+}
+.add-node-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-button);
+  color: var(--text-bright-body);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.add-node-pill-btn:hover {
+  background: var(--surface-input);
+}
+.add-node-pill-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.add-node-pill-btn:disabled:hover {
+  background: transparent;
+}
+.add-node-pill-btn--more {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.add-node-pill-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-strong);
+  margin: 0 2px;
 }
 
 .panel-skeleton {

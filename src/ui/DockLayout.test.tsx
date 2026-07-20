@@ -8,11 +8,26 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDockStore } from "../state/dockStore";
 import {
+  collectPanelIds,
   createDefaultDockTree,
+  DOCK_PANEL_IDS,
+  type DockNode,
+  type DockPath,
   findTabLeafPath,
-  firstLeafPath,
 } from "../state/dockTree";
 import { useDockDragStart } from "./dockDragContext";
+
+/** 테스트 전용 순회 헬퍼 — v2.0에서 프로덕션의 `firstLeafPath`(무조건 첫
+ * leaf)는 병합 대상만 찾는 `firstMergeableLeafPath`(addPanel 전용, S5/T1)로
+ * 대체됐다. 아래 "닫힐 때까지 반복" 루프는 병합 가능 여부와 무관하게 *아무*
+ * leaf나 하나 골라 반복하면 충분하므로, 옛 동작을 그대로 복제한
+ * 모듈-로컬 헬퍼를 둔다(프로덕션 export가 아니므로 knip 대상이 아니다). */
+function anyLeafPath(node: DockNode | null): DockPath | null {
+  if (node === null) return null;
+  if (node.type === "leaf") return [];
+  const sub = anyLeafPath(node.a);
+  return sub === null ? null : ["a", ...sub];
+}
 
 // The 4 panel components DockLayout renders are heavy (WebGL canvas,
 // CodeMirror, ReactFlow) and already covered by their own test suites —
@@ -96,7 +111,7 @@ describe("DockLayout", () => {
     const { container } = render(<DockLayout />);
 
     act(() => {
-      useDockStore.getState().toggleCollapsed(["a", "a"]);
+      useDockStore.getState().toggleCollapsed(["b", "a"]);
     });
 
     const shellLeft = q(container, "shell-left");
@@ -109,7 +124,7 @@ describe("DockLayout", () => {
     const { container } = render(<DockLayout />);
 
     act(() => {
-      useDockStore.getState().toggleMaximized("l2"); // viewport leaf
+      useDockStore.getState().toggleMaximized("l1"); // viewport leaf
     });
 
     const shellLeft = q(container, "shell-left");
@@ -162,10 +177,10 @@ describe("DockLayout", () => {
     // issue, rather than just setting tree:null directly, so it exercises
     // removePanel's tree-collapsing logic all the way to null.
     act(() => {
-      let path = firstLeafPath(useDockStore.getState().tree);
+      let path = anyLeafPath(useDockStore.getState().tree);
       while (path !== null) {
         useDockStore.getState().closePanel(path);
-        path = firstLeafPath(useDockStore.getState().tree);
+        path = anyLeafPath(useDockStore.getState().tree);
       }
     });
     expect(useDockStore.getState().tree).toBeNull();
@@ -180,6 +195,37 @@ describe("DockLayout", () => {
     rerender(<DockLayout />);
     expect(screen.queryByTestId("dock-empty")).toBeNull();
     expect(screen.getByTestId("stub-viewport")).not.toBeNull();
+  });
+
+  it("S5: a heterogeneous leaf (nodeEditor+assets) renders by active kind, and switching active swaps the mounted panel + legacy class", () => {
+    useDockStore.setState({
+      tree: {
+        type: "leaf",
+        id: "mixed",
+        tabs: ["nodeEditor", "assets"],
+        active: "assets",
+      },
+      maximized: null,
+    });
+    const { container } = render(<DockLayout />);
+
+    expect(container.getElementsByClassName("shell-right-bottom").length).toBe(
+      1,
+    );
+    expect(container.getElementsByClassName("shell-left").length).toBe(0);
+    expect(screen.getByTestId("stub-side-panel")).not.toBeNull();
+    expect(screen.queryByTestId("stub-node-editor")).toBeNull();
+
+    act(() => {
+      useDockStore.getState().setActiveTab([], "nodeEditor");
+    });
+
+    expect(container.getElementsByClassName("shell-left").length).toBe(1);
+    expect(container.getElementsByClassName("shell-right-bottom").length).toBe(
+      0,
+    );
+    expect(screen.getByTestId("stub-node-editor")).not.toBeNull();
+    expect(screen.queryByTestId("stub-side-panel")).toBeNull();
   });
 });
 
@@ -311,21 +357,37 @@ describe("DockLayout drag engine (B4-U3)", () => {
   it("5. releasing in a gap outside every region/band still docks (R1) via fallbackDropTarget — no floating ghost survives", () => {
     render(<DockLayout />);
 
-    // Release in the 324↔330 divider gap between the viewport and
-    // inspector/assets regions — inside neither region's bounds and outside
-    // every 42px outer band, so computeDropTarget returns null and onUp must
-    // fall back to the first region instead of leaving the ghost resting.
+    // Once the nodeEditor tab (the sole tab of leaf l3) is detached, the
+    // inner row split collapses and its sibling col split (viewport /
+    // inspector+assets) takes over the rest of the width (x365↔1440) —
+    // opening up a 426↔432 divider gap in that span (the left code column,
+    // x0↔359, is unaffected). x=700,y=429 falls inside that gap: outside
+    // every region's bounds and outside every 42px outer band, so
+    // computeDropTarget returns null and onUp must fall back to the first
+    // region (in-order, the code leaf) instead of leaving the ghost resting.
     down(200, 100);
     move(206, 100); // cross the threshold
-    move(700, 327); // gap: not in any region, not in any outer band
+    move(700, 429); // gap: not in any region, not in any outer band
     up();
 
     expect(screen.queryByTestId("dock-drag-ghost")).toBeNull();
     const tree = useDockStore.getState().tree;
     const nodeEditorPath = findTabLeafPath(tree, "nodeEditor");
-    const viewportPath = findTabLeafPath(tree, "viewport");
+    const codePath = findTabLeafPath(tree, "code");
     expect(nodeEditorPath).not.toBeNull();
-    expect(nodeEditorPath).toEqual(viewportPath);
+    expect(codePath).not.toBeNull();
+    // T1 (v2.0): the fallback target's leaf is the code leaf (exclusive) —
+    // nodeEditor can't merge into it (canMergeDockTabs), so
+    // insertDetachedLeaf splits instead of merging. The two panels end up
+    // as split siblings, not sharing a single leaf — but neither is lost.
+    expect(nodeEditorPath).not.toEqual(codePath);
+    // the two are split siblings under the same parent path (T1's
+    // right-split fallback geometry) — no panel lost.
+    expect(nodeEditorPath?.slice(0, -1)).toEqual(codePath?.slice(0, -1));
+    expect(collectPanelIds(tree)).toHaveLength(DOCK_PANEL_IDS.length);
+    for (const id of DOCK_PANEL_IDS) {
+      expect(collectPanelIds(tree)).toContain(id);
+    }
   });
 });
 
@@ -465,7 +527,7 @@ describe("DockLayout compact shell (R11)", () => {
     const { container } = render(<DockLayout />);
 
     act(() => {
-      useDockStore.getState().toggleMaximized("l2"); // viewport leaf
+      useDockStore.getState().toggleMaximized("l1"); // viewport leaf
     });
 
     const shellLeft = q(container, "shell-left");

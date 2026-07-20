@@ -74,7 +74,7 @@
         <div style="background:#e7eaee;border:1px solid #20242a;border-radius:14px;padding:20px;display:flex;align-items:center;gap:14px;">
           <div style="position:relative;width:40px;height:40px;border-radius:11px;background:#0b0c0e;flex-shrink:0;"><div style="position:absolute;left:10px;top:10px;width:20px;height:20px;border-radius:6px;border:2px solid #3d9bff;"></div><div style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:9px;height:9px;border-radius:50%;background:#3d9bff;"></div></div>
           <div style="font-size:16px;font-weight:600;letter-spacing:-0.3px;color:#0b0c0e;">Shader<span style="color:#2b6fe0;">Playground</span></div>
-          <div style="margin-left:auto;font-size:9px;font-family:'JetBrains Mono',monospace;color:#8890a0;">on light</div>
+          <div style="margin-left:auto;font-size:9px;font-family:'JetBrains Mono',monospace;color:#9aa2ac;">on light</div>
         </div>
       </div>
     </div>
@@ -93,7 +93,7 @@
             <div style="height:76px;border-radius:9px;border:1px solid #2b3037;background:{{ s.hex }};"></div>
             <div style="margin-top:9px;font-size:12px;font-weight:500;color:#e7eaee;">{{ s.name }}</div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;margin-top:2px;">{{ s.hex }}</div>
-            <div style="font-size:10px;color:#565e68;margin-top:1px;">{{ s.role }}</div>
+            <div style="font-size:10px;color:#656d78;margin-top:1px;">{{ s.role }}</div>
           </div>
         </sc-for>
       </div>
@@ -178,7 +178,7 @@
   <section style="max-width:1180px;margin:0 auto;padding:32px 40px 16px;">
     <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#656d78;margin-bottom:18px;display:flex;align-items:center;gap:10px;"><span style="width:20px;height:2px;background:#3d9bff;border-radius:2px;"></span>04 · Ports &amp; data types <span style="color:#3d9bff;">★</span></div>
     <div style="background:#131519;border:1px solid #20242a;border-radius:14px;padding:26px 28px;">
-      <div style="font-size:12px;color:#8f97a1;max-width:660px;margin-bottom:8px;line-height:1.6;">Following the Unreal Blueprint convention — <strong style="color:#c4cad2;font-weight:600;">shape encodes structure, color encodes type</strong>. Here shape carries a single axis: <strong style="color:#c4cad2;font-weight:600;">direction</strong> (input socket vs output plug), identical for every data type. Color is allocated <strong style="color:#c4cad2;font-weight:600;">per type-family</strong>, so the palette scales as new types are added — a new type simply joins its family's hue instead of demanding a brand-new shape.</div>
+      <div style="font-size:12px;color:#9aa2ac;max-width:660px;margin-bottom:8px;line-height:1.6;">Following the Unreal Blueprint convention — <strong style="color:#c4cad2;font-weight:600;">shape encodes structure, color encodes type</strong>. Here shape carries a single axis: <strong style="color:#c4cad2;font-weight:600;">direction</strong> (input socket vs output plug), identical for every data type. Color is allocated <strong style="color:#c4cad2;font-weight:600;">per type-family</strong>, so the palette scales as new types are added — a new type simply joins its family's hue instead of demanding a brand-new shape.</div>
 
       <!-- Shape = direction -->
       <div style="height:1px;background:#20242a;margin:22px 0 18px;"></div>
@@ -188,17 +188,17 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
         <div style="border:1px solid #20242a;border-radius:11px;background:#1a1d22;padding:20px 22px;display:flex;align-items:center;gap:20px;">
-          <div style="width:22px;height:22px;border-radius:50%;border:2.5px solid #8f97a1;background:{{ inputFill }};flex-shrink:0;"></div>
+          <div style="width:22px;height:22px;border-radius:50%;border:2.5px solid #9aa2ac;background:{{ inputFill }};flex-shrink:0;"></div>
           <div>
             <div style="font-size:13px;font-weight:600;color:#e7eaee;">Input · socket</div>
-            <div style="font-size:11.5px;color:#8f97a1;margin-top:3px;line-height:1.5;">A hollow ring on the left edge. Fills with the incoming type's color once wired — {{ connHint }}.</div>
+            <div style="font-size:11.5px;color:#9aa2ac;margin-top:3px;line-height:1.5;">A hollow ring on the left edge. Fills with the incoming type's color once wired — {{ connHint }}.</div>
           </div>
         </div>
         <div style="border:1px solid #20242a;border-radius:11px;background:#1a1d22;padding:20px 22px;display:flex;align-items:center;gap:20px;">
-          <div style="width:22px;height:22px;border-radius:50%;background:#8f97a1;flex-shrink:0;box-shadow:0 0 10px rgba(143,151,161,0.5);"></div>
+          <div style="width:22px;height:22px;border-radius:50%;background:#9aa2ac;flex-shrink:0;box-shadow:0 0 10px rgba(143,151,161,0.5);"></div>
           <div>
             <div style="font-size:13px;font-weight:600;color:#e7eaee;">Output · plug</div>
-            <div style="font-size:11.5px;color:#8f97a1;margin-top:3px;line-height:1.5;">A solid disc on the right edge — always emitting. Its color tells you the type it produces.</div>
+            <div style="font-size:11.5px;color:#9aa2ac;margin-top:3px;line-height:1.5;">A solid disc on the right edge — always emitting. Its color tells you the type it produces.</div>
           </div>
         </div>
       </div>
@@ -213,7 +213,7 @@
             <div style="padding:16px 16px 14px;">
               <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:3px;">
                 <div style="font-size:12.5px;font-weight:600;color:#e7eaee;">{{ fam.group }}</div>
-                <div style="font-size:9.5px;font-family:'JetBrains Mono',monospace;color:#565e68;">{{ fam.tag }}</div>
+                <div style="font-size:9.5px;font-family:'JetBrains Mono',monospace;color:#656d78;">{{ fam.tag }}</div>
               </div>
               <div style="font-size:11px;color:#656d78;margin-bottom:14px;">{{ fam.desc }}</div>
               <div style="display:flex;flex-direction:column;gap:10px;">
@@ -224,7 +224,7 @@
                       <div style="width:13px;height:13px;border-radius:50%;background:{{ t.color }};"></div>
                     </div>
                     <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#e7eaee;">{{ t.name }}</div>
-                    <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#565e68;margin-left:auto;">{{ t.color }}</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#656d78;margin-left:auto;">{{ t.color }}</div>
                   </div>
                 </sc-for>
               </div>
@@ -240,15 +240,15 @@
       <div style="display:flex;gap:14px;flex-wrap:wrap;">
         <div style="flex:1;min-width:200px;background:#1a1d22;border:1px solid #20242a;border-radius:10px;padding:16px;">
           <svg viewBox="0 0 240 44" style="width:100%;height:44px;display:block;"><path d="M8 22 C 80 22, 160 22, 232 22" stroke="#f0b429" stroke-width="2.5" fill="none"/><circle cx="8" cy="22" r="5" fill="#f0b429"/><circle cx="232" cy="22" r="5" fill="#f0b429"/></svg>
-          <div style="font-size:11px;color:#8f97a1;margin-top:6px;">Valid — matching types, solid edge in the type color</div>
+          <div style="font-size:11px;color:#9aa2ac;margin-top:6px;">Valid — matching types, solid edge in the type color</div>
         </div>
         <div style="flex:1;min-width:200px;background:#1a1d22;border:1px solid #20242a;border-radius:10px;padding:16px;">
           <svg viewBox="0 0 240 44" style="width:100%;height:44px;display:block;"><path d="M8 22 C 80 22, 160 22, 232 22" stroke="#f0555c" stroke-width="2.5" fill="none" stroke-dasharray="5 5"/><circle cx="8" cy="22" r="5" fill="#7ed957"/><circle cx="232" cy="22" r="5" fill="none" stroke="#f0555c" stroke-width="2"/></svg>
-          <div style="font-size:11px;color:#8f97a1;margin-top:6px;">Invalid — type mismatch, dashed red, target dimmed</div>
+          <div style="font-size:11px;color:#9aa2ac;margin-top:6px;">Invalid — type mismatch, dashed red, target dimmed</div>
         </div>
         <div style="flex:1;min-width:200px;background:#1a1d22;border:1px solid #20242a;border-radius:10px;padding:16px;">
           <svg viewBox="0 0 240 44" style="width:100%;height:44px;display:block;"><path d="M8 22 C 70 22, 90 10, 150 10" stroke="#7ed957" stroke-width="2.5" fill="none"/><path d="M8 22 C 70 22, 90 34, 150 34" stroke="#7ed957" stroke-width="2.5" fill="none"/><circle cx="8" cy="22" r="5" fill="#7ed957"/><circle cx="150" cy="10" r="4" fill="none" stroke="#7ed957" stroke-width="2"/><circle cx="150" cy="34" r="4" fill="none" stroke="#7ed957" stroke-width="2"/></svg>
-          <div style="font-size:11px;color:#8f97a1;margin-top:6px;">1 : N fan-out — one plug, many sockets</div>
+          <div style="font-size:11px;color:#9aa2ac;margin-top:6px;">1 : N fan-out — one plug, many sockets</div>
         </div>
       </div>
     </div>
@@ -300,7 +300,7 @@
           <button style="background:#3d9bff;border:none;color:#fff;font-size:12.5px;font-weight:500;padding:8px 16px;border-radius:8px;cursor:pointer;box-shadow:0 1px 0 rgba(255,255,255,0.15) inset;">Primary</button>
           <button style="background:#22262c;border:1px solid #3a414a;color:#e7eaee;font-size:12.5px;font-weight:500;padding:8px 16px;border-radius:8px;cursor:pointer;">Secondary</button>
           <button style="background:transparent;border:none;color:#9aa2ac;font-size:12.5px;font-weight:500;padding:8px 12px;border-radius:8px;cursor:pointer;">Ghost</button>
-          <button style="background:#22262c;border:1px solid #3a414a;color:#565e68;font-size:12.5px;font-weight:500;padding:8px 16px;border-radius:8px;cursor:default;opacity:0.6;">Disabled</button>
+          <button style="background:#22262c;border:1px solid #3a414a;color:#656d78;font-size:12.5px;font-weight:500;padding:8px 16px;border-radius:8px;cursor:default;opacity:0.6;">Disabled</button>
           <button style="width:34px;height:34px;background:#22262c;border:1px solid #3a414a;color:#c4cad2;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;">+</button>
           <button onClick="{{ toggle }}" style="height:34px;padding:0 14px;background:{{ toggleBtnBg }};border:1px solid {{ toggleBtnBorder }};color:{{ toggleBtnColor }};border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:7px;"><span style="width:7px;height:7px;border-radius:50%;background:{{ toggleDot }};"></span>Toggle</button>
         </div>
@@ -351,7 +351,7 @@
       <div style="background:#131519;border:1px solid #20242a;border-radius:14px;padding:24px;">
         <div style="font-size:12px;font-weight:600;color:#e7eaee;margin-bottom:18px;">Badges, chips &amp; tooltip</div>
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#f4d774;background:rgba(0,0,0,0.5);border:1px solid rgba(244,215,116,0.35);border-radius:6px;padding:2px 7px;">0.42ms</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#e2ba57;background:rgba(0,0,0,0.5);border:1px solid rgba(226,186,87,0.35);border-radius:6px;padding:2px 7px;">0.42ms</span>
           <span style="font-size:10px;font-weight:700;color:#0b0c0e;background:#f0555c;border-radius:8px;padding:1px 7px;">3</span>
           <span style="font-size:10px;font-weight:600;color:#3d9bff;background:rgba(61,155,255,0.14);border:1px solid rgba(61,155,255,0.3);border-radius:6px;padding:2px 8px;">FBO pass</span>
           <span style="font-size:10px;font-weight:600;color:#34d399;background:rgba(52,211,153,0.13);border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:2px 8px;">compiled</span>
@@ -373,7 +373,7 @@
             <div style="display:flex;align-items:center;gap:11px;background:#1a1d22;border:1px solid #20242a;border-left:3px solid {{ tst.hex }};border-radius:9px;padding:10px 13px;">
               <div style="width:7px;height:7px;border-radius:50%;background:{{ tst.hex }};box-shadow:0 0 8px {{ tst.hex }};flex-shrink:0;"></div>
               <div style="min-width:0;flex:1;"><span style="font-size:12px;font-weight:600;color:#e7eaee;">{{ tst.title }}</span> <span style="font-size:11.5px;color:#9aa2ac;">{{ tst.msg }}</span></div>
-              <div style="color:#565e68;font-size:13px;cursor:pointer;flex-shrink:0;">✕</div>
+              <div style="color:#656d78;font-size:13px;cursor:pointer;flex-shrink:0;">✕</div>
             </div>
           </sc-for>
         </div>
@@ -391,7 +391,7 @@
           <div style="display:flex;align-items:center;gap:7px;padding:8px 12px;border-top-left-radius:10px;border-top-right-radius:10px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(61,155,255,0.28),rgba(61,155,255,0.12));">
             <div style="width:16px;height:16px;border-radius:5px;background:rgba(61,155,255,0.25);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#7dbcff;">◆</div>
             <div style="font-size:11.5px;font-weight:600;color:#fff;">Fresnel</div>
-            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#f4d774;background:rgba(0,0,0,0.5);border:1px solid rgba(244,215,116,0.35);border-radius:5px;padding:1px 5px;">0.31ms</span>
+            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#e2ba57;background:rgba(0,0,0,0.5);border:1px solid rgba(226,186,87,0.35);border-radius:5px;padding:1px 5px;">0.31ms</span>
           </div>
           <div style="padding:10px;">
             <div style="width:96px;height:96px;margin:0 auto;border-radius:6px;background:radial-gradient(circle at 40% 35%,#7dbcff 0%,#2b6fe0 40%,#0b1a3a 100%);border:1px solid #0b0c0e;box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);"></div>
@@ -408,7 +408,7 @@
       <div style="background:#131519;border:1px solid #20242a;border-radius:14px;padding:24px;">
         <div style="font-size:12px;font-weight:600;color:#e7eaee;margin-bottom:18px;">Command palette · ⌘K</div>
         <div style="background:#131519;border:1px solid #3a414a;border-radius:10px;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,0.6);">
-          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #20242a;"><span style="color:#565e68;">⌕</span><span style="font-size:14px;color:#e7eaee;">add shad</span><span style="width:1.5px;height:16px;background:#3d9bff;animation:fndPulse 1s infinite;"></span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #20242a;"><span style="color:#656d78;">⌕</span><span style="font-size:14px;color:#e7eaee;">add shad</span><span style="width:1.5px;height:16px;background:#3d9bff;animation:fndPulse 1s infinite;"></span></div>
           <div style="padding:6px;">
             <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:7px;background:rgba(61,155,255,0.14);">
               <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#7dbcff;background:rgba(61,155,255,0.18);padding:2px 6px;border-radius:4px;min-width:52px;text-align:center;font-weight:600;">node</span>
@@ -416,15 +416,15 @@
               <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#7dbcff;">↵</span>
             </div>
             <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:7px;">
-              <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#8f97a1;background:#22262c;padding:2px 6px;border-radius:4px;min-width:52px;text-align:center;font-weight:600;">preset</span>
+              <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#9aa2ac;background:#22262c;padding:2px 6px;border-radius:4px;min-width:52px;text-align:center;font-weight:600;">preset</span>
               <span style="flex:1;font-size:13px;color:#c4cad2;">Load <strong>Shad</strong>ertoy raymarcher</span>
             </div>
             <div style="display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:7px;">
-              <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#8f97a1;background:#22262c;padding:2px 6px;border-radius:4px;min-width:52px;text-align:center;font-weight:600;">compute</span>
+              <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#9aa2ac;background:#22262c;padding:2px 6px;border-radius:4px;min-width:52px;text-align:center;font-weight:600;">compute</span>
               <span style="flex:1;font-size:13px;color:#c4cad2;">Add <strong>Shad</strong>ow-pass compute</span>
             </div>
           </div>
-          <div style="display:flex;gap:16px;padding:7px 14px;border-top:1px solid #20242a;color:#565e68;font-size:10.5px;font-family:'JetBrains Mono',monospace;"><span>↑↓ navigate</span><span>↵ select</span><span>esc close</span></div>
+          <div style="display:flex;gap:16px;padding:7px 14px;border-top:1px solid #20242a;color:#656d78;font-size:10.5px;font-family:'JetBrains Mono',monospace;"><span>↑↓ navigate</span><span>↵ select</span><span>esc close</span></div>
         </div>
       </div>
 
@@ -451,9 +451,9 @@
   <section style="max-width:1180px;margin:0 auto;padding:32px 40px 72px;">
     <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#656d78;margin-bottom:18px;display:flex;align-items:center;gap:10px;"><span style="width:20px;height:2px;background:#3d9bff;border-radius:2px;"></span>07 · Motion principles</div>
     <div style="background:#131519;border:1px solid #20242a;border-radius:14px;padding:26px 28px;display:grid;grid-template-columns:repeat(3,1fr);gap:26px;">
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#3d9bff;margin-bottom:8px;">90–150ms</div><div style="font-size:12.5px;font-weight:600;color:#e7eaee;margin-bottom:5px;">Fast &amp; restrained</div><div style="font-size:12px;color:#8f97a1;line-height:1.6;">The render loop is realtime — UI motion never competes with the canvas. No decorative easing.</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#3d9bff;margin-bottom:8px;">cubic-bezier<br>(.2,.7,.3,1)</div><div style="font-size:12.5px;font-weight:600;color:#e7eaee;margin-bottom:5px;">One curve</div><div style="font-size:12px;color:#8f97a1;line-height:1.6;">Panels, popovers and toasts share a single ease-out. Consistency over flair.</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#f0555c;margin-bottom:8px;">pulse · glow</div><div style="font-size:12.5px;font-weight:600;color:#e7eaee;margin-bottom:5px;">Reserved for state</div><div style="font-size:12px;color:#8f97a1;line-height:1.6;">The only ambient animation: record dot, compiling shimmer, active port glow. Motion means something changed.</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#3d9bff;margin-bottom:8px;">90–150ms</div><div style="font-size:12.5px;font-weight:600;color:#e7eaee;margin-bottom:5px;">Fast &amp; restrained</div><div style="font-size:12px;color:#9aa2ac;line-height:1.6;">The render loop is realtime — UI motion never competes with the canvas. No decorative easing.</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#3d9bff;margin-bottom:8px;">cubic-bezier<br>(.2,.7,.3,1)</div><div style="font-size:12.5px;font-weight:600;color:#e7eaee;margin-bottom:5px;">One curve</div><div style="font-size:12px;color:#9aa2ac;line-height:1.6;">Panels, popovers and toasts share a single ease-out. Consistency over flair.</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#f0555c;margin-bottom:8px;">pulse · glow</div><div style="font-size:12.5px;font-weight:600;color:#e7eaee;margin-bottom:5px;">Reserved for state</div><div style="font-size:12px;color:#9aa2ac;line-height:1.6;">The only ambient animation: record dot, compiling shimmer, active port glow. Motion means something changed.</div></div>
     </div>
   </section>
 
@@ -542,13 +542,13 @@ class Component extends DCLogic {
       surfaces, accents, texts, semantics, cats, families, toasts, tabs,
       connLabel: s.connected ? "active" : "idle",
       connHint: s.connected ? "wired here" : "empty until wired",
-      inputFill: s.connected ? "#8f97a1" : "transparent",
+      inputFill: s.connected ? "#9aa2ac" : "transparent",
       toggleConn: () => this.setState({ connected: !s.connected }),
       toggle: () => this.setState({ on: !on }),
       toggleBtnBg: on ? "rgba(61,155,255,0.14)" : "#22262c",
       toggleBtnBorder: on ? "#3d9bff" : "#3a414a",
       toggleBtnColor: on ? "#7dbcff" : "#9aa2ac",
-      toggleDot: on ? "#3d9bff" : "#565e68",
+      toggleDot: on ? "#3d9bff" : "#656d78",
       switchBg: on ? "#3d9bff" : "#2b3037",
       switchLeft: on ? "20px" : "2px",
       switchLabel: on ? "true" : "false",

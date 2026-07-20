@@ -2,7 +2,12 @@ import type { ReactNode } from "react";
 import { useDockStore } from "../state/dockStore";
 import { type DockPanelId, getNodeAt } from "../state/dockTree";
 import { useDockDragStart } from "./dockDragContext";
-import { collapsesToRail, PANEL_DOTS, PANEL_TITLES } from "./dockLayoutModel";
+import {
+  collapseChevron,
+  collapsesToRail,
+  PANEL_DOTS,
+  PANEL_TITLES,
+} from "./dockLayoutModel";
 import { useDockLeaf } from "./dockLeafContext";
 
 export interface DockPanelHeaderProps {
@@ -21,8 +26,14 @@ export interface DockPanelHeaderProps {
    * design/README.md §도메인 [D13] Q4 문단 · design/CHANGELOG.md §v1.3 Q4.
    */
   metaAlign?: "start" | "end";
-  /** 탭 버튼 등 헤더 중앙에 끼워 넣을 슬롯(dock 탭 뒤에 이어진다). CodeEditor의
-   * stage 탭(Vertex/Fragment)이 이 슬롯을 쓴다. */
+  /** 탭 버튼 등 헤더 중앙에 끼워 넣을 슬롯(dock 탭 뒤에 이어진다). v2.0부터
+   * CodeEditor의 stage 탭(Vertex/Fragment)은 더 이상 이 슬롯을 쓰지 않는다
+   * — Code 본문 상단의 별도 `.code-stage-strip`으로 이동했다(25% 폭
+   * 컬럼에서 dock 탭 + stage 탭 + 메타 배지 + collapse/maximize/close가 한
+   * 줄에 다 들어가지 못해 오버플로하던 문제, design/CHANGELOG.md §v2.0
+   * Changed). 현재 실제 소비자는 없지만(0 사용) 컴포넌트 계약 자체는
+   * 범용으로 남겨둔다 — DockPanelHeader.test.tsx가 이 슬롯을 독립적으로
+   * 커버한다. */
   children?: ReactNode;
   /** 탭별 카운트 배지(예: Assets 에셋 수). 항목이 없거나 0 이하면 그 탭엔
    * 배지를 렌더하지 않는다. */
@@ -45,8 +56,11 @@ export interface DockPanelHeaderProps {
  * 밑줄형 `.panel-tab` idiom을 재사용하고(README §M), 컨테이너(dot/✕)만
  * 신설했다. R5 완료: problems/diagnostics는 도킹 탭이 아니다(상태바 진입
  * 오버레이) — dockTree.DockPanelId 5종(nodeEditor/viewport/code/inspector/
- * assets)이 전부다. `children`(CodeEditor stage 탭)·`badges`(SidePanel
- * assets)는 유지한다.
+ * assets)이 전부다. `badges`(SidePanel assets)는 유지한다. `children`
+ * (범용 슬롯)은 v2.0부터 CodeEditor의 stage 탭이 더 이상 채우지 않는다 —
+ * 그쪽은 본문 하위 `.code-stage-strip`으로 옮겼다(§v2.0 Changed, 이 헤더가
+ * 25% 폭에서 dock 탭+stage 탭+메타 배지+아이콘 3종을 한 줄에 다 담지
+ * 못해 오버플로하던 문제).
  */
 export function DockPanelHeader({
   meta,
@@ -66,6 +80,19 @@ export function DockPanelHeader({
   const railCapable = useDockStore((s) =>
     s.tree === null ? false : collapsesToRail(s.tree, path),
   );
+  // req1: the collapse chevron's direction is position-based (parent split
+  // dir + a/b side), not tied to panel kind — `collapseChevron` re-derives
+  // it from the tree on every render, so re-docking a panel automatically
+  // flips the glyph. Returns a primitive `string`, so (like `railCapable`
+  // above) there's no reference-identity over-render risk from this
+  // selector.
+  const chevron = useDockStore((s) => {
+    if (s.tree === null) return collapseChevron(null, path, false);
+    const n = getNodeAt(s.tree, path);
+    const leafCollapsed =
+      n !== null && n.type === "leaf" && n.collapsed === true;
+    return collapseChevron(s.tree, path, leafCollapsed);
+  });
   const isMaximized = useDockStore((s) => s.maximized === leafId);
   const setActiveTab = useDockStore((s) => s.setActiveTab);
   const closeTab = useDockStore((s) => s.closeTab);
@@ -181,7 +208,7 @@ export function DockPanelHeader({
         aria-label={collapsed === true ? "Expand panel" : "Collapse panel"}
         aria-expanded={collapsed !== true}
       >
-        {collapsed === true ? "⌃" : "⌄"}
+        {chevron}
       </button>
       {!isRail && (
         <button

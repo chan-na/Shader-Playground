@@ -15,6 +15,7 @@ import { tokens, withAlpha } from "../../theme";
 import { debounce } from "../../utils/debounce";
 import { DockPanelHeader } from "../DockPanelHeader";
 import { NODE_GLYPH } from "../NodeEditor/nodeTheme";
+import { AutoOpenToggle } from "./AutoOpenToggle";
 import { setCurrentView } from "./currentView";
 import { glslExtensions } from "./glslSetup";
 import { toCMDiagnostics } from "./lintAdapter";
@@ -23,8 +24,23 @@ import { StageTabs } from "./StageTabs";
 
 /** Node breadcrumb chip (Code Editor.dc.html L39-43) — accent-tinted pill
  * showing the currently-edited node's category glyph, display name, and
- * kind, rendered in the DockPanelHeader children slot right after the stage
- * tabs. */
+ * kind. Rendered in the Code body's own stage-tab sub-strip (`.code-stage-
+ * strip`, below `DockPanelHeader`), right after the stage tabs — **not**
+ * the dock header's `children` slot anymore (design/CHANGELOG.md §v2.0
+ * Changed: "Code는 [● Code] 탭 + GLSL 배지 헤더 + vertex/fragment 스테이지
+ * 탭을 본문 하위 스트립으로 이동"). At the v2.0 25%-width Code column, the
+ * dock header alone (grab + `[● Code ✕]` tab + `GLSL · ES 3.0` meta +
+ * collapse/maximize/close) already fills the ~359px panel; keeping the
+ * stage tabs + this chip in that same row pushed the trailing buttons past
+ * the panel's right edge (clipped by `.panel`'s `overflow:hidden`, real
+ * pointer unreachable even though the DOM node was technically present).
+ * M3 regression fix: this chip (plus its leading divider) now renders
+ * inside a `.code-stage-strip-meta` wrapper (index.css) instead of as two
+ * bare fragment children of `.code-stage-strip` — the wrapper is what
+ * actually collapses to 0 width under squeeze (see its index.css comment);
+ * this component's own `minWidth: 0` below is only the inner half of that
+ * — it lets the chip shrink *within* the wrapper before the wrapper itself
+ * has to clip it entirely. */
 const BREADCRUMB_CONTAINER_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -33,6 +49,7 @@ const BREADCRUMB_CONTAINER_STYLE: CSSProperties = {
   background: withAlpha(tokens.accent.default, 0.1),
   border: `1px solid ${tokens.accent.muted}`,
   borderRadius: tokens.radius.button,
+  minWidth: 0,
 };
 const BREADCRUMB_ICON_STYLE: CSSProperties = {
   width: 14,
@@ -51,6 +68,15 @@ const BREADCRUMB_NAME_STYLE: CSSProperties = {
   fontSize: 11.5,
   fontWeight: 600,
   color: tokens.text.primary,
+  // M3 regression fix: the node display name is the one part of the
+  // breadcrumb with unbounded length, so it's the part that truncates
+  // when `.code-stage-strip` is too narrow (icon and kind stay fixed).
+  // `minWidth: 0` overrides the flex-item default (min-content size),
+  // which is required for `textOverflow: ellipsis` to ever take effect.
+  minWidth: 0,
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
 };
 const BREADCRUMB_KIND_STYLE: CSSProperties = {
   fontFamily: tokens.font.mono,
@@ -352,7 +378,14 @@ export function CodeEditor() {
 
   return (
     <div className="panel panel--code">
-      <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end">
+      <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end" />
+      {/* Stage-tab sub-strip (design/CHANGELOG.md §v2.0 Changed) — a direct
+          `.panel` child, so the existing collapsed-rail rule
+          (`.shell-slot--collapsed .panel > :not(.dock-header)`, index.css)
+          hides it automatically along with the editor body; no extra
+          isRail check needed here (unlike when it lived inside
+          DockPanelHeader's children slot, gated by `!isRail`). */}
+      <div className="code-stage-strip">
         <StageTabs
           active={stage}
           onChange={setStage}
@@ -360,12 +393,13 @@ export function CodeEditor() {
           fragmentHasError={fragmentHasError}
         />
         {!isMulti && effectiveId && node && (
-          <>
+          <div className="code-stage-strip-meta">
             <span className="dock-header-divider" aria-hidden="true" />
             <NodeBreadcrumb name={displayNodeName(node)} kind={node.kind} />
-          </>
+          </div>
         )}
-      </DockPanelHeader>
+        <AutoOpenToggle />
+      </div>
       <div className="panel-body">
         <div
           ref={containerRef}

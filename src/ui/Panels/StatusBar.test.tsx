@@ -119,10 +119,10 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
   });
 
   it("clicking open-diagnostics opens diagnostics without touching the dock tree", () => {
-    useDockStore.getState().toggleCollapsed(["a", "b", "b"]);
+    useDockStore.getState().toggleCollapsed(["b", "b", "b"]);
     const treeBefore = useDockStore.getState().tree;
     const leafBefore =
-      treeBefore === null ? null : getNodeAt(treeBefore, ["a", "b", "b"]);
+      treeBefore === null ? null : getNodeAt(treeBefore, ["b", "b", "b"]);
     expect(leafBefore !== null && leafBefore.type === "leaf").toBe(true);
     expect(
       leafBefore !== null && leafBefore.type === "leaf"
@@ -138,7 +138,7 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     // collapsed — StatusBar no longer touches dockStore at all.
     const treeAfter = useDockStore.getState().tree;
     const leafAfter =
-      treeAfter === null ? null : getNodeAt(treeAfter, ["a", "b", "b"]);
+      treeAfter === null ? null : getNodeAt(treeAfter, ["b", "b", "b"]);
     expect(
       leafAfter !== null && leafAfter.type === "leaf"
         ? leafAfter.collapsed

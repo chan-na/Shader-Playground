@@ -60,11 +60,11 @@ afterEach(() => {
 
 /** B2-U1: SidePanel now reads its collapsed state via `useDockLeaf()` (routed
  * through `DockPanelHeader`), so every render needs a `DockLeafContext`
- * provider. `l3`/`["a","b","b"]` is the default tree's inspector/assets leaf
+ * provider. `l2`/`["b","b","b"]` is the default tree's inspector/assets leaf
  * (`createDefaultDockTree()`). */
 function renderSidePanel() {
   return render(
-    <DockLeafContext.Provider value={{ leafId: "l3", path: ["a", "b", "b"] }}>
+    <DockLeafContext.Provider value={{ leafId: "l2", path: ["b", "b", "b"] }}>
       <SidePanel />
     </DockLeafContext.Provider>,
   );
@@ -95,7 +95,7 @@ describe("SidePanel", () => {
     fireEvent.click(screen.getByTestId("tab-assets"));
 
     const tree = useDockStore.getState().tree;
-    const leaf = tree === null ? null : getNodeAt(tree, ["a", "b", "b"]);
+    const leaf = tree === null ? null : getNodeAt(tree, ["b", "b", "b"]);
     expect(leaf !== null && leaf.type === "leaf" && leaf.active).toBe("assets");
   });
 
@@ -104,7 +104,7 @@ describe("SidePanel", () => {
 
     expect(screen.queryByTestId("asset-browser-drop")).toBeNull();
     act(() => {
-      useDockStore.getState().setActiveTab(["a", "b", "b"], "assets");
+      useDockStore.getState().setActiveTab(["b", "b", "b"], "assets");
     });
 
     expect(screen.getByTestId("asset-browser-drop")).not.toBeNull();

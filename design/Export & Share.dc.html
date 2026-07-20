@@ -50,7 +50,7 @@
           <div style="flex:1;background:#131519;border-top:1px solid #20242a;"></div>
         </div>
       </div>
-      <div style="height:232px;flex-shrink:0;background:#0d0f12;border-top:1px solid #20242a;"></div>
+      <div style="height:232px;flex-shrink:0;background:#0f1114;border-top:1px solid #20242a;"></div>
     </div>
   </div>
   </sc-if>
@@ -76,7 +76,7 @@
       <div class="es-scroll" style="width:236px;flex-shrink:0;border-right:1px solid #20242a;background:#0f1114;overflow-y:auto;padding:16px 12px;">
         <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
           <div style="margin-bottom:18px;">
-            <div style="font-size:9.5px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:#565e68;padding:0 8px;margin-bottom:8px;">{{ g.label }}</div>
+            <div style="font-size:9.5px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:#656d78;padding:0 8px;margin-bottom:8px;">{{ g.label }}</div>
             <div style="display:flex;flex-direction:column;gap:3px;">
               <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
                 <button onClick="{{ it.select }}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:9px 10px;border-radius:9px;background:{{ it.bg }};border:1px solid {{ it.border }};cursor:pointer;">
@@ -138,7 +138,7 @@
             </div>
             <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
               <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#656d78;">est.</span>
-              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e2ba57;background:rgba(0,0,0,0.4);border:1px solid rgba(244,215,116,0.28);border-radius:6px;padding:3px 8px;">{{ estSize }}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e2ba57;background:rgba(0,0,0,0.4);border:1px solid rgba(226,186,87,0.28);border-radius:6px;padding:3px 8px;">{{ estSize }}</span>
             </div>
           </div>
         </div>
@@ -148,7 +148,7 @@
         <sc-if value="{{ cfgCode }}" hint-placeholder-val="{{ false }}">
         <div style="flex:1;display:flex;flex-direction:column;padding:22px 24px;">
           <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Code snippet</div>
-          <div style="font-size:12px;color:#8f97a1;margin-bottom:16px;line-height:1.5;">Copy the compiled graph as a self-contained module. Uniforms are wired as exported params.</div>
+          <div style="font-size:12px;color:#9aa2ac;margin-bottom:16px;line-height:1.5;">Copy the compiled graph as a self-contained module. Uniforms are wired as exported params.</div>
           <div style="display:flex;gap:4px;background:#1a1d22;border:1px solid #20242a;border-radius:8px;padding:3px;width:fit-content;margin-bottom:14px;">
             <sc-for list="{{ langOpts }}" as="l" hint-placeholder-count="3"><button onClick="{{ l.select }}" style="padding:6px 14px;border:none;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11.5px;cursor:pointer;background:{{ l.bg }};color:{{ l.color }};">{{ l.name }}</button></sc-for>
           </div>
@@ -162,7 +162,7 @@
         <sc-if value="{{ cfgHtml }}" hint-placeholder-val="{{ false }}">
         <div style="flex:1;display:flex;flex-direction:column;padding:22px 24px;">
           <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Standalone HTML</div>
-          <div style="font-size:12px;color:#8f97a1;margin-bottom:18px;line-height:1.5;">One file, no dependencies — runs the WebGL2 render loop straight from a browser.</div>
+          <div style="font-size:12px;color:#9aa2ac;margin-bottom:18px;line-height:1.5;">One file, no dependencies — runs the WebGL2 render loop straight from a browser.</div>
           <div style="display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #20242a;border-radius:11px;background:#1a1d22;margin-bottom:18px;">
             <div style="width:46px;height:56px;border-radius:8px;background:linear-gradient(160deg,#1e2126,#101216);border:1px solid #2b3037;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#7dbcff;flex-shrink:0;">HTML</div>
             <div style="flex:1;min-width:0;">
@@ -180,7 +180,7 @@
               <div onClick="{{ o.toggle }}" style="display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:9px;cursor:pointer;background:{{ o.bg }};" style-hover="background:#1a1d22;">
                 <span style="width:18px;height:18px;flex-shrink:0;border-radius:5px;border:1.5px solid {{ o.boxBorder }};background:{{ o.boxBg }};display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;">{{ o.check }}</span>
                 <span style="flex:1;min-width:0;"><span style="display:block;font-size:12.5px;color:#e7eaee;">{{ o.name }}</span><span style="display:block;font-size:11px;color:#656d78;margin-top:1px;">{{ o.desc }}</span></span>
-                <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;">{{ o.tag }}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;">{{ o.tag }}</span>
               </div>
             </sc-for>
           </div>
@@ -191,7 +191,7 @@
         <sc-if value="{{ cfgLink }}" hint-placeholder-val="{{ false }}">
         <div style="flex:1;display:flex;flex-direction:column;padding:22px 24px;">
           <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Share link</div>
-          <div style="font-size:12px;color:#8f97a1;margin-bottom:18px;line-height:1.5;">Publish a live, editable copy of the graph. Recipients open it in the browser — no install.</div>
+          <div style="font-size:12px;color:#9aa2ac;margin-bottom:18px;line-height:1.5;">Publish a live, editable copy of the graph. Recipients open it in the browser — no install.</div>
           <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#656d78;margin-bottom:10px;">Visibility</div>
           <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:20px;">
             <sc-for list="{{ visOpts }}" as="v" hint-placeholder-count="3">
@@ -249,7 +249,7 @@
             <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:600;color:#e7eaee;">{{ encPct }}</div>
           </div>
           <div style="font-size:15px;font-weight:600;margin-bottom:6px;">{{ encTitle }}</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8f97a1;margin-bottom:4px;">{{ encStage }}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#9aa2ac;margin-bottom:4px;">{{ encStage }}</div>
           <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#656d78;">{{ encEta }}</div>
         </div>
         </sc-if>
@@ -259,13 +259,13 @@
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px 30px;text-align:center;animation:esUp 0.2s cubic-bezier(.2,.7,.3,1);">
           <div style="width:56px;height:56px;border-radius:50%;background:rgba(52,211,153,0.13);border:1px solid rgba(52,211,153,0.4);display:flex;align-items:center;justify-content:center;color:#34d399;font-size:26px;margin-bottom:18px;box-shadow:0 0 24px rgba(52,211,153,0.2);">✓</div>
           <div style="font-size:17px;font-weight:600;letter-spacing:-0.2px;margin-bottom:8px;">{{ doneTitle }}</div>
-          <div style="font-size:12.5px;color:#8f97a1;margin-bottom:22px;max-width:360px;line-height:1.5;">{{ doneMsg }}</div>
+          <div style="font-size:12.5px;color:#9aa2ac;margin-bottom:22px;max-width:360px;line-height:1.5;">{{ doneMsg }}</div>
 
           <!-- link URL row -->
           <sc-if value="{{ doneLink }}" hint-placeholder-val="{{ false }}">
           <div style="width:100%;max-width:420px;display:flex;gap:8px;margin-bottom:14px;">
             <div style="flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:#0b0c0e;border:1px solid #2b3037;border-radius:9px;padding:0 12px;height:40px;">
-              <span style="color:#565e68;font-size:12px;flex-shrink:0;">🔗</span>
+              <span style="color:#656d78;font-size:12px;flex-shrink:0;">🔗</span>
               <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7dbcff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ shareUrl }}</span>
             </div>
             <button onClick="{{ copyLink }}" style="flex-shrink:0;height:40px;padding:0 16px;border-radius:9px;border:1px solid {{ copyBorder }};background:{{ copyBg }};color:{{ copyColor }};font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;">{{ copyLabel }}</button>
@@ -320,7 +320,7 @@
       <div style="font-size:12.5px;font-weight:600;color:#e7eaee;">{{ toastTitle }}</div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#9aa2ac;margin-top:2px;">{{ toastMsg }}</div>
     </div>
-    <div style="color:#565e68;font-size:13px;cursor:pointer;flex-shrink:0;">✕</div>
+    <div style="color:#656d78;font-size:13px;cursor:pointer;flex-shrink:0;">✕</div>
   </div>
   </sc-if>
 
@@ -450,7 +450,7 @@ class Component extends DCLogic {
 
     // ── code ──
     const mkLang = (key, name) => ({ name, select: () => this.setState({ lang: key }),
-      bg: s.lang === key ? "#22262c" : "transparent", color: s.lang === key ? "#e7eaee" : "#8f97a1" });
+      bg: s.lang === key ? "#22262c" : "transparent", color: s.lang === key ? "#e7eaee" : "#9aa2ac" });
     const langOpts = [mkLang("glsl", "GLSL"), mkLang("js", "JS embed"), mkLang("react", "React")];
     const C = { k: "#c586c0", ty: "#4ec9b0", v: "#9cdcfe", fn: "#dcdcaa", n: "#b5cea8", c: "#6a737d", s: "#ce9178" };
     const el = React.createElement;
@@ -619,9 +619,9 @@ class Component extends DCLogic {
       htmlBaseName: projectSlug,
       setHtmlBase: (e) => this.setState({ htmlBase: e.target.value }),
 
-      forkBg: s.fork ? "rgba(61,155,255,0.1)" : "#1a1d22", forkBorder: s.fork ? "rgba(61,155,255,0.3)" : "#20242a", forkDot: s.fork ? "#3d9bff" : "#565e68",
+      forkBg: s.fork ? "rgba(61,155,255,0.1)" : "#1a1d22", forkBorder: s.fork ? "rgba(61,155,255,0.3)" : "#20242a", forkDot: s.fork ? "#3d9bff" : "#656d78",
       toggleFork: () => this.setState({ fork: !s.fork }),
-      embedBg: s.embed ? "rgba(61,155,255,0.1)" : "#1a1d22", embedBorder: s.embed ? "rgba(61,155,255,0.3)" : "#20242a", embedDot: s.embed ? "#3d9bff" : "#565e68",
+      embedBg: s.embed ? "rgba(61,155,255,0.1)" : "#1a1d22", embedBorder: s.embed ? "rgba(61,155,255,0.3)" : "#20242a", embedDot: s.embed ? "#3d9bff" : "#656d78",
       toggleEmbed: () => this.setState({ embed: !s.embed }),
 
       recPct, recFrames, recElapsed: s.recT.toFixed(1) + "s",

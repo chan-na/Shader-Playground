@@ -87,4 +87,40 @@ describe("StatusOverlays", () => {
     expect(screen.queryByTestId("diagnostics-overlay")).toBeNull();
     expect(useDebugUiStore.getState().open).toBe(false);
   });
+
+  // T3/T4 (§v1.6, design/App Shell.dc.html L403-433): diagnostics gets the
+  // 26px metric strip + card-suppressed panel; problems never gets the strip.
+  it("shows the metric strip and suppresses the 2x2 cards when diagnostics is open (T3)", () => {
+    render(<StatusOverlays />);
+
+    act(() => {
+      useDebugUiStore.getState().setOpen(true);
+    });
+
+    expect(screen.getByTestId("diagnostics-metric-strip")).not.toBeNull();
+    expect(screen.queryByTestId("diagnostics-metric-cards")).toBeNull();
+  });
+
+  it("never renders the metric strip in the problems overlay (T4)", () => {
+    render(<StatusOverlays />);
+
+    act(() => {
+      useDebugUiStore.getState().setProblemsOpen(true);
+    });
+
+    expect(screen.getByTestId("problems-overlay")).not.toBeNull();
+    expect(screen.queryByTestId("diagnostics-metric-strip")).toBeNull();
+  });
+
+  it("renders the metric strip alongside the panel skeleton while bootstrap isn't done (interim decision)", () => {
+    useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
+    render(<StatusOverlays />);
+
+    act(() => {
+      useDebugUiStore.getState().setOpen(true);
+    });
+
+    expect(screen.getByTestId("diagnostics-metric-strip")).not.toBeNull();
+    expect(screen.getByTestId("panel-skeleton")).not.toBeNull();
+  });
 });

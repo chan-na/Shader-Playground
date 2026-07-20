@@ -19,7 +19,7 @@
   .pal-scroll::-webkit-scrollbar { width: 10px; }
   .pal-scroll::-webkit-scrollbar-thumb { background: #2b3037; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
   .pal-scroll::-webkit-scrollbar-track { background: transparent; }
-  .pal-input::placeholder { color: #565e68; }
+  .pal-input::placeholder { color: #656d78; }
   .pal-input:focus { outline: none; }
   @keyframes spBlink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%,8px); } to { opacity: 1; transform: translate(-50%,0); } }
@@ -79,7 +79,7 @@
 
       <!-- search field -->
       <div style="display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid #20242a;">
-        <span style="color:#565e68;font-size:17px;line-height:1;flex-shrink:0;">⌕</span>
+        <span style="color:#656d78;font-size:17px;line-height:1;flex-shrink:0;">⌕</span>
         <sc-if value="{{ modeChip }}" hint-placeholder-val="{{ false }}">
           <span style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:{{ modeColor }};background:{{ modeBg }};border:1px solid {{ modeBorder }};border-radius:6px;padding:3px 8px;">{{ modeChip }}</span>
         </sc-if>
@@ -102,7 +102,7 @@
                 <div style="font-size:13.5px;color:#e7eaee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><sc-for list="{{ it.segs }}" as="sg" hint-placeholder-count="3"><span style="color:{{ sg.color }};font-weight:{{ sg.weight }};">{{ sg.text }}</span></sc-for></div>
                 <sc-if value="{{ it.sub }}" hint-placeholder-val="{{ false }}"><div style="font-size:11px;color:#656d78;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ it.sub }}</div></sc-if>
               </div>
-              <sc-if value="{{ it.warn }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:600;color:#f5c778;background:rgba(245,177,61,0.12);border:1px solid rgba(245,177,61,0.35);border-radius:5px;padding:2px 7px;white-space:nowrap;">⚠ {{ it.warn }}</span></sc-if>
+              <sc-if value="{{ it.warn }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:600;color:#f5b13d;background:rgba(245,177,61,0.12);border:1px solid rgba(245,177,61,0.35);border-radius:5px;padding:2px 7px;white-space:nowrap;">⚠ {{ it.warn }}</span></sc-if>
               <span style="flex-shrink:0;font-size:9px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:{{ it.tagColor }};background:{{ it.tagBg }};border-radius:5px;padding:2px 6px;min-width:52px;text-align:center;">{{ it.tag }}</span>
               <div style="flex-shrink:0;display:flex;align-items:center;gap:4px;min-width:56px;justify-content:flex-end;">
                 <sc-if value="{{ it.selected }}" hint-placeholder-val="{{ false }}"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7dbcff;">↵</span></sc-if>
@@ -236,7 +236,7 @@ class Component extends DCLogic {
       P("Feedback loop","6 nodes · buffer ping-pong"),
       P("Kaleidoscope","4 nodes · mirror symmetry"),
     ];
-    const R = (label, sub) => ({ kind:"recent", glyph:"\u21BA", label, sub, keys:[], iconColor:"#8f97a1", iconBg:"#16181c", iconBorder:"#22262c", tag:"RECENT", tagColor:"#8f97a1", tagBg:"#16181c" });
+    const R = (label, sub) => ({ kind:"recent", glyph:"\u21BA", label, sub, keys:[], iconColor:"#9aa2ac", iconBg:"#16181c", iconBorder:"#22262c", tag:"RECENT", tagColor:"#9aa2ac", tagBg:"#16181c" });
     const recent = [
       R("Nebula drift","edited 2h ago · 11 nodes"),
       R("Client logo loop","edited yesterday · 8 nodes"),

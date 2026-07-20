@@ -259,7 +259,7 @@ function saveDockLayout(): void {
   try {
     const { tree, maximized, nextLeafId } = useDockStore.getState();
     const snapshot: DockLayoutSnapshot = {
-      version: 1,
+      version: 2,
       tree,
       maximized,
       nextLeafId,

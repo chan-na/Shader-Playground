@@ -27,7 +27,7 @@
   <!-- header -->
   <div style="display:flex;align-items:center;gap:12px;height:44px;flex-shrink:0;padding:0 14px;background:#131519;border-bottom:1px solid #20242a;">
     <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Node Editor</span>
-    <span style="font-size:11px;color:#565e68;">— vocabulary, states &amp; edges</span>
+    <span style="font-size:11px;color:#656d78;">— vocabulary, states &amp; edges</span>
     <div style="flex:1;"></div>
     <button onClick="{{ toggleMulti }}" style="display:flex;align-items:center;gap:7px;height:28px;padding:0 11px;background:{{ multiBg }};border:1px solid {{ multiBorder }};border-radius:7px;color:{{ multiColor }};font-size:11.5px;font-weight:500;cursor:pointer;"><span style="width:7px;height:7px;border-radius:2px;background:{{ multiDot }};"></span>Selection demo</button>
     <button onClick="{{ toggleGrid }}" style="height:28px;padding:0 11px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#c4cad2;font-size:11.5px;font-weight:500;cursor:pointer;">{{ gridLabel }}</button>
@@ -50,16 +50,16 @@
       <path d="M198 309.5 C 340 309.5, 360 369.5, 500 369.5" stroke="#a06bff" stroke-width="2.5" fill="none"/>
       <!-- Audio -> Blend texB (violet) -->
       <path d="M198 477.5 C 350 477.5, 360 399.5, 500 399.5" stroke="#a06bff" stroke-width="2.5" fill="none"/>
-      <!-- Fresnel out -> Output A (gold) -->
-      <path d="M696 195.5 C 840 195.5, 860 165.5, 1000 165.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
-      <!-- Blend out -> Combine in1 (gold) -->
-      <path d="M696 399.5 C 726 399.5, 740 349.5, 770 349.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
+      <!-- Fresnel out -> Output A (gold) — start x follows widened node (label-sized width) -->
+      <path d="M720 195.5 C 850 180.5, 880 165.5, 1000 165.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
+      <!-- Blend out -> Combine in1 (gold) — start x follows widened node -->
+      <path d="M708 399.5 C 732 399.5, 746 349.5, 770 349.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
       <!-- Math out -> Combine in2 (green) -->
-      <path d="M409 375.5 C 560 375.5, 620 375.5, 770 375.5" stroke="#7ed957" stroke-width="2.5" fill="none"/>
+      <path d="M409 375.5 C 560 375.5, 620 375.5, 770 376.5" stroke="#7ed957" stroke-width="2.5" fill="none"/>
       <!-- Compute out -> Combine in3 (violet) -->
-      <path d="M696 555.5 C 728 500, 742 401.5, 770 401.5" stroke="#a06bff" stroke-width="2.5" fill="none"/>
+      <path d="M696 555.5 C 728 500, 742 403.5, 770 403.5" stroke="#a06bff" stroke-width="2.5" fill="none"/>
       <!-- Combine out -> Output B (gold) -->
-      <path d="M920 375.5 C 952 375.5, 972 365.5, 1000 365.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
+      <path d="M920 349.5 C 952 349.5, 972 365.5, 1000 365.5" stroke="#f0b429" stroke-width="2.5" fill="none"/>
       <!-- DRAG IN PROGRESS: Swizzle out -> floating cursor (gold dashed) -->
       <path d="M409 515.5 C 520 515.5, 560 470, 632 452" stroke="#f0b429" stroke-width="2.5" fill="none" stroke-dasharray="6 6" style="animation:neDash 0.6s linear infinite;" opacity="0.9"/>
     </svg>
@@ -98,7 +98,7 @@
       <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(75,191,137,0.22),rgba(75,191,137,0.08));border-radius:9px 9px 0 0;">
         <div style="width:15px;height:15px;border-radius:4px;background:rgba(75,191,137,0.2);border:1px solid #4bbf89;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6fd6a3;">∿</div>
         <div style="font-size:11.5px;font-weight:600;color:#fff;">Audio</div>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#565e68;">mic · 256</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#656d78;">mic · 256</span>
       </div>
       <div style="padding:9px 11px;display:flex;align-items:flex-end;gap:2px;height:26px;">
         <div style="flex:1;background:#4bbf89;height:40%;border-radius:1px;"></div><div style="flex:1;background:#4bbf89;height:75%;border-radius:1px;"></div><div style="flex:1;background:#4bbf89;height:55%;border-radius:1px;"></div><div style="flex:1;background:#4bbf89;height:90%;border-radius:1px;"></div><div style="flex:1;background:#4bbf89;height:35%;border-radius:1px;"></div><div style="flex:1;background:#4bbf89;height:65%;border-radius:1px;"></div>
@@ -112,7 +112,7 @@
         <span style="color:#a4adb8;font-size:10px;cursor:pointer;">▾</span>
         <span style="width:8px;height:8px;border-radius:2px;background:#77828f;"></span>
         <span style="font-size:11px;font-weight:600;color:#c4cad2;">Rim params</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#565e68;">2</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#656d78;">2</span>
       </div>
     </div>
 
@@ -178,21 +178,21 @@
     </div>
 
     <!-- ══ Fresnel shader (SELECTED) ══ -->
-    <div onClick="{{ selFresnel }}" style="position:absolute;left:500px;top:96px;width:196px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;border-radius:11px;cursor:pointer;box-shadow:{{ fresnelShadow }};">
+    <div onClick="{{ selFresnel }}" style="position:absolute;left:500px;top:96px;width:220px;background:linear-gradient(180deg,#1e2126,#16181c);border:1px solid #0b0c0e;border-radius:11px;cursor:pointer;box-shadow:{{ fresnelShadow }};">
       <div style="display:flex;align-items:center;gap:7px;padding:8px 12px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(61,155,255,0.3),rgba(61,155,255,0.12));border-radius:10px 10px 0 0;">
         <div style="width:16px;height:16px;border-radius:5px;background:rgba(61,155,255,0.25);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#7dbcff;">◆</div>
         <div style="font-size:12px;font-weight:600;color:#fff;">Fresnel</div>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#f4d774;background:rgba(0,0,0,0.5);border:1px solid rgba(244,215,116,0.35);border-radius:5px;padding:1px 5px;">0.31ms</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#e2ba57;background:rgba(0,0,0,0.5);border:1px solid rgba(226,186,87,0.35);border-radius:5px;padding:1px 5px;">0.31ms</span>
       </div>
       <div style="padding:9px 0;">
-        <div style="margin:0 46px;height:96px;border-radius:7px;background:radial-gradient(circle at 42% 34%,#8fc7ff 0%,#3d9bff 34%,#1a3d7a 68%,#0a1730 100%);border:1px solid #0b0c0e;box-shadow:inset 0 1px 4px rgba(0,0,0,0.5);position:relative;overflow:hidden;"><div style="position:absolute;inset:0;background:radial-gradient(circle at 42% 34%,transparent 42%,rgba(125,188,255,0.42) 72%,transparent 74%);"></div></div>
+        <div style="margin:0 58px;height:96px;border-radius:7px;background:radial-gradient(circle at 42% 34%,#8fc7ff 0%,#3d9bff 34%,#1a3d7a 68%,#0a1730 100%);border:1px solid #0b0c0e;box-shadow:inset 0 1px 4px rgba(0,0,0,0.5);position:relative;overflow:hidden;"><div style="position:absolute;inset:0;background:radial-gradient(circle at 42% 34%,transparent 42%,rgba(125,188,255,0.42) 72%,transparent 74%);"></div></div>
       </div>
       <!-- input port rail: label = port name, colored by type family -->
-      <div style="position:absolute;left:11px;top:62px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">mesh</div>
-      <div style="position:absolute;left:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">color</div>
-      <div style="position:absolute;left:11px;top:122px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">time</div>
+      <div style="position:absolute;left:11px;top:62px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;white-space:nowrap;">geometry</div>
+      <div style="position:absolute;left:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;white-space:nowrap;">baseColor</div>
+      <div style="position:absolute;left:11px;top:122px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;white-space:nowrap;">u_time</div>
       <!-- output port rail -->
-      <div style="position:absolute;right:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;max-width:30px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">color</div>
+      <div style="position:absolute;right:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;text-align:right;white-space:nowrap;">fragColor</div>
       <div style="position:absolute;left:-6px;top:64px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;"></div>
       <div style="position:absolute;left:-6px;top:94px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
       <div style="position:absolute;left:-6px;top:124px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
@@ -200,21 +200,21 @@
     </div>
 
     <!-- ══ Blend shader (ERROR) ══ -->
-    <div onClick="{{ selBlend }}" style="position:absolute;left:500px;top:300px;width:196px;background:linear-gradient(180deg,#231a1c,#180f10);border:1px solid #0b0c0e;border-radius:11px;cursor:pointer;box-shadow:{{ blendShadow }};">
+    <div onClick="{{ selBlend }}" style="position:absolute;left:500px;top:300px;width:208px;background:linear-gradient(180deg,#231a1c,#180f10);border:1px solid #0b0c0e;border-radius:11px;cursor:pointer;box-shadow:{{ blendShadow }};">
       <div style="display:flex;align-items:center;gap:7px;padding:8px 12px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(240,85,92,0.26),rgba(240,85,92,0.1));border-radius:10px 10px 0 0;">
         <div style="width:16px;height:16px;border-radius:5px;background:rgba(61,155,255,0.2);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#7dbcff;">◆</div>
         <div style="font-size:12px;font-weight:600;color:#fff;">Blend</div>
         <span style="margin-left:auto;display:flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;color:#0b0c0e;background:#f0555c;border-radius:8px;padding:1px 6px;">✕ 2</span>
       </div>
       <div style="padding:9px 0;">
-        <div style="margin:0 46px;height:96px;border-radius:7px;background:repeating-linear-gradient(45deg,#2a1618 0 8px,#1c0f11 8px 16px);border:1px solid #0b0c0e;display:flex;align-items:center;justify-content:center;">
+        <div style="margin:0 46px 0 58px;height:96px;border-radius:7px;background:repeating-linear-gradient(45deg,#2a1618 0 8px,#1c0f11 8px 16px);border:1px solid #0b0c0e;display:flex;align-items:center;justify-content:center;">
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#f0555c;">failed</span>
         </div>
       </div>
-      <div style="position:absolute;left:11px;top:62px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">texA</div>
-      <div style="position:absolute;left:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">texB</div>
-      <div style="position:absolute;left:11px;top:122px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">mix</div>
-      <div style="position:absolute;right:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;max-width:30px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:0.55;">color</div>
+      <div style="position:absolute;left:11px;top:62px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;white-space:nowrap;">textureA</div>
+      <div style="position:absolute;left:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;white-space:nowrap;">textureB</div>
+      <div style="position:absolute;left:11px;top:122px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;white-space:nowrap;">mixAmount</div>
+      <div style="position:absolute;right:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;text-align:right;white-space:nowrap;opacity:0.55;">color</div>
       <div style="position:absolute;left:-6px;top:64px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#180f10;"></div>
       <div style="position:absolute;left:-6px;top:94px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#180f10;"></div>
       <div style="position:absolute;left:-6px;top:124px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#180f10;"></div>
@@ -226,7 +226,7 @@
       <div style="display:flex;align-items:center;gap:7px;padding:8px 12px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(61,155,255,0.3),rgba(61,155,255,0.12));border-radius:10px 10px 0 0;">
         <div style="width:16px;height:16px;border-radius:5px;background:rgba(61,155,255,0.25);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#7dbcff;">⌗</div>
         <div style="font-size:12px;font-weight:600;color:#fff;">Compute</div>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#f4d774;background:rgba(0,0,0,0.5);border:1px solid rgba(244,215,116,0.35);border-radius:5px;padding:1px 5px;">1.8ms</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#e2ba57;background:rgba(0,0,0,0.5);border:1px solid rgba(226,186,87,0.35);border-radius:5px;padding:1px 5px;">1.8ms</span>
       </div>
       <div style="padding:11px 12px;display:flex;flex-direction:column;gap:7px;">
         <div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;">particles</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e7eaee;">65,536</span></div>
@@ -243,16 +243,20 @@
         <div style="width:15px;height:15px;border-radius:4px;background:rgba(212,165,60,0.2);border:1px solid #d4a53c;display:flex;align-items:center;justify-content:center;font-size:11px;color:#e2ba57;">⊕</div>
         <div style="font-size:11.5px;font-weight:600;color:#fff;">Combine</div>
       </div>
-      <div style="padding:9px 11px;display:flex;flex-direction:column;gap:6px;">
-        <div style="display:flex;justify-content:space-between;"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#9aa2ac;">rgb</span><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#9aa2ac;">a</span></div>
-        <div style="height:4px;border-radius:2px;background:linear-gradient(90deg,#3d9bff,#f0b429);"></div>
-        <div style="text-align:right;"><span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;">vec4 ▸</span></div>
+      <div style="height:112px;position:relative;">
+        <div style="position:absolute;left:46px;right:46px;top:6px;bottom:6px;border-radius:6px;background:linear-gradient(135deg,rgba(240,180,41,0.35),rgba(126,217,87,0.3),rgba(160,107,255,0.35));border:1px solid #0b0c0e;"></div>
       </div>
-      <!-- Q7: Combine port stride 26 (aligns to .node-card__field row rhythm) -->
+      <!-- input port labels aligned to dots at top 44/71/98 -->
+      <div style="position:absolute;left:11px;top:42px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;white-space:nowrap;">rgb</div>
+      <div style="position:absolute;left:11px;top:69px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;white-space:nowrap;">alpha</div>
+      <div style="position:absolute;left:11px;top:96px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;white-space:nowrap;">mask</div>
+      <!-- output port label aligned to output dot at top 44 -->
+      <div style="position:absolute;right:11px;top:42px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;text-align:right;white-space:nowrap;">vec4</div>
+      <!-- S2: Combine port stride 27 (browser-measured 27px; aligns to .node-card__field row rhythm). Output disc sits at first row (PORT_TOP_PAD convention) matching impl — dc's earlier centered top:70 was presentation only. -->
       <div style="position:absolute;left:-6px;top:44px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
-      <div style="position:absolute;left:-6px;top:70px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
-      <div style="position:absolute;left:-6px;top:96px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;"></div>
-      <div style="position:absolute;right:-6px;top:70px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 7px rgba(240,180,41,0.6);"></div>
+      <div style="position:absolute;left:-6px;top:71px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
+      <div style="position:absolute;left:-6px;top:98px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;"></div>
+      <div style="position:absolute;right:-6px;top:44px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 7px rgba(240,180,41,0.6);"></div>
     </div>
 
     <!-- ══ Output A ══ -->
@@ -260,10 +264,9 @@
       <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(224,92,147,0.24),rgba(224,92,147,0.08));border-radius:9px 9px 0 0;">
         <div style="width:15px;height:15px;border-radius:4px;background:rgba(224,92,147,0.2);border:1px solid #e05c93;display:flex;align-items:center;justify-content:center;font-size:10px;color:#ee7fac;">◎</div>
         <div style="font-size:11.5px;font-weight:600;color:#fff;">Output</div>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#565e68;">A · 1/4</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#656d78;">A · 1/4</span>
       </div>
-      <div style="padding:8px 11px 8px 46px;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;">→ viewport</span></div>
-      <div style="position:absolute;left:11px;top:38px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;">texture</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;height:31px;padding:0 11px;"><span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;">texture</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;">→ viewport</span></div>
       <div style="position:absolute;left:-6px;top:40px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
     </div>
 
@@ -272,10 +275,9 @@
       <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(224,92,147,0.24),rgba(224,92,147,0.08));border-radius:9px 9px 0 0;">
         <div style="width:15px;height:15px;border-radius:4px;background:rgba(224,92,147,0.2);border:1px solid #e05c93;display:flex;align-items:center;justify-content:center;font-size:10px;color:#ee7fac;">◎</div>
         <div style="font-size:11.5px;font-weight:600;color:#fff;">Output</div>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#565e68;">B · 2/4</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#656d78;">B · 2/4</span>
       </div>
-      <div style="padding:8px 11px 8px 46px;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;">→ viewport</span></div>
-      <div style="position:absolute;left:11px;top:38px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;">texture</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;height:31px;padding:0 11px;"><span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;">texture</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9aa2ac;">→ viewport</span></div>
       <div style="position:absolute;left:-6px;top:40px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
     </div>
 
@@ -284,7 +286,7 @@
       <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(75,191,137,0.22),rgba(75,191,137,0.08));border-radius:9px 9px 0 0;">
         <div style="width:15px;height:15px;border-radius:4px;background:rgba(75,191,137,0.2);border:1px solid #4bbf89;display:flex;align-items:center;justify-content:center;font-size:10px;color:#6fd6a3;">◉</div>
         <div style="font-size:11.5px;font-weight:600;color:#fff;">Webcam</div>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#565e68;">16:9</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#656d78;">16:9</span>
       </div>
       <div style="padding:6px;">
         <div style="height:74px;border-radius:5px;background:#08090b;border:1px solid #0b0c0e;display:flex;align-items:center;overflow:hidden;">
@@ -302,7 +304,7 @@
       <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(75,191,137,0.22),rgba(75,191,137,0.08));border-radius:9px 9px 0 0;">
         <div style="width:15px;height:15px;border-radius:4px;background:rgba(75,191,137,0.2);border:1px solid #4bbf89;display:flex;align-items:center;justify-content:center;font-size:9px;color:#6fd6a3;">▷</div>
         <div style="font-size:11.5px;font-weight:600;color:#fff;">Video</div>
-        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#565e68;">loop</span>
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:#656d78;">loop</span>
       </div>
       <div style="padding:6px;">
         <div style="height:74px;border-radius:5px;background:#08090b;border:1px solid #0b0c0e;display:flex;flex-direction:column;justify-content:center;overflow:hidden;">
@@ -326,27 +328,27 @@
         <div style="display:flex;align-items:center;gap:7px;padding:8px 12px;border-bottom:1px solid #0b0c0e;background:linear-gradient(180deg,rgba(61,155,255,0.3),rgba(61,155,255,0.12));border-radius:10px 10px 0 0;">
           <div style="width:16px;height:16px;border-radius:5px;background:rgba(61,155,255,0.25);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#7dbcff;">◆</div>
           <div style="font-size:12px;font-weight:600;color:#fff;">Noise</div>
-          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#f4d774;background:rgba(0,0,0,0.5);border:1px solid rgba(244,215,116,0.35);border-radius:5px;padding:1px 5px;">6 in</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#e2ba57;background:rgba(0,0,0,0.5);border:1px solid rgba(226,186,87,0.35);border-radius:5px;padding:1px 5px;">6 in</span>
         </div>
         <div style="padding:9px 0;">
           <div style="margin:0 46px;height:176px;border-radius:7px;background:radial-gradient(circle at 50% 42%,#2a3550,#141b28 72%);border:1px solid #0b0c0e;box-shadow:inset 0 1px 4px rgba(0,0,0,0.5);position:relative;overflow:hidden;"><div style="position:absolute;inset:0;background:repeating-conic-gradient(from 0deg at 50% 45%,#1b2740 0deg 12deg,#233251 12deg 24deg);opacity:0.55;"></div></div>
         </div>
-        <!-- 6 input ports @ stride 30, body height follows -->
-        <div style="position:absolute;left:11px;top:62px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">scale</div>
-        <div style="position:absolute;left:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">detail</div>
-        <div style="position:absolute;left:11px;top:122px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">offset</div>
-        <div style="position:absolute;left:11px;top:152px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">warp</div>
-        <div style="position:absolute;left:11px;top:182px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">seed</div>
-        <div style="position:absolute;left:11px;top:212px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;max-width:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">mask</div>
-        <div style="position:absolute;left:-6px;top:64px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
-        <div style="position:absolute;left:-6px;top:94px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
-        <div style="position:absolute;left:-6px;top:124px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
-        <div style="position:absolute;left:-6px;top:154px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
-        <div style="position:absolute;left:-6px;top:184px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
-        <div style="position:absolute;left:-6px;top:214px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;"></div>
+        <!-- 6 input ports @ stride 30, vertically centered in preview (center ~130) -->
+        <div style="position:absolute;left:11px;top:48px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;white-space:nowrap;">scale</div>
+        <div style="position:absolute;left:11px;top:78px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;white-space:nowrap;">detail</div>
+        <div style="position:absolute;left:11px;top:108px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;white-space:nowrap;">offset</div>
+        <div style="position:absolute;left:11px;top:138px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;white-space:nowrap;">warp</div>
+        <div style="position:absolute;left:11px;top:168px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#7ed957;white-space:nowrap;">seed</div>
+        <div style="position:absolute;left:11px;top:198px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;white-space:nowrap;">mask</div>
+        <div style="position:absolute;left:-6px;top:50px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
+        <div style="position:absolute;left:-6px;top:80px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
+        <div style="position:absolute;left:-6px;top:110px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
+        <div style="position:absolute;left:-6px;top:140px;width:11px;height:11px;border-radius:50%;border:2.5px solid #f0b429;background:#16181c;"></div>
+        <div style="position:absolute;left:-6px;top:170px;width:11px;height:11px;border-radius:50%;border:2.5px solid #7ed957;background:#16181c;"></div>
+        <div style="position:absolute;left:-6px;top:200px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;"></div>
         <!-- output centered on body -->
-        <div style="position:absolute;right:11px;top:131px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;max-width:30px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">color</div>
-        <div style="position:absolute;right:-6px;top:134px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 8px rgba(240,180,41,0.65);"></div>
+        <div style="position:absolute;right:11px;top:122px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;text-align:right;white-space:nowrap;">color</div>
+        <div style="position:absolute;right:-6px;top:124px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 8px rgba(240,180,41,0.65);"></div>
       </div>
       <div style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:8px;line-height:1.55;color:#656d78;">bodyH = max(96, (n−1)·30 + 56)<br>stride 30 · preview fills · cap ~10 ports</div>
     </div>
@@ -364,10 +366,10 @@
           <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#6fe3b8;background:rgba(52,211,153,0.13);border:1px solid rgba(52,211,153,0.3);border-radius:5px;padding:1px 6px;">ok</span>
         </div>
         <div style="padding:9px 0;">
-          <div style="margin:0 46px;height:96px;border-radius:7px;background:radial-gradient(circle at 50% 44%,rgba(61,155,255,0.6) 0%,rgba(61,155,255,0.16) 34%,transparent 62%),radial-gradient(circle at 50% 118%,rgba(61,155,255,0.14),transparent 56%),#0e1116;border:1px solid #0b0c0e;box-shadow:inset 0 1px 4px rgba(0,0,0,0.5);position:relative;overflow:hidden;"><div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 52%,rgba(0,0,0,0.45) 100%);"></div></div>
+          <div style="margin:0 46px;height:96px;border-radius:7px;background:radial-gradient(circle at 50% 44%,rgba(61,155,255,0.6) 0%,rgba(61,155,255,0.16) 34%,transparent 62%),radial-gradient(circle at 50% 118%,rgba(61,155,255,0.14),transparent 56%),#0f1114;border:1px solid #0b0c0e;box-shadow:inset 0 1px 4px rgba(0,0,0,0.5);position:relative;overflow:hidden;"><div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 52%,rgba(0,0,0,0.45) 100%);"></div></div>
         </div>
-        <div style="position:absolute;left:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;opacity:0.6;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">mesh?</div>
-        <div style="position:absolute;right:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;max-width:30px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">color</div>
+        <div style="position:absolute;left:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#a06bff;opacity:0.6;white-space:nowrap;">mesh?</div>
+        <div style="position:absolute;right:11px;top:92px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:#f0b429;text-align:right;white-space:nowrap;">color</div>
         <div style="position:absolute;left:-6px;top:94px;width:11px;height:11px;border-radius:50%;border:2.5px solid #a06bff;background:#16181c;opacity:0.6;"></div>
         <div style="position:absolute;right:-6px;top:94px;width:11px;height:11px;border-radius:50%;background:#f0b429;border:2px solid #16181c;box-shadow:0 0 8px rgba(240,180,41,0.65);"></div>
       </div>
@@ -411,7 +413,7 @@
   </div>
 
   <!-- ══ REFERENCE STRIP ══ -->
-  <div style="flex-shrink:0;height:186px;background:#0e1013;border-top:1px solid #20242a;display:grid;grid-template-columns:1.55fr 0.9fr 1.1fr;gap:0;">
+  <div style="flex-shrink:0;height:186px;background:#0f1114;border-top:1px solid #20242a;display:grid;grid-template-columns:1.55fr 0.9fr 1.1fr;gap:0;">
 
     <!-- 13 kinds -->
     <div style="padding:14px 18px;border-right:1px solid #17191e;">
@@ -437,13 +439,13 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;">
         <sc-for list="{{ states }}" as="st" hint-placeholder-count="4">
           <div style="display:flex;align-items:center;gap:9px;">
-            <div style="width:34px;height:24px;border-radius:6px;background:#1a1d22;border:{{ st.border }};box-shadow:{{ st.shadow }};flex-shrink:0;position:relative;"><sc-if value="{{ st.dot }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:-4px;top:-4px;width:10px;height:10px;border-radius:50%;background:#f0555c;border:1.5px solid #0e1013;"></span></sc-if></div>
+            <div style="width:34px;height:24px;border-radius:6px;background:#1a1d22;border:{{ st.border }};box-shadow:{{ st.shadow }};flex-shrink:0;position:relative;"><sc-if value="{{ st.dot }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:-4px;top:-4px;width:10px;height:10px;border-radius:50%;background:#f0555c;border:1.5px solid #0f1114;"></span></sc-if></div>
             <span style="font-size:11px;color:#c4cad2;">{{ st.name }}</span>
           </div>
         </sc-for>
       </div>
       <div style="margin-top:13px;padding-top:11px;border-top:1px solid #17191e;">
-        <div style="font-size:9px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#565e68;margin-bottom:7px;">Double-click title → rename</div>
+        <div style="font-size:9px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#656d78;margin-bottom:7px;">Double-click title → rename</div>
         <div style="display:inline-flex;align-items:center;gap:7px;padding:5px 9px;background:linear-gradient(180deg,rgba(61,155,255,0.3),rgba(61,155,255,0.12));border:1px solid #0b0c0e;border-radius:8px;">
           <div style="width:15px;height:15px;border-radius:4px;background:rgba(61,155,255,0.25);border:1px solid #3d9bff;display:flex;align-items:center;justify-content:center;font-size:10px;color:#7dbcff;">◆</div>
           <div style="display:flex;align-items:center;background:#0b0c0e;border:1px solid #3d9bff;border-radius:5px;padding:2px 6px;box-shadow:0 0 0 2px rgba(61,155,255,0.22);">
@@ -458,14 +460,14 @@
     <div style="padding:14px 18px;">
       <div style="font-size:10px;font-weight:600;letter-spacing:0.9px;text-transform:uppercase;color:#656d78;margin-bottom:12px;">Edges &amp; interaction</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;">
-        <div><svg viewBox="0 0 120 24" style="width:100%;height:22px;"><path d="M6 12 H 114" stroke="#f0b429" stroke-width="2.5" fill="none"/><circle cx="6" cy="12" r="4" fill="#f0b429"/><circle cx="114" cy="12" r="4" fill="none" stroke="#f0b429" stroke-width="2"/></svg><div style="font-size:10px;color:#8f97a1;margin-top:3px;">Valid · type match</div></div>
-        <div><svg viewBox="0 0 120 24" style="width:100%;height:22px;"><path d="M6 12 H 114" stroke="#f0555c" stroke-width="2.5" fill="none" stroke-dasharray="5 5"/><circle cx="6" cy="12" r="4" fill="#7ed957"/><circle cx="114" cy="12" r="4" fill="none" stroke="#f0555c" stroke-width="2"/></svg><div style="font-size:10px;color:#8f97a1;margin-top:3px;">Invalid · mismatch</div></div>
-        <div><svg viewBox="0 0 120 24" style="width:100%;height:22px;"><path d="M6 12 C 50 12, 55 5, 114 5" stroke="#7ed957" stroke-width="2.5" fill="none"/><path d="M6 12 C 50 12, 55 19, 114 19" stroke="#7ed957" stroke-width="2.5" fill="none"/><circle cx="6" cy="12" r="4" fill="#7ed957"/><circle cx="114" cy="5" r="3.5" fill="none" stroke="#7ed957" stroke-width="2"/><circle cx="114" cy="19" r="3.5" fill="none" stroke="#7ed957" stroke-width="2"/></svg><div style="font-size:10px;color:#8f97a1;margin-top:3px;">1 : N fan-out</div></div>
-        <div><svg viewBox="0 0 120 24" style="width:100%;height:22px;"><path d="M6 12 H 100" stroke="#f0b429" stroke-width="2.5" fill="none" stroke-dasharray="6 6"/><circle cx="6" cy="12" r="4" fill="#f0b429"/><circle cx="106" cy="12" r="4.5" fill="none" stroke="#f0b429" stroke-width="2" stroke-dasharray="3 3"/></svg><div style="font-size:10px;color:#8f97a1;margin-top:3px;">Drag in progress</div></div>
+        <div><svg viewBox="0 0 120 24" style="width:100%;height:22px;"><path d="M6 12 H 114" stroke="#f0b429" stroke-width="2.5" fill="none"/><circle cx="6" cy="12" r="4" fill="#f0b429"/><circle cx="114" cy="12" r="4" fill="none" stroke="#f0b429" stroke-width="2"/></svg><div style="font-size:10px;color:#9aa2ac;margin-top:3px;">Valid · type match</div></div>
+        <div><svg viewBox="0 0 120 24" style="width:100%;height:22px;"><path d="M6 12 H 114" stroke="#f0555c" stroke-width="2.5" fill="none" stroke-dasharray="5 5"/><circle cx="6" cy="12" r="4" fill="#7ed957"/><circle cx="114" cy="12" r="4" fill="none" stroke="#f0555c" stroke-width="2"/></svg><div style="font-size:10px;color:#9aa2ac;margin-top:3px;">Invalid · mismatch</div></div>
+        <div><svg viewBox="0 0 120 24" style="width:100%;height:22px;"><path d="M6 12 C 50 12, 55 5, 114 5" stroke="#7ed957" stroke-width="2.5" fill="none"/><path d="M6 12 C 50 12, 55 19, 114 19" stroke="#7ed957" stroke-width="2.5" fill="none"/><circle cx="6" cy="12" r="4" fill="#7ed957"/><circle cx="114" cy="5" r="3.5" fill="none" stroke="#7ed957" stroke-width="2"/><circle cx="114" cy="19" r="3.5" fill="none" stroke="#7ed957" stroke-width="2"/></svg><div style="font-size:10px;color:#9aa2ac;margin-top:3px;">1 : N fan-out</div></div>
+        <div><svg viewBox="0 0 120 24" style="width:100%;height:22px;"><path d="M6 12 H 100" stroke="#f0b429" stroke-width="2.5" fill="none" stroke-dasharray="6 6"/><circle cx="6" cy="12" r="4" fill="#f0b429"/><circle cx="106" cy="12" r="4.5" fill="none" stroke="#f0b429" stroke-width="2" stroke-dasharray="3 3"/></svg><div style="font-size:10px;color:#9aa2ac;margin-top:3px;">Drag in progress</div></div>
       </div>
       <div style="display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:11px;border-top:1px solid #17191e;">
         <div style="width:34px;height:22px;border:1.5px dashed #3d9bff;background:rgba(61,155,255,0.08);border-radius:4px;flex-shrink:0;"></div>
-        <span style="font-size:10.5px;color:#8f97a1;">Box-select marquee · drag on empty canvas</span>
+        <span style="font-size:10.5px;color:#9aa2ac;">Box-select marquee · drag on empty canvas</span>
       </div>
     </div>
   </div>
@@ -526,7 +528,7 @@ class Component extends DCLogic {
       multiBg: s.multi ? "rgba(61,155,255,0.14)" : "#1a1d22",
       multiBorder: s.multi ? "#3d9bff" : "#20242a",
       multiColor: s.multi ? "#7dbcff" : "#9aa2ac",
-      multiDot: s.multi ? "#3d9bff" : "#565e68",
+      multiDot: s.multi ? "#3d9bff" : "#656d78",
     };
   }
 }

@@ -32,11 +32,11 @@
     <clipPath id="wCore"><circle cx="50" cy="50" r="13"></circle></clipPath>
     <symbol id="wspm" viewBox="0 0 100 100">
       <circle cx="50" cy="50" r="20" style="fill:none;stroke:#3d9bff;stroke-width:1.5;stroke-opacity:0.28"></circle>
-      <line x1="27" y1="34" x2="42" y2="45" style="stroke:#59626c;stroke-width:3;stroke-linecap:round"></line>
-      <line x1="27" y1="66" x2="42" y2="55" style="stroke:#59626c;stroke-width:3;stroke-linecap:round"></line>
-      <line x1="64" y1="50" x2="75" y2="50" style="stroke:#59626c;stroke-width:3;stroke-linecap:round"></line>
-      <circle cx="20" cy="30" r="6.5" style="fill:none;stroke:#c2c8d0;stroke-width:3.2"></circle>
-      <circle cx="20" cy="70" r="6.5" style="fill:none;stroke:#c2c8d0;stroke-width:3.2"></circle>
+      <line x1="27" y1="34" x2="42" y2="45" style="stroke:#656d78;stroke-width:3;stroke-linecap:round"></line>
+      <line x1="27" y1="66" x2="42" y2="55" style="stroke:#656d78;stroke-width:3;stroke-linecap:round"></line>
+      <line x1="64" y1="50" x2="75" y2="50" style="stroke:#656d78;stroke-width:3;stroke-linecap:round"></line>
+      <circle cx="20" cy="30" r="6.5" style="fill:none;stroke:#c4cad2;stroke-width:3.2"></circle>
+      <circle cx="20" cy="70" r="6.5" style="fill:none;stroke:#c4cad2;stroke-width:3.2"></circle>
       <circle cx="82" cy="50" r="6" style="fill:#3d9bff"></circle>
       <circle cx="50" cy="50" r="13" style="fill:#3d9bff"></circle>
       <path d="M38 50 q3 -7.5 6 0 t6 0 t6 0 t6 0" clip-path="url(#wCore)" style="fill:none;stroke:#dff0ff;stroke-width:2.2;stroke-linecap:round;stroke-opacity:0.9"></path>
@@ -61,10 +61,10 @@
       </sc-for>
     </div>
     <div style="width:1px;height:24px;background:#20242a;"></div>
-    <button style="display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#c4cad2;font-size:12px;font-weight:500;cursor:pointer;" style-hover="background:#22262c;">Presets<span style="color:#565e68;font-size:9px;">▾</span></button>
+    <button style="display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#c4cad2;font-size:12px;font-weight:500;cursor:pointer;" style-hover="background:#22262c;">Presets<span style="color:#656d78;font-size:9px;">▾</span></button>
     <div style="flex:1;"></div>
     <button style="height:30px;padding:0 12px;background:#131519;border:1px solid #1c2026;border-radius:7px;color:#454c55;font-size:12px;font-weight:500;cursor:not-allowed;">Share</button>
-    <button style="height:30px;padding:0 12px;background:#16202e;border:none;border-radius:7px;font-size:12px;font-weight:600;color:#5f7488;cursor:not-allowed;">Export HTML</button>
+    <button style="height:30px;padding:0 12px;background:#16202e;border:none;border-radius:7px;font-size:12px;font-weight:600;color:#656d78;cursor:not-allowed;">Export HTML</button>
     <div style="width:1px;height:24px;background:#20242a;"></div>
     <button style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#9aa2ac;font-size:12px;cursor:pointer;" style-hover="background:#22262c;">Search<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;background:#0b0c0e;border:1px solid #2b3037;border-radius:4px;padding:1px 5px;">⌘K</span></button>
     <button style="width:30px;height:30px;background:#1a1d22;border:1px solid #20242a;border-radius:7px;color:#9aa2ac;font-size:13px;cursor:pointer;" style-hover="background:#22262c;">?</button>
@@ -78,7 +78,7 @@
       <div style="display:flex;align-items:center;gap:10px;height:34px;flex-shrink:0;padding:0 12px;background:#101216;border-bottom:1px solid #17191e;">
         <span style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;">⣿</span>
         <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Node Editor</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#565e68;background:#1a1d22;border:1px solid #20242a;border-radius:4px;padding:1px 6px;">0N · 0E</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#656d78;background:#1a1d22;border:1px solid #20242a;border-radius:4px;padding:1px 6px;">0N · 0E</span>
         <div style="flex:1;"></div>
         <span style="font-size:11px;color:#454c55;">empty graph</span>
       </div>
@@ -114,7 +114,7 @@
                 </div>
                 <div style="padding:12px 14px 14px;">
                   <div style="font-size:13.5px;font-weight:600;color:#e7eaee;margin-bottom:3px;">{{ s.title }}</div>
-                  <div style="font-size:11.5px;line-height:1.45;color:#8f97a1;margin-bottom:10px;">{{ s.desc }}</div>
+                  <div style="font-size:11.5px;line-height:1.45;color:#9aa2ac;margin-bottom:10px;">{{ s.desc }}</div>
                   <div style="display:flex;gap:5px;flex-wrap:wrap;">
                     <sc-for list="{{ s.tags }}" as="t" hint-placeholder-count="3">
                       <span style="display:inline-flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#9aa2ac;background:#16181c;border:1px solid #22262c;border-radius:5px;padding:2px 7px;"><span style="width:6px;height:6px;border-radius:50%;background:{{ t.hex }};"></span>{{ t.name }}</span>
@@ -156,7 +156,7 @@
           <span style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:#9aa2ac;">Viewport</span>
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#454c55;">no output</span>
         </div>
-        <div style="flex:1;position:relative;min-height:0;overflow:hidden;background:radial-gradient(circle at 50% 42%,#0e1116 0%,#0a0c10 55%,#08090b 100%);display:flex;align-items:center;justify-content:center;">
+        <div style="flex:1;position:relative;min-height:0;overflow:hidden;background:radial-gradient(circle at 50% 40%,#10131a 0%,#0a0b0e 70%);display:flex;align-items:center;justify-content:center;">
           <sc-if value="{{ showViewportHint }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px;">
             <div style="width:54px;height:54px;border-radius:50%;border:2px dashed #2b3037;display:flex;align-items:center;justify-content:center;color:#454c55;font-size:22px;">◎</div>

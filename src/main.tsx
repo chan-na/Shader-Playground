@@ -30,6 +30,7 @@ import * as assetActions from "./state/assetActions";
 import { getAudioBlob, getVideoBlob, useAssetStore } from "./state/assetStore";
 import { startDockLayoutPersistence } from "./state/autoSave";
 import { useCameraStore } from "./state/cameraStore";
+import { startCodeAutoOpen } from "./state/codeAutoOpen";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
 import { useDockStore } from "./state/dockStore";
 import { useEditorStore } from "./state/editorStore";
@@ -76,6 +77,9 @@ setAudioBlobResolver(getAudioBlob);
 // 복구(BootstrapGate의 startAutoSave)와는 별개 — 레이아웃은 recovery
 // 다이얼로그 없이 무조건 즉시 복원된다.
 startDockLayoutPersistence();
+
+// W5 — 노드 선택 → Code 자동 접기/펼침 구동(autoCode 게이트, 기본 ON).
+startCodeAutoOpen();
 
 if (import.meta.env.DEV) {
   // Expose stores for debugging / Playwright-style verification.

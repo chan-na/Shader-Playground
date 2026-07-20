@@ -157,6 +157,55 @@ describe("overlay 토큰", () => {
   });
 });
 
+describe("S26 신규 토큰 (v2.0)", () => {
+  it("6종 신규 토큰이 design/theme.ts 정본 값으로 고정된다", () => {
+    expect(tokens.accent.bright).toBe("#7dbcff");
+    expect(tokens.semantic.successBright).toBe("#6fe3b8");
+    expect(tokens.nodeCategory.processBright).toBe("#7dbcff");
+    expect(tokens.nodeCategory.valueBright).toBe("#e2ba57");
+    expect(tokens.nodeCategory.outputBright).toBe("#ee7fac");
+  });
+
+  it("processBright는 accent.bright와 동일 값이다 (S26-D: = accent.bright)", () => {
+    expect(tokens.nodeCategory.processBright).toBe(tokens.accent.bright);
+  });
+
+  it("gradient.viewportActive가 v2.0 정정 종점(42%/40%/80%)을 포함한다", () => {
+    expect(tokens.gradient.viewportActive).toBe(
+      "radial-gradient(circle at 50% 42%, #12325e 0%, #0c1c38 40%, #080a10 80%)",
+    );
+  });
+
+  it("gradient.shaderSphere가 5종점 정본 문자열과 일치한다", () => {
+    expect(tokens.gradient.shaderSphere).toBe(
+      "radial-gradient(circle at 40% 32%, #bcdcff 0%, #4ba3ff 26%, #2b6fe0 52%, #12336b 78%, #08152e 100%)",
+    );
+  });
+
+  it("cssVars()가 S26 신규 CSS 변수를 자동 emit한다", () => {
+    const css = cssVars();
+    expect(css).toContain(`--accent-bright: ${tokens.accent.bright};`);
+    expect(css).toContain(
+      `--success-bright: ${tokens.semantic.successBright};`,
+    );
+    expect(css).toContain(
+      `--node-cat-process-bright: ${tokens.nodeCategory.processBright};`,
+    );
+    expect(css).toContain(
+      `--node-cat-value-bright: ${tokens.nodeCategory.valueBright};`,
+    );
+    expect(css).toContain(
+      `--node-cat-output-bright: ${tokens.nodeCategory.outputBright};`,
+    );
+    expect(css).toContain(
+      `--gradient-viewport-active: ${tokens.gradient.viewportActive};`,
+    );
+    expect(css).toContain(
+      `--gradient-shader-sphere: ${tokens.gradient.shaderSphere};`,
+    );
+  });
+});
+
 describe("withAlpha", () => {
   /** rgba(r, g, b, a) 문자열의 r/g/b 채널을 다시 "#rrggbb"로 재조립한다. */
   function rgbaToHex(rgba: string): string {

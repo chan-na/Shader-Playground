@@ -35,6 +35,7 @@ import { nextId } from "../../utils/id";
 import { DockPanelHeader } from "../DockPanelHeader";
 import { MOTION_MAX_MS } from "../motion";
 import { WelcomeOverlay } from "../WelcomeOverlay";
+import { AddNodePill } from "./AddNodePill";
 import { ConnectionLine } from "./ConnectionLine";
 import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
 import { GraphSkeleton } from "./GraphSkeleton";
@@ -509,6 +510,7 @@ export function NodeEditor() {
             {`${selectedNodeIds.length} nodes selected`}
           </div>
         )}
+        <AddNodePill />
       </div>
       <HelpModal />
     </div>

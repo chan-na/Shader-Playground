@@ -8,7 +8,9 @@ import {
   emptyDiagnostics,
   type NodeDiagnostics,
 } from "../../state/diagnosticsStore";
+import type { GlInfo } from "../../state/rendererStore";
 import {
+  diagnosticsMetricValues,
   frameMetricValue,
   linkedProgramsValue,
   relativeLogTime,
@@ -90,5 +92,63 @@ describe("relativeLogTime", () => {
 
   it("clamps negative deltas (out-of-order timestamps) to 0.0s", () => {
     expect(relativeLogTime(500, 1000)).toBe("0.0s");
+  });
+});
+
+describe("diagnosticsMetricValues", () => {
+  it("reports gpu as an em dash when glInfo is null, other fields normal", () => {
+    const result = diagnosticsMetricValues({
+      glInfo: null,
+      fps: 60,
+      drawCalls: 3,
+      nodes: [],
+      byNode: {},
+    });
+    expect(result.gpu).toBe("—");
+    expect(result.frame).toBe("16.7 ms · 60 fps");
+    expect(result.draws).toBe("3");
+    expect(result.shaders).toBe("0 compiled");
+  });
+
+  it("passes glInfo.renderer through unchanged", () => {
+    const glInfo: GlInfo = { renderer: "Apple M1", version: "WebGL 2.0" };
+    const result = diagnosticsMetricValues({
+      glInfo,
+      fps: 0,
+      drawCalls: 0,
+      nodes: [],
+      byNode: {},
+    });
+    expect(result.gpu).toBe("Apple M1");
+  });
+
+  it("delegates frame/draws formatting to frameMetricValue", () => {
+    const result = diagnosticsMetricValues({
+      glInfo: null,
+      fps: 60,
+      drawCalls: 142,
+      nodes: [],
+      byNode: {},
+    });
+    expect(result.frame).toBe("16.7 ms · 60 fps");
+    expect(result.draws).toBe("142");
+  });
+
+  it("delegates shader compiled count to linkedProgramsValue", () => {
+    const nodes = [shaderNode("s1"), shaderNode("s2")];
+    const byNode: Record<string, NodeDiagnostics> = {
+      s1: {
+        ...emptyDiagnostics(),
+        fragment: [{ line: 1, severity: "error", message: "boom" }],
+      },
+    };
+    const result = diagnosticsMetricValues({
+      glInfo: null,
+      fps: 60,
+      drawCalls: 0,
+      nodes,
+      byNode,
+    });
+    expect(result.shaders).toBe("1 compiled");
   });
 });

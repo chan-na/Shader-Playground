@@ -132,6 +132,11 @@ export interface SpStores {
         line: number;
         column?: number;
       }) => void;
+      // W5(design/CHANGELOG.md §v2.0) — Code 자동 접기/펼침 게이트. E2E가
+      // autoCode를 UI 없이 직접 끌 수 있는 테스트 훅 계약(main.tsx의
+      // `editor: useEditorStore` 노출로 런타임 연결은 이미 존재).
+      autoCode: boolean;
+      setAutoCode: (on: boolean) => void;
     };
   };
   assets: {

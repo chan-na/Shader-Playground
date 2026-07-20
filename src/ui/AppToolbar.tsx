@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GraphNode, ParamKind } from "../core/graph/types";
-import { MAX_OUTPUTS } from "../core/graph/validate";
 import { DEFAULT_EXPORT_BASE, exportFileName } from "../export/exportFileName";
-import basicVert from "../shaders/basic.vert?raw";
-import blendFrag from "../shaders/templates/blend.frag?raw";
-import starterFrag from "../shaders/templates/starter.frag?raw";
 import { hydrateGraphAssets, importFiles } from "../state/assetActions";
 import { useCommandPaletteStore } from "../state/commandPaletteStore";
 import {
@@ -27,7 +22,6 @@ import { useRecorderStore } from "../state/recorder";
 import { deserializeProject, serializeProject } from "../state/serialization";
 import { toast } from "../state/toastStore";
 import { tokens, withAlpha } from "../theme";
-import { nextId } from "../utils/id";
 import { PANEL_DOTS, PANEL_TITLES } from "./dockLayoutModel";
 import { useHelpModalStore } from "./NodeEditor/HelpModal";
 
@@ -44,7 +38,7 @@ const BRAND_DOT_BORDER = `1.4px solid ${withAlpha("#ffffff", 0.95)}`;
 /**
  * Generic toolbar dropdown: a trigger button plus an absolutely-positioned
  * menu that closes on outside pointerdown or Escape. Not exported — used
- * only by AppToolbar's "+ More" and "Presets" triggers.
+ * only by AppToolbar's "File", "Presets", and "＋ Panel" triggers.
  */
 function ToolbarMenu({
   label,
@@ -97,57 +91,11 @@ function ToolbarMenu({
   );
 }
 
-/** One node-add palette button (Mesh/Image/Shader/Output) — category-colored tile + name. */
-function PaletteButton({
-  name,
-  glyph,
-  category,
-  onClick,
-  disabled,
-  title,
-}: {
-  name: string;
-  glyph: string;
-  category: keyof typeof tokens.nodeCategory;
-  onClick: () => void;
-  disabled?: boolean;
-  title?: string;
-}) {
-  const hex = tokens.nodeCategory[category];
-  return (
-    <button
-      type="button"
-      className="tb-btn"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-    >
-      <span
-        className="tb-tile"
-        aria-hidden="true"
-        style={{
-          background: withAlpha(hex, 0.16),
-          border: `1px solid ${hex}`,
-          color: hex,
-        }}
-      >
-        {glyph}
-      </span>
-      {name}
-    </button>
-  );
-}
-
 export function AppToolbar() {
-  const addNode = useGraphStore((s) => s.addNode);
   const setGraph = useGraphStore((s) => s.setGraph);
   const reset = useGraphStore((s) => s.reset);
-  const nodes = useGraphStore((s) => s.nodes);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const projectInputRef = useRef<HTMLInputElement | null>(null);
-
-  const outputCount = nodes.filter((n) => n.kind === "output").length;
-  const outputsFull = outputCount >= MAX_OUTPUTS;
 
   const canUndo = useHistoryStore((s) => s.past.length > 0);
   const canRedo = useHistoryStore((s) => s.future.length > 0);
@@ -274,91 +222,6 @@ export function AppToolbar() {
     }
   };
 
-  const addMesh = () => {
-    const id = nextId("mesh");
-    addNode({ id, kind: "mesh", primitive: "sphere" }, { x: -200, y: 0 });
-  };
-  const addImage = () => {
-    const id = nextId("image");
-    addNode({ id, kind: "image", assetId: null }, { x: -200, y: 200 });
-  };
-  const addWebcam = () => {
-    const id = nextId("webcam");
-    addNode({ id, kind: "webcam" }, { x: -200, y: 320 });
-  };
-  const addVideo = () => {
-    const id = nextId("video");
-    addNode(
-      {
-        id,
-        kind: "video",
-        assetId: null,
-        playing: true,
-        loop: true,
-        muted: true,
-      },
-      { x: -200, y: 440 },
-    );
-  };
-  const addAudio = () => {
-    const id = nextId("audio");
-    addNode(
-      {
-        id,
-        kind: "audio",
-        sourceKind: "mic",
-        assetId: null,
-        fftSize: 256,
-        smoothing: 0.8,
-        playing: true,
-        loop: true,
-      },
-      { x: -200, y: 560 },
-    );
-  };
-  // [C-7] Starter template, not unlit — a node added here has no mesh input, so
-  // it compiles against fullscreen.vert (v_uv only) and unlit.frag's
-  // `in vec3 v_normal` could never link on its first frame. See starter.frag.
-  const addShader = () => {
-    const id = nextId("shader");
-    const node: GraphNode = {
-      id,
-      kind: "shader",
-      vertexSource: basicVert,
-      fragmentSource: starterFrag,
-      uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
-    };
-    addNode(node, { x: 100, y: 0 });
-  };
-  const addOutput = () => {
-    if (outputsFull) return;
-    const id = nextId("output");
-    addNode({ id, kind: "output" }, { x: 400, y: 0 });
-  };
-  const addParam = (paramKind: ParamKind) => {
-    const id = nextId(`param-${paramKind}`);
-    const value: number | number[] =
-      paramKind === "float"
-        ? 0.5
-        : paramKind === "time"
-          ? [1, 0]
-          : paramKind === "color"
-            ? [1, 0.5, 0.2]
-            : [0, 0, 0];
-    addNode({ id, kind: "param", paramKind, value }, { x: -240, y: 240 });
-  };
-  const addBlend = () => {
-    const id = nextId("blend");
-    const node: GraphNode = {
-      id,
-      kind: "shader",
-      vertexSource: basicVert,
-      fragmentSource: blendFrag,
-      uniformValues: { u_mix: 0.5, u_mode: 0 },
-    };
-    addNode(node, { x: 200, y: 200 });
-  };
-
   const gifActive = gifStatus !== "idle";
   const gifActiveStyle = gifActive
     ? {
@@ -416,174 +279,74 @@ export function AppToolbar() {
 
       <div className="tb-divider" />
 
-      <div className="tb-group">
-        <PaletteButton
-          name="Mesh"
-          glyph="▣"
-          category="source"
-          onClick={addMesh}
-        />
-        <PaletteButton
-          name="Image"
-          glyph="▤"
-          category="source"
-          onClick={addImage}
-        />
-        <PaletteButton
-          name="Shader"
-          glyph="◆"
-          category="process"
-          onClick={addShader}
-        />
-        <PaletteButton
-          name="Output"
-          glyph="◎"
-          category="output"
-          onClick={addOutput}
-          disabled={outputsFull}
-          title={`Up to ${MAX_OUTPUTS} outputs (split viewport)`}
-        />
-        <ToolbarMenu label="＋ More">
-          {(close) => (
-            <>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  addWebcam();
-                  close();
-                }}
-                title="Live camera texture (requires permission)"
-              >
-                Webcam
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  addVideo();
-                  close();
-                }}
-                title="Video file as a live texture (import via AssetBrowser)"
-              >
-                Video
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  addAudio();
-                  close();
-                }}
-                title="Microphone or audio file → FFT bin texture"
-              >
-                Audio
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  addBlend();
-                  close();
-                }}
-                title="Two-input blend/composite shader"
-              >
-                Blend
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  addParam("float");
-                  close();
-                }}
-              >
-                Float
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  addParam("color");
-                  close();
-                }}
-              >
-                Color
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  addParam("time");
-                  close();
-                }}
-              >
-                Time
-              </button>
-              <div className="tb-menu-divider" />
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  onPickFiles();
-                  close();
-                }}
-                title="Import OBJ/GLTF/PNG/JPG/MP4/WebM/MP3/WAV"
-                aria-label="Import OBJ, GLTF, image, video, or audio files"
-              >
-                Load…
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  onPickProject();
-                  close();
-                }}
-                title="Load graph from JSON"
-                aria-label="Import project from JSON"
-              >
-                Import JSON
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  exportProject();
-                  close();
-                }}
-                title="Save graph as JSON"
-                aria-label="Export project as JSON"
-              >
-                Export JSON
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="tb-menu-item"
-                onClick={() => {
-                  screenshot();
-                  close();
-                }}
-                title="Save viewport PNG"
-                aria-label="Save viewport as PNG"
-              >
-                Snap PNG
-              </button>
-            </>
-          )}
-        </ToolbarMenu>
-      </div>
+      <ToolbarMenu
+        label={
+          <>
+            File
+            <span className="tb-caret" aria-hidden="true">
+              ▾
+            </span>
+          </>
+        }
+      >
+        {(close) => (
+          <>
+            <button
+              type="button"
+              role="menuitem"
+              className="tb-menu-item"
+              onClick={() => {
+                onPickFiles();
+                close();
+              }}
+              title="Import OBJ/GLTF/PNG/JPG/MP4/WebM/MP3/WAV"
+              aria-label="Import OBJ, GLTF, image, video, or audio files"
+            >
+              Load…
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="tb-menu-item"
+              onClick={() => {
+                onPickProject();
+                close();
+              }}
+              title="Load graph from JSON"
+              aria-label="Import project from JSON"
+            >
+              Import JSON
+            </button>
+            <div className="tb-menu-divider" />
+            <button
+              type="button"
+              role="menuitem"
+              className="tb-menu-item"
+              onClick={() => {
+                exportProject();
+                close();
+              }}
+              title="Save graph as JSON"
+              aria-label="Export project as JSON"
+            >
+              Export JSON
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="tb-menu-item"
+              onClick={() => {
+                screenshot();
+                close();
+              }}
+              title="Save viewport PNG"
+              aria-label="Save viewport as PNG"
+            >
+              Snap PNG
+            </button>
+          </>
+        )}
+      </ToolbarMenu>
       <input
         ref={fileInputRef}
         type="file"

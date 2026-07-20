@@ -161,4 +161,16 @@ describe("DiagnosticsPanel", () => {
     expect(panel.textContent).toContain("above-threshold-marker");
     expect(panel.textContent).not.toContain("below-threshold-marker");
   });
+
+  // T3(§v1.6): the default ("full") variant keeps the 2x2 metric cards —
+  // this is the Side Panel Diagnostics tab's existing pixel-identical shape.
+  it("renders the 2x2 metric cards wrapper by default (variant='full')", () => {
+    render(<DiagnosticsPanel />);
+    expect(screen.getByTestId("diagnostics-metric-cards")).not.toBeNull();
+  });
+
+  it("suppresses the 2x2 metric cards when variant='overlay' (T3)", () => {
+    render(<DiagnosticsPanel variant="overlay" />);
+    expect(screen.queryByTestId("diagnostics-metric-cards")).toBeNull();
+  });
 });

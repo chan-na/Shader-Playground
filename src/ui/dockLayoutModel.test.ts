@@ -6,6 +6,7 @@ import {
   type DockSplit,
 } from "../state/dockTree";
 import {
+  collapseChevron,
   collapsesToRail,
   GHOST_POINTER_OFFSET,
   ghostSize,
@@ -28,12 +29,12 @@ function leaf(
 
 const tree = createDefaultDockTree();
 if (tree.type !== "split") throw new Error("default tree root must be split");
-const middleSplit = tree.a;
-if (middleSplit.type !== "split") throw new Error("tree.a must be split");
-const innerSplit = middleSplit.b;
-if (innerSplit.type !== "split") throw new Error("tree.a.b must be split");
+const innerSplit = tree.b;
+if (innerSplit.type !== "split") throw new Error("tree.b must be split");
+const colSplit = innerSplit.b;
+if (colSplit.type !== "split") throw new Error("tree.b.b must be split");
 
-describe("leafPanelKind", () => {
+describe("leafPanelKind — S5: leaf.active 기준(이전엔 tabs[0] 기준)", () => {
   it("maps a single-tab nodeEditor leaf to nodeEditor", () => {
     expect(leafPanelKind(leaf(["nodeEditor"], "nodeEditor"))).toBe(
       "nodeEditor",
@@ -56,13 +57,28 @@ describe("leafPanelKind", () => {
     expect(leafPanelKind(leaf(["assets"], "assets"))).toBe("sidePanel");
   });
 
-  it("maps a mixed inspector+assets leaf to sidePanel regardless of tabs[0]", () => {
+  it("maps a mixed inspector+assets leaf to sidePanel regardless of which is active", () => {
     expect(leafPanelKind(leaf(["inspector", "assets"], "assets"))).toBe(
+      "sidePanel",
+    );
+    expect(leafPanelKind(leaf(["inspector", "assets"], "inspector"))).toBe(
       "sidePanel",
     );
   });
 
-  it("returns null for an empty tabs array (tabs[0] is undefined)", () => {
+  it("S5: a heterogeneous nodeEditor+assets leaf follows active, not tabs[0] — assets active maps to sidePanel", () => {
+    expect(leafPanelKind(leaf(["nodeEditor", "assets"], "assets"))).toBe(
+      "sidePanel",
+    );
+  });
+
+  it("S5: the same heterogeneous leaf with nodeEditor active maps to nodeEditor (kind flips with active, not tabs order)", () => {
+    expect(leafPanelKind(leaf(["nodeEditor", "assets"], "nodeEditor"))).toBe(
+      "nodeEditor",
+    );
+  });
+
+  it("returns null for an empty tabs array (no active tab exists to switch on)", () => {
     expect(
       leafPanelKind({ type: "leaf", id: "x", tabs: [], active: "code" }),
     ).toBe(null);
@@ -97,6 +113,15 @@ describe("legacyLeafClass", () => {
       legacyLeafClass({ type: "leaf", id: "x", tabs: [], active: "code" }),
     ).toBe(null);
   });
+
+  it("S5: switches class on a heterogeneous leaf when active changes (same tabs, different active)", () => {
+    expect(legacyLeafClass(leaf(["nodeEditor", "assets"], "assets"))).toBe(
+      "shell-right-bottom",
+    );
+    expect(legacyLeafClass(leaf(["nodeEditor", "assets"], "nodeEditor"))).toBe(
+      "shell-left",
+    );
+  });
 });
 
 describe("splitChildFlex", () => {
@@ -116,25 +141,25 @@ describe("splitChildFlex", () => {
     });
   });
 
-  it("collapses side a to a fixed strip and gives b the divider-free remainder", () => {
+  it("collapses side a to a fixed strip and gives b grow=1 to fill the entire remainder (not 1-ratio)", () => {
     const split: DockSplit = {
       ...normalSplit,
       a: leaf(["nodeEditor"], "nodeEditor", true),
     };
     expect(splitChildFlex(split)).toEqual({
       a: `0 0 ${COLLAPSED_STRIP_PX}px`,
-      b: "0.4 1 0px",
+      b: "1 1 0px",
       showDivider: false,
     });
   });
 
-  it("collapses side b to a fixed strip and gives a the divider-free remainder", () => {
+  it("collapses side b to a fixed strip and gives a grow=1 to fill the entire remainder (not ratio)", () => {
     const split: DockSplit = {
       ...normalSplit,
       b: leaf(["viewport"], "viewport", true),
     };
     expect(splitChildFlex(split)).toEqual({
-      a: "0.6 1 0px",
+      a: "1 1 0px",
       b: `0 0 ${COLLAPSED_STRIP_PX}px`,
       showDivider: false,
     });
@@ -176,16 +201,20 @@ describe("splitChildFlex", () => {
 });
 
 describe("collapsesToRail", () => {
-  it("is true for a leaf whose direct parent split is row-direction (l1 nodeEditor, path [a,a])", () => {
-    expect(collapsesToRail(tree, ["a", "a"])).toBe(true);
+  it("is true for a leaf whose direct parent split is row-direction (l4 code, path [a])", () => {
+    expect(collapsesToRail(tree, ["a"])).toBe(true);
   });
 
-  it("is false for a leaf whose direct parent split is col-direction (l2 viewport, path [a,b,a])", () => {
-    expect(collapsesToRail(tree, ["a", "b", "a"])).toBe(false);
+  it("is true for a leaf whose direct parent split is row-direction (l3 nodeEditor, path [b,a])", () => {
+    expect(collapsesToRail(tree, ["b", "a"])).toBe(true);
   });
 
-  it("is false for a leaf whose direct parent is the col-direction root split (l4 code, path [b])", () => {
-    expect(collapsesToRail(tree, ["b"])).toBe(false);
+  it("is false for a leaf whose direct parent split is col-direction (l1 viewport, path [b,b,a])", () => {
+    expect(collapsesToRail(tree, ["b", "b", "a"])).toBe(false);
+  });
+
+  it("is false for a leaf whose direct parent split is col-direction (l2 sidePanel, path [b,b,b])", () => {
+    expect(collapsesToRail(tree, ["b", "b", "b"])).toBe(false);
   });
 
   it("is false for the root path (no parent to inspect)", () => {
@@ -197,26 +226,86 @@ describe("collapsesToRail", () => {
   });
 
   it("is false for a path that descends past a leaf (invalid path)", () => {
-    expect(collapsesToRail(tree, ["a", "a", "a"])).toBe(false);
+    // root.a is the code leaf — a further step past it is invalid.
+    expect(collapsesToRail(tree, ["a", "a"])).toBe(false);
+  });
+});
+
+// req1 (dc `_buildPanel`'s `collapseIcon`, App Shell.dc.html L800-801,
+// 821-823): the collapse chevron is decided by *position* (parent split
+// dir + a/b side), not panel kind. All 8 combinations, exercised on the
+// v2.0 default tree where possible (code=row-a, nodeEditor=row-a,
+// viewport=col-a, sidePanel=col-b) plus a custom row split for the row-b
+// cases the default tree has no leaf at.
+describe("collapseChevron", () => {
+  const rowSplit: DockSplit = {
+    type: "split",
+    dir: "row",
+    ratio: 0.5,
+    a: leaf(["nodeEditor"], "nodeEditor"),
+    b: leaf(["viewport"], "viewport"),
+  };
+
+  it("row-a: ‹ (U+2039) open / › (U+203A) collapsed (l4 code, path [a])", () => {
+    expect(collapseChevron(tree, ["a"], false)).toBe("‹");
+    expect(collapseChevron(tree, ["a"], true)).toBe("›");
+  });
+
+  it("row-a: same rule for another row-a leaf (l3 nodeEditor, path [b,a])", () => {
+    expect(collapseChevron(tree, ["b", "a"], false)).toBe("‹");
+    expect(collapseChevron(tree, ["b", "a"], true)).toBe("›");
+  });
+
+  it("row-b: › (U+203A) open / ‹ (U+2039) collapsed (custom row split, path [b])", () => {
+    expect(collapseChevron(rowSplit, ["b"], false)).toBe("›");
+    expect(collapseChevron(rowSplit, ["b"], true)).toBe("‹");
+  });
+
+  it("col-a (top): ⌃ (U+2303) open / ⌄ (U+2304) collapsed (l1 viewport, path [b,b,a])", () => {
+    expect(collapseChevron(tree, ["b", "b", "a"], false)).toBe("⌃");
+    expect(collapseChevron(tree, ["b", "b", "a"], true)).toBe("⌄");
+  });
+
+  it("col-b (bottom): ⌄ (U+2304) open / ⌃ (U+2303) collapsed (l2 sidePanel, path [b,b,b])", () => {
+    expect(collapseChevron(tree, ["b", "b", "b"], false)).toBe("⌄");
+    expect(collapseChevron(tree, ["b", "b", "b"], true)).toBe("⌃");
+  });
+
+  it("falls back to the row-a rule for the root path (no parent to inspect, dc L800-801 default)", () => {
+    const rootLeaf = leaf(["code"], "code");
+    expect(collapseChevron(rootLeaf, [], false)).toBe("‹");
+    expect(collapseChevron(rootLeaf, [], true)).toBe("›");
+  });
+
+  it("falls back to the row-a rule for a null tree", () => {
+    expect(collapseChevron(null, ["a", "a"], false)).toBe("‹");
+    expect(collapseChevron(null, ["a", "a"], true)).toBe("›");
+  });
+
+  it("falls back to the row-a rule for a path that descends past a leaf (invalid path)", () => {
+    // root.a is the code leaf — a further step past it is invalid, same
+    // defensive case as collapsesToRail above.
+    expect(collapseChevron(tree, ["a", "a"], false)).toBe("‹");
+    expect(collapseChevron(tree, ["a", "a"], true)).toBe("›");
   });
 });
 
 describe("splitterLabel", () => {
-  it("labels the inner split (viewport | inspector/assets)", () => {
-    expect(splitterLabel(innerSplit)).toBe(
+  it("labels the col split (viewport | inspector/assets)", () => {
+    expect(splitterLabel(colSplit)).toBe(
       "Resize Viewport and Inspector / Assets",
     );
   });
 
-  it("labels the middle split (nodeEditor | inner split)", () => {
-    expect(splitterLabel(middleSplit)).toBe(
+  it("labels the inner row split (nodeEditor | col split)", () => {
+    expect(splitterLabel(innerSplit)).toBe(
       "Resize Node Editor and Viewport and Inspector / Assets",
     );
   });
 
-  it("labels the root split (middle split | code)", () => {
+  it("labels the root split (code | inner split)", () => {
     expect(splitterLabel(tree)).toBe(
-      "Resize Node Editor and Viewport and Inspector / Assets and Code",
+      "Resize Code and Node Editor and Viewport and Inspector / Assets",
     );
   });
 });

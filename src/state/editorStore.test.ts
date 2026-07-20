@@ -6,6 +6,7 @@ describe("editorStore", () => {
     const s = useEditorStore.getState();
     s.setStage("fragment");
     s.clearJump();
+    s.setAutoCode(true);
   });
 
   it("toggles the active stage", () => {
@@ -43,5 +44,16 @@ describe("editorStore", () => {
     expect(useEditorStore.getState().jumpRequest).not.toBeNull();
     useEditorStore.getState().clearJump();
     expect(useEditorStore.getState().jumpRequest).toBeNull();
+  });
+
+  it("defaults autoCode to true", () => {
+    expect(useEditorStore.getState().autoCode).toBe(true);
+  });
+
+  it("setAutoCode toggles the auto-open gate", () => {
+    useEditorStore.getState().setAutoCode(false);
+    expect(useEditorStore.getState().autoCode).toBe(false);
+    useEditorStore.getState().setAutoCode(true);
+    expect(useEditorStore.getState().autoCode).toBe(true);
   });
 });

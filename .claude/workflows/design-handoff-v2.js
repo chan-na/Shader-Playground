@@ -61,7 +61,13 @@ const AUTONOMY = `
 - 사용자/디자이너 결정이 "진짜로" 필요해 보여도 **멈추지 마라**. 대신:
   1) 되돌리기 쉬운 **잠정 결정**으로 진행한다 (우선순위: 정본/기존 패턴 근사 → 현행 유지 + 사유 주석 → 최소 변경).
   2) followups에 기록한다 (audience: 'user' | 'designer', 무엇을 왜 잠정 결정했는지 + 정식 결정 시 바꿀 위치).
-- followups는 ${FOLLOWUP_DOC} 로 취합된다. 기록하면 그 항목은 "처리된 것"이다 — 다시 막히지 마라.`
+- followups는 ${FOLLOWUP_DOC} 로 취합된다. 기록하면 그 항목은 "처리된 것"이다 — 다시 막히지 마라.
+
+[⛔ 장시간 명령 실행 규칙 — 이 규칙 위반이 실제로 이 워크플로우를 두 번 죽였다]
+- **오래 걸리는 명령(npm run check, npm run test:e2e, npx playwright/vitest)을 백그라운드(run_in_background)로 띄워놓고 완료 알림을 기다리며 턴을 끝내지 마라.** 너는 워크플로우 서브에이전트다 — 백그라운드 완료 알림으로 다시 깨워주지 않는다. 기다리면 그대로 죽고 네 작업 전체가 유실된다.
+- 장시간 명령은 **반드시 포그라운드에서 timeout을 크게(최대 600000ms) 잡고** 실행하라. 그래도 초과가 우려되면 파일 단위로 쪼개 각각 포그라운드로 돌려라(임의 생략 금지). "돌려놓고 다른 일 하기"는 금지다.
+- 유일한 예외: dev 서버(npm run dev)처럼 **종료를 기다리지 않는** 상주 프로세스만 백그라운드 허용.
+- 시스템이 StructuredOutput 호출을 요구하면 **그 즉시 호출하라.** 증거가 아직 불완전하면 "무엇이 미확인인지"를 결과에 명시하고(예: pass:false + 사유, 또는 summary에 미확인 항목) 반환하라 — 알림을 기다리는 선택지는 존재하지 않는다.`
 
 const CONSTRAINTS = `
 [품질 제약 — CLAUDE.md, 위반 금지]
@@ -727,6 +733,7 @@ function gatePrompt(_m) {
 
 1) npm run check — Bash timeout 600000ms로 실행. (내부: typecheck → lint → deadcode → circular → unit test, 실패 시 즉시 중단)
 2) 1)이 성공했을 때만: npm run test:e2e — timeout 600000ms. 전체 스펙(약 126건, 6~10분). 시간 초과가 우려되면 npx playwright test tests/e2e/<파일> 로 나눠 돌리되 **임의 생략 금지**. dev 서버는 자동으로 뜬다.
+⛔ 두 명령 모두 **포그라운드로만** 실행하라(run_in_background 금지). 백그라운드로 띄우고 완료 알림을 기다리면 이 에이전트는 재호출되지 않고 그대로 죽는다 — 실제로 이 워크플로우가 그렇게 두 번 죽었다.
    ⚠ 유닛 테스트는 jsdom stderr 노이즈(HTMLMediaElement not implemented 등)를 대량 출력한다 — 그건 실패가 아니다. **종료 코드와 요약 라인**으로 판정하라.
 3) 번들 사이즈 가드(npm run size:check)는 이 워크플로우의 게이트가 아니다 — 실행하지 마라.
 

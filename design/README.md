@@ -114,11 +114,11 @@ ShaderPlayground는 브라우저에서 도는 **노드 기반 셰이더 플레�
 - **구현**: CodeMirror 6. 위 syntax 색으로 `HighlightStyle` 커스텀, 거터/툴팁 크롬만 테마. 에디터 자체 재발명 금지.
 
 ### E. Side Panel — `Side Panel.dc.html` (1320×860)
-- **목적**: Inspector / Assets / Problems / **Diagnostics** 탭. 선택 노드에 따라 Inspector 내용이 완전히 바뀜.
+- **목적**: **Inspector / Assets 2탭.** 선택 노드에 따라 Inspector 내용이 완전히 바뀜. (problems·diagnostics는 Side Panel 탭이 아니라 App Shell 상태바 오버레이로 단일화 — R5·S6·S7·X12·Y1.)
 - **Inspector**: uniform 자동 컨트롤 — `float`→슬라이더, `vec2/3/4`→다축 슬라이더, 색→컬러 피커, `bool`→토글. 노드 종류별 8종 인스펙터. 상단 공통 **`Name` 필드**로 노드 rename(그래프 더블클릭 인라인과 동일 값)[D15]. **모든 노드 종류(param·group 포함)가 이 공통 Name 하나로 rename** — param의 Label 필드·group의 Group label 필드는 제거해 단일 소스화 [A-1·A-2]. `Output type` 배지 색 = 포트 패밀리[D18].
 - **Assets**: 썸네일 그리드, 드래그&드롭 임포트, "노드로 추가".
-- **Problems**: 전 노드 에러 목록, 클릭 시 노드 선택 + 코드 라인 점프, 탭 헤더 카운트 뱃지.
-- **Diagnostics** [D1]: 런타임 진단 — GPU/Frame/Draw calls/**Shaders** 메트릭 카드 + 레벨 로그. `Shaders`는 실제 GL 링크 카운터가 없어 **error 진단 없는 shader/compute 노드 수 프록시**("N compiled") [A-6]. 레벨 태그 색(dc 실측값이 정본) = **INFO `accent.hover` · WARN `warning` · ERROR `error` · DEBUG `text.secondary`** [A-5]. 로그 행 = **카테고리 접두**(gl/shader/mem, `text.muted`) + 레벨 태그 + 메시지 + 시간. 상단 **툴바**(Copy/Clear/Close, 24×24 아이콘 `⧉ ⌧ ✕`) + **레벨 필터**(All/Info+/Warn+/Error+/Debug+, All 기본) [C-9]. **필터 의미 = 누적(Q9)**: `Info+` = info 이상 전부(구현 `<select>` 누적 의미와 일치) — dc 라벨에 `+`를 붙여 '정확히 그 레벨만'으로 오독되지 않게 정정. 카테고리 필터(gl/shader/mem)는 기존 기능이라 유지. 카드 = surface.card, 배경 = surface.panel. (Problems=컴파일 에러 목록과 별개.)
+- **Problems / Diagnostics**: **Side Panel 탭 아님(Y1 정정)** — 상세 스펙은 §M 상태바 오버레이 참조. Problems=상태바 `⚠ N problems` 클릭 → 172px 오버레이(에러 클릭 → 노드 선택+코드 점프). Diagnostics=상태바 토글 → 오버레이(메트릭 스트립 + 레벨 로그).
+- **Diagnostics(상태바 오버레이 — Side Panel 탭 아님, R5)** [D1]: 런타임 진단 — 단일 행 메트릭 스트립(GPU/Frame/Draws/Shaders) + 레벨 로그. `Shaders`는 실제 GL 링크 카운터가 없어 **error 진단 없는 shader/compute 노드 수 프록시**("N compiled") [A-6]. 레벨 태그 색(dc 실측값이 정본) = **INFO `accent.hover` · WARN `warning` · ERROR `error` · DEBUG `text.secondary`** [A-5]. 로그 행 = **카테고리 접두**(gl/shader/mem, `text.muted`) + 레벨 태그 + 메시지 + 시간. 상단 **툴바**(Copy/Clear/Close, 24×24 아이콘 `⧉ ⌧ ✕`) + **레벨 필터**(All/Info+/Warn+/Error+/Debug+, All 기본) [C-9]. **필터 의미 = 누적(Q9)**: `Info+` = info 이상 전부(구현 `<select>` 누적 의미와 일치) — dc 라벨에 `+`를 붙여 '정확히 그 레벨만'으로 오독되지 않게 정정. 카테고리 필터(gl/shader/mem)는 기존 기능이라 유지. 오버레이 배경 = surface.rail(X10). (Problems=컴파일 에러 목록과 별개.)
 - 폼 컨트롤 라이브러리(슬라이더·다축·컬러·토글·셀렉트·숫자입력)가 여기 대량 등장.
 
 ### F. Command Palette — `Command Palette.dc.html` (1440×900)

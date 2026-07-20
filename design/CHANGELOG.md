@@ -36,7 +36,7 @@
 
 ### D. 진단 오버레이(S7/T3) 후속
 - **X10 [오버레이 배경] `[token]` `[screen]`** = **(a) `surface.rail` 통일.** dc L405 오버레이 본문+스트립 bg `#0f1114`가 `surface.rail`과 정확히 일치 — rail 톤 통일이 의도. 재구현은 `.status-overlay` 배경을 `var(--surface-rail)`로(1줄). dc는 값이 이미 일치해 무변경.
-- **X11 [스트립 GPU/Frame 값] `[screen]`** = **카드=스트립 동일 값 확정.** GPU-time 계측이 없어 카드와 같은 값(GPU=renderer 문자열, Frame=16.7 ms·60 fps)을 단일 헬퍼로 공유. 라벨만 dc대로 카드 "Draw calls"/스트립 "Draws". 진짜 GPU-time은 GL 타이머 쿼리 신규 계측(스코프 밖).
+- **X11 [스트립 GPU/Frame 값] `[screen]`** = **카드=스트립 동일 값 확정.** GPU-time 계측이 없어 카드와 같은 값(GPU=renderer 문자열, Frame=16.7 ms·60 fps)을 단일 헬퍼로 공유. 라벨만 dc대로 카드 "Draw calls"/스트립 "Draws". 진짜 GPU-time은 GL 타이머 쿼리 신규 계측(스코프 밖). (**Y2 정정**: X12로 카드 제거 후 카드 라벨 규정은 소멸 — 스트립 "Draws"만 유효.)
 - **X12 [2×2 메트릭 카드 거취] `[screen]` `[component]`** = **(b) 카드 제거 — 스트립 단일화.** R5로 Side Panel diagnostics 탭이 없어 2×2 카드 그리드는 렌더 호스트가 없는 잠복 코드(단위 테스트로만 소비) → **메트릭 카드 컴포넌트/분기 제거**, 오버레이 메트릭 스트립을 유일 경로로 확정. 카드 전용 단위 테스트도 함께 정리(번들 소폭 감소).
 
 ### E. 토큰/스타일 확답
@@ -48,10 +48,16 @@
 - **X16 [`autoCodeStyle` 죽은 코드] `[component]`** = **제거.** `App Shell.dc.html`의 미사용 `autoCodeStyle`(실 바인딩은 `autoCodeHdrStyle`뿐) 삭제(문서 위생, 구현 영향 0).
 - **X17 [접힌 Code 레일 인테리어] `[component]`** = **(b) 정식 채택.** 접힌 34px 레일이 크롬(grip)만 렌더돼 정체성/에러/펼침 어포던스가 없던 것을 정식 인테리어로: **⣿ grip + 패널 dot + 세로 라벨("Code · GLSL", writing-mode) + (에러 시) 빨강 에러 dot + 위치 기반 펼침 chevron**. 접힘 상태에서도 컴파일 에러가 보여야 하므로 에러 dot 채택(소스=diagnosticsStore, 번들 소폭 증가). dc `App Shell`에 접힘 레일 오버레이 추가 — 구현도 이 시안대로 빌드.
 
+### G. v2.1-fix (Y1~Y2 — `design-request-v2.1-fix.md`, 번들 `8fd9d6c` 검증 정정)
+- **Y1 [Side Panel이 X12·R5와 모순] `[screen]` `[component]`** = **정정함 — (a) inspector·assets 2탭으로 정리.** X12(카드 제거)·R5(problems/diagnostics는 도킹 탭 아님, 상태바 오버레이 단일 경로)를 v2.1이 `Side Panel.dc.html`엔 반영하지 않아 이 화면만 4탭(inspector/assets/problems/diagnostics)·`diagStats`(카드) 잔존 → 정본과 모순(W3형 파일 간 드리프트). **Problems/Diagnostics 탭 버튼·본문 sc-if·`diagStats`/`diagFilters`/`diagLog` 데이터·`problems` 데이터·관련 return 키/핸들러 전부 제거**, 부제 "— inspector, assets, problems & controls" → "— inspector & assets · form controls", `tab` prop enum을 `inspector|assets`로 축소. problems/diagnostics 정본 화면은 App Shell 상태바 오버레이로 단일화(S6/S7/T4/R5/X12와 정합). (b) 4탭 유지는 R5·X12 번복이라 미채택.
+- **Y2 [X11 카드 라벨 규정 정합] `[screen]`** = **정정함.** X12 카드 제거로 X11의 "카드 'Draw calls' / 스트립 'Draws'" 중 **카드 라벨 규정은 소멸** — 스트립 "Draws"만 유효. X11 항목에 병기(위).
+
+
 ### Changed
 - `[component]` `App Shell.dc.html` — File ▾ 메뉴 툴바 추가(X8) · ＋More `openPalette` 배선(X7) · add-node pill z-index 6→11 + 근거 주석(X9) · Code 스테이지 스트립 30→34px·padding 0 8px→0 12px, active bg 스왑→accent border-top 2px(X15) · Auto-open 토글 라벨 `Auto: ON/OFF` + nowrap(X2) · 접힌 leaf 34px 세로 레일 인테리어(grip+dot+세로 라벨+에러 dot+펼침 chevron, X17) · `autoCodeStyle` 죽은 코드 제거(X16).
 - `[component]` `Command Palette.dc.html` — `Toggle Code auto-open` 명령 추가(X2 도달성 경로).
 - `[token]` `theme.ts` — `radius.skeletonStatus`/`shadow.skeletonStatus` → `floatingPill` 개명(X14, 값 불변) · 헤더 버전 v2.1.
+- `[screen]` `Side Panel.dc.html` — **inspector·assets 2탭으로 정리(Y1)**: Problems/Diagnostics 탭·본문·`diagStats`(2×2 카드)·`diagFilters`/`diagLog`·`problems` 데이터 제거, 부제 갱신, `tab` prop enum 축소. X12·R5 정합.
 - `[screen]` `README.md` — 버전 v2.1 · §A 툴바(File ▾·＋More=팔레트)·Code 자동 접기(shader|compute·라벨·도달성·×최대화·비영속·스트립 규격)·§토큰(floatingPill) · §M 드롭 폴백(T1·＋Panel)·접힌 레일 인테리어·diagnostics 오버레이 bg/스트립/카드 갱신.
 
 > ⚠ 신규 토큰 0(X14는 개명). breaking 0. 코드 변경: X13 소비처 2곳 + X14 참조 2곳 + X12 메트릭 카드 제거(스트립 단일화), 나머지 현행 승인/문서 정정. 근사 없음.

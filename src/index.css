@@ -617,20 +617,21 @@ textarea {
    the DOM node was technically present). A direct `.panel` child, so the
    existing collapsed-rail rule (`.shell-slot--collapsed .panel > :not(.dock-
    header)` above) hides it along with the editor body automatically.
-   Height/padding/bg/border reuse `.dock-header`'s own values (34px · 0 12px
-   · surface.docking-header · border.header-divider) for visual continuity
-   with the strip directly above it — dc's own reference row uses a
-   slightly different 30px/0 8px (App Shell.dc.html L313), approximated here
-   to the value already established codebase-wide for every other header/
-   strip row (`.dock-header`, `.dock-drag-ghost-header`), a layout-px choice
-   rather than a color/radius/shadow token this repo constrains. */
+   M3 regression fix (verifier-measured 1440×900 default layout: toggle box
+   right edge 387.6px vs strip's own right edge 358.25px, ~29px clipped —
+   the OFF label, being longer, clips further): padding/gap tightened to
+   dc's own reference row (30px/0 8px, App Shell.dc.html L313) instead of
+   reusing `.dock-header`'s 34px/0 12px, and the height stays at 34px only
+   (dc's 30px would also require shrinking `.stage-tab`'s own height, out of
+   this fix's blast radius) for visual continuity with the header directly
+   above. `.code-stage-strip-meta` below absorbs the rest of the squeeze. */
 .code-stage-strip {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   height: 34px;
   flex-shrink: 0;
-  padding: 0 12px;
+  padding: 0 8px;
   background: var(--surface-docking-header);
   border-bottom: 1px solid var(--border-header-divider);
 }
@@ -644,7 +645,7 @@ textarea {
   align-items: center;
   gap: 8px;
   height: 34px;
-  padding: 0 14px;
+  padding: 0 12px;
   background: transparent;
   border: none;
   border-top: 2px solid transparent;
@@ -668,6 +669,86 @@ textarea {
   border-radius: 50%;
   background: var(--error);
   box-shadow: 0 0 6px var(--error);
+}
+
+/* M3 regression fix — wraps the divider + NodeBreadcrumb pair (CodeEditor/
+   index.tsx) as a single flex item of `.code-stage-strip`, replacing the
+   bare `<>...</>` fragment they used to render as (2 direct strip children).
+   `.stage-tabs` hits its own min-content floor (two single-token labels,
+   "vertex.glsl"/"fragment.glsl", can't wrap) well before the strip runs out
+   of room, and `.code-auto-toggle`'s `flex-shrink:0` + `white-space:nowrap`
+   (below) mean it never gives up space either — so this pair is the only
+   remaining slack in the row. Giving *this wrapper* (not just the
+   breadcrumb chip inside it) `min-width:0` lets the flex algorithm size it
+   all the way down to 0 instead of floor-ing at the divider's 1px + the
+   chip's own padding/border (~19px) — and `overflow:hidden` clips whatever
+   of the divider/chip's content still wants to render at that point cleanly
+   (no stray icon/text spilling into the toggle's space). Un-wrapped, this
+   pair used to survive at a fixed ~19-30px even when there was no room left
+   for it, which was exactly the slack the toggle needed back. */
+.code-stage-strip-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* W5 — Code 헤더 Auto-open 토글 (App Shell.dc.html L943-945). dc hex →
+   토큰 매핑: #2b6fe0=accent-active · #1c3452=accent-muted · #7dbcff=
+   accent-bright(S26) · #20242a=border-default · #1a1d22=surface-card ·
+   #9aa2ac=text-secondary · dot #3d9bff=accent-default · #454c55=
+   text-disabled. glow rgba(61,155,255,.6)는 color-mix 60% 근사(기존
+   L1091+ 관례). radius 6 = var(--radius-chip). */
+.code-auto-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 9px;
+  border-radius: var(--radius-chip);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  /* M3 regression fix: this is a trailing, fixed-purpose control in
+     `.code-stage-strip` (same "right-side control must not shrink"
+     principle as the strip-overflow note below at L~636). Without
+     `flex-shrink:0`, the flex algorithm's default `min-width:auto` on
+     this item is only the *largest unbreakable word* ("Auto-open:" or
+     "ON") — not the full label — so the strip was willing to squeeze
+     this button down to a near-zero width, wrapping the label onto
+     multiple lines that then got clipped by the fixed 20px height,
+     leaving only the always-`flex-shrink:0` dot visible (a "sliver").
+     `white-space:nowrap` additionally forces this item's min-content
+     size to the full label width so it never wraps in the first place;
+     `flex-shrink:0` then guarantees the strip never asks it to go
+     narrower than that. The breadcrumb (NodeBreadcrumb, CodeEditor/
+     index.tsx) is the one that yields space instead, via its own
+     `min-width:0` + ellipsis truncation. */
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.code-auto-toggle--on {
+  border-color: var(--accent-active);
+  background: var(--accent-muted);
+  color: var(--accent-bright);
+}
+.code-auto-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-disabled);
+  flex-shrink: 0;
+}
+.code-auto-toggle--on .code-auto-toggle-dot {
+  background: var(--accent-default);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent-default) 60%, transparent);
 }
 
 /* ── Problems tab (Side Panel.dc.html L188-205, M5-U5 reskin) ────────── */

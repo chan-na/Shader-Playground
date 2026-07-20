@@ -118,6 +118,69 @@ describe("toggleCollapsed", () => {
   });
 });
 
+describe("setCollapsed", () => {
+  it("sets the code leaf (l4) collapsed to true", () => {
+    useDockStore.getState().setCollapsed("code", true);
+    expect(nodeAt(useDockStore.getState().tree, ["a"])).toMatchObject({
+      id: "l4",
+      collapsed: true,
+    });
+  });
+
+  it("is idempotent — a second call with the same value keeps the same tree reference", () => {
+    useDockStore.getState().setCollapsed("code", true);
+    const after = useDockStore.getState().tree;
+    useDockStore.getState().setCollapsed("code", true);
+    expect(useDockStore.getState().tree).toBe(after);
+  });
+
+  it("restores collapsed to false", () => {
+    useDockStore.getState().setCollapsed("code", true);
+    useDockStore.getState().setCollapsed("code", false);
+    expect(nodeAt(useDockStore.getState().tree, ["a"])).toMatchObject({
+      id: "l4",
+      collapsed: false,
+    });
+  });
+
+  it("is a no-op when the tree is null (every panel closed)", () => {
+    let path = anyLeafPath(useDockStore.getState().tree);
+    let guard = 0;
+    while (path !== null && guard < 10) {
+      useDockStore.getState().closePanel(path);
+      path = anyLeafPath(useDockStore.getState().tree);
+      guard += 1;
+    }
+    expect(useDockStore.getState().tree).toBeNull();
+
+    useDockStore.getState().setCollapsed("code", true);
+    expect(useDockStore.getState().tree).toBeNull();
+  });
+
+  it("is a no-op when the panel isn't docked (findTabLeafPath returns null)", () => {
+    useDockStore.getState().closeTab("code");
+    const before = useDockStore.getState().tree;
+    useDockStore.getState().setCollapsed("code", true);
+    expect(useDockStore.getState().tree).toBe(before);
+  });
+
+  it("clears maximized when collapsing the maximized leaf itself (l4 = code)", () => {
+    useDockStore.getState().toggleMaximized("l4");
+    expect(useDockStore.getState().maximized).toBe("l4");
+
+    useDockStore.getState().setCollapsed("code", true);
+    expect(useDockStore.getState().maximized).toBeNull();
+  });
+
+  it("preserves maximized when a different leaf is maximized (l3, unlike toggleCollapsed)", () => {
+    useDockStore.getState().toggleMaximized("l3");
+    expect(useDockStore.getState().maximized).toBe("l3");
+
+    useDockStore.getState().setCollapsed("code", true);
+    expect(useDockStore.getState().maximized).toBe("l3");
+  });
+});
+
 describe("toggleMaximized", () => {
   it("maximizes a leaf, then restores (null) on a second call for the same id", () => {
     useDockStore.getState().toggleMaximized("l1");

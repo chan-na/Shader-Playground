@@ -60,6 +60,14 @@ export interface DockState {
   /** 지정 경로 leaf의 접힘 상태를 반전한다. dc `toggleCollapse`
    * (L505-508) 이식 — 접기 조작은 최대화를 항상 해제한다(dc 정본). */
   toggleCollapsed: (path: DockPath) => void;
+  /** 지정 패널 id가 속한 leaf의 접힘 상태를 절대값으로 설정한다(W5 Code
+   * 자동접기용 — design/CHANGELOG.md §v2.0 W5). 대상 경로는
+   * `findTabLeafPath(tree, id)`로 해석하며 패널이 닫혔거나 트리가 비었으면
+   * no-op. 이미 원하는 상태면 set 자체를 생략하는 멱등 액션이라 선택 이벤트가
+   * 반복 발화해도 렌더/영속화 churn이 없다. `toggleCollapsed`와 달리
+   * `maximized`는 **그 leaf 자신이 최대화 중일 때만** 해제한다 — 자동 구동이
+   * 무관한 패널의 최대화를 깨지 않기 위한 의도적 차이(dc 미정의 코너). */
+  setCollapsed: (id: DockPanelId, collapsed: boolean) => void;
   /** 지정 leaf의 최대화 상태를 토글한다. dc `toggleMaximize`(L509-511) +
    * 이전 고정 레이아웃 스토어의 `toggleMaximized` 관례 병합 — 새로
    * 최대화하는 leaf가 접혀 있었다면 강제로 펼친다(dc는 이 코너를 정의하지
@@ -160,6 +168,20 @@ export const useDockStore = create<DockState>((set, get) => ({
     set({
       tree: setNodeAt(tree, path, { ...node, collapsed: !node.collapsed }),
       maximized: null,
+    });
+  },
+
+  setCollapsed: (id, collapsed) => {
+    const { tree, maximized } = get();
+    if (tree === null) return;
+    const path = findTabLeafPath(tree, id);
+    if (path === null) return;
+    const node = getNodeAt(tree, path);
+    if (node === null || node.type !== "leaf") return;
+    if (Boolean(node.collapsed) === collapsed) return;
+    set({
+      tree: setNodeAt(tree, path, { ...node, collapsed }),
+      maximized: maximized === node.id ? null : maximized,
     });
   },
 

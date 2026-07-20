@@ -15,6 +15,7 @@ import { tokens, withAlpha } from "../../theme";
 import { debounce } from "../../utils/debounce";
 import { DockPanelHeader } from "../DockPanelHeader";
 import { NODE_GLYPH } from "../NodeEditor/nodeTheme";
+import { AutoOpenToggle } from "./AutoOpenToggle";
 import { setCurrentView } from "./currentView";
 import { glslExtensions } from "./glslSetup";
 import { toCMDiagnostics } from "./lintAdapter";
@@ -32,7 +33,14 @@ import { StageTabs } from "./StageTabs";
  * collapse/maximize/close) already fills the ~359px panel; keeping the
  * stage tabs + this chip in that same row pushed the trailing buttons past
  * the panel's right edge (clipped by `.panel`'s `overflow:hidden`, real
- * pointer unreachable even though the DOM node was technically present). */
+ * pointer unreachable even though the DOM node was technically present).
+ * M3 regression fix: this chip (plus its leading divider) now renders
+ * inside a `.code-stage-strip-meta` wrapper (index.css) instead of as two
+ * bare fragment children of `.code-stage-strip` — the wrapper is what
+ * actually collapses to 0 width under squeeze (see its index.css comment);
+ * this component's own `minWidth: 0` below is only the inner half of that
+ * — it lets the chip shrink *within* the wrapper before the wrapper itself
+ * has to clip it entirely. */
 const BREADCRUMB_CONTAINER_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -41,6 +49,7 @@ const BREADCRUMB_CONTAINER_STYLE: CSSProperties = {
   background: withAlpha(tokens.accent.default, 0.1),
   border: `1px solid ${tokens.accent.muted}`,
   borderRadius: tokens.radius.button,
+  minWidth: 0,
 };
 const BREADCRUMB_ICON_STYLE: CSSProperties = {
   width: 14,
@@ -59,6 +68,15 @@ const BREADCRUMB_NAME_STYLE: CSSProperties = {
   fontSize: 11.5,
   fontWeight: 600,
   color: tokens.text.primary,
+  // M3 regression fix: the node display name is the one part of the
+  // breadcrumb with unbounded length, so it's the part that truncates
+  // when `.code-stage-strip` is too narrow (icon and kind stay fixed).
+  // `minWidth: 0` overrides the flex-item default (min-content size),
+  // which is required for `textOverflow: ellipsis` to ever take effect.
+  minWidth: 0,
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
 };
 const BREADCRUMB_KIND_STYLE: CSSProperties = {
   fontFamily: tokens.font.mono,
@@ -375,11 +393,12 @@ export function CodeEditor() {
           fragmentHasError={fragmentHasError}
         />
         {!isMulti && effectiveId && node && (
-          <>
+          <div className="code-stage-strip-meta">
             <span className="dock-header-divider" aria-hidden="true" />
             <NodeBreadcrumb name={displayNodeName(node)} kind={node.kind} />
-          </>
+          </div>
         )}
+        <AutoOpenToggle />
       </div>
       <div className="panel-body">
         <div

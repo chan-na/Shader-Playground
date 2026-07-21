@@ -676,30 +676,37 @@ textarea {
    bare `<>...</>` fragment they used to render as (2 direct strip children).
    `.stage-tabs` hits its own min-content floor (two single-token labels,
    "vertex.glsl"/"fragment.glsl", can't wrap) well before the strip runs out
-   of room, and `.code-auto-toggle`'s `flex-shrink:0` + `white-space:nowrap`
-   (below) mean it never gives up space either — so this pair is the only
-   remaining slack in the row. Giving *this wrapper* (not just the
-   breadcrumb chip inside it) `min-width:0` lets the flex algorithm size it
-   all the way down to 0 instead of floor-ing at the divider's 1px + the
-   chip's own padding/border (~19px) — and `overflow:hidden` clips whatever
-   of the divider/chip's content still wants to render at that point cleanly
-   (no stray icon/text spilling into the toggle's space). Un-wrapped, this
-   pair used to survive at a fixed ~19-30px even when there was no room left
-   for it, which was exactly the slack the toggle needed back. */
+   of room, so this pair is the primary remaining slack in the row. Giving
+   *this wrapper* (not just the breadcrumb chip inside it) `min-width:0`
+   lets the flex algorithm size it all the way down to 0 instead of
+   floor-ing at the divider's 1px + the chip's own padding/border (~19px) —
+   and `overflow:hidden` clips whatever of the divider/chip's content still
+   wants to render at that point cleanly (no stray icon/text spilling into
+   the toggle's space). Un-wrapped, this pair used to survive at a fixed
+   ~19-30px even when there was no room left for it, which was exactly the
+   slack the toggle needed back.
+   X2 — `flex-shrink:100000;` (below) makes this wrapper shrink far more
+   aggressively than `.code-auto-toggle` (shrink:1): meta is squeezed to 0
+   *first*, and only once that slack is exhausted does the toggle (and its
+   label) start giving up width. */
 .code-stage-strip-meta {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
   overflow: hidden;
+  /* X2 — 토글(shrink:1)보다 압도적 우선으로 양보: meta가 0까지 소진된
+     극한 폭에서만 토글 라벨이 ellipsis 된다. */
+  flex-shrink: 100000;
 }
 
-/* W5 — Code 헤더 Auto-open 토글 (App Shell.dc.html L943-945). dc hex →
+/* W5 — Code 헤더 Auto-open 토글 (App Shell.dc.html L959-962). dc hex →
    토큰 매핑: #2b6fe0=accent-active · #1c3452=accent-muted · #7dbcff=
    accent-bright(S26) · #20242a=border-default · #1a1d22=surface-card ·
    #9aa2ac=text-secondary · dot #3d9bff=accent-default · #454c55=
    text-disabled. glow rgba(61,155,255,.6)는 color-mix 60% 근사(기존
-   L1091+ 관례). radius 6 = var(--radius-chip). */
+   L1091+ 관례). radius 6 = var(--radius-chip).
+   [X2] 라벨 'Auto-open: ON/OFF' → 'Auto: ON/OFF' 단축(CHANGELOG §v2.1). */
 .code-auto-toggle {
   margin-left: auto;
   display: flex;
@@ -716,23 +723,25 @@ textarea {
   border: 1px solid var(--border-default);
   background: var(--surface-card);
   color: var(--text-secondary);
-  /* M3 regression fix: this is a trailing, fixed-purpose control in
-     `.code-stage-strip` (same "right-side control must not shrink"
-     principle as the strip-overflow note below at L~636). Without
-     `flex-shrink:0`, the flex algorithm's default `min-width:auto` on
-     this item is only the *largest unbreakable word* ("Auto-open:" or
-     "ON") — not the full label — so the strip was willing to squeeze
-     this button down to a near-zero width, wrapping the label onto
-     multiple lines that then got clipped by the fixed 20px height,
-     leaving only the always-`flex-shrink:0` dot visible (a "sliver").
-     `white-space:nowrap` additionally forces this item's min-content
-     size to the full label width so it never wraps in the first place;
-     `flex-shrink:0` then guarantees the strip never asks it to go
-     narrower than that. The breadcrumb (NodeBreadcrumb, CodeEditor/
-     index.tsx) is the one that yields space instead, via its own
-     `min-width:0` + ellipsis truncation. */
-  flex-shrink: 0;
+  /* X2 — 정상 상태는 단축 라벨('Auto: ON/OFF')+nowrap으로 완전 해소
+     (34px·0 12px 스트립에서 안 넘침). 극한 폭(스테이지 탭에 에러 dot
+     2개, vertex+fragment 동시 에러)에서는 `.code-stage-strip-meta`가
+     먼저 0까지 양보(위 flex-shrink 우선순위)한 뒤에야 이 버튼이 줄고,
+     라벨 span(.code-auto-toggle-label, 아래)이 ellipsis 된다.
+     `white-space:nowrap`은 이 아이템의 min-content를 전체 라벨 폭으로
+     고정해 줄바꿈을 막고, `min-width:0`은 그 nowrap이 만드는
+     전체-라벨 min-content 바닥을 풀어 shrink:1이 실제로 작동하게
+     하는 스위치다(풀지 않으면 flex-shrink는 min-content 밑으로는
+     못 줄어든다). */
+  flex-shrink: 1;
+  min-width: 0;
   white-space: nowrap;
+}
+/* X2 — 극한 폭에서만 잘리는 라벨. white-space:nowrap은 버튼에서 상속. */
+.code-auto-toggle-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .code-auto-toggle--on {
   border-color: var(--accent-active);

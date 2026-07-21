@@ -32,6 +32,7 @@ import {
   SPLIT_DEMO_LAYOUT,
   TORUS_DEMO_LAYOUT,
 } from "../../state/demoGraph";
+import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
@@ -88,6 +89,8 @@ const GLYPH = {
   combine: "⊞",
   group: "▢",
   clearGraph: "⌧",
+  // [X2] dc Command Palette L224 (U+25C9 — webcam과 동일 글리프, dc 정본 그대로)
+  autoOpen: "◉",
 } as const;
 
 const PARAM_GLYPH: Record<ParamKind, string> = {
@@ -541,6 +544,23 @@ function buildCommands(): Command[] {
       sub: "remove all nodes",
       keywords: "clear empty reset",
       run: () => reset(),
+    },
+    // [X2] Auto-open 도달성 — Code가 34px 레일로 접히면 인라인 토글이 숨으므로
+    // 팔레트에서 접힘과 무관하게 토글한다 (dc Command Palette.dc.html L224,
+    // design/CHANGELOG.md §v2.1 X2). AutoOpenToggle.tsx와 동일하게 editorStore의
+    // setAutoCode를 재사용 — 상태는 run() 시점에 읽는다(빌드 시 캡처 금지).
+    {
+      id: "toggle-code-auto-open",
+      kind: "command",
+      glyph: GLYPH.autoOpen,
+      label: "Toggle Code auto-open",
+      sub: "open Code on Shader/Compute selection — reachable even when the Code rail is collapsed",
+      keywords:
+        "toggle code auto open auto-open collapse expand rail shader compute editor",
+      run: () => {
+        const { autoCode, setAutoCode } = useEditorStore.getState();
+        setAutoCode(!autoCode);
+      },
     },
   );
 

@@ -22,7 +22,7 @@ describe("AutoOpenToggle", () => {
   it("renders ON by default with the --on class and data-auto=true", () => {
     render(<AutoOpenToggle />);
     const toggle = screen.getByTestId("code-auto-open-toggle");
-    expect(toggle.textContent).toBe("Auto-open: ON");
+    expect(toggle.textContent).toBe("Auto: ON");
     expect(toggle.getAttribute("data-auto")).toBe("true");
     expect(toggle.className).toContain("code-auto-toggle--on");
   });
@@ -32,7 +32,7 @@ describe("AutoOpenToggle", () => {
     const toggle = screen.getByTestId("code-auto-open-toggle");
     fireEvent.click(toggle);
     expect(useEditorStore.getState().autoCode).toBe(false);
-    expect(toggle.textContent).toBe("Auto-open: OFF");
+    expect(toggle.textContent).toBe("Auto: OFF");
     expect(toggle.getAttribute("data-auto")).toBe("false");
     expect(toggle.className).not.toContain("code-auto-toggle--on");
   });
@@ -43,9 +43,17 @@ describe("AutoOpenToggle", () => {
     fireEvent.click(toggle);
     fireEvent.click(toggle);
     expect(useEditorStore.getState().autoCode).toBe(true);
-    expect(toggle.textContent).toBe("Auto-open: ON");
+    expect(toggle.textContent).toBe("Auto: ON");
     expect(toggle.getAttribute("data-auto")).toBe("true");
     expect(toggle.className).toContain("code-auto-toggle--on");
+  });
+
+  it("label text is wrapped in .code-auto-toggle-label (X2 ellipsis carrier)", () => {
+    render(<AutoOpenToggle />);
+    const toggle = screen.getByTestId("code-auto-open-toggle");
+    const label = toggle.querySelector(".code-auto-toggle-label");
+    expect(label).not.toBeNull();
+    expect(label?.textContent).toBe("Auto: ON");
   });
 
   it("title matches the dc ON/OFF copy exactly", () => {

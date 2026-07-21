@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import starterFrag from "../../shaders/templates/starter.frag?raw";
 import { useCommandPaletteStore } from "../../state/commandPaletteStore";
+import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { CommandPalette } from "./index";
@@ -24,6 +25,7 @@ beforeEach(() => {
   useGraphStore.getState().reset();
   useCommandPaletteStore.getState().setOpen(false);
   useSelectionStore.getState().select(null);
+  useEditorStore.setState({ autoCode: true });
 });
 
 afterEach(() => {
@@ -85,9 +87,9 @@ describe("CommandPalette", () => {
     render(<CommandPalette />);
     const input = getInput();
 
-    // Command-mode pool is exactly [group-selected, graph-clear] in that
-    // push order; ArrowDown from 0 selects the second entry (graph-clear),
-    // whose run() resets the graph store.
+    // Command-mode pool is exactly [group-selected, graph-clear,
+    // toggle-code-auto-open] in that push order; ArrowDown from 0 selects
+    // the second entry (graph-clear), whose run() resets the graph store.
     fireEvent.change(input, { target: { value: ">" } });
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -158,7 +160,7 @@ describe("CommandPalette", () => {
     openPalette();
     render(<CommandPalette />);
     fireEvent.change(getInput(), { target: { value: ">" } });
-    expect(screen.getByText("2 results")).not.toBeNull();
+    expect(screen.getByText("3 results")).not.toBeNull();
   });
 
   it("reopening via store.setOpen(true) clears the previous query and active row", () => {
@@ -223,5 +225,26 @@ describe("CommandPalette", () => {
     const starterRow = starterSub.closest("button");
     expect(starterRow?.textContent).toContain("◆");
     expect(starterRow?.querySelector(".cmdk-warn-badge")).toBeNull();
+  });
+
+  // [X2] dc Command Palette L224 — palette reachability for the Auto-open
+  // toggle even when the Code rail is collapsed (34px, no inline toggle).
+  it("Toggle Code auto-open command flips editorStore.autoCode and closes the palette", () => {
+    openPalette();
+    render(<CommandPalette />);
+
+    const sub = screen.getByText(
+      "open Code on Shader/Compute selection — reachable even when the Code rail is collapsed",
+    );
+    const button = sub.closest("button");
+    expect(button).not.toBeNull();
+    expect(button?.textContent).toContain("Toggle Code auto-open");
+    expect(button?.textContent).toContain("◉");
+
+    expect(useEditorStore.getState().autoCode).toBe(true);
+    fireEvent.click(button as HTMLButtonElement);
+
+    expect(useEditorStore.getState().autoCode).toBe(false);
+    expect(useCommandPaletteStore.getState().open).toBe(false);
   });
 });

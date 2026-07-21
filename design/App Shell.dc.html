@@ -112,7 +112,7 @@
           <span onPointerDown="{{ p.grabDown }}" style="color:#454c55;font-size:13px;letter-spacing:1px;cursor:grab;flex-shrink:0;">⣿</span>
           <span style="width:8px;height:8px;border-radius:2.5px;background:{{ p.dot }};flex-shrink:0;"></span>
           <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;font-weight:600;color:#9aa2ac;letter-spacing:0.4px;white-space:nowrap;">{{ p.railLabel }}</div>
-          <sc-if value="{{ p.railErr }}" hint-placeholder-val="{{ false }}"><span title="1 error" style="width:7px;height:7px;border-radius:50%;background:#f0555c;box-shadow:0 0 6px #f0555c;flex-shrink:0;"></span></sc-if>
+          <sc-if value="{{ p.railErr }}" hint-placeholder-val="{{ false }}"><span title="{{ p.railErrTitle }}" style="width:7px;height:7px;border-radius:50%;background:#f0555c;box-shadow:0 0 6px #f0555c;flex-shrink:0;"></span></sc-if>
           <span onClick="{{ p.collapse }}" title="Expand panel" style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:#656d78;cursor:pointer;font-size:13px;flex-shrink:0;" style-hover="background:#22262c;color:#c4cad2;">{{ p.collapseIcon }}</span>
         </div>
         </sc-if>
@@ -331,11 +331,14 @@
           <sc-if value="{{ p.isCode }}" hint-placeholder-val="{{ false }}">
           <div style="position:absolute;inset:0;display:flex;flex-direction:column;background:#0f1114;">
             <div style="display:flex;align-items:center;gap:2px;height:34px;flex-shrink:0;padding:0 12px;background:#101216;border-bottom:1px solid #17191e;">
-              <sc-for list="{{ codeTabs }}" as="c" hint-placeholder-count="2">
-                <button onClick="{{ c.select }}" style="display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;background:transparent;border:none;border-top:2px solid {{ c.border }};color:{{ c.color }};font-size:11.5px;font-weight:{{ c.weight }};cursor:pointer;font-family:'JetBrains Mono',monospace;">{{ c.name }}<sc-if value="{{ c.err }}" hint-placeholder-val="{{ true }}"><span style="width:6px;height:6px;border-radius:50%;background:#f0555c;box-shadow:0 0 6px #f0555c;"></span></sc-if></button>
-              </sc-for>
-              <!-- W5: auto-open Code toggle (inline in Code header) -->
-              <button onClick="{{ toggleAutoCode }}" title="{{ autoCodeTitle }}" style="{{ autoCodeHdrStyle }}"><span style="{{ autoCodeDot }}"></span>{{ autoCodeLabel }}</button>
+              <!-- Z1: .code-stage-strip-meta — breadcrumb wrapper shrinks first (flex-shrink:100000) so it yields to 0 before the toggle does -->
+              <div style="display:flex;align-items:center;gap:2px;flex-shrink:100000;min-width:0;overflow:hidden;">
+                <sc-for list="{{ codeTabs }}" as="c" hint-placeholder-count="2">
+                  <button onClick="{{ c.select }}" style="display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;background:transparent;border:none;border-top:2px solid {{ c.border }};color:{{ c.color }};font-size:11.5px;font-weight:{{ c.weight }};cursor:pointer;font-family:'JetBrains Mono',monospace;">{{ c.name }}<sc-if value="{{ c.err }}" hint-placeholder-val="{{ true }}"><span style="width:6px;height:6px;border-radius:50%;background:#f0555c;box-shadow:0 0 6px #f0555c;"></span></sc-if></button>
+                </sc-for>
+              </div>
+              <!-- W5: auto-open Code toggle (inline in Code header). Z1: only shrinks (flex-shrink:1) after the meta wrapper is exhausted; label span carries the ellipsis (button is a flex container, so text-overflow can't sit on it directly) -->
+              <button onClick="{{ toggleAutoCode }}" title="{{ autoCodeTitle }}" style="{{ autoCodeHdrStyle }}"><span style="{{ autoCodeDot }}"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">{{ autoCodeLabel }}</span></button>
             </div>
             <div class="sp-scroll" style="flex:1;overflow:auto;min-height:0;display:flex;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;">
               <div style="flex-shrink:0;padding:10px 12px 10px 14px;text-align:right;color:#3a414a;user-select:none;background:#0b0c0e;border-right:1px solid #17191e;">
@@ -521,7 +524,7 @@ class Component extends DCLogic {
     nodeEditor: { title: "Node Editor", dot: "#3d9bff", meta: "5N \u00B7 4E" },
     viewport:   { title: "Viewport",    dot: "#4bbf89", meta: "single" },
     inspector:  { title: "Inspector",   dot: "#d4a53c", meta: "Fresnel" },
-    code:       { title: "Code",        dot: "#a06bff", meta: "GLSL" },
+    code:       { title: "Code",        dot: "#a06bff", meta: "GLSL \u00B7 ES 3.0" },
     assets:     { title: "Assets",      dot: "#f0b429", meta: "6" },
   };
   ALL = ["nodeEditor", "viewport", "inspector", "code", "assets"];
@@ -834,7 +837,9 @@ class Component extends DCLogic {
       collapsed,
       dot: this.META[node.active].dot,
       railLabel: `${this.META[node.active].title} \u00B7 ${this.META[node.active].meta}`,
+      // Z5(b): rail error dot is scoped to the shader the Code editor currently has open (not the whole graph). Demo: the open fragment shader has one compile error.
       railErr: node.active === "code",
+      railErrTitle: "1 error in fragment.glsl",
       collapse: () => this.toggleCollapse(r.path),
       collapseIcon: parentDir === "row"
         ? (childSide === "a" ? (collapsed ? "\u203a" : "\u2039") : (collapsed ? "\u2039" : "\u203a"))
@@ -958,7 +963,7 @@ class Component extends DCLogic {
       toggleAutoCode: () => this.setState({ autoCode: !s.autoCode }),
       autoCodeTitle: s.autoCode ? "Auto-open Code is ON — selecting a Shader node opens this panel, selecting others collapses it. Click to switch to manual." : "Auto-open Code is OFF — the panel only opens/closes when you toggle it. Click to let node selection open it automatically.",
       autoCodeLabel: s.autoCode ? "Auto: ON" : "Auto: OFF",
-      autoCodeHdrStyle: `margin-left:auto;flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:6px;height:20px;padding:0 9px;border-radius:6px;font-size:10px;font-weight:600;letter-spacing:0.3px;cursor:pointer;font-family:'IBM Plex Sans',system-ui,sans-serif;border:1px solid ${s.autoCode ? "#2b6fe0" : "#20242a"};background:${s.autoCode ? "#1c3452" : "#1a1d22"};color:${s.autoCode ? "#7dbcff" : "#9aa2ac"};`,
+      autoCodeHdrStyle: `margin-left:auto;flex-shrink:1;min-width:0;overflow:hidden;display:flex;align-items:center;gap:6px;height:20px;padding:0 9px;border-radius:6px;font-size:10px;font-weight:600;letter-spacing:0.3px;cursor:pointer;font-family:'IBM Plex Sans',system-ui,sans-serif;border:1px solid ${s.autoCode ? "#2b6fe0" : "#20242a"};background:${s.autoCode ? "#1c3452" : "#1a1d22"};color:${s.autoCode ? "#7dbcff" : "#9aa2ac"};`,
       autoCodeDot: `width:6px;height:6px;border-radius:50%;background:${s.autoCode ? "#3d9bff" : "#454c55"};box-shadow:${s.autoCode ? "0 0 6px rgba(61,155,255,0.6)" : "none"};flex-shrink:0;`,
       diagOpen: s.diagOpen,
       diagColor: s.diagOpen ? "#3d9bff" : "#9aa2ac",

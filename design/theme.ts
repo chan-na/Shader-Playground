@@ -8,10 +8,11 @@
  * 재구현 시 이 파일을 src/theme.ts 로 옮기고, 필요하면 :root CSS 변수로도
  * 파생(예: --surface-panel: #131519). 아래 cssVars() 참고.
  *
- * 버전: v2.1 · 2026-07-20
+ * 버전: v2.2 · 2026-07-21
  * v1.3/v1.4/v1.5: 신규 토큰 0 — 병합분 없음(S25). 값 정본은 이 파일, 변경 사유는 CHANGELOG.md.
  * S26(v2.0 완성도): 드리프트 정리 — accent.bright / semantic.successBright / nodeCategory.*Bright / gradient.viewportActive·shaderSphere 신규, 중간 회색·근-검정 표면·yellow 변형 흡수. 버전 번호 유지(v2.0).
  * v2.1: 신규 토큰 0. radius/shadow.skeletonStatus → floatingPill 개명(그래프 스켈레톤 상태 필 + 캔버스 add-node pill 공용, X14). 나머지는 현행 승인/문서 정정.
+ * v2.2: 신규 토큰 0. semantic.successBright는 그대로 emit되나 diagnostics 소비처는 X12(2×2 카드 제거)로 0곳 — X13은 index.css 라벨색(→accent.bright) 1건만 유효(Z6-b). 나머지 Z 항목은 App Shell dc/문서 정정.
  */
 
 export const tokens = {

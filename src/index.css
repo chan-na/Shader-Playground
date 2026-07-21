@@ -648,21 +648,23 @@ textarea {
    the DOM node was technically present). A direct `.panel` child, so the
    existing collapsed-rail rule (`.shell-slot--collapsed .panel > :not(.dock-
    header)` above) hides it along with the editor body automatically.
-   M3 regression fix (verifier-measured 1440×900 default layout: toggle box
-   right edge 387.6px vs strip's own right edge 358.25px, ~29px clipped —
-   the OFF label, being longer, clips further): padding/gap tightened to
-   dc's own reference row (30px/0 8px, App Shell.dc.html L313) instead of
-   reusing `.dock-header`'s 34px/0 12px, and the height stays at 34px only
-   (dc's 30px would also require shrinking `.stage-tab`'s own height, out of
-   this fix's blast radius) for visual continuity with the header directly
-   above. `.code-stage-strip-meta` below absorbs the rest of the squeeze. */
+   Z2(§v2.2/X15): padding restored to the docking-header canonical 0 12px for
+   visual continuity with `.dock-header` above. An earlier M3 fix had tightened
+   this to 0 8px because at 1440×900 the toggle clipped ~29px (toggle right edge
+   387.6px vs strip right edge 358.25px, the longer "Auto-open: OFF" label
+   clipping further). That clip is now recovered two independent ways: X2
+   shortened the label `Auto-open:`→`Auto:` (~6 chars ≈ the 29px), and Z1's
+   two-stage shrink (`.code-stage-strip-meta` flex-shrink:100000 yields to 0
+   first, then the toggle's flex-shrink:1 + min-width:0 with an ellipsis label)
+   makes a hard clip structurally impossible at any width. Height stays 34px
+   (dc's 30px would also need `.stage-tab`'s height shrunk, out of scope). */
 .code-stage-strip {
   display: flex;
   align-items: center;
   gap: 6px;
   height: 34px;
   flex-shrink: 0;
-  padding: 0 8px;
+  padding: 0 12px;
   background: var(--surface-docking-header);
   border-bottom: 1px solid var(--border-header-divider);
 }

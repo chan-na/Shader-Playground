@@ -1605,9 +1605,9 @@ textarea {
   z-index: 50;
   display: flex;
   flex-direction: column;
-  /* dc L210 bg #0d0f12 — 대응 토큰 없음, surface.panel(#131519) 근사
-     (followup 기록). */
-  background: var(--surface-panel);
+  /* dc App Shell L419 #0f1114 = surface.rail 정확 일치 — 오버레이 본문+스트립
+     rail 톤 통일 [X10 §v2.1]. (구 v1.4의 surface.panel 근사를 정정.) */
+  background: var(--surface-rail);
   border-top: 1px solid var(--border-default); /* dc #20242a 정확 일치 */
 }
 .status-overlay-header {

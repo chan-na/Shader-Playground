@@ -1,6 +1,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import {
+  emptyDiagnostics,
+  useDiagnosticsStore,
+} from "../../state/diagnosticsStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { DiagnosticsMetricStrip } from "./DiagnosticsMetricStrip";
@@ -34,7 +37,7 @@ describe("DiagnosticsMetricStrip", () => {
     expect(strip.textContent).toContain("—");
   });
 
-  it("reflects rendererStore/graphStore/diagnosticsStore values (same source as the 2x2 cards)", () => {
+  it("reflects rendererStore/graphStore/diagnosticsStore values (diagnosticsMetricValues single source)", () => {
     useRendererStore.getState().setGlInfo({
       renderer: "Apple M1",
       version: "WebGL 2.0",
@@ -56,5 +59,27 @@ describe("DiagnosticsMetricStrip", () => {
     expect(strip.textContent).toContain("16.7 ms · 60 fps");
     expect(strip.textContent).toContain("142");
     expect(strip.textContent).toContain("1 compiled");
+  });
+
+  it("reflects a shader node's compile-error diagnostic via diagnosticsStore.byNode", () => {
+    useGraphStore.getState().addNode({
+      id: "s1",
+      kind: "shader",
+      vertexSource: "",
+      fragmentSource: "",
+      uniformValues: {},
+    });
+    useDiagnosticsStore.setState({
+      byNode: {
+        s1: {
+          ...emptyDiagnostics(),
+          fragment: [{ line: 1, severity: "error", message: "boom" }],
+        },
+      },
+    });
+
+    render(<DiagnosticsMetricStrip />);
+    const strip = screen.getByTestId("diagnostics-metric-strip");
+    expect(strip.textContent).toContain("0 compiled");
   });
 });

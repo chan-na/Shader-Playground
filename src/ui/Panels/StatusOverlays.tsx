@@ -12,7 +12,7 @@ import { ProblemsPanel } from "./ProblemsPanel";
  * 속하지 않는 상태바 트리거 오버레이다 — `.shell-content` 하단에 절대 배치되는
  * 172px 영역 하나를 diagnostics 또는 problems가 번갈아 차지한다.
  * 순서(T3/T4): 헤더 → 26px 메트릭 스트립(diagnostics 전용, T4) → 패널 본문
- * (카드 억제 variant, T3).
+ * (X12로 카드 제거 — 메트릭은 스트립 유일 경로).
  *
  * 상호 배타는 debugUiStore(U1, R5)가 스토어 레벨에서 보장하지만(open을 켜면
  * problemsOpen이 꺼지고 그 반대도 동일), 여기서는 방어적으로 open을 우선한다.
@@ -68,7 +68,7 @@ export function StatusOverlays() {
         {bootPhase !== "done" ? (
           <PanelSkeleton />
         ) : open ? (
-          <DiagnosticsPanel variant="overlay" />
+          <DiagnosticsPanel />
         ) : (
           <ProblemsPanel />
         )}

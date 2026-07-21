@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useDebugUiStore } from "../../state/debugUiStore";
-import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { toast } from "../../state/toastStore";
@@ -17,7 +16,7 @@ import {
   subscribeLog,
 } from "../../utils/log";
 import { buildDiagnosticsReport } from "./diagnosticsReport";
-import { diagnosticsMetricValues, relativeLogTime } from "./diagnosticsTab";
+import { relativeLogTime } from "./diagnosticsTab";
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 0,
@@ -120,21 +119,14 @@ async function copyDiagnostics(): Promise<void> {
   }
 }
 
-export function DiagnosticsPanel({
-  variant = "full",
-}: {
-  variant?: "full" | "overlay";
-}) {
+// X12(§v2.1): 2×2 메트릭 카드 제거 — 메트릭은 오버레이의 DiagnosticsMetricStrip이
+// 유일 경로. 이 패널은 상태바 오버레이 전용(런타임 로그 + 필터 툴바).
+export function DiagnosticsPanel() {
   const setOpen = useDebugUiStore((s) => s.setOpen);
   const levelFilter = useDebugUiStore((s) => s.levelFilter);
   const categoryFilter = useDebugUiStore((s) => s.categoryFilter);
   const setLevelFilter = useDebugUiStore((s) => s.setLevelFilter);
   const setCategoryFilter = useDebugUiStore((s) => s.setCategoryFilter);
-
-  const glInfo = useRendererStore((s) => s.glInfo);
-  const stats = useRendererStore((s) => s.stats);
-  const nodes = useGraphStore((s) => s.nodes);
-  const byNode = useDiagnosticsStore((s) => s.byNode);
 
   const [entries, setEntries] = useState<readonly LogEntry[]>(() => [
     ...getLogBuffer(),
@@ -155,42 +147,6 @@ export function DiagnosticsPanel({
     return true;
   });
 
-  const mv = diagnosticsMetricValues({
-    glInfo,
-    fps: stats.fps,
-    drawCalls: stats.drawCalls,
-    nodes,
-    byNode,
-  });
-  // design/Side Panel.dc.html L221-225 (diagStats): 4 metric cards, 2×2 grid.
-  const metrics: Array<{ k: string; v: string; color: string }> = [
-    {
-      k: "GPU",
-      v: mv.gpu,
-      color: "var(--text-bright-body)",
-    },
-    {
-      k: "Frame",
-      // dc L386의 값 색 #6fe3b8은 대응 토큰이 없어 semantic.success(#34d399)로
-      // 근사 — 근사 5건 일괄 승인 [B-8]. (v1.1에서 이 건만 사유 주석이 누락돼
-      // 있던 것을 보완.)
-      v: mv.frame,
-      color: "var(--success)",
-    },
-    {
-      k: "Draw calls",
-      v: mv.draws,
-      color: "var(--text-primary)",
-    },
-    {
-      // "Programs: N linked" → "Shaders: N compiled" [A-6] — 실제 GL 링크
-      // 카운터가 없어 값이 프록시이므로 라벨을 측정 대상에 맞췄다.
-      k: "Shaders",
-      v: mv.shaders,
-      color: "var(--text-primary)",
-    },
-  ];
-
   return (
     <div
       className="panel-body"
@@ -202,69 +158,6 @@ export function DiagnosticsPanel({
         fontSize: 11,
       }}
     >
-      {/* T3(§v1.6): 172px 오버레이 호스팅 시 2×2 카드 억제 — 전체 카드는
-          Side Panel Diagnostics 탭 전용(구현엔 아직 해당 호스트 없음,
-          followup 참조). */}
-      {variant === "full" ? (
-        <div
-          style={{ padding: "12px 14px" }}
-          data-testid="diagnostics-metric-cards"
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 8,
-              marginBottom: 14,
-            }}
-          >
-            {metrics.map((m) => (
-              <div
-                key={m.k}
-                style={{
-                  background: "var(--surface-card)",
-                  border: "1px solid var(--border-default)",
-                  // dc L222 radius 8 — no exact token; approximated with
-                  // radius.button (7), same D11 precedent as the multi-select
-                  // chip radius. Followup logged.
-                  borderRadius: tokens.radius.button,
-                  padding: "9px 11px",
-                  // Grid items default to min-width:auto, so a long nowrap
-                  // value (e.g. a real GPU renderer string) forces this track
-                  // to its intrinsic width and collapses the 2x2 layout.
-                  // minWidth:0 lets the item shrink to the grid track so the
-                  // value div's existing nowrap+ellipsis (below) can clip it.
-                  minWidth: 0,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: 0.6,
-                    textTransform: "uppercase",
-                    color: "var(--text-muted)",
-                    marginBottom: 5,
-                  }}
-                >
-                  {m.k}
-                </div>
-                <div
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11.5,
-                    color: m.color,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {m.v}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
       <div
         style={{
           display: "flex",

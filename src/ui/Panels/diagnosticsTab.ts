@@ -1,16 +1,19 @@
 /**
- * Pure helpers for the Diagnostics tab's metric grid + runtime log
+ * Pure helpers backing the diagnostics metric values + runtime log
  * (design/Side Panel.dc.html L217-238, diagStats/diagLog L384-396).
- * Kept separate from DiagnosticsPanel so the value-formatting logic has a
+ * [X12 §v2.1] The metric-value helpers' sole consumer is now the overlay's
+ * DiagnosticsMetricStrip (the 2×2 metric-card grid this file originally
+ * backed was removed from DiagnosticsPanel). The runtime-log helper
+ * (relativeLogTime) is still consumed by DiagnosticsPanel itself.
+ * Kept separate from those components so the value-formatting logic has a
  * unit-testable surface independent of store wiring / DOM.
- * + overlay metric strip (S7).
  */
 
 import type { GraphNode } from "../../core/graph/types";
 import type { NodeDiagnostics } from "../../state/diagnosticsStore";
 import type { GlInfo } from "../../state/rendererStore";
 
-/** "Frame" metric card value: `<ms> ms · <fps> fps` (dc L386), or "—" when idle. */
+/** "Frame" metric value: `<ms> ms · <fps> fps` (dc L386), or "—" when idle. */
 export function frameMetricValue(fps: number): string {
   return fps > 0 ? `${(1000 / fps).toFixed(1)} ms · ${fps} fps` : "—";
 }
@@ -53,7 +56,7 @@ export function relativeLogTime(ts: number, baseTs: number): string {
   return `${(Math.max(0, ts - baseTs) / 1000).toFixed(1)}s`;
 }
 
-/** Card/strip shared metric values (S7 single source — design/CHANGELOG.md §v1.5 S7, §v1.6 T3). */
+/** Strip metric values (S7 single source; X12로 카드 제거 후 스트립이 유일 소비처). */
 export interface DiagnosticsMetricValues {
   gpu: string;
   frame: string;

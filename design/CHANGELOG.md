@@ -32,12 +32,12 @@
 - **Z6 [X13 `--success-bright` diagnostics 소비처] `[token]`** = **(b) X13을 index.css 라벨색 1건으로 공식 축소.** X12(2×2 카드 제거)가 Frame 값색 소비처를 카드 분기째 삭제 → 살아남은 `DiagnosticsMetricStrip`은 전 값을 `text-secondary` 단색으로 표시(per-value 강조 없음)이 카드 소멸의 자연 귀결. `--success-bright`는 diagnostics에선 소비처 0곳으로 확정(토큰 자체는 `semantic.successBright`로 여전히 emit — 다른 소비처 무영향, 되살리지 않음). 코드/​dc 변경 없음.
 
 ### D. 문서 정합 (확답만)
-- **Z7 [X13 subsume 각주] `[breaking]`** = **승인 — 병기함.** §v2.1 X13에 "DiagnosticsPanel 반쪽(Frame 값색)은 X12로 subsume — index.css 라벨색 소비처 1곳만 유효" 정정 각주 추가(Y2가 X11에 남긴 병기와 동일 형식).
-- **Z8 [X10 line 참조 보정] `[screen]`** = **승인 — 보정함.** §v2.1 X10의 "dc L405"를 현재 `App Shell.dc.html` 실측 **L419**(오버레이 컨테이너 `background:#0f1114` + border-top + box-shadow)로 보정. **값 자체는 불변**(v2.1 dc 편집으로 line만 밀림).
+- **Z7 [X13 subsume 각주] `[screen]`** = **승인 — 병기함.** §v2.1 X13에 "DiagnosticsPanel 반쪽(Frame 값색)은 X12로 subsume — index.css 라벨색 소비처 1곳만 유효" 정정 각주 추가(Y2가 X11에 남긴 병기와 동일 형식).
+- **Z8 [X10 line 참조 보정] `[screen]`** = **승인 — 보정함.** §v2.1 X10의 "dc L405"를 현재 `App Shell.dc.html` 실측 **L422**(오버레이 컨테이너 `background:#0f1114` + border-top + box-shadow)로 보정. **값 자체는 불변**(dc 편집으로 line만 밀림 — v2.2의 스테이지 스트립 wrapper 삽입으로 L419→L422 재보정).
 
 ### Changed
 - `[component]` `App Shell.dc.html` — Code 스테이지 스트립 2단계 shrink(메타 래퍼 `flex-shrink:100000` + 토글 라벨 span ellipsis, Z1) · `autoCodeHdrStyle` `shrink:0/nowrap`→`shrink:1/min-width:0/overflow:hidden`(Z3) · code META `GLSL`→`GLSL · ES 3.0`(Z4, 헤더 배지+레일 라벨 동시) · 접힌 레일 에러 dot을 현재-노드 스코프로, 동적 툴팁 `railErrTitle`(Z5).
-- `[breaking]` `CHANGELOG.md` §v2.1 — X13에 X12 subsume 각주 병기(Z7) · X10 line 참조 L405→L419 보정(Z8).
+- `[screen]` `CHANGELOG.md` §v2.1 — X13에 X12 subsume 각주 병기(Z7) · X10 line 참조 L405→L422 보정(Z8).
 
 ---
 
@@ -60,7 +60,7 @@
 - **X9 [pill z-index/클리어런스] `[screen]`** = **z-index 11 승인 + 상단 클리어런스 현행 승인.** dc L131 z-6은 `.welcome-overlay`(z-10)에 "첫 노드 추가" 클릭을 뺏겨 **z-11**로(근거 주석 병기). 고정 상단 클리어런스는 두지 않고 기존 fitView padding(0.15/0.2) + 패닝 회피로 마무리(pill 뒤 노드는 패닝).
 
 ### D. 진단 오버레이(S7/T3) 후속
-- **X10 [오버레이 배경] `[token]` `[screen]`** = **(a) `surface.rail` 통일.** dc L419 오버레이 본문+스트립 bg `#0f1114`가 `surface.rail`과 정확히 일치 — rail 톤 통일이 의도. 재구현은 `.status-overlay` 배경을 `var(--surface-rail)`로(1줄). dc는 값이 이미 일치해 무변경.
+- **X10 [오버레이 배경] `[token]` `[screen]`** = **(a) `surface.rail` 통일.** dc L422 오버레이 본문+스트립 bg `#0f1114`가 `surface.rail`과 정확히 일치 — rail 톤 통일이 의도. 재구현은 `.status-overlay` 배경을 `var(--surface-rail)`로(1줄). dc는 값이 이미 일치해 무변경.
 - **X11 [스트립 GPU/Frame 값] `[screen]`** = **카드=스트립 동일 값 확정.** GPU-time 계측이 없어 카드와 같은 값(GPU=renderer 문자열, Frame=16.7 ms·60 fps)을 단일 헬퍼로 공유. 라벨만 dc대로 카드 "Draw calls"/스트립 "Draws". 진짜 GPU-time은 GL 타이머 쿼리 신규 계측(스코프 밖). (**Y2 정정**: X12로 카드 제거 후 카드 라벨 규정은 소멸 — 스트립 "Draws"만 유효.)
 - **X12 [2×2 메트릭 카드 거취] `[screen]` `[component]`** = **(b) 카드 제거 — 스트립 단일화.** R5로 Side Panel diagnostics 탭이 없어 2×2 카드 그리드는 렌더 호스트가 없는 잠복 코드(단위 테스트로만 소비) → **메트릭 카드 컴포넌트/분기 제거**, 오버레이 메트릭 스트립을 유일 경로로 확정. 카드 전용 단위 테스트도 함께 정리(번들 소폭 감소).
 

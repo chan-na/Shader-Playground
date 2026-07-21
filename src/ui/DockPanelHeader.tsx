@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { useDiagnosticsStore } from "../state/diagnosticsStore";
 import { useDockStore } from "../state/dockStore";
 import { type DockPanelId, getNodeAt } from "../state/dockTree";
+import { useGraphStore } from "../state/graphStore";
+import { useSelectionStore } from "../state/selectionStore";
 import { useDockDragStart } from "./dockDragContext";
 import {
   collapseChevron,
@@ -102,21 +104,32 @@ export function DockPanelHeader({
   const closePanel = useDockStore((s) => s.closePanel);
 
   const isRail = collapsed === true && railCapable;
-  // X17: 접힌 code 레일의 에러 dot — 컴파일 에러(severity "error")가 하나라도
-  // 있으면 켠다. StatusBar.tsx compileErrorCount 셀렉터와 동일 순회 패턴
-  // (byNode 전체 — code 패널은 그래프 전체의 셰이더 소스 편집 진입점이므로
-  // 노드 무관 전역 에러 유무가 정본, dc railErr(App Shell.dc.html L837) 참조).
-  // primitive number 반환이라 참조 동일성 오버렌더 없음. code 레일이 아닐 땐
-  // 조기 0 반환으로 순회 생략.
   const isCodeRail =
     isRail && leaf !== null && leaf.type === "leaf" && leaf.active === "code";
+  // Z5(§v2.2/README §M R4): 접힌 code 레일의 에러 dot을 "Code 에디터가 현재 연
+  // 셰이더 노드"로 스코프한다 — 그래프 전체 합산(구 X17)이 아니라, 그 패널이
+  // 지금 보여주는 셰이더의 에러만. 열린 노드 = selectedNodeId ?? 첫 shader,
+  // 단 shader/compute일 때만(CodeEditor/index.tsx effectiveId 미러). 비-shader
+  // 선택으로 접힌 상태면 열린 셰이더가 없어 0. dc railErr(App Shell.dc.html).
+  const selectedNodeId = useSelectionStore((s) => s.selectedNodeId);
+  const openCodeNodeId = useGraphStore((s) => {
+    const first = s.nodes.find((n) => n.kind === "shader")?.id ?? null;
+    const id = selectedNodeId ?? first;
+    if (id === null) return null;
+    const n = s.nodes.find((x) => x.id === id);
+    return n !== undefined && (n.kind === "shader" || n.kind === "compute")
+      ? id
+      : null;
+  });
+  // primitive number 반환이라 참조 동일성 오버렌더 없음. code 레일이 아니거나
+  // 열린 셰이더가 없으면 조기 0 반환으로 순회 생략.
   const railErrorCount = useDiagnosticsStore((s) => {
-    if (!isCodeRail) return 0;
+    if (!isCodeRail || openCodeNodeId === null) return 0;
+    const d = s.byNode[openCodeNodeId];
+    if (d === undefined) return 0;
     let n = 0;
-    for (const d of Object.values(s.byNode)) {
-      for (const arr of [d.vertex, d.fragment, d.link]) {
-        for (const x of arr) if (x.severity === "error") n++;
-      }
+    for (const arr of [d.vertex, d.fragment, d.link]) {
+      for (const x of arr) if (x.severity === "error") n++;
     }
     return n;
   });

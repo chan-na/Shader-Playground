@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ShaderGraphNode } from "../core/graph/types";
 import { useDiagnosticsStore } from "../state/diagnosticsStore";
 import { useDockStore } from "../state/dockStore";
 import {
@@ -15,6 +16,8 @@ import {
   type DockPanelId,
   getNodeAt,
 } from "../state/dockTree";
+import { useGraphStore } from "../state/graphStore";
+import { useSelectionStore } from "../state/selectionStore";
 import { DockPanelHeader } from "./DockPanelHeader";
 import { DockDragContext, type DockDragStart } from "./dockDragContext";
 import { DockLeafContext, useDockLeaf } from "./dockLeafContext";
@@ -403,8 +406,21 @@ describe("DockPanelHeader", () => {
   // now renders a full identity interior (panel dot + vertical "title · meta"
   // label + a code-only compile error dot), App Shell.dc.html L109-117.
   describe("rail interior (X17)", () => {
+    // Z5(§v2.2): the code-rail error dot is scoped to the shader the Code
+    // editor currently has open (selectedNodeId ?? first shader). These tests
+    // wire a shader node so `openCodeNodeId` resolves to it.
+    const shaderN1: ShaderGraphNode = {
+      id: "n1",
+      kind: "shader",
+      vertexSource: "void main(){ gl_Position = vec4(0); }",
+      fragmentSource: "void main(){}",
+      uniformValues: {},
+    };
+
     afterEach(() => {
       useDiagnosticsStore.getState().reset();
+      useGraphStore.setState({ nodes: [] });
+      useSelectionStore.setState({ selectedNodeId: null, selectedNodeIds: [] });
     });
 
     it("collapsed code rail renders the vertical title · meta label", () => {
@@ -444,7 +460,8 @@ describe("DockPanelHeader", () => {
       );
     });
 
-    it("code rail shows the error dot when diagnostics hold an error", () => {
+    it("code rail shows the error dot when the open shader's diagnostics hold an error", () => {
+      useGraphStore.setState({ nodes: [shaderN1] });
       useDiagnosticsStore.getState().set("n1", {
         vertex: [{ line: 1, severity: "error", message: "boom" }],
         fragment: [],
@@ -459,8 +476,24 @@ describe("DockPanelHeader", () => {
     });
 
     it("code rail shows no error dot for warning-only diagnostics", () => {
+      useGraphStore.setState({ nodes: [shaderN1] });
       useDiagnosticsStore.getState().set("n1", {
         vertex: [{ line: 1, severity: "warning", message: "careful" }],
+        fragment: [],
+        link: [],
+      });
+      render(withLeaf("l4", ["a"], <DockPanelHeader />));
+      fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+
+      expect(screen.queryByTestId("dock-rail-error-dot")).toBeNull();
+    });
+
+    it("code rail error dot is scoped to the open shader — an error on another node is ignored (Z5)", () => {
+      // n1 is the open shader (first shader → effectiveId). The error lives on
+      // an unrelated node, so under node-scope the dot must stay dark.
+      useGraphStore.setState({ nodes: [shaderN1] });
+      useDiagnosticsStore.getState().set("other-node", {
+        vertex: [{ line: 1, severity: "error", message: "elsewhere" }],
         fragment: [],
         link: [],
       });

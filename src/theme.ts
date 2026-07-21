@@ -173,8 +173,9 @@ export const tokens = {
     // 컴팩트(≤990px) 티어 전용 — 풀 바(12/9) 상속 근사 대신 정본화 [B-5].
     transportBarCompact: 11,
     overlayCompact: 8,
-    // 그래프 스켈레톤 상태 필 — 근사(overlay 9) 대신 dc 실측 정본화 [B-6].
-    skeletonStatus: 10,
+    // 캔버스 플로팅 필 (그래프 스켈레톤 상태 + add-node pill 공용) — 근사(overlay 9)
+    // 대신 dc 실측 정본화 [B-6·X14].
+    floatingPill: 10,
     // 뷰포트 빈 상태 중앙 아이콘 박스(64×64) — Viewport.dc.html L52:
     // border-radius 16. Graph-empty 온보딩 아이콘(56×56)도 같은 토큰을 공유
     // (System States.dc.html L110의 실측 15px과 1px 차이 — 두 "빈 상태 아이콘"
@@ -198,9 +199,9 @@ export const tokens = {
     // 0.7 알파 패밀리 일관성 유지 [D12] — design/System States.dc.html의 solid
     // #f5b13d 링 대신 이 값이 정본이다.
     warnRing: "0 0 0 1.5px rgba(245,177,61,0.7), 0 0 14px rgba(245,177,61,0.3)",
-    // 그래프 스켈레톤 상태 필. nodeCard 패밀리 + blur 24 — 근사(nodeCard blur 20)
-    // 대신 dc 실측 정본화 [B-6].
-    skeletonStatus: "0 8px 24px rgba(0,0,0,0.5)",
+    // 캔버스 플로팅 필 (그래프 스켈레톤 상태 + add-node pill 공용). nodeCard 패밀리 +
+    // blur 24 — 근사(nodeCard blur 20) 대신 dc 실측 정본화 [B-6·X14].
+    floatingPill: "0 8px 24px rgba(0,0,0,0.5)",
     portOutputGlow: (famHex: string) => `0 0 7px ${famHex}aa`,
     // 노드 카드 썸네일(Shader/Image 96px 프리뷰) 안쪽 그림자.
     // design/Node Editor.dc.html L188: box-shadow: inset 0 1px 4px rgba(0,0,0,0.5).

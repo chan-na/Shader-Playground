@@ -367,9 +367,9 @@ textarea {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  /* dc 라벨색 #7dbcff는 무토큰 — accent.hover(#57a9ff)로 근사(신규 토큰 0
-     제약). followup(designer)에 기록. */
-  color: var(--accent-hover);
+  /* dc 라벨색 #7dbcff = accent.bright (S26 정본) — v2.0의 accent.hover
+     근사를 정본 토큰으로 교체 [X13]. */
+  color: var(--accent-bright);
   border-radius: var(--radius-chip);
   padding: 3px 9px;
 }
@@ -3496,15 +3496,15 @@ textarea {
      color-mix pattern follows the existing .cmdk-overlay convention above. */
   background: color-mix(in srgb, var(--surface-app) 82%, transparent);
   border: 1px solid var(--border-default);
-  /* dc 실측 10px이 radius.skeletonStatus로 정본화 — radius.overlay(9) 근사를
-     대체 [B-6]. */
-  border-radius: var(--radius-skeleton-status);
+  /* dc 실측 10px이 radius.floatingPill로 정본화 — radius.overlay(9) 근사를
+     대체 [B-6·X14]. */
+  border-radius: var(--radius-floating-pill);
   padding: 9px 14px;
   /* literal blur, matches .modal-scrim (L3181) — blur isn't tokenized. */
   backdrop-filter: blur(6px);
-  /* dc 실측 blur 24가 shadow.skeletonStatus로 정본화 — shadow.nodeCard(blur 20)
-     근사를 대체. nodeCard와 같은 offset/alpha 패밀리 [B-6]. */
-  box-shadow: var(--shadow-skeleton-status);
+  /* dc 실측 blur 24가 shadow.floatingPill로 정본화 — shadow.nodeCard(blur 20)
+     근사를 대체. nodeCard와 같은 offset/alpha 패밀리 [B-6·X14]. */
+  box-shadow: var(--shadow-floating-pill);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-secondary);
@@ -3523,7 +3523,7 @@ textarea {
    dc `background:rgba(19,21,25,0.92)` == tokens.surface.panel(#131519) at
    92% alpha; color-mix pattern follows the .graph-skeleton-status (L3416)
    convention above. dc `border-radius:10px` + `box-shadow:0 8px
-   24px rgba(0,0,0,0.5)` match radius/shadow.skeletonStatus exactly — reused
+   24px rgba(0,0,0,0.5)` match radius/shadow.floatingPill exactly — reused
    rather than adding a new token (S26 adds exactly 6, no more). `blur(8px)`
    is a non-tokenized literal (see .graph-skeleton-status's blur(6px)
    convention, L3423).
@@ -3552,10 +3552,10 @@ textarea {
   gap: 3px;
   background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-skeleton-status);
+  border-radius: var(--radius-floating-pill);
   padding: 4px;
   backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-skeleton-status);
+  box-shadow: var(--shadow-floating-pill);
 }
 .add-node-pill-btn {
   display: flex;

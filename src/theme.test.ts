@@ -206,6 +206,18 @@ describe("S26 신규 토큰 (v2.0)", () => {
   });
 });
 
+describe("v2.1 토큰 개명 (X14)", () => {
+  it("X14: skeletonStatus → floatingPill 개명 후에도 값이 불변이고 cssVars가 kebab emit한다", () => {
+    expect(tokens.radius.floatingPill).toBe(10);
+    expect(tokens.shadow.floatingPill).toBe("0 8px 24px rgba(0,0,0,0.5)");
+    const css = cssVars();
+    expect(css).toContain("--radius-floating-pill: 10px;");
+    expect(css).toContain(
+      `--shadow-floating-pill: ${tokens.shadow.floatingPill};`,
+    );
+  });
+});
+
 describe("withAlpha", () => {
   /** rgba(r, g, b, a) 문자열의 r/g/b 채널을 다시 "#rrggbb"로 재조립한다. */
   function rgbaToHex(rgba: string): string {

@@ -431,13 +431,44 @@ textarea {
    class is no longer a `collapsedRail` prop — it's derived from the tree
    (`dockLayoutModel.collapsesToRail`, B3-U1), so it keeps tracking whichever
    leaf sits under a row-direction parent, position not panel kind, with V2:
-   zero new logic needed here. */
+   zero new logic needed here. X17-b (v2.1): the rail was v2.0 chrome-only
+   (grip only) — promoted here to the dc-specified full interior (panel dot +
+   vertical title·meta label + error dot when applicable), App
+   Shell.dc.html L109-117. */
 .dock-header--rail {
   flex-direction: column;
   flex: 1 1 auto;
   height: auto;
-  padding: 10px 0;
-  gap: 8px;
+  padding: 9px 0;
+  gap: 10px;
+}
+
+/* X17-b 세로 라벨 — App Shell.dc.html L114 정본. writing-mode vertical-rl
+   + rotate(180deg)로 아래→위 읽기. #9aa2ac = text.secondary 정확 일치. */
+.dock-rail-label {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+/* X17-b code 컴파일 에러 dot — App Shell.dc.html L115 정본.
+   #f0555c = semantic.error 정확 일치(글로우 포함). */
+.dock-rail-error-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--error);
+  box-shadow: 0 0 6px var(--error);
+  flex-shrink: 0;
 }
 
 .inspector-section {

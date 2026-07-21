@@ -131,6 +131,16 @@ test.describe("M5 — dock header chrome: close semantics, collapse strip, divid
     // split's left child, so it collapses on the *width* axis, not height.
     expect(collapsedBox.width).toBeLessThan(60);
 
+    // v2.1 X17-b: the collapsed rail is no longer bare chrome — it carries an
+    // interior (panel dot + vertical "title · meta" label, plus an error dot
+    // on code rails when compile errors exist). Assert the label is really
+    // visible inside the 34px strip, and that a clean boot shows no error dot
+    // (the default scene compiles). design/CHANGELOG.md §v2.1 X17.
+    const railLabel = shellCode.getByTestId("dock-rail-label");
+    await expect(railLabel).toBeVisible();
+    await expect(railLabel).toContainText("Code");
+    await expect(shellCode.getByTestId("dock-rail-error-dot")).toHaveCount(0);
+
     // splitChildFlex's collapsed branch must give the opposite subtree
     // grow=1 (fills *all* freed space), not `1-ratio` (grow=0.75, which
     // would leave ~25% of the freed width — ~350px at this viewport — as
@@ -189,6 +199,9 @@ test.describe("M5 — dock header chrome: close semantics, collapse strip, divid
     }
     expect(restoredBox.width).toBeGreaterThan(100);
     await expect(page.locator("hr.splitter")).toHaveCount(3);
+
+    // The interior is rail-only: expanding the leaf removes it again.
+    await expect(shellCode.getByTestId("dock-rail-label")).toHaveCount(0);
   });
 
   test("R7: root/inner/col divider drags each clamp at the 240×160 leaf minimum", async ({

@@ -43,6 +43,11 @@ test.describe("M1-U2 — Code dock header stays reachable when width-collapsed",
     }
     expect(collapsedBox.width).toBeLessThan(60);
 
+    // v2.1 X17-b: the width-collapsed rail now renders its vertical identity
+    // label — additive guard only, the width/hit-test assertions above are
+    // the mechanism contract and stay untouched.
+    await expect(shellCode.getByTestId("dock-rail-label")).toBeVisible();
+
     const restoreBtn = shellCode.getByRole("button", { name: "Expand panel" });
     const restoreBox = await restoreBtn.boundingBox();
     if (!restoreBox) throw new Error("restore button has no bounding box");

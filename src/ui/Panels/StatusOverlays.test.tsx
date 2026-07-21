@@ -89,8 +89,9 @@ describe("StatusOverlays", () => {
   });
 
   // T3/T4 (§v1.6, design/App Shell.dc.html L403-433): diagnostics gets the
-  // 26px metric strip + card-suppressed panel; problems never gets the strip.
-  it("shows the metric strip and suppresses the 2x2 cards when diagnostics is open (T3)", () => {
+  // 26px metric strip; problems never gets the strip. (X12 §v2.1 removed the
+  // 2x2 metric cards entirely, so there is no longer a suppression to assert.)
+  it("shows the metric strip when diagnostics is open (T3)", () => {
     render(<StatusOverlays />);
 
     act(() => {
@@ -98,7 +99,6 @@ describe("StatusOverlays", () => {
     });
 
     expect(screen.getByTestId("diagnostics-metric-strip")).not.toBeNull();
-    expect(screen.queryByTestId("diagnostics-metric-cards")).toBeNull();
   });
 
   it("never renders the metric strip in the problems overlay (T4)", () => {

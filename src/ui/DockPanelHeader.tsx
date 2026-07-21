@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useDiagnosticsStore } from "../state/diagnosticsStore";
 import { useDockStore } from "../state/dockStore";
 import { type DockPanelId, getNodeAt } from "../state/dockTree";
 import { useDockDragStart } from "./dockDragContext";
@@ -101,6 +102,24 @@ export function DockPanelHeader({
   const closePanel = useDockStore((s) => s.closePanel);
 
   const isRail = collapsed === true && railCapable;
+  // X17: 접힌 code 레일의 에러 dot — 컴파일 에러(severity "error")가 하나라도
+  // 있으면 켠다. StatusBar.tsx compileErrorCount 셀렉터와 동일 순회 패턴
+  // (byNode 전체 — code 패널은 그래프 전체의 셰이더 소스 편집 진입점이므로
+  // 노드 무관 전역 에러 유무가 정본, dc railErr(App Shell.dc.html L837) 참조).
+  // primitive number 반환이라 참조 동일성 오버렌더 없음. code 레일이 아닐 땐
+  // 조기 0 반환으로 순회 생략.
+  const isCodeRail =
+    isRail && leaf !== null && leaf.type === "leaf" && leaf.active === "code";
+  const railErrorCount = useDiagnosticsStore((s) => {
+    if (!isCodeRail) return 0;
+    let n = 0;
+    for (const d of Object.values(s.byNode)) {
+      for (const arr of [d.vertex, d.fragment, d.link]) {
+        for (const x of arr) if (x.severity === "error") n++;
+      }
+    }
+    return n;
+  });
   const { startLeafDrag, startTabDrag, dragEnabled } = useDockDragStart();
 
   function selectTab(id: DockPanelId) {
@@ -126,6 +145,39 @@ export function DockPanelHeader({
         >
           ⣿
         </span>
+      )}
+      {/* X17-b 레일 인테리어(App Shell.dc.html L109-117 정본): 패널 dot + 세로
+          라벨(제목 · 메타) + (code 컴파일 에러 시) 에러 dot. 접힘 메커니즘
+          (34px 폭·부모 dir 파생·divider 비활성)은 건드리지 않는다 — V2 불변식.
+          범용 규칙: 모든 rail-collapsed leaf가 dot+라벨을 얻고, 에러 dot은
+          code leaf만(CHANGELOG §v2.1 X17 · README §M R4). */}
+      {isRail && leaf !== null && leaf.type === "leaf" && (
+        <>
+          <span
+            className="panel-tab-dot"
+            style={{ background: PANEL_DOTS[leaf.active] }}
+            aria-hidden="true"
+          />
+          <div className="dock-rail-label" data-testid="dock-rail-label">
+            {meta !== undefined
+              ? `${PANEL_TITLES[leaf.active]} · ${meta}`
+              : PANEL_TITLES[leaf.active]}
+          </div>
+          {railErrorCount > 0 && (
+            <span
+              className="dock-rail-error-dot"
+              data-testid="dock-rail-error-dot"
+              title={
+                railErrorCount === 1
+                  ? "1 compile error"
+                  : `${railErrorCount} compile errors`
+              }
+              // 에러 수는 StatusBar 문제 카운트가 이미 스크린리더에 노출한다 —
+              // 이 dot은 시각적 중복 표시라 aria-hidden (dc title="1 error" 대응).
+              aria-hidden="true"
+            />
+          )}
+        </>
       )}
       {!isRail && leaf !== null && leaf.type === "leaf" && (
         <div
@@ -197,7 +249,7 @@ export function DockPanelHeader({
         <span className="dock-header-meta">{meta}</span>
       )}
       {!isRail && children}
-      <div className="dock-header-spacer" />
+      {!isRail && <div className="dock-header-spacer" />}
       {!isRail && meta !== undefined && metaAlign === "end" && (
         <span className="dock-header-meta">{meta}</span>
       )}

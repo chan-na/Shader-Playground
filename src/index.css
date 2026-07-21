@@ -367,9 +367,9 @@ textarea {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  /* dc 라벨색 #7dbcff는 무토큰 — accent.hover(#57a9ff)로 근사(신규 토큰 0
-     제약). followup(designer)에 기록. */
-  color: var(--accent-hover);
+  /* dc 라벨색 #7dbcff = accent.bright (S26 정본) — v2.0의 accent.hover
+     근사를 정본 토큰으로 교체 [X13]. */
+  color: var(--accent-bright);
   border-radius: var(--radius-chip);
   padding: 3px 9px;
 }
@@ -431,13 +431,44 @@ textarea {
    class is no longer a `collapsedRail` prop — it's derived from the tree
    (`dockLayoutModel.collapsesToRail`, B3-U1), so it keeps tracking whichever
    leaf sits under a row-direction parent, position not panel kind, with V2:
-   zero new logic needed here. */
+   zero new logic needed here. X17-b (v2.1): the rail was v2.0 chrome-only
+   (grip only) — promoted here to the dc-specified full interior (panel dot +
+   vertical title·meta label + error dot when applicable), App
+   Shell.dc.html L109-117. */
 .dock-header--rail {
   flex-direction: column;
   flex: 1 1 auto;
   height: auto;
-  padding: 10px 0;
-  gap: 8px;
+  padding: 9px 0;
+  gap: 10px;
+}
+
+/* X17-b 세로 라벨 — App Shell.dc.html L114 정본. writing-mode vertical-rl
+   + rotate(180deg)로 아래→위 읽기. #9aa2ac = text.secondary 정확 일치. */
+.dock-rail-label {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+/* X17-b code 컴파일 에러 dot — App Shell.dc.html L115 정본.
+   #f0555c = semantic.error 정확 일치(글로우 포함). */
+.dock-rail-error-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--error);
+  box-shadow: 0 0 6px var(--error);
+  flex-shrink: 0;
 }
 
 .inspector-section {
@@ -676,30 +707,37 @@ textarea {
    bare `<>...</>` fragment they used to render as (2 direct strip children).
    `.stage-tabs` hits its own min-content floor (two single-token labels,
    "vertex.glsl"/"fragment.glsl", can't wrap) well before the strip runs out
-   of room, and `.code-auto-toggle`'s `flex-shrink:0` + `white-space:nowrap`
-   (below) mean it never gives up space either — so this pair is the only
-   remaining slack in the row. Giving *this wrapper* (not just the
-   breadcrumb chip inside it) `min-width:0` lets the flex algorithm size it
-   all the way down to 0 instead of floor-ing at the divider's 1px + the
-   chip's own padding/border (~19px) — and `overflow:hidden` clips whatever
-   of the divider/chip's content still wants to render at that point cleanly
-   (no stray icon/text spilling into the toggle's space). Un-wrapped, this
-   pair used to survive at a fixed ~19-30px even when there was no room left
-   for it, which was exactly the slack the toggle needed back. */
+   of room, so this pair is the primary remaining slack in the row. Giving
+   *this wrapper* (not just the breadcrumb chip inside it) `min-width:0`
+   lets the flex algorithm size it all the way down to 0 instead of
+   floor-ing at the divider's 1px + the chip's own padding/border (~19px) —
+   and `overflow:hidden` clips whatever of the divider/chip's content still
+   wants to render at that point cleanly (no stray icon/text spilling into
+   the toggle's space). Un-wrapped, this pair used to survive at a fixed
+   ~19-30px even when there was no room left for it, which was exactly the
+   slack the toggle needed back.
+   X2 — `flex-shrink:100000;` (below) makes this wrapper shrink far more
+   aggressively than `.code-auto-toggle` (shrink:1): meta is squeezed to 0
+   *first*, and only once that slack is exhausted does the toggle (and its
+   label) start giving up width. */
 .code-stage-strip-meta {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
   overflow: hidden;
+  /* X2 — 토글(shrink:1)보다 압도적 우선으로 양보: meta가 0까지 소진된
+     극한 폭에서만 토글 라벨이 ellipsis 된다. */
+  flex-shrink: 100000;
 }
 
-/* W5 — Code 헤더 Auto-open 토글 (App Shell.dc.html L943-945). dc hex →
+/* W5 — Code 헤더 Auto-open 토글 (App Shell.dc.html L959-962). dc hex →
    토큰 매핑: #2b6fe0=accent-active · #1c3452=accent-muted · #7dbcff=
    accent-bright(S26) · #20242a=border-default · #1a1d22=surface-card ·
    #9aa2ac=text-secondary · dot #3d9bff=accent-default · #454c55=
    text-disabled. glow rgba(61,155,255,.6)는 color-mix 60% 근사(기존
-   L1091+ 관례). radius 6 = var(--radius-chip). */
+   L1091+ 관례). radius 6 = var(--radius-chip).
+   [X2] 라벨 'Auto-open: ON/OFF' → 'Auto: ON/OFF' 단축(CHANGELOG §v2.1). */
 .code-auto-toggle {
   margin-left: auto;
   display: flex;
@@ -716,23 +754,25 @@ textarea {
   border: 1px solid var(--border-default);
   background: var(--surface-card);
   color: var(--text-secondary);
-  /* M3 regression fix: this is a trailing, fixed-purpose control in
-     `.code-stage-strip` (same "right-side control must not shrink"
-     principle as the strip-overflow note below at L~636). Without
-     `flex-shrink:0`, the flex algorithm's default `min-width:auto` on
-     this item is only the *largest unbreakable word* ("Auto-open:" or
-     "ON") — not the full label — so the strip was willing to squeeze
-     this button down to a near-zero width, wrapping the label onto
-     multiple lines that then got clipped by the fixed 20px height,
-     leaving only the always-`flex-shrink:0` dot visible (a "sliver").
-     `white-space:nowrap` additionally forces this item's min-content
-     size to the full label width so it never wraps in the first place;
-     `flex-shrink:0` then guarantees the strip never asks it to go
-     narrower than that. The breadcrumb (NodeBreadcrumb, CodeEditor/
-     index.tsx) is the one that yields space instead, via its own
-     `min-width:0` + ellipsis truncation. */
-  flex-shrink: 0;
+  /* X2 — 정상 상태는 단축 라벨('Auto: ON/OFF')+nowrap으로 완전 해소
+     (34px·0 12px 스트립에서 안 넘침). 극한 폭(스테이지 탭에 에러 dot
+     2개, vertex+fragment 동시 에러)에서는 `.code-stage-strip-meta`가
+     먼저 0까지 양보(위 flex-shrink 우선순위)한 뒤에야 이 버튼이 줄고,
+     라벨 span(.code-auto-toggle-label, 아래)이 ellipsis 된다.
+     `white-space:nowrap`은 이 아이템의 min-content를 전체 라벨 폭으로
+     고정해 줄바꿈을 막고, `min-width:0`은 그 nowrap이 만드는
+     전체-라벨 min-content 바닥을 풀어 shrink:1이 실제로 작동하게
+     하는 스위치다(풀지 않으면 flex-shrink는 min-content 밑으로는
+     못 줄어든다). */
+  flex-shrink: 1;
+  min-width: 0;
   white-space: nowrap;
+}
+/* X2 — 극한 폭에서만 잘리는 라벨. white-space:nowrap은 버튼에서 상속. */
+.code-auto-toggle-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .code-auto-toggle--on {
   border-color: var(--accent-active);
@@ -1605,9 +1645,9 @@ textarea {
   z-index: 50;
   display: flex;
   flex-direction: column;
-  /* dc L210 bg #0d0f12 — 대응 토큰 없음, surface.panel(#131519) 근사
-     (followup 기록). */
-  background: var(--surface-panel);
+  /* dc App Shell L419 #0f1114 = surface.rail 정확 일치 — 오버레이 본문+스트립
+     rail 톤 통일 [X10 §v2.1]. (구 v1.4의 surface.panel 근사를 정정.) */
+  background: var(--surface-rail);
   border-top: 1px solid var(--border-default); /* dc #20242a 정확 일치 */
 }
 .status-overlay-header {
@@ -3496,15 +3536,15 @@ textarea {
      color-mix pattern follows the existing .cmdk-overlay convention above. */
   background: color-mix(in srgb, var(--surface-app) 82%, transparent);
   border: 1px solid var(--border-default);
-  /* dc 실측 10px이 radius.skeletonStatus로 정본화 — radius.overlay(9) 근사를
-     대체 [B-6]. */
-  border-radius: var(--radius-skeleton-status);
+  /* dc 실측 10px이 radius.floatingPill로 정본화 — radius.overlay(9) 근사를
+     대체 [B-6·X14]. */
+  border-radius: var(--radius-floating-pill);
   padding: 9px 14px;
   /* literal blur, matches .modal-scrim (L3181) — blur isn't tokenized. */
   backdrop-filter: blur(6px);
-  /* dc 실측 blur 24가 shadow.skeletonStatus로 정본화 — shadow.nodeCard(blur 20)
-     근사를 대체. nodeCard와 같은 offset/alpha 패밀리 [B-6]. */
-  box-shadow: var(--shadow-skeleton-status);
+  /* dc 실측 blur 24가 shadow.floatingPill로 정본화 — shadow.nodeCard(blur 20)
+     근사를 대체. nodeCard와 같은 offset/alpha 패밀리 [B-6·X14]. */
+  box-shadow: var(--shadow-floating-pill);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-secondary);
@@ -3523,7 +3563,7 @@ textarea {
    dc `background:rgba(19,21,25,0.92)` == tokens.surface.panel(#131519) at
    92% alpha; color-mix pattern follows the .graph-skeleton-status (L3416)
    convention above. dc `border-radius:10px` + `box-shadow:0 8px
-   24px rgba(0,0,0,0.5)` match radius/shadow.skeletonStatus exactly — reused
+   24px rgba(0,0,0,0.5)` match radius/shadow.floatingPill exactly — reused
    rather than adding a new token (S26 adds exactly 6, no more). `blur(8px)`
    is a non-tokenized literal (see .graph-skeleton-status's blur(6px)
    convention, L3423).
@@ -3552,10 +3592,10 @@ textarea {
   gap: 3px;
   background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-skeleton-status);
+  border-radius: var(--radius-floating-pill);
   padding: 4px;
   backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-skeleton-status);
+  box-shadow: var(--shadow-floating-pill);
 }
 .add-node-pill-btn {
   display: flex;

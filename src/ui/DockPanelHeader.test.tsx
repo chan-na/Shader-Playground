@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useDiagnosticsStore } from "../state/diagnosticsStore";
 import { useDockStore } from "../state/dockStore";
 import {
   collectPanelIds,
@@ -395,6 +396,102 @@ describe("DockPanelHeader", () => {
       expect(
         screen.getByRole("button", { name: "Close panel" }),
       ).not.toBeNull();
+    });
+  });
+
+  // X17: the collapsed 34px rail is no longer chrome-only (grip only) — it
+  // now renders a full identity interior (panel dot + vertical "title · meta"
+  // label + a code-only compile error dot), App Shell.dc.html L109-117.
+  describe("rail interior (X17)", () => {
+    afterEach(() => {
+      useDiagnosticsStore.getState().reset();
+    });
+
+    it("collapsed code rail renders the vertical title · meta label", () => {
+      render(
+        withLeaf(
+          "l4",
+          ["a"],
+          <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end" />,
+        ),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+
+      const label = screen.getByTestId("dock-rail-label");
+      expect(label.textContent).toBe("Code · GLSL · ES 3.0");
+      expect(label.className).toBe("dock-rail-label");
+    });
+
+    it("expanded header renders no rail interior", () => {
+      render(
+        withLeaf(
+          "l4",
+          ["a"],
+          <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end" />,
+        ),
+      );
+
+      expect(screen.queryByTestId("dock-rail-label")).toBeNull();
+      expect(screen.queryByTestId("dock-rail-error-dot")).toBeNull();
+    });
+
+    it("meta-less rail label falls back to the title alone", () => {
+      render(withLeaf("l3", ["b", "a"], <DockPanelHeader />));
+      fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+
+      expect(screen.getByTestId("dock-rail-label").textContent).toBe(
+        "Node Editor",
+      );
+    });
+
+    it("code rail shows the error dot when diagnostics hold an error", () => {
+      useDiagnosticsStore.getState().set("n1", {
+        vertex: [{ line: 1, severity: "error", message: "boom" }],
+        fragment: [],
+        link: [],
+      });
+      render(withLeaf("l4", ["a"], <DockPanelHeader />));
+      fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+
+      const dot = screen.getByTestId("dock-rail-error-dot");
+      expect(dot).not.toBeNull();
+      expect(dot.getAttribute("title")).toBe("1 compile error");
+    });
+
+    it("code rail shows no error dot for warning-only diagnostics", () => {
+      useDiagnosticsStore.getState().set("n1", {
+        vertex: [{ line: 1, severity: "warning", message: "careful" }],
+        fragment: [],
+        link: [],
+      });
+      render(withLeaf("l4", ["a"], <DockPanelHeader />));
+      fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+
+      expect(screen.queryByTestId("dock-rail-error-dot")).toBeNull();
+    });
+
+    it("non-code rail never shows the error dot", () => {
+      useDiagnosticsStore.getState().set("n1", {
+        vertex: [{ line: 1, severity: "error", message: "boom" }],
+        fragment: [],
+        link: [],
+      });
+      render(withLeaf("l3", ["b", "a"], <DockPanelHeader />));
+      fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+
+      expect(screen.getByTestId("dock-rail-label")).not.toBeNull();
+      expect(screen.queryByTestId("dock-rail-error-dot")).toBeNull();
+    });
+
+    it("rail keeps the expand chevron and mechanism-side chrome untouched", () => {
+      render(withLeaf("l4", ["a"], <DockPanelHeader />));
+      fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
+
+      const expandBtn = screen.getByRole("button", { name: "Expand panel" });
+      expect(expandBtn).not.toBeNull();
+      expect(expandBtn.parentElement?.className).toBe(
+        "dock-header dock-header--rail",
+      );
     });
   });
 

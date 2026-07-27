@@ -1,7 +1,102 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered, readCanvasStats } from "./helpers/canvas";
 import { bootApp, setGraph } from "./helpers/fixtures";
 import { readSp, waitForRev, withSp } from "./helpers/sp";
+
+const handleSel = (nodeId: string, handleId: string) =>
+  `.react-flow__handle[data-nodeid="${nodeId}"][data-handleid="${handleId}"]`;
+
+/** Resolve a handle's viewport box once it stops moving. Every graph mutation
+ *  bumps `rev`, which re-runs the editor's animated fitView (MOTION_MAX_MS) —
+ *  a box read mid-animation points at where the port *was*. */
+async function stableBox(
+  page: Page,
+  sel: string,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  let previous = "";
+  await expect
+    .poll(
+      async () => {
+        const box = await page.locator(sel).boundingBox();
+        const key = box ? `${Math.round(box.x)}:${Math.round(box.y)}` : "";
+        const settled = key !== "" && key === previous;
+        previous = key;
+        return settled;
+      },
+      { message: `handle ${sel} never settled`, intervals: [80] },
+    )
+    .toBe(true);
+  const box = await page.locator(sel).boundingBox();
+  if (!box) throw new Error(`missing handle ${sel}`);
+  return box;
+}
+
+/**
+ * Drag a real connection between two port handles, pointer-event faithful:
+ * React Flow starts the drag on pointerdown, resolves the drop target on
+ * pointermove, and commits on pointerup — a synthetic click can't stand in.
+ *
+ * `dropOffsetX` shifts the release point away from the port center. A non-zero
+ * offset that still sits inside React Flow's 20px `connectionRadius` is the
+ * meaningful test: landing dead-center also succeeds through RF's
+ * `elementFromPoint` fallback, so only an off-center drop proves the handle is
+ * actually registered in the store. `beforeRelease` runs while the button is
+ * still down, for asserting the in-drag highlight.
+ */
+async function dragConnection(
+  page: Page,
+  fromSel: string,
+  toSel: string,
+  options: {
+    dropOffsetX?: number;
+    beforeRelease?: () => Promise<void>;
+  } = {},
+): Promise<void> {
+  const from = await stableBox(page, fromSel);
+  const to = await stableBox(page, toSel);
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    to.x + to.width / 2 + (options.dropOffsetX ?? 0),
+    to.y + to.height / 2,
+    { steps: 25 },
+  );
+  await options.beforeRelease?.();
+  await page.mouse.up();
+}
+
+/** Edges landing on a given target port, read straight from the graph store. */
+async function edgesInto(
+  page: Page,
+  nodeId: string,
+  handleId: string,
+): Promise<Array<{ source: string; sourceHandle: string }>> {
+  return withSp(
+    page,
+    (sp, args) =>
+      sp.graph
+        .getState()
+        .edges.filter(
+          (e) => e.target === args.nodeId && e.targetHandle === args.handleId,
+        )
+        .map((e) => ({ source: e.source, sourceHandle: e.sourceHandle })),
+    { nodeId, handleId },
+  );
+}
+
+const FRAG_ONE_UNIFORM = `#version 300 es
+precision highp float;
+uniform float u_a;
+out vec4 fragColor;
+void main() { fragColor = vec4(u_a, 0.0, 0.0, 1.0); }`;
+
+const FRAG_TWO_UNIFORMS = `#version 300 es
+precision highp float;
+uniform float u_a;
+uniform float u_b;
+out vec4 fragColor;
+void main() { fragColor = vec4(u_a, u_b, 0.0, 1.0); }`;
 
 test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
   test.beforeEach(async ({ page }) => {
@@ -32,6 +127,112 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
     await expect(page.locator("[data-id='extra1']")).toBeVisible({
       timeout: 5_000,
     });
+  });
+
+  // Regression: a ShaderNode's input ports are derived from its GLSL uniforms,
+  // so declaring one mid-session adds a <Handle> that React Flow never
+  // measured. RF resolves connection drags against its cached handle bounds
+  // and only refreshes them on mount / on a size change — and a shader card
+  // under ~5 ports keeps its 96px thumbnail floor, so the new port changes no
+  // dimension. Without an explicit updateNodeInternals the port renders but
+  // stays unreachable: an off-center drop inside the connection radius is
+  // discarded and a drag *from* the port never even starts (only a
+  // pixel-perfect drop onto the dot survives, via RF's elementFromPoint
+  // fallback). See nodes/usePortInternals.ts.
+  test("a shader input port added by a source edit is immediately connectable", async ({
+    page,
+  }) => {
+    await setGraph(
+      page,
+      {
+        nodes: [
+          { id: "p1", kind: "param", paramKind: "float", value: 0.5 },
+          {
+            id: "s1",
+            kind: "shader",
+            vertexSource: "",
+            fragmentSource: FRAG_ONE_UNIFORM,
+            uniformValues: {},
+          },
+          { id: "o1", kind: "output" },
+        ],
+        edges: [
+          {
+            id: "eo",
+            source: "s1",
+            sourceHandle: "texture",
+            target: "o1",
+            targetHandle: "texture",
+          },
+        ],
+      },
+      {
+        p1: { x: 40, y: 320 },
+        s1: { x: 380, y: 60 },
+        o1: { x: 760, y: 60 },
+      },
+    );
+    await expect(page.locator(handleSel("s1", "u_a"))).toHaveCount(1);
+
+    const before = await readSp(page, (sp) => sp.graph.getState().rev);
+    await withSp(
+      page,
+      (sp, args) => {
+        sp.graph
+          .getState()
+          .updateShaderSource("s1", { fragmentSource: args.frag });
+      },
+      { frag: FRAG_TWO_UNIFORMS },
+    );
+    await waitForRev(page, before);
+    // The port exists in the DOM either way — the bug was that only the DOM
+    // knew about it.
+    await expect(page.locator(handleSel("s1", "u_b"))).toHaveCount(1);
+
+    // Drop 10px left of the port center: inside RF's 20px connectionRadius,
+    // outside the 11px dot — so this only lands if the store knows the handle.
+    await dragConnection(
+      page,
+      handleSel("p1", "value"),
+      handleSel("s1", "u_b"),
+      {
+        dropOffsetX: -10,
+        beforeRelease: async () => {
+          // `connectingto` is driven by connection.toHandle, which RF resolves
+          // from its handle bounds — the highlight IS the registration proof.
+          await expect(page.locator(handleSel("s1", "u_b"))).toHaveClass(
+            /connectingto/,
+          );
+        },
+      },
+    );
+    expect(await edgesInto(page, "s1", "u_b")).toEqual([
+      { source: "p1", sourceHandle: "value" },
+    ]);
+
+    // The reverse direction exercises the other half: a drag that *starts* on
+    // an unregistered handle is dropped before it begins.
+    await withSp(
+      page,
+      (sp) => {
+        for (const e of sp.graph.getState().edges) {
+          if (e.target === "s1" && e.targetHandle === "u_b") {
+            sp.graph.getState().removeEdge(e.id);
+          }
+        }
+      },
+      undefined,
+    );
+    expect(await edgesInto(page, "s1", "u_b")).toEqual([]);
+
+    await dragConnection(
+      page,
+      handleSel("s1", "u_b"),
+      handleSel("p1", "value"),
+    );
+    expect(await edgesInto(page, "s1", "u_b")).toEqual([
+      { source: "p1", sourceHandle: "value" },
+    ]);
   });
 
   test("cycle is rejected by validateGraph (would-be edge prevents compile)", async ({

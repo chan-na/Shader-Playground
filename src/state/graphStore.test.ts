@@ -164,6 +164,174 @@ describe("graphStore", () => {
     expect(node.fragmentSource).toBe("B");
   });
 
+  describe("retired ports drop their edges", () => {
+    const FRAG_WITH_U_B = `precision highp float;
+uniform float u_a;
+uniform float u_b;
+void main(){}`;
+    const FRAG_WITHOUT_U_B = `precision highp float;
+uniform float u_a;
+void main(){}`;
+
+    /** Shader with u_a/u_b fed by two params, plus an unrelated edge. */
+    function seedShaderGraph() {
+      const s = useGraphStore.getState();
+      s.addNode(makeShader("s1", FRAG_WITH_U_B));
+      s.addNode({ id: "p1", kind: "param", paramKind: "float", value: 0.1 });
+      s.addNode({ id: "p2", kind: "param", paramKind: "float", value: 0.2 });
+      s.addNode({ id: "o1", kind: "output" });
+      s.addEdge({
+        id: "ea",
+        source: "p1",
+        sourceHandle: "value",
+        target: "s1",
+        targetHandle: "u_a",
+      });
+      s.addEdge({
+        id: "eb",
+        source: "p2",
+        sourceHandle: "value",
+        target: "s1",
+        targetHandle: "u_b",
+      });
+      s.addEdge({
+        id: "eo",
+        source: "s1",
+        sourceHandle: "texture",
+        target: "o1",
+        targetHandle: "texture",
+      });
+    }
+
+    it("updateShaderSource drops the edge into a deleted uniform", () => {
+      seedShaderGraph();
+      useGraphStore
+        .getState()
+        .updateShaderSource("s1", { fragmentSource: FRAG_WITHOUT_U_B });
+      expect(useGraphStore.getState().edges.map((e) => e.id)).toEqual([
+        "ea",
+        "eo",
+      ]);
+    });
+
+    it("updateShaderSource keeps edges when no port is retired", () => {
+      seedShaderGraph();
+      const before = useGraphStore.getState().edges;
+      useGraphStore.getState().updateShaderSource("s1", {
+        fragmentSource: `${FRAG_WITH_U_B}\n// touched`,
+      });
+      // Same reference — a no-op prune must not churn edge identity.
+      expect(useGraphStore.getState().edges).toBe(before);
+    });
+
+    it("undo restores an edge dropped by a uniform deletion", () => {
+      seedShaderGraph();
+      useGraphStore
+        .getState()
+        .updateShaderSource("s1", { fragmentSource: FRAG_WITHOUT_U_B });
+      expect(useGraphStore.getState().edges).toHaveLength(2);
+
+      expect(undoGraph()).toBe(true);
+      expect(useGraphStore.getState().edges.map((e) => e.id)).toEqual([
+        "ea",
+        "eb",
+        "eo",
+      ]);
+    });
+
+    it("setMathConfig drops the `b` edge when switching to a unary op", () => {
+      const s = useGraphStore.getState();
+      const mn: MathGraphNode = {
+        id: "m1",
+        kind: "math",
+        op: "add",
+        a: 0,
+        b: 0,
+      };
+      s.addNode(mn);
+      s.addNode({ id: "p1", kind: "param", paramKind: "float", value: 0.1 });
+      s.addEdge({
+        id: "ea",
+        source: "p1",
+        sourceHandle: "value",
+        target: "m1",
+        targetHandle: "a",
+      });
+      s.addEdge({
+        id: "eb",
+        source: "p1",
+        sourceHandle: "value",
+        target: "m1",
+        targetHandle: "b",
+      });
+
+      useGraphStore.getState().setMathConfig("m1", { op: "sin" });
+      expect(useGraphStore.getState().edges.map((e) => e.id)).toEqual(["ea"]);
+    });
+
+    it("setCombineConfig drops channels above a lowered arity", () => {
+      const s = useGraphStore.getState();
+      const cn: CombineGraphNode = {
+        id: "c1",
+        kind: "combine",
+        arity: 4,
+        values: [0, 0, 0, 0],
+      };
+      s.addNode(cn);
+      s.addNode({ id: "p1", kind: "param", paramKind: "float", value: 0.1 });
+      for (const ch of ["x", "y", "z", "w"]) {
+        s.addEdge({
+          id: `e${ch}`,
+          source: "p1",
+          sourceHandle: "value",
+          target: "c1",
+          targetHandle: ch,
+        });
+      }
+
+      useGraphStore.getState().setCombineConfig("c1", { arity: 2 });
+      expect(useGraphStore.getState().edges.map((e) => e.id)).toEqual([
+        "ex",
+        "ey",
+      ]);
+    });
+
+    it("updateComputeSource drops the edge into a deleted uniform", () => {
+      const s = useGraphStore.getState();
+      const cn: ComputeGraphNode = {
+        id: "cp1",
+        kind: "compute",
+        vertexSource:
+          "uniform float u_speed;\nuniform float u_drag;\nvoid main(){}",
+        count: 16,
+        primitive: "POINTS",
+        attributes: [],
+        uniformValues: {},
+      };
+      s.addNode(cn);
+      s.addNode({ id: "p1", kind: "param", paramKind: "float", value: 0.1 });
+      s.addEdge({
+        id: "e1",
+        source: "p1",
+        sourceHandle: "value",
+        target: "cp1",
+        targetHandle: "u_speed",
+      });
+      s.addEdge({
+        id: "e2",
+        source: "p1",
+        sourceHandle: "value",
+        target: "cp1",
+        targetHandle: "u_drag",
+      });
+
+      useGraphStore
+        .getState()
+        .updateComputeSource("cp1", "uniform float u_speed;\nvoid main(){}");
+      expect(useGraphStore.getState().edges.map((e) => e.id)).toEqual(["e1"]);
+    });
+  });
+
   it("setUniformValue bumps uniformRev not rev", () => {
     useGraphStore.getState().addNode(makeShader("s1"));
     const before = useGraphStore.getState();

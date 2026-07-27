@@ -13,6 +13,7 @@ import {
   PORT_TOP_PAD,
   PortHandle,
 } from "./PortHandle";
+import { usePortInternals } from "./usePortInternals";
 
 export function ShaderNodeView({ id, data }: NodeProps) {
   const node = data.node as ShaderGraphNode;
@@ -24,6 +25,9 @@ export function ShaderNodeView({ id, data }: NodeProps) {
     () => NODE_META.shader.inputs(node),
     [node.vertexSource, node.fragmentSource, node],
   );
+  // Editing the shader source adds/removes/reorders input ports; tell React
+  // Flow so the new handles become connectable.
+  usePortInternals(id, inputs);
 
   return (
     <div

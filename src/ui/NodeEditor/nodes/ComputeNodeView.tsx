@@ -12,6 +12,7 @@ import {
   PORT_TOP_PAD,
   PortHandle,
 } from "./PortHandle";
+import { usePortInternals } from "./usePortInternals";
 
 /** label mono 10px muted / value mono 11px primary, space-between — mirrors
  * design/Node Editor.dc.html L221-225's particles/dispatch/buffer rows. */
@@ -31,6 +32,9 @@ export function ComputeNodeView({ id, data }: NodeProps) {
   );
 
   const inputs = useMemo(() => NODE_META.compute.inputs(node), [node]);
+  // Editing the compute source adds/removes/reorders input ports; tell React
+  // Flow so the new handles become connectable.
+  usePortInternals(id, inputs);
 
   return (
     <div

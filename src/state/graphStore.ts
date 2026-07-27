@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { pruneEdgesForNode } from "../core/graph/edgePrune";
 import {
   allDescendants,
   getAbsolutePosition,
@@ -194,6 +195,23 @@ export interface GraphState {
   }) => void;
 }
 
+/**
+ * Edges after `id`'s port surface was re-derived. Every mutator that can
+ * *retire* a port (a uniform deleted or renamed, Math switched to a unary op,
+ * Combine's arity lowered) must route its next edge list through this, or the
+ * graph keeps edges pointing at ports that no longer exist — see
+ * core/graph/edgePrune for what those cost. Returns the same array reference
+ * when nothing is dropped.
+ */
+function prunedEdges(
+  id: string,
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+): GraphEdge[] {
+  const node = nodes.find((n) => n.id === id);
+  return node ? pruneEdgesForNode(node, edges) : edges;
+}
+
 function pushHistory(s: GraphState) {
   useHistoryStore.getState().push({
     nodes: s.nodes.map((n) => ({ ...n })),
@@ -326,8 +344,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     }),
   updateShaderSource: (id, patch) => {
     pushHistory(get());
-    set((s) => ({
-      nodes: s.nodes.map((n) => {
+    set((s) => {
+      const nodes = s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "shader") return n;
         const sn = n as ShaderGraphNode;
         return {
@@ -335,9 +353,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           vertexSource: patch.vertexSource ?? sn.vertexSource,
           fragmentSource: patch.fragmentSource ?? sn.fragmentSource,
         };
-      }),
-      rev: s.rev + 1,
-    }));
+      });
+      // Deleting or renaming a uniform retires its input port.
+      return { nodes, edges: prunedEdges(id, nodes, s.edges), rev: s.rev + 1 };
+    });
   },
   setUniformValue: (id, name, value) =>
     set((s) => ({
@@ -401,8 +420,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     })),
   setMathConfig: (id, patch) => {
     pushHistory(get());
-    set((s) => ({
-      nodes: s.nodes.map((n) => {
+    set((s) => {
+      const nodes = s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "math") return n;
         const mn = n as MathGraphNode;
         return {
@@ -411,9 +430,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           a: patch.a ?? mn.a,
           b: patch.b ?? mn.b,
         } as MathGraphNode;
-      }),
-      rev: s.rev + 1,
-    }));
+      });
+      // Switching to a unary op retires the `b` port.
+      return { nodes, edges: prunedEdges(id, nodes, s.edges), rev: s.rev + 1 };
+    });
   },
   setSwizzleMask: (id, mask) => {
     pushHistory(get());
@@ -427,8 +447,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
   setCombineConfig: (id, patch) => {
     pushHistory(get());
-    set((s) => ({
-      nodes: s.nodes.map((n) => {
+    set((s) => {
+      const nodes = s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "combine") return n;
         const cn = n as CombineGraphNode;
         return {
@@ -443,19 +463,21 @@ export const useGraphStore = create<GraphState>((set, get) => ({
               ]
             : cn.values,
         } as CombineGraphNode;
-      }),
-      rev: s.rev + 1,
-    }));
+      });
+      // Lowering the arity retires the channels above it.
+      return { nodes, edges: prunedEdges(id, nodes, s.edges), rev: s.rev + 1 };
+    });
   },
   updateComputeSource: (id, vertexSource) => {
     pushHistory(get());
-    set((s) => ({
-      nodes: s.nodes.map((n) => {
+    set((s) => {
+      const nodes = s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "compute") return n;
         return { ...(n as ComputeGraphNode), vertexSource } as ComputeGraphNode;
-      }),
-      rev: s.rev + 1,
-    }));
+      });
+      // Deleting or renaming a uniform retires its input port.
+      return { nodes, edges: prunedEdges(id, nodes, s.edges), rev: s.rev + 1 };
+    });
   },
   setComputeConfig: (id, patch) => {
     pushHistory(get());

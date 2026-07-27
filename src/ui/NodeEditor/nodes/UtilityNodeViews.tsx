@@ -15,12 +15,15 @@ import { isValidSwizzleMask } from "../../../core/nodes/utility";
 import { useGraphStore } from "../../../state/graphStore";
 import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_STRIDE, PORT_TOP_PAD, PortHandle } from "./PortHandle";
+import { usePortInternals } from "./usePortInternals";
 import { NumberField } from "./ValueInput";
 
 export function MathNodeView({ id, data }: NodeProps) {
   const node = data.node as MathGraphNode;
   const setMathConfig = useGraphStore((s) => s.setMathConfig);
   const inputs = mathInputPorts(node.op);
+  // Switching between unary and binary ops drops/restores the `b` port.
+  usePortInternals(id, inputs);
 
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 172 }}>
@@ -119,6 +122,8 @@ export function CombineNodeView({ id, data }: NodeProps) {
   const setCombineConfig = useGraphStore((s) => s.setCombineConfig);
   const inputs = combineInputPorts(node.arity);
   const out = combineOutputPort(node.arity);
+  // Arity picks how many of x/y/z/w render as ports.
+  usePortInternals(id, inputs);
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 176 }}>
       <NodeCardHeader

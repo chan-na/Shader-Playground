@@ -1,3 +1,4 @@
+import { pruneDeadEdges } from "../core/graph/edgePrune";
 import type { ParentsMap } from "../core/graph/parents";
 import type { Graph, GraphEdge, GraphNode } from "../core/graph/types";
 import { SANITIZE_LIMITS } from "../core/graph/types";
@@ -122,17 +123,33 @@ export function deserializeProject(raw: unknown): DeserializedProject {
     if (e) sanitizedEdges.push(e);
     else warnings.push("Edge dropped: malformed shape");
   }
-  const sanitizedGraph: Graph = {
+  // Validate what the payload claimed, before anything below removes edges —
+  // an edge can be both dead and pointing at a missing node, and the file
+  // deserves the report for both.
+  const errors = validateGraph({
     nodes: sanitizedNodes,
     edges: sanitizedEdges,
-  };
-
-  const errors = validateGraph(sanitizedGraph);
+  });
   for (const e of errors) {
     if (e.code === "missing_node" || e.code === "multiple_outputs") {
       warnings.push(`Validation: ${e.message}`);
     }
   }
+
+  // Ports are re-derived from node state (a shader's uniforms, Math's op,
+  // Combine's arity), so a payload written before an edit retired a port — or
+  // by a build that didn't reconcile edges on edit at all — can carry edges
+  // into ports that no longer exist. They are invisible but not inert (see
+  // core/graph/edgePrune), and nothing else on this path removes them, so drop
+  // them here and say which port went missing.
+  const live = pruneDeadEdges(sanitizedNodes, sanitizedEdges);
+  for (const d of live.dropped) {
+    warnings.push(`Edge dropped: ${d.nodeId} has no port '${d.handle}'`);
+  }
+  const sanitizedGraph: Graph = {
+    nodes: sanitizedNodes,
+    edges: live.edges,
+  };
 
   // Sanitize parents: drop entries with unknown ids, self-cycles, and any
   // chain that loops. The walk caps at MAX_DEPTH to defend against malformed

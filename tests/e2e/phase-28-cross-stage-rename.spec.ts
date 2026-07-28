@@ -339,6 +339,77 @@ void main() {
       .toBe(before + 1);
   });
 
+  test("cross-stage rename carries the uniform's edge and tuned value", async ({
+    page,
+  }) => {
+    // The rename refactor passes the exact old→new pair with the both-stages
+    // patch, so the store moves the input port's edge instead of reading the
+    // old name as a deleted uniform.
+    const shaderId = await page.evaluate(
+      async ({ v, f }) => {
+        const sp = window.__sp;
+        if (!sp) throw new Error("__sp not exposed");
+        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
+        if (!node) throw new Error("no shader node");
+        sp.selection.getState().select(node.id);
+        sp.graph
+          .getState()
+          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
+        sp.graph.getState().addNode({
+          id: "p-xstage",
+          kind: "param",
+          paramKind: "float",
+          value: 0.25,
+        });
+        sp.graph.getState().addEdge({
+          id: "e-xstage",
+          source: "p-xstage",
+          sourceHandle: "value",
+          target: node.id,
+          targetHandle: "u_amount",
+        });
+        sp.graph.getState().setUniformValue(node.id, "u_amount", 0.5);
+        return node.id;
+      },
+      { v: VERT, f: FRAG },
+    );
+    await page.getByTestId("stage-tab-fragment").click();
+    const content = page.locator(".cm-content").first();
+    await expect
+      .poll(async () => (await content.textContent())?.includes("u_amount"))
+      .toBe(true);
+
+    const useToken = content.getByText("u_amount", { exact: true }).last();
+    await useToken.click();
+    page.once("dialog", (d) => {
+      void d.accept("u_strength");
+    });
+    await page.keyboard.press("F2");
+
+    await expect
+      .poll(async () =>
+        withSp(
+          page,
+          (sp, id: string) => {
+            const g = sp.graph.getState();
+            const node = g.nodes.find((n) => n.id === id) as
+              | { uniformValues?: Record<string, number | number[]> }
+              | undefined;
+            const e = g.edges.find((edge) => edge.id === "e-xstage");
+            return {
+              handle: e?.targetHandle ?? null,
+              value: node?.uniformValues?.u_strength ?? null,
+              staleKey: node?.uniformValues
+                ? "u_amount" in node.uniformValues
+                : true,
+            };
+          },
+          shaderId,
+        ),
+      )
+      .toEqual({ handle: "u_strength", value: 0.5, staleKey: false });
+  });
+
   test("cross-stage rename keeps the cursor in place (no offset-0 collapse)", async ({
     page,
   }) => {

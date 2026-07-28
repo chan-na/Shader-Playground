@@ -146,16 +146,22 @@ void main() {
       const view = viewOf(VERT, VERT.indexOf("u_amount") + 1);
       // Wrapper object so TS doesn't narrow the let to null after the
       // closure assignment (it can't statically prove the callback fires).
-      const captured: { origin: string | null; other: string | null } = {
+      const captured: {
+        origin: string | null;
+        other: string | null;
+        rename: { from: string; to: string } | null;
+      } = {
         origin: null,
         other: null,
+        rename: null,
       };
       const ctx: CrossStageRenameContext = {
         originStage: "vertex",
         otherStageSource: FRAG_X,
-        applyBothStages(newOrigin, newOther) {
+        applyBothStages(newOrigin, newOther, rename) {
           captured.origin = newOrigin;
           captured.other = newOther;
+          captured.rename = rename;
         },
       };
       const result = runRename(view, () => "u_strength", ctx);
@@ -174,6 +180,9 @@ void main() {
       expect(captured.other).not.toBeNull();
       expect(captured.other).not.toContain("u_amount");
       expect(captured.other?.match(/u_strength/g)?.length).toBe(2);
+      // …and the exact pair, so the store can move the uniform's input-port
+      // edge and tuned value instead of reading the old name as deleted.
+      expect(captured.rename).toEqual({ from: "u_amount", to: "u_strength" });
       view.destroy();
     });
 

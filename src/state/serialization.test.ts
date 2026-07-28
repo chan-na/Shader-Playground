@@ -282,6 +282,81 @@ describe("serializeProject / deserializeProject", () => {
     );
   });
 
+  it("drops an edge into a port the node no longer declares", () => {
+    // Saved before the uniform was renamed away (or by a build that didn't
+    // reconcile edges on edit): `u_gone` is not in the shader's source.
+    const restored = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      graph: {
+        nodes: [
+          {
+            id: "s1",
+            kind: "shader",
+            vertexSource: "void main(){ gl_Position = vec4(0); }",
+            fragmentSource:
+              "precision highp float;\nuniform float u_a;\nvoid main(){}",
+            uniformValues: {},
+          },
+          { id: "p1", kind: "param", paramKind: "float", value: 0.5 },
+          { id: "o1", kind: "output" },
+        ],
+        edges: [
+          {
+            id: "live",
+            source: "p1",
+            sourceHandle: "value",
+            target: "s1",
+            targetHandle: "u_a",
+          },
+          {
+            id: "dead",
+            source: "p1",
+            sourceHandle: "value",
+            target: "s1",
+            targetHandle: "u_gone",
+          },
+          {
+            id: "out",
+            source: "s1",
+            sourceHandle: "texture",
+            target: "o1",
+            targetHandle: "texture",
+          },
+        ],
+      },
+      positions: {},
+    });
+    expect(restored.graph.edges.map((e) => e.id)).toEqual(["live", "out"]);
+    expect(
+      restored.warnings.some((w) => w.includes("s1 has no port 'u_gone'")),
+    ).toBe(true);
+  });
+
+  it("keeps an edge whose node is missing, warning only", () => {
+    // `missing_node` stays a warn-don't-delete class — dropping the edge would
+    // also drop the only evidence that the node went missing.
+    const restored = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      graph: {
+        nodes: [{ id: "o1", kind: "output" }],
+        edges: [
+          {
+            id: "e1",
+            source: "ghost",
+            sourceHandle: "texture",
+            target: "o1",
+            targetHandle: "texture",
+          },
+        ],
+      },
+      positions: {},
+    });
+    expect(restored.graph.edges.map((e) => e.id)).toEqual(["e1"]);
+    expect(restored.warnings.some((w) => w.includes("Validation"))).toBe(true);
+  });
+
   it("clamps an oversized compute count from external payload", () => {
     const restored = deserializeProject({
       format: "shader-playground",

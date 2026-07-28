@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { pruneEdgesForNode } from "../core/graph/edgePrune";
+import type { PortRename } from "../core/graph/edgePrune";
+import { applyPortRename, pruneEdgesForNode } from "../core/graph/edgePrune";
 import {
   allDescendants,
   getAbsolutePosition,
@@ -87,9 +88,20 @@ export interface GraphState {
    * ignored.
    */
   nudgeNodes: (ids: string[], dx: number, dy: number) => void;
+  /**
+   * Replace one or both GLSL stages of a ShaderNode.
+   *
+   * `rename` is the F2 refactor's exact old→new uniform pair. Pass it whenever
+   * the patch is a rename: the node's port surface only shows "one port left,
+   * another appeared", and without the pair the reconcile falls back to
+   * inferring it from the surface (see `applyPortRename`). The pair is
+   * validated against the new surface, so a hint for a non-uniform symbol is
+   * simply ignored.
+   */
   updateShaderSource: (
     id: string,
     patch: { vertexSource?: string; fragmentSource?: string },
+    rename?: PortRename,
   ) => void;
   setUniformValue: (id: string, name: string, value: number | number[]) => void;
   /**
@@ -196,20 +208,50 @@ export interface GraphState {
 }
 
 /**
- * Edges after `id`'s port surface was re-derived. Every mutator that can
- * *retire* a port (a uniform deleted or renamed, Math switched to a unary op,
- * Combine's arity lowered) must route its next edge list through this, or the
+ * Nodes and edges after `id`'s port surface was re-derived. Every mutator that
+ * can *retire* a port (a uniform deleted or renamed, Math switched to a unary
+ * op, Combine's arity lowered) must route its next state through this, or the
  * graph keeps edges pointing at ports that no longer exist — see
- * core/graph/edgePrune for what those cost. Returns the same array reference
- * when nothing is dropped.
+ * core/graph/edgePrune for what those cost.
+ *
+ * A rename is handled before the prune: the edge follows the port to its new
+ * name and the node's tuned value follows with it, so only genuinely retired
+ * ports lose their wiring. Returns the same array references when nothing
+ * changed, so store subscribers keyed on identity don't re-render for a no-op.
  */
-function prunedEdges(
+function reconciled(
   id: string,
+  prevNodes: GraphNode[],
   nodes: GraphNode[],
   edges: GraphEdge[],
-): GraphEdge[] {
-  const node = nodes.find((n) => n.id === id);
-  return node ? pruneEdgesForNode(node, edges) : edges;
+  rename?: PortRename,
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const next = nodes.find((n) => n.id === id);
+  if (!next) return { nodes, edges };
+  const prev = prevNodes.find((n) => n.id === id);
+  const moved = applyPortRename(prev, next, edges, rename);
+  const applied = moved.rename;
+  return {
+    nodes: applied
+      ? nodes.map((n) => (n.id === id ? withRenamedUniform(n, applied) : n))
+      : nodes,
+    edges: pruneEdgesForNode(next, moved.edges),
+  };
+}
+
+/**
+ * Move a uniform's tuned value to the port's new name. `uniformValues` is
+ * keyed by uniform name, so without this a rename resets the Inspector to the
+ * declaration default and leaves the old key to accumulate in every save.
+ */
+function withRenamedUniform(node: GraphNode, rename: PortRename): GraphNode {
+  if (node.kind !== "shader" && node.kind !== "compute") return node;
+  const owner = node as ShaderGraphNode | ComputeGraphNode;
+  const value = owner.uniformValues[rename.from];
+  if (value === undefined) return node;
+  const uniformValues = { ...owner.uniformValues, [rename.to]: value };
+  delete uniformValues[rename.from];
+  return { ...owner, uniformValues };
 }
 
 function pushHistory(s: GraphState) {
@@ -342,10 +384,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }
       return changed ? { positions } : {};
     }),
-  updateShaderSource: (id, patch) => {
+  updateShaderSource: (id, patch, rename) => {
     pushHistory(get());
     set((s) => {
-      const nodes = s.nodes.map((n) => {
+      const patched = s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "shader") return n;
         const sn = n as ShaderGraphNode;
         return {
@@ -354,8 +396,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           fragmentSource: patch.fragmentSource ?? sn.fragmentSource,
         };
       });
-      // Deleting or renaming a uniform retires its input port.
-      return { nodes, edges: prunedEdges(id, nodes, s.edges), rev: s.rev + 1 };
+      // Deleting a uniform retires its input port; renaming one moves it.
+      const r = reconciled(id, s.nodes, patched, s.edges, rename);
+      return { nodes: r.nodes, edges: r.edges, rev: s.rev + 1 };
     });
   },
   setUniformValue: (id, name, value) =>
@@ -421,7 +464,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setMathConfig: (id, patch) => {
     pushHistory(get());
     set((s) => {
-      const nodes = s.nodes.map((n) => {
+      const patched = s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "math") return n;
         const mn = n as MathGraphNode;
         return {
@@ -432,7 +475,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         } as MathGraphNode;
       });
       // Switching to a unary op retires the `b` port.
-      return { nodes, edges: prunedEdges(id, nodes, s.edges), rev: s.rev + 1 };
+      const r = reconciled(id, s.nodes, patched, s.edges);
+      return { nodes: r.nodes, edges: r.edges, rev: s.rev + 1 };
     });
   },
   setSwizzleMask: (id, mask) => {
@@ -448,7 +492,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setCombineConfig: (id, patch) => {
     pushHistory(get());
     set((s) => {
-      const nodes = s.nodes.map((n) => {
+      const patched = s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "combine") return n;
         const cn = n as CombineGraphNode;
         return {
@@ -465,18 +509,22 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         } as CombineGraphNode;
       });
       // Lowering the arity retires the channels above it.
-      return { nodes, edges: prunedEdges(id, nodes, s.edges), rev: s.rev + 1 };
+      const r = reconciled(id, s.nodes, patched, s.edges);
+      return { nodes: r.nodes, edges: r.edges, rev: s.rev + 1 };
     });
   },
   updateComputeSource: (id, vertexSource) => {
     pushHistory(get());
     set((s) => {
-      const nodes = s.nodes.map((n) => {
+      const patched = s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "compute") return n;
         return { ...(n as ComputeGraphNode), vertexSource } as ComputeGraphNode;
       });
-      // Deleting or renaming a uniform retires its input port.
-      return { nodes, edges: prunedEdges(id, nodes, s.edges), rev: s.rev + 1 };
+      // Deleting a uniform retires its input port; renaming one moves it.
+      // A ComputeNode is single-document, so F2 commits through the editor
+      // debounce like hand typing does — the rename is always inferred here.
+      const r = reconciled(id, s.nodes, patched, s.edges);
+      return { nodes: r.nodes, edges: r.edges, rev: s.rev + 1 };
     });
   },
   setComputeConfig: (id, patch) => {

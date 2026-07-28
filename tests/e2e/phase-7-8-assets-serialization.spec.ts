@@ -95,6 +95,62 @@ test.describe("Phase 7-8 — assets & serialization", () => {
     expect(result.baseColorOut).toEqual(result.baseColorIn);
   });
 
+  test("deserialize drops an edge into a port the node no longer declares", async ({
+    page,
+  }) => {
+    // Projects saved before the port was retired (autosave, share URL,
+    // exported JSON) carry edges nothing can reconnect. They still cost a
+    // texture unit and keep upstream passes alive, so the load path drops
+    // them and says which port went missing.
+    const result = await page.evaluate(async () => {
+      const mod = await import(
+        // @ts-expect-error - dev-mode dynamic path
+        "/src/state/serialization.ts"
+      );
+      const parsed = mod.deserializeProject({
+        format: "shader-playground",
+        version: 1,
+        graph: {
+          nodes: [
+            {
+              id: "s1",
+              kind: "shader",
+              vertexSource: "void main(){ gl_Position = vec4(0); }",
+              fragmentSource:
+                "precision highp float;\nuniform float u_a;\nvoid main(){}",
+              uniformValues: {},
+            },
+            { id: "p1", kind: "param", paramKind: "float", value: 0.5 },
+          ],
+          edges: [
+            {
+              id: "live",
+              source: "p1",
+              sourceHandle: "value",
+              target: "s1",
+              targetHandle: "u_a",
+            },
+            {
+              id: "dead",
+              source: "p1",
+              sourceHandle: "value",
+              target: "s1",
+              targetHandle: "u_gone",
+            },
+          ],
+        },
+        positions: {},
+      });
+      return {
+        edgeIds: parsed.graph.edges.map((e: { id: string }) => e.id),
+        warnings: parsed.warnings as string[],
+      };
+    });
+
+    expect(result.edgeIds).toEqual(["live"]);
+    expect(result.warnings.some((w) => w.includes("u_gone"))).toBe(true);
+  });
+
   test("Image node placeholder renders when no asset bound", async ({
     page,
   }) => {

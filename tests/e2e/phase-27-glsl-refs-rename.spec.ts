@@ -183,6 +183,74 @@ void main() {
     expect(occurrences).toBe(3);
   });
 
+  test("F2 rename carries the uniform's edge and tuned value to the new name", async ({
+    page,
+  }) => {
+    // A uniform is also a node input port, so a rename retires one port and
+    // creates another. Without reconciliation the wiring silently disappears.
+    const shaderId = await page.evaluate(async (src) => {
+      const sp = window.__sp;
+      if (!sp) throw new Error("__sp not exposed");
+      const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
+      if (!node) throw new Error("no shader node");
+      sp.selection.getState().select(node.id);
+      sp.graph.getState().updateShaderSource(node.id, { fragmentSource: src });
+      sp.graph.getState().addNode({
+        id: "p-rename",
+        kind: "param",
+        paramKind: "float",
+        value: 0.25,
+      });
+      sp.graph.getState().addEdge({
+        id: "e-rename",
+        source: "p-rename",
+        sourceHandle: "value",
+        target: node.id,
+        targetHandle: "u_strength",
+      });
+      sp.graph.getState().setUniformValue(node.id, "u_strength", 0.75);
+      return node.id;
+    }, FRAG);
+    await page.getByTestId("stage-tab-fragment").click();
+
+    const content = page.locator(".cm-content").first();
+    await expect
+      .poll(async () => (await content.textContent())?.includes("u_strength"))
+      .toBe(true);
+
+    const useToken = content.getByText("u_strength", { exact: true }).last();
+    await useToken.click();
+    page.once("dialog", (d) => {
+      void d.accept("u_amount");
+    });
+    await page.keyboard.press("F2");
+
+    // The edge follows the port to its new name, and the Inspector value
+    // follows with it instead of resetting to the declaration default.
+    await expect
+      .poll(async () =>
+        withSp(
+          page,
+          (sp, id: string) => {
+            const g = sp.graph.getState();
+            const node = g.nodes.find((n) => n.id === id) as
+              | { uniformValues?: Record<string, number | number[]> }
+              | undefined;
+            const e = g.edges.find((edge) => edge.id === "e-rename");
+            return {
+              handle: e?.targetHandle ?? null,
+              value: node?.uniformValues?.u_amount ?? null,
+              staleKey: node?.uniformValues
+                ? "u_strength" in node.uniformValues
+                : true,
+            };
+          },
+          shaderId,
+        ),
+      )
+      .toEqual({ handle: "u_amount", value: 0.75, staleKey: false });
+  });
+
   test("active reference highlight paints occurrences when cursor lands on a symbol", async ({
     page,
   }) => {

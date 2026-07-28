@@ -332,6 +332,143 @@ void main(){}`;
     });
   });
 
+  describe("renamed ports keep their edges", () => {
+    const FRAG_U_A = `precision highp float;
+uniform float u_a;
+void main(){}`;
+    const FRAG_U_AMOUNT = `precision highp float;
+uniform float u_amount;
+void main(){}`;
+
+    /** Shader whose `u_a` is fed by a param and tuned in the Inspector. */
+    function seedRenameGraph() {
+      const s = useGraphStore.getState();
+      s.addNode(makeShader("s1", FRAG_U_A));
+      s.addNode({ id: "p1", kind: "param", paramKind: "float", value: 0.1 });
+      s.addEdge({
+        id: "ea",
+        source: "p1",
+        sourceHandle: "value",
+        target: "s1",
+        targetHandle: "u_a",
+      });
+      s.setUniformValue("s1", "u_a", 0.75);
+    }
+
+    const shaderNode = () =>
+      useGraphStore.getState().nodes.find((n) => n.id === "s1") as
+        | ShaderGraphNode
+        | undefined;
+
+    it("moves the edge and the tuned value onto the new uniform name", () => {
+      seedRenameGraph();
+      useGraphStore
+        .getState()
+        .updateShaderSource("s1", { fragmentSource: FRAG_U_AMOUNT });
+
+      expect(useGraphStore.getState().edges).toHaveLength(1);
+      expect(useGraphStore.getState().edges[0]?.targetHandle).toBe("u_amount");
+      // The old key must go, or it lingers in every save and the Inspector
+      // falls back to the declaration default for the new name.
+      expect(shaderNode()?.uniformValues).toEqual({ u_amount: 0.75 });
+    });
+
+    it("honours the exact pair the F2 refactor passes in", () => {
+      seedRenameGraph();
+      useGraphStore
+        .getState()
+        .updateShaderSource(
+          "s1",
+          { fragmentSource: FRAG_U_AMOUNT },
+          { from: "u_a", to: "u_amount" },
+        );
+      expect(useGraphStore.getState().edges[0]?.targetHandle).toBe("u_amount");
+      expect(shaderNode()?.uniformValues).toEqual({ u_amount: 0.75 });
+    });
+
+    it("keeps the rename undoable as a single step", () => {
+      seedRenameGraph();
+      useGraphStore
+        .getState()
+        .updateShaderSource("s1", { fragmentSource: FRAG_U_AMOUNT });
+      expect(undoGraph()).toBe(true);
+      expect(useGraphStore.getState().edges[0]?.targetHandle).toBe("u_a");
+      expect(shaderNode()?.uniformValues).toEqual({ u_a: 0.75 });
+    });
+
+    it("follows a rename typed one character at a time", () => {
+      // The editor commits on a 50ms debounce, so hand typing arrives as a
+      // chain of single-character renames rather than one edit.
+      seedRenameGraph();
+      for (const name of ["u_am", "u_amo", "u_amou", "u_amount"]) {
+        useGraphStore.getState().updateShaderSource("s1", {
+          fragmentSource: `precision highp float;
+uniform float ${name};
+void main(){}`,
+        });
+      }
+      expect(useGraphStore.getState().edges[0]?.targetHandle).toBe("u_amount");
+      expect(shaderNode()?.uniformValues).toEqual({ u_amount: 0.75 });
+    });
+
+    it("renames a ComputeNode uniform port the same way", () => {
+      const s = useGraphStore.getState();
+      s.addNode({
+        id: "cp1",
+        kind: "compute",
+        vertexSource: "uniform float u_speed;\nvoid main(){}",
+        count: 16,
+        primitive: "POINTS",
+        attributes: [],
+        uniformValues: {},
+      } as ComputeGraphNode);
+      s.addNode({ id: "p1", kind: "param", paramKind: "float", value: 0.1 });
+      s.addEdge({
+        id: "e1",
+        source: "p1",
+        sourceHandle: "value",
+        target: "cp1",
+        targetHandle: "u_speed",
+      });
+      s.setUniformValue("cp1", "u_speed", 2);
+
+      useGraphStore
+        .getState()
+        .updateComputeSource("cp1", "uniform float u_rate;\nvoid main(){}");
+      expect(useGraphStore.getState().edges[0]?.targetHandle).toBe("u_rate");
+      const cp = useGraphStore.getState().nodes.find((n) => n.id === "cp1") as
+        | ComputeGraphNode
+        | undefined;
+      expect(cp?.uniformValues).toEqual({ u_rate: 2 });
+    });
+
+    it("reads a same-type swap in one edit as a rename (known trade-off)", () => {
+      // Deleting one uniform and adding another of the same type in the same
+      // slot is indistinguishable from a rename once the debounce collapses it
+      // into a single commit, so the edge follows. Documented, not desired:
+      // the alternative is dropping the edge on every hand-typed rename.
+      seedRenameGraph();
+      useGraphStore.getState().updateShaderSource("s1", {
+        fragmentSource: `precision highp float;
+uniform float u_unrelated;
+void main(){}`,
+      });
+      expect(useGraphStore.getState().edges[0]?.targetHandle).toBe(
+        "u_unrelated",
+      );
+    });
+
+    it("still drops the edge when the swap changes the port type", () => {
+      seedRenameGraph();
+      useGraphStore.getState().updateShaderSource("s1", {
+        fragmentSource: `precision highp float;
+uniform vec3 u_unrelated;
+void main(){}`,
+      });
+      expect(useGraphStore.getState().edges).toEqual([]);
+    });
+  });
+
   it("setUniformValue bumps uniformRev not rev", () => {
     useGraphStore.getState().addNode(makeShader("s1"));
     const before = useGraphStore.getState();

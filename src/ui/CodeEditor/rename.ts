@@ -30,6 +30,7 @@ import {
   findReferencesAcrossStages,
   type ShaderStage,
 } from "../../core/glsl/references";
+import type { PortRename } from "../../core/graph/edgePrune";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
@@ -75,8 +76,18 @@ export interface CrossStageRenameContext {
    * Commit BOTH stages' rewritten sources at once. The single-undo guarantee
    * lives here — typically one {@link graphStore.updateShaderSource} patch
    * carrying both stages so graph history records one entry.
+   *
+   * `rename` is the exact old→new pair. When the renamed symbol is a uniform
+   * it names a node input port, and the store needs the pair to move that
+   * port's edge and tuned value instead of treating the old name as deleted;
+   * for any other symbol the store validates the pair against the port surface
+   * and ignores it.
    */
-  applyBothStages(newOriginSource: string, newOtherSource: string): void;
+  applyBothStages(
+    newOriginSource: string,
+    newOtherSource: string,
+    rename: PortRename,
+  ): void;
 }
 
 /**
@@ -153,7 +164,10 @@ export function runRename(
   if (crossStage && otherSites.length > 0) {
     const newOrigin = applyEdits(source, localSites, next);
     const newOther = applyEdits(crossStage.otherStageSource, otherSites, next);
-    crossStage.applyBothStages(newOrigin, newOther);
+    crossStage.applyBothStages(newOrigin, newOther, {
+      from: ident.word,
+      to: next,
+    });
   }
 
   view.dispatch({
@@ -253,12 +267,12 @@ function resolveCrossStageContext(): CrossStageRenameContext | undefined {
   return {
     originStage,
     otherStageSource,
-    applyBothStages(newOrigin, newOther) {
+    applyBothStages(newOrigin, newOther, rename) {
       const patch =
         originStage === "vertex"
           ? { vertexSource: newOrigin, fragmentSource: newOther }
           : { vertexSource: newOther, fragmentSource: newOrigin };
-      useGraphStore.getState().updateShaderSource(sn.id, patch);
+      useGraphStore.getState().updateShaderSource(sn.id, patch, rename);
     },
   };
 }

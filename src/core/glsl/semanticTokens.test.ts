@@ -244,3 +244,67 @@ void main() {
     for (const t of params) expect(t.kind).toBe("parameter");
   });
 });
+
+describe("member access is not classified as the global (L5)", () => {
+  it("skips a struct-field access that shares a uniform's name", () => {
+    const src = `struct Light {
+  vec3 color;
+};
+uniform vec3 color;
+uniform Light u_light;
+out vec4 outColor;
+void main() {
+  outColor = vec4(color + u_light.color, 1.0);
+}
+`;
+    const tokens = classifySemanticTokens(src).filter(
+      (t) => src.slice(t.from, t.to) === "color",
+    );
+    // The `u_light.color` access names the member, so it gets no token.
+    const accessOffset = src.indexOf("color", src.indexOf("u_light."));
+    expect(tokens.some((t) => t.from === accessOffset)).toBe(false);
+    // The uniform's own declaration and its bare use are still tagged.
+    expect(
+      tokens.some((t) => t.from === src.indexOf("uniform vec3 color") + 13),
+    ).toBe(true);
+    // Scope note: the struct *member declaration* on line 2 is still tagged
+    // `uniform` (the symbol table doesn't index members, so it resolves to the
+    // same-named global). That is cosmetic only — `references.ts` excludes
+    // struct bodies, so rename never rewrites it.
+    expect(tokens.some((t) => t.from === src.indexOf("vec3 color;") + 5)).toBe(
+      true,
+    );
+  });
+
+  it("skips swizzle letters that collide with a declared name", () => {
+    const src = `uniform float x;
+out vec4 outColor;
+void main() {
+  vec3 v = vec3(x);
+  outColor = vec4(v.x, x, 0.0, 1.0);
+}
+`;
+    const xTokens = classifySemanticTokens(src).filter(
+      (t) => src.slice(t.from, t.to) === "x",
+    );
+    // Declaration + `vec3(x)` + the bare `x` argument. `v.x` is a swizzle.
+    expect(xTokens).toHaveLength(3);
+    expect(xTokens.every((t) => t.kind === "uniform")).toBe(true);
+  });
+});
+
+describe("comment masking (L20)", () => {
+  it("emits no tokens for identifiers inside comments", () => {
+    const src = `uniform float u_time;
+/* u_time in a block comment */
+void main() {
+  float t = u_time; // u_time again
+}
+`;
+    const hits = classifySemanticTokens(src).filter(
+      (t) => src.slice(t.from, t.to) === "u_time",
+    );
+    expect(hits).toHaveLength(2);
+    for (const t of hits) expect(src.slice(t.from, t.to)).toBe("u_time");
+  });
+});

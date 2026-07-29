@@ -12,17 +12,31 @@
  *     source under one logical program. When the cursor is on a top-level
  *     symbol whose kind is share-able across stages (uniform, varying, in/out,
  *     function, struct, top-level const), the rename rewrites occurrences in
- *     the OTHER stage too. The current-stage edit is dispatched into the
- *     CodeMirror view (single CM undo step) and the other-stage source is
- *     committed through `applyOtherStage` (typically
- *     `graphStore.updateShaderSource` with a patch carrying BOTH stages so
- *     graph history records a single entry). Locals and parameters never
- *     cross stages — that matches the GLSL linker model.
+ *     the OTHER stage too. Both sources are committed through
+ *     `applyBothStages` (typically `graphStore.updateShaderSource` with a patch
+ *     carrying BOTH stages so graph history records a single entry), and the
+ *     current-stage edit is also dispatched into the CodeMirror view so the
+ *     visible doc updates without waiting for a reload. Locals and parameters
+ *     never cross stages — that matches the GLSL linker model.
+ *
+ *     **Undo scope (#1c).** That CM dispatch is marked
+ *     `Transaction.addToHistory.of(false)`. CodeMirror's history only covers
+ *     the one document the view holds, so an undoable cross-stage rename would
+ *     revert the visible stage while the paired stage kept the new name — a
+ *     program that no longer links. The trade-off is that a cross-stage rename
+ *     is **not keyboard-undoable while the editor has focus**: the global
+ *     Cmd+Z handler (`KeyboardShortcuts.tsx`) treats anything inside
+ *     `.cm-editor` as an editing target and yields to CodeMirror, so graph undo
+ *     is not reached either. Graph history *does* still hold the single
+ *     `updateShaderSource` entry — Cmd+Z reverts the whole rename once focus is
+ *     outside the editor. Single-document renames keep their normal CM undo
+ *     step.
  *
  * The prompt UX uses the browser's `window.prompt` for the lowest-friction
  * path. Tests inject a custom `promptFn` to avoid the modal.
  */
 
+import { Transaction } from "@codemirror/state";
 import { type EditorView, keymap } from "@codemirror/view";
 import {
   type CrossStageReferenceSite,
@@ -30,12 +44,13 @@ import {
   findReferencesAcrossStages,
   type ShaderStage,
 } from "../../core/glsl/references";
+import { precededByDot } from "../../core/glsl/symbolTable";
 import type { PortRename } from "../../core/graph/edgePrune";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
-import { useSelectionStore } from "../../state/selectionStore";
 import { GLSL_KEYWORDS, GLSL_TYPES } from "./autocomplete";
+import { currentEditorNodeId } from "./editorNode";
 import { identifierAt } from "./hover";
 
 const IDENT_VALID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -136,6 +151,13 @@ export function runRename(
   const line = view.state.doc.lineAt(pos);
   const ident = identifierAt(line.text, line.from, pos);
   if (!ident) return { applied: false, reason: "not-on-identifier" };
+  // Cursor on a member / swizzle (`v.xyz`, `light.color`): the reference
+  // finder excludes such occurrences, so without this guard F2 would prompt
+  // and then rename the unrelated same-named global everywhere *except* under
+  // the cursor. Clean no-op instead (L5).
+  if (precededByDot(line.text, ident.from - line.from)) {
+    return { applied: false, reason: "no-binding" };
+  }
 
   const source = view.state.doc.toString();
   // Probe references before prompting so we can bail early on "cursor is on a
@@ -158,10 +180,10 @@ export function runRename(
 
   // When cross-stage hit additional sites we commit BOTH stages to the graph
   // store in a single patch — that's the single graph-history entry covering
-  // the whole rename. The subsequent CM dispatch then provides the CM-level
-  // undo for the visible doc; the 50ms commit debounce in CodeEditor sees the
+  // the whole rename. The 50ms commit debounce in CodeEditor then sees the
   // store already holds the value and early-returns, so no extra push lands.
-  if (crossStage && otherSites.length > 0) {
+  const wroteOtherStage = crossStage !== undefined && otherSites.length > 0;
+  if (crossStage && wroteOtherStage) {
     const newOrigin = applyEdits(source, localSites, next);
     const newOther = applyEdits(crossStage.otherStageSource, otherSites, next);
     crossStage.applyBothStages(newOrigin, newOther, {
@@ -172,6 +194,15 @@ export function runRename(
 
   view.dispatch({
     changes: localSites.map((s) => ({ from: s.from, to: s.to, insert: next })),
+    // A cross-stage rename is only *half* representable in CodeMirror: the view
+    // holds one stage, but the edit also rewrote the paired stage in the graph
+    // store. Leaving it on the CM undo stack meant Cmd+Z reverted the visible
+    // stage while the other stage kept the new name — a program that no longer
+    // links. Keeping it off the stack makes the visible doc and the store agree
+    // (#1c). Single-document renames are unaffected and stay one undo step.
+    ...(wroteOtherStage
+      ? { annotations: Transaction.addToHistory.of(false) }
+      : {}),
   });
   return {
     applied: true,
@@ -239,21 +270,36 @@ function applyEdits(
 
 /**
  * Look up the live cross-stage context for the currently-edited ShaderNode.
- * Returns `undefined` when the selection is on a non-shader node (Compute,
- * Param, no node, etc.) — the caller falls back to the single-document
- * rename path in that case.
+ * Returns `undefined` when the edited node is not a ShaderNode (Compute, Param,
+ * empty graph, etc.) — the caller falls back to the single-document rename path
+ * in that case.
+ *
+ * The node is resolved with {@link currentEditorNodeId}, the *same* rule the
+ * Code panel uses to pick its document (#10). Reading `selectedNodeId` directly
+ * was wrong: with nothing selected the editor still shows the first shader node,
+ * so F2 rewrote the visible stage through the single-document path and left the
+ * paired stage untouched — a half-renamed program with no error reported.
  *
  * The atomicity guarantee (single graph-history entry) is encoded here:
  * `applyBothStages` ships ONE `updateShaderSource` patch carrying the new
  * source for both stages, so graph history records a single entry regardless
  * of how many stages were touched.
+ *
+ * ⚠ Undo scope (#1c): when the rename actually writes the other stage, the CM
+ * transaction carries `Transaction.addToHistory.of(false)`, so the editor's
+ * Cmd+Z will not revert it. Neither will the global graph undo —
+ * `KeyboardShortcuts.tsx` treats anything inside `.cm-editor` as an editing
+ * target and yields Cmd+Z to the editor. A cross-stage rename is therefore not
+ * keyboard-undoable while the editor holds focus; reverting it means renaming
+ * back, or clicking outside the editor first so Cmd+Z reaches graph history
+ * (which still holds the single `updateShaderSource` entry).
  */
 function resolveCrossStageContext(): CrossStageRenameContext | undefined {
-  const selectedId = useSelectionStore.getState().selectedNodeId;
-  if (!selectedId) return undefined;
+  const editorNodeId = currentEditorNodeId();
+  if (!editorNodeId) return undefined;
   const node = useGraphStore
     .getState()
-    .nodes.find((n) => n.id === selectedId) as
+    .nodes.find((n) => n.id === editorNodeId) as
     | ShaderGraphNode
     | ComputeGraphNode
     | undefined;

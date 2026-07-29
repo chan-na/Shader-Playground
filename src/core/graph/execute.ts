@@ -12,10 +12,11 @@ import { getExternalTexture } from "../external/registry";
 import { bindFramebuffer } from "../gl/framebuffer";
 import type { GpuTimerPool } from "../gl/gpuTimer";
 import { drawMesh } from "../gl/mesh";
+import type { CompiledProgram } from "../gl/program";
 import { setUniform } from "../gl/uniforms";
 import { resolveValueFor, type Value } from "../nodes/utility";
 import type { ComputePass, ExecutionPlan, ShaderPass } from "./compile";
-import type { Graph, GraphNode } from "./types";
+import type { Graph } from "./types";
 import {
   snapshotUniformValue,
   type UniformValue,
@@ -37,12 +38,12 @@ export interface FrameContext {
   frame?: number;
   /** Background color shown by the placeholder/empty pass. */
   background?: [number, number, number];
-  /** Snapshot of parameter-node values keyed by node ID (read each frame). */
-  params?: Record<string, GraphNode>;
   /**
-   * Full graph snapshot — required when math/swizzle/combine utility nodes
-   * appear as upstream value sources, since their output depends on inbound
-   * edges (which `params` alone does not capture).
+   * Full graph snapshot. This is the *only* source for upstream value
+   * resolution: math/swizzle/combine utility nodes depend on their inbound
+   * edges, so a per-node value map keyed by id could never describe them. A
+   * `params` field that carried exactly that map used to sit alongside this
+   * one; nothing ever read it, so it is gone. (#39)
    */
   graph?: Graph;
 }
@@ -50,15 +51,90 @@ export interface FrameContext {
 const _view = mat4.create();
 const _proj = mat4.create();
 const _model = mat4.create();
+/**
+ * Scratch tuple for the pass-space `u_mouse` value. Module scope because
+ * `bindSystemUniforms` runs once per pass per frame on the RAF hot path — a
+ * fresh literal there would allocate for every pass of every frame.
+ */
+const _mouse: [number, number, number, number] = [0, 0, 0, 0];
+
+/**
+ * GLSL integer uniform types (GL_INT, GL_INT_VEC2..4). Deliberately an
+ * allow-list and *not* "anything that isn't GL_FLOAT": SAMPLER_2D (0x8B5E) is
+ * also non-float but is uploaded by `bindSamplers` as a texture unit, and BOOL
+ * (0x8B56) legally accepts a float upload in GLES3 — routing either through the
+ * integer entry points would break working shaders. (#11)
+ */
+const INT_UNIFORM_TYPES = new Set([0x1404, 0x8b53, 0x8b54, 0x8b55]);
+
+/** Numeric shapes accepted by the type-aware uniform path. */
+type NumericUniform = number | number[] | Float32Array;
+
+function roundAt(v: number[] | Float32Array, i: number): number {
+  return Math.round(v[i] ?? 0);
+}
+
+/**
+ * The one type-aware uniform upload path — system uniforms, compute system
+ * uniforms and user uniforms all land here. Resolves the location *and* the
+ * program's reflected GLSL type by name, so a shader that declares
+ * `uniform int u_frame;` (or an `ivec2` user uniform) gets `uniform*i` instead
+ * of a silent INVALID_OPERATION from `uniform*f`. (#11)
+ */
+function setTypedUniform(
+  gl: WebGL2RenderingContext,
+  program: CompiledProgram,
+  name: string,
+  value: NumericUniform,
+) {
+  const loc = program.uniforms[name];
+  if (loc === undefined || loc === null) return;
+  const type = program.uniformTypes[name];
+  if (type === undefined || !INT_UNIFORM_TYPES.has(type)) {
+    setUniform(gl, loc, value);
+    return;
+  }
+  // Values arrive as JS numbers (the UI stores every uniform as a float), so
+  // round rather than truncate — a slider resting on 2.9999 means 3.
+  if (typeof value === "number") {
+    gl.uniform1i(loc, Math.round(value));
+    return;
+  }
+  switch (value.length) {
+    case 1:
+      gl.uniform1i(loc, roundAt(value, 0));
+      return;
+    case 2:
+      gl.uniform2i(loc, roundAt(value, 0), roundAt(value, 1));
+      return;
+    case 3:
+      gl.uniform3i(
+        loc,
+        roundAt(value, 0),
+        roundAt(value, 1),
+        roundAt(value, 2),
+      );
+      return;
+    case 4:
+      gl.uniform4i(
+        loc,
+        roundAt(value, 0),
+        roundAt(value, 1),
+        roundAt(value, 2),
+        roundAt(value, 3),
+      );
+      return;
+  }
+}
 
 function bindComputeSystemUniforms(
   gl: WebGL2RenderingContext,
   pass: ComputePass,
   ctx: FrameContext,
 ) {
-  const u = pass.program.uniforms;
-  setUniform(gl, u.u_time ?? null, ctx.time);
-  setUniform(gl, u.u_frame ?? null, ctx.frame ?? 0);
+  const p = pass.program;
+  setTypedUniform(gl, p, "u_time", ctx.time);
+  setTypedUniform(gl, p, "u_frame", ctx.frame ?? 0);
 }
 
 function bindSystemUniforms(
@@ -66,19 +142,31 @@ function bindSystemUniforms(
   pass: ShaderPass,
   ctx: FrameContext,
 ) {
-  const u = pass.program.uniforms;
-  setUniform(gl, u.u_time ?? null, ctx.time);
-  setUniform(gl, u.u_resolution ?? null, [pass.width, pass.height]);
-  setUniform(gl, u.u_mouse ?? null, ctx.mouse ?? [0, 0, 0, 0]);
-  setUniform(gl, u.u_frame ?? null, ctx.frame ?? 0);
+  const p = pass.program;
+  setTypedUniform(gl, p, "u_time", ctx.time);
+  setTypedUniform(gl, p, "u_resolution", [pass.width, pass.height]);
+  // `ctx.mouse` is in canvas/plan framebuffer pixels, but `u_resolution` is the
+  // *pass* size — a pass rendering at resolutionScale < 1 would otherwise see a
+  // pointer far outside its own frame, so `u_mouse.xy / u_resolution` (the
+  // Shadertoy idiom) blew past 1.0. Rescale per axis; x/z ride the width ratio,
+  // y/w the height ratio. Scales are 1 for full-resolution passes. (#19)
+  const m: [number, number, number, number] = ctx.mouse ?? [0, 0, 0, 0];
+  const mx = pass.width / Math.max(1, ctx.width);
+  const my = pass.height / Math.max(1, ctx.height);
+  _mouse[0] = m[0] * mx;
+  _mouse[1] = m[1] * my;
+  _mouse[2] = m[2] * mx;
+  _mouse[3] = m[3] * my;
+  setTypedUniform(gl, p, "u_mouse", _mouse);
+  setTypedUniform(gl, p, "u_frame", ctx.frame ?? 0);
   if (!pass.meshIsFullscreen) {
     viewMatrix(ctx.camera, _view);
     projMatrix(ctx.camera, pass.width / Math.max(1, pass.height), _proj);
     modelMatrix(_model);
-    setUniform(gl, u.u_view ?? null, _view as Float32Array);
-    setUniform(gl, u.u_proj ?? null, _proj as Float32Array);
-    setUniform(gl, u.u_model ?? null, _model as Float32Array);
-    setUniform(gl, u.u_camera ?? null, cameraEye(ctx.camera));
+    setTypedUniform(gl, p, "u_view", _view as Float32Array);
+    setTypedUniform(gl, p, "u_proj", _proj as Float32Array);
+    setTypedUniform(gl, p, "u_model", _model as Float32Array);
+    setTypedUniform(gl, p, "u_camera", cameraEye(ctx.camera));
   }
 }
 
@@ -96,24 +184,6 @@ const userUniformCache = new WeakMap<
   ShaderPass | ComputePass,
   Map<string, UniformValue>
 >();
-
-function uploadUniform(
-  gl: WebGL2RenderingContext,
-  loc: WebGLUniformLocation,
-  value: UniformValue,
-) {
-  if (typeof value === "number") {
-    setUniform(gl, loc, value);
-    return;
-  }
-  if (value.length === 2) {
-    setUniform(gl, loc, [value[0]!, value[1]!]);
-  } else if (value.length === 3) {
-    setUniform(gl, loc, [value[0]!, value[1]!, value[2]!]);
-  } else if (value.length === 4) {
-    setUniform(gl, loc, [value[0]!, value[1]!, value[2]!, value[3]!]);
-  }
-}
 
 function bindUserUniforms(
   gl: WebGL2RenderingContext,
@@ -146,7 +216,7 @@ function bindUserUniforms(
     const loc = pass.program.uniforms[name];
     if (loc === undefined || loc === null) continue;
     if (uniformValuesEqual(cache.get(name), value)) continue;
-    uploadUniform(gl, loc, value);
+    setTypedUniform(gl, pass.program, name, value);
     cache.set(name, snapshotUniformValue(value));
   }
 }

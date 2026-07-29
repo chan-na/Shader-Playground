@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { frameDelays, useGifRecorderStore } from "./gifRecorder";
 import { useToastStore } from "./toastStore";
+import { useViewportStore } from "./viewportStore";
 
 describe("frameDelays", () => {
   it("uses inter-frame gaps and the fallback for the last frame", () => {
@@ -15,11 +16,33 @@ describe("frameDelays", () => {
   it("never returns negative delays", () => {
     expect(frameDelays([200, 100], 80)).toEqual([0, 80]);
   });
+
+  // #31 — a backgrounded tab throttles RAF to ~1 Hz or stops it outright, so
+  // the gap across a hidden stretch must not be baked into the GIF verbatim.
+  it("clamps a backgrounded-tab gap to the 1s ceiling", () => {
+    // 12 fps → 83.3ms nominal, so the ceiling is the 1000ms floor, not 4×.
+    expect(frameDelays([0, 60_000], 1000 / 12)[0]).toBe(1000);
+  });
+
+  it("lets a deliberately slow recording keep 4× its nominal interval", () => {
+    // 1 fps → 4000ms cap, so a 3s gap survives intact but 9s still clamps.
+    expect(frameDelays([0, 3000, 12_000], 1000)).toEqual([3000, 4000, 1000]);
+  });
+
+  it("leaves ordinary sub-second gaps untouched", () => {
+    expect(frameDelays([0, 100, 950], 80)).toEqual([100, 850, 80]);
+  });
 });
 
 // --- Store with mocked 2D canvas ------------------------------------------
 
+// fillRect/fillStyle are part of the required surface: captureFrame paints an
+// opaque matte before drawImage (#16) and swallows any throw in its try/catch,
+// so a FakeCtx missing them would silently degrade every test below to
+// frameCount 0 rather than failing loudly.
 interface FakeCtx {
+  fillStyle: string;
+  fillRect: (x: number, y: number, w: number, h: number) => void;
   drawImage: () => void;
   getImageData: (x: number, y: number, w: number, h: number) => ImageData;
 }
@@ -66,9 +89,27 @@ describe("useGifRecorderStore", () => {
     resetStore();
   });
 
+  /** Ordered log of matte/draw calls so #16's ordering can be asserted. */
+  let calls: string[] = [];
+  /** `fillStyle` as it stood at each fillRect call. */
+  let fillStyles: string[] = [];
+  /** Every fillRect argument tuple, in order. */
+  let fillRects: number[][] = [];
+
   function installFakeContext(): void {
+    calls = [];
+    fillStyles = [];
+    fillRects = [];
     const fake: FakeCtx = {
-      drawImage: () => {},
+      fillStyle: "",
+      fillRect: (x, y, w, h) => {
+        calls.push("fillRect");
+        fillStyles.push(fake.fillStyle);
+        fillRects.push([x, y, w, h]);
+      },
+      drawImage: () => {
+        calls.push("drawImage");
+      },
       getImageData: (_x, _y, w, h) => {
         const data = new Uint8ClampedArray(w * h * 4);
         for (let i = 0; i < w * h; i++) {
@@ -193,6 +234,56 @@ describe("useGifRecorderStore", () => {
       clock += 200;
     }
     expect(useGifRecorderStore.getState().frameCount).toBe(2);
+  });
+
+  // --- #16: opaque matte behind every captured frame ----------------------
+
+  it("paints one full-size opaque matte before drawImage on each capture", () => {
+    installFakeContext();
+    const canvas = makeCanvas(32, 24);
+    useGifRecorderStore.getState().start({ fps: 20, maxLongEdge: 16 });
+    const r = useGifRecorderStore.getState();
+    r.captureFrame(canvas);
+    clock += 60;
+    r.captureFrame(canvas);
+
+    expect(useGifRecorderStore.getState().frameCount).toBe(2);
+    // Exactly one matte per capture, and always *before* the source is drawn.
+    expect(calls).toEqual(["fillRect", "drawImage", "fillRect", "drawImage"]);
+    // 32×24 fitted to a 16px long edge → 16×12; the matte covers all of it.
+    for (const rect of fillRects) {
+      expect(rect).toEqual([0, 0, 16, 12]);
+    }
+  });
+
+  it("uses the viewport's own clear colour as the matte, not a hard-coded one", () => {
+    const prev = useViewportStore.getState().background;
+    useViewportStore.setState({ background: [1, 0.5, 0] });
+    try {
+      installFakeContext();
+      useGifRecorderStore.getState().start({ fps: 20, maxLongEdge: 16 });
+      useGifRecorderStore.getState().captureFrame(makeCanvas(16, 16));
+      expect(fillStyles).toEqual(["rgb(255, 128, 0)"]);
+    } finally {
+      useViewportStore.setState({ background: prev });
+    }
+  });
+
+  it("tracks a later background change on subsequent captures", () => {
+    const prev = useViewportStore.getState().background;
+    useViewportStore.setState({ background: [0, 0, 0] });
+    try {
+      installFakeContext();
+      const canvas = makeCanvas(16, 16);
+      useGifRecorderStore.getState().start({ fps: 20, maxLongEdge: 16 });
+      useGifRecorderStore.getState().captureFrame(canvas);
+      useViewportStore.getState().setBackground([1, 1, 1]);
+      clock += 60;
+      useGifRecorderStore.getState().captureFrame(canvas);
+      expect(fillStyles).toEqual(["rgb(0, 0, 0)", "rgb(255, 255, 255)"]);
+    } finally {
+      useViewportStore.setState({ background: prev });
+    }
   });
 
   it("tick() updates elapsedMs while recording", () => {

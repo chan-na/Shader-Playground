@@ -227,8 +227,14 @@ export function encodeGif(
   for (const frame of frames) {
     // Graphic Control Extension — disposal method 1 (leave in place), no
     // transparency. Delay is in centiseconds; clamp so browsers don't treat
-    // very small values as "as fast as possible".
-    const delayCs = Math.max(2, Math.round(frame.delayMs / 10));
+    // very small values as "as fast as possible". The upper bound is a format
+    // constraint, not a policy: the field is u16, so anything past 0xffff would
+    // silently wrap and turn a stalled frame into a near-zero delay. Delay
+    // *policy* stays with the caller (`gifRecorder.frameDelays`). (#31)
+    const delayCs = Math.min(
+      0xffff,
+      Math.max(2, Math.round(frame.delayMs / 10)),
+    );
     w.bytes(0x21, 0xf9, 0x04, 0x04);
     w.u16le(delayCs);
     w.bytes(0x00, 0x00);

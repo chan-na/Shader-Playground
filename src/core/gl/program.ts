@@ -12,6 +12,13 @@ export interface CompiledProgram {
   program: WebGLProgram;
   attributes: Record<string, number>;
   uniforms: Record<string, WebGLUniformLocation | null>;
+  /**
+   * Reflected GLSL type enum per uniform (GL_FLOAT, GL_INT, GL_FLOAT_VEC2, …),
+   * keyed by the same array-subscript-stripped name as `uniforms`. The upload
+   * path needs it to pick the int vs float entry point — `uniform1f` against an
+   * `int` location is INVALID_OPERATION in WebGL2. (#11)
+   */
+  uniformTypes: Record<string, number>;
 }
 
 function compileShader(
@@ -41,6 +48,63 @@ function compileShader(
     };
   }
   return { shader };
+}
+
+/**
+ * Shared tail for both program builders: link check, GL-error drain, and the
+ * active-attribute / active-uniform reflection loops. Extracted because the two
+ * builders carried byte-identical copies of it — a fix applied to only one of
+ * them still type-checks, so "works for shader nodes but not compute nodes"
+ * was a silent failure mode (the reflection now records `info.type` in exactly
+ * one place). `label` stays a parameter so each caller keeps its own name in
+ * the GL error log. (#40)
+ */
+function finishProgram(
+  gl: WebGL2RenderingContext,
+  prog: WebGLProgram,
+  errors: ShaderError[],
+  label: string,
+): { program: CompiledProgram | null; errors: ShaderError[] } {
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    const log = gl.getProgramInfoLog(prog) ?? "";
+    gl.deleteProgram(prog);
+    return {
+      program: null,
+      errors: [...errors, { stage: "link", message: log, raw: log }],
+    };
+  }
+  checkGlError(gl, label);
+
+  const attributes: Record<string, number> = {};
+  const uniforms: Record<string, WebGLUniformLocation | null> = {};
+  const uniformTypes: Record<string, number> = {};
+
+  const numAttribs = gl.getProgramParameter(
+    prog,
+    gl.ACTIVE_ATTRIBUTES,
+  ) as number;
+  for (let i = 0; i < numAttribs; i++) {
+    const info = gl.getActiveAttrib(prog, i);
+    if (!info) continue;
+    attributes[info.name] = gl.getAttribLocation(prog, info.name);
+  }
+
+  const numUniforms = gl.getProgramParameter(
+    prog,
+    gl.ACTIVE_UNIFORMS,
+  ) as number;
+  for (let i = 0; i < numUniforms; i++) {
+    const info = gl.getActiveUniform(prog, i);
+    if (!info) continue;
+    const baseName = info.name.replace(/\[\d+\]$/, "");
+    uniforms[baseName] = gl.getUniformLocation(prog, info.name);
+    uniformTypes[baseName] = info.type;
+  }
+
+  return {
+    program: { program: prog, attributes, uniforms, uniformTypes },
+    errors,
+  };
 }
 
 export function createProgram(
@@ -74,41 +138,7 @@ export function createProgram(
   gl.deleteShader(vs.shader);
   gl.deleteShader(fs.shader);
 
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    const log = gl.getProgramInfoLog(prog) ?? "";
-    gl.deleteProgram(prog);
-    return {
-      program: null,
-      errors: [...errors, { stage: "link", message: log, raw: log }],
-    };
-  }
-  checkGlError(gl, "createProgram");
-
-  const attributes: Record<string, number> = {};
-  const uniforms: Record<string, WebGLUniformLocation | null> = {};
-
-  const numAttribs = gl.getProgramParameter(
-    prog,
-    gl.ACTIVE_ATTRIBUTES,
-  ) as number;
-  for (let i = 0; i < numAttribs; i++) {
-    const info = gl.getActiveAttrib(prog, i);
-    if (!info) continue;
-    attributes[info.name] = gl.getAttribLocation(prog, info.name);
-  }
-
-  const numUniforms = gl.getProgramParameter(
-    prog,
-    gl.ACTIVE_UNIFORMS,
-  ) as number;
-  for (let i = 0; i < numUniforms; i++) {
-    const info = gl.getActiveUniform(prog, i);
-    if (!info) continue;
-    const baseName = info.name.replace(/\[\d+\]$/, "");
-    uniforms[baseName] = gl.getUniformLocation(prog, info.name);
-  }
-
-  return { program: { program: prog, attributes, uniforms }, errors };
+  return finishProgram(gl, prog, errors, "createProgram");
 }
 
 export function disposeProgram(gl: WebGL2RenderingContext, p: CompiledProgram) {
@@ -155,39 +185,5 @@ export function createTransformFeedbackProgram(
   gl.deleteShader(vs.shader);
   gl.deleteShader(fs.shader);
 
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    const log = gl.getProgramInfoLog(prog) ?? "";
-    gl.deleteProgram(prog);
-    return {
-      program: null,
-      errors: [...errors, { stage: "link", message: log, raw: log }],
-    };
-  }
-  checkGlError(gl, "createTransformFeedbackProgram");
-
-  const attributes: Record<string, number> = {};
-  const uniforms: Record<string, WebGLUniformLocation | null> = {};
-
-  const numAttribs = gl.getProgramParameter(
-    prog,
-    gl.ACTIVE_ATTRIBUTES,
-  ) as number;
-  for (let i = 0; i < numAttribs; i++) {
-    const info = gl.getActiveAttrib(prog, i);
-    if (!info) continue;
-    attributes[info.name] = gl.getAttribLocation(prog, info.name);
-  }
-
-  const numUniforms = gl.getProgramParameter(
-    prog,
-    gl.ACTIVE_UNIFORMS,
-  ) as number;
-  for (let i = 0; i < numUniforms; i++) {
-    const info = gl.getActiveUniform(prog, i);
-    if (!info) continue;
-    const baseName = info.name.replace(/\[\d+\]$/, "");
-    uniforms[baseName] = gl.getUniformLocation(prog, info.name);
-  }
-
-  return { program: { program: prog, attributes, uniforms }, errors };
+  return finishProgram(gl, prog, errors, "createTransformFeedbackProgram");
 }

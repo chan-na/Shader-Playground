@@ -684,6 +684,8 @@ export function fallbackDropTarget(regions: DockRegion[]): DockDropTarget {
  * - `{kind:"region", zone:"center"}` → **T1(S5, v2.0) 게이트**: 대상 leaf의
  *   `tabs`와 `leaf.tabs`가 `canMergeDockTabs`를 통과하면 종전대로 탭을 병합
  *   (`tabs`에 `leaf.tabs`를 이어붙이고 `active`는 `leaf.active`로 갱신).
+ *   대상 leaf가 접혀 있었다면 그 경우에만 `collapsed: false`로 펼친다 —
+ *   접힌 레일 뒤로 드롭한 패널이 사라지는 것을 막는다.
  *   통과하지 못하면(viewport/code가 관여하는 이종 병합) **탭 병합 대신
  *   `zone:"right"`와 동일한 기하의 스플릿으로 폴백**한다(대상 leaf가 `a`
  *   비율 `1 - REGION_SPLIT_RATIO`, 새 leaf가 `b` 비율 `REGION_SPLIT_RATIO`
@@ -751,6 +753,11 @@ export function insertDetachedLeaf(
       ...node,
       tabs: [...node.tabs, ...leaf.tabs],
       active: leaf.active,
+      // 접힌 leaf에 탭을 병합하면 드롭된 패널이 34px 레일 뒤에 숨어 사라진
+      // 것처럼 보인다 — 병합은 "이 leaf를 지금 보여달라"는 의도이므로 접힘을
+      // 편다(dc 미정의 코너). 조건부 스프레드라 이미 펼쳐진(=`collapsed` 키가
+      // 없는) leaf의 형태는 그대로 유지된다.
+      ...(node.collapsed === true ? { collapsed: false } : {}),
     });
   }
 

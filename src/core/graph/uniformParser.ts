@@ -1,4 +1,10 @@
 // biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + regex captures / line walk bounds
+
+// Block-only masking, deliberately. This module *reads* line comments — that's
+// where `@range` / `@label` / `@default` annotations live — so it must never
+// use the combined `maskComments`.
+import { maskBlockComments } from "../glsl/stripComments";
+
 type UniformType =
   | "float"
   | "vec2"
@@ -306,6 +312,13 @@ function stripManagedTokens(line: string): string | null {
  * the trailing comment is the single source of truth (parseUniforms merges
  * both, and a leftover preceding `@range` would otherwise win). Returns the
  * rewritten source, or null when no matching declaration is found.
+ *
+ * Declaration *matching* runs against a block-comment-masked copy (L33) so a
+ * `uniform` line that only exists inside `/* … *\/` is never rewritten — that
+ * would have edited commented-out code and left the live declaration alone.
+ * The rewrite itself reads the RAW line: masking is length-preserving, so the
+ * comment index found in the masked copy indexes the raw line identically, and
+ * any block comment sitting before the `//` survives the edit verbatim.
  */
 export function writeUniformHints(
   source: string,
@@ -313,12 +326,16 @@ export function writeUniformHints(
   hints: UniformHints,
 ): string | null {
   const lines = source.split(/\r?\n/);
+  const scan = maskBlockComments(source).split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    const commentIdx = line.indexOf("//");
-    const code = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
-    const m = RE_UNIFORM.exec(code);
+    const scanLine = scan[i] ?? line;
+    const commentIdx = scanLine.indexOf("//");
+    const m = RE_UNIFORM.exec(
+      commentIdx >= 0 ? scanLine.slice(0, commentIdx) : scanLine,
+    );
     if (!m || m[2] !== name) continue;
+    const code = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
 
     // Walk back over preceding comment-only lines, stripping managed tokens.
     // Indices are collected descending so the later splice is index-safe.
@@ -415,12 +432,11 @@ export function parseUniforms(source: string): UniformSpec[] {
   // Walk line by line, BUT preserve trailing line comments and look back at
   // the previous comment-only line for hint annotations.
   const rawLines = source.split(/\r?\n/);
-  // Strip block comments globally so they don't break the line walk; convert
-  // them into spaces but preserve newline count.
-  const noBlock = source.replace(/\/\*[\s\S]*?\*\//g, (m) =>
-    m.replace(/[^\n]/g, " "),
-  );
-  const lines = noBlock.split(/\r?\n/);
+  // Mask block comments only — length-preserving, newlines intact. Line
+  // comments must survive: the `//` run on a declaration line is the hint
+  // source, so masking it here would silently delete every @range/@label in
+  // the app.
+  const lines = maskBlockComments(source).split(/\r?\n/);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;

@@ -55,7 +55,10 @@ const GROUPS: ShortcutGroup[] = [
       { keys: `${MOD} + Shift + Z`, desc: "Redo" },
       { keys: `${MOD} + Y`, desc: "Redo (Windows 스타일)" },
       { keys: `${MOD} + K`, desc: "Command Palette 열기" },
-      { keys: "Space", desc: "재생 / 일시정지 (입력 포커스 외)" },
+      {
+        keys: "Space",
+        desc: "재생 / 일시정지 (입력 · 버튼 포커스 외)",
+      },
     ],
   },
 ];

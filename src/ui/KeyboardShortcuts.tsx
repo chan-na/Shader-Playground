@@ -12,7 +12,8 @@ import { useTimeStore } from "../state/timeStore";
  *   Cmd/Ctrl+A         — select every node (when not editing text)
  *   Cmd/Ctrl+G         — wrap the current selection in a new group
  *   Arrow keys         — nudge the whole selection (Shift = coarse step)
- *   Space              — toggle play/pause (when no text input has focus)
+ *   Space              — toggle play/pause (when neither a text input nor an
+ *                        activatable control has focus)
  */
 
 /** Flow-coordinate distance for a single arrow-key nudge; Shift multiplies. */
@@ -33,6 +34,27 @@ function isEditingTarget(target: EventTarget | null): boolean {
   // Inside CodeMirror?
   if (target.closest(".cm-editor")) return true;
   return false;
+}
+
+/**
+ * 포커스가 "Space로 활성화되는 컨트롤" 위에 있는가. Space 분기 전용 가드 —
+ * 전역 재생 토글이 `preventDefault()`로 버튼/링크/탭의 네이티브 활성화를
+ * 삼키던 회귀를 막는다(접근성: 키보드 사용자가 포커스한 버튼을 누를 수
+ * 없었다).
+ *
+ * ⚠ `[role="group"]` / `[role="application"]`은 **절대 넣지 않는다** —
+ * @xyflow/react가 노드에 `role="group"`, 페인에 `role="application"`을
+ * 부여하므로 캔버스에 포커스가 있을 때 Space 단축키가 통째로 죽는다.
+ * 화살표 nudge 분기는 이 가드를 쓰지 않는다(React Flow의 네이티브 이동은
+ * `e.defaultPrevented`로 이미 구분한다).
+ */
+function isActivatableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.closest(
+      'button, a[href], summary, [role="button"], [role="menuitem"], [role="tab"]',
+    ) !== null
+  );
 }
 
 export function KeyboardShortcuts() {
@@ -100,7 +122,11 @@ export function KeyboardShortcuts() {
           .nudgeNodes(ids, arrow.dx * step, arrow.dy * step);
         return;
       }
-      if (e.key === " " && !isEditingTarget(e.target)) {
+      if (
+        e.key === " " &&
+        !isEditingTarget(e.target) &&
+        !isActivatableTarget(e.target)
+      ) {
         e.preventDefault();
         useTimeStore.getState().togglePlaying();
       }

@@ -12,6 +12,18 @@
  *     cursor sits on an identifier.
  *   - `ui/CodeEditor/rename.ts` — drive a single-transaction rename refactor.
  *
+ * Two occurrence classes are excluded even when the spelling matches (L5),
+ * because neither binds to the global:
+ *   - **Member / swizzle access** — the `color` in `light.color`, the `xyz` in
+ *     `v.xyz`. See `precededByDot`, including its documented line-break
+ *     limitation.
+ *   - **Struct member declarator names** — the `color` in `struct Light { vec3
+ *     color; }`. See `structMemberNameOffsets`. Excluding only the first class
+ *     would make rename *break* shaders: the member declaration would be
+ *     rewritten while every access to it was left alone. Only the name
+ *     position is excluded — a member's type token and array-size expression
+ *     still reference real globals and must stay renameable.
+ *
  * Not goals: cross-file references (GLSL has no imports), preprocessor
  * expansion, or overload resolution. Two functions with the same name are
  * collapsed by `resolveSymbol`'s "first match wins" rule — only the first
@@ -20,11 +32,14 @@
 
 // biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + length-guarded regex captures
 
+import { maskComments } from "./stripComments";
 import {
   buildSymbolTable,
   type GlslSymbol,
+  precededByDot,
   resolveSymbol,
   type SymbolTable,
+  structMemberNameOffsets,
 } from "./symbolTable";
 
 export interface ReferenceSite {
@@ -76,16 +91,6 @@ const CROSS_STAGE_KINDS = new Set([
 
 const IDENT_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
 
-function stripBlockComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-}
-
-function maskLineComment(line: string): string {
-  const idx = line.indexOf("//");
-  if (idx < 0) return line;
-  return line.slice(0, idx) + " ".repeat(line.length - idx);
-}
-
 /**
  * Find references to the declaration that binds `name` at `atLine`. Returns
  * an empty array when no declaration is in scope (the cursor is on a builtin,
@@ -112,21 +117,28 @@ export function findReferencesOf(
   table: SymbolTable,
   target: GlslSymbol,
 ): ReferenceSite[] {
-  const noBlock = stripBlockComments(source);
-  const lines = noBlock.split(/\r?\n/);
+  const masked = maskComments(source);
+  const lines = masked.split(/\r?\n/);
+  // Struct member *names* share the global namespace's spelling but not its
+  // binding (L5) — see `structMemberNameOffsets`. Member types and array sizes
+  // are deliberately NOT excluded: they are real uses of real globals.
+  const memberNameOffsets = structMemberNameOffsets(masked);
   const sites: ReferenceSite[] = [];
 
   let lineStart = 0;
   for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i]!;
-    const masked = maskLineComment(raw);
+    const line = lines[i]!;
     const lineNo = i + 1;
 
     IDENT_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
     // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
-    while ((m = IDENT_RE.exec(masked)) !== null) {
+    while ((m = IDENT_RE.exec(line)) !== null) {
       if (m[0] !== target.name) continue;
+      // `v.color` / `s.xyz` bind to a member, never to the same-named global.
+      if (precededByDot(line, m.index)) continue;
+      const from = lineStart + m.index;
+      if (memberNameOffsets.has(from)) continue;
       // Ask the symbol table what binding is in scope at this occurrence.
       // If it isn't the target, we hit a shadowed name (e.g. a global `foo`
       // shadowed by a local `foo` inside a function body). Skip it.
@@ -136,15 +148,15 @@ export function findReferencesOf(
       const col = m.index + 1;
       const isDef = lineNo === target.line && col === target.column;
       sites.push({
-        from: lineStart + m.index,
-        to: lineStart + m.index + target.name.length,
+        from,
+        to: from + target.name.length,
         line: lineNo,
         column: col,
         isDefinition: isDef,
       });
     }
 
-    lineStart += raw.length + 1;
+    lineStart += line.length + 1;
   }
 
   return sites;

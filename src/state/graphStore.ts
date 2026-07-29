@@ -24,6 +24,7 @@ import type {
   GroupGraphNode,
   MathGraphNode,
   MathOp,
+  MeshGraphNode,
   ParamGraphNode,
   ResolutionScale,
   ShaderGraphNode,
@@ -53,6 +54,20 @@ export interface GraphState {
   parents: ParentsMap;
   rev: number; // bumped on structural change (re-compile trigger)
   uniformRev: number; // bumped on uniform-only change
+  /**
+   * Bumped only when the graph is replaced *wholesale* — `setGraph` (demo
+   * load, import, share/session restore), `reset` (Clear) and `applySnapshot`
+   * (undo/redo). Incremental edits (add node, wire an edge, type in a shader)
+   * bump `rev` but leave this alone.
+   *
+   * The node editor refits its viewport on this counter [#38]: keying the
+   * refit on `rev` re-framed and animated the canvas after *every* structural
+   * edit, so the view jumped away while the user was still working. Node count
+   * is not a usable proxy either — the demo graph and `trivialMeshGraph()`
+   * both have exactly 3 nodes, so a count-based trigger would silently drop
+   * the refit on the share/restore path.
+   */
+  graphEpoch: number;
 
   setGraph: (
     g: Graph,
@@ -117,6 +132,16 @@ export interface GraphState {
     patch: { op?: MathOp; a?: number; b?: number },
   ) => void;
   setSwizzleMask: (id: string, mask: string) => void;
+  /**
+   * Pick a MeshNode's built-in primitive, dropping any custom mesh asset it
+   * was bound to (`primitive` and `assetId` are mutually exclusive).
+   *
+   * Targeted on purpose: the node view used to rebuild the whole graph through
+   * `setGraph`, which resets `parents` to `{}` and so silently dissolved every
+   * group as a side effect of changing a dropdown. Only `nodes` moves here.
+   * No-op (no history push, no rev bump) for unknown / non-mesh ids.
+   */
+  setMeshPrimitive: (id: string, primitive: MeshGraphNode["primitive"]) => void;
   setCombineConfig: (
     id: string,
     patch: { arity?: CombineArity; values?: [number, number, number, number] },
@@ -198,7 +223,9 @@ export interface GraphState {
    */
   toggleGroupCollapsed: (id: string) => void;
 
-  /** Replace state without bumping history (used by undo/redo). */
+  /** Replace state without bumping history (used by undo/redo). Counts as a
+   *  wholesale replace (`graphEpoch`), so stepping through history refits the
+   *  editor viewport the same way loading a graph does. */
   applySnapshot: (snap: {
     nodes: GraphNode[];
     edges: GraphEdge[];
@@ -254,6 +281,30 @@ function withRenamedUniform(node: GraphNode, rename: PortRename): GraphNode {
   return { ...owner, uniformValues };
 }
 
+/**
+ * True when some ancestor of `id` is itself part of the moving selection and
+ * carries a position of its own. Stored positions are parent-relative, so a
+ * selection that contains both a group and something nested inside it must
+ * translate the group only — the descendant is carried along by its parent and
+ * would otherwise move twice (or 3× for a chain of nested groups). The walk is
+ * transitive and capped like the other parent-chain walkers in
+ * core/graph/parents, so a malformed cycle can't hang the nudge.
+ */
+function hasSelectedPositionedAncestor(
+  id: string,
+  parents: ParentsMap,
+  positions: Record<string, NodePosition>,
+  selected: ReadonlySet<string>,
+): boolean {
+  const MAX_DEPTH = 64;
+  let cur: string | undefined = parents[id];
+  for (let i = 0; i < MAX_DEPTH && cur !== undefined; i++) {
+    if (selected.has(cur) && positions[cur] !== undefined) return true;
+    cur = parents[cur];
+  }
+  return false;
+}
+
 function pushHistory(s: GraphState) {
   useHistoryStore.getState().push({
     nodes: s.nodes.map((n) => ({ ...n })),
@@ -272,6 +323,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   parents: {},
   rev: 0,
   uniformRev: 0,
+  graphEpoch: 0,
   setGraph: (g, positions, parents) => {
     pushHistory(get());
     set((s) => {
@@ -282,6 +334,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         positions: positions ?? s.positions,
         parents: nextParents,
         rev: s.rev + 1,
+        graphEpoch: s.graphEpoch + 1,
       };
     });
   },
@@ -301,12 +354,21 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const newId = nextId(src.kind);
     const clone: GraphNode = { ...structuredClone(src), id: newId };
     const srcPos = get().positions[id];
+    // The clone inherits the source's group. Positions are parent-relative, so
+    // without this the "+40" offset is read against the canvas origin instead
+    // of the group's — the copy lands far away from its original and outside
+    // the group box it visually belongs to.
+    const srcParent = get().parents[id];
     pushHistory(get());
     set((s) => ({
+      // Appending keeps any parent ahead of the clone, as React Flow requires.
       nodes: [...s.nodes, clone],
       positions: srcPos
         ? { ...s.positions, [newId]: { x: srcPos.x + 40, y: srcPos.y + 40 } }
         : s.positions,
+      ...(srcParent !== undefined
+        ? { parents: { ...s.parents, [newId]: srcParent } }
+        : {}),
       rev: s.rev + 1,
     }));
     return newId;
@@ -374,14 +436,20 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   nudgeNodes: (ids, dx, dy) =>
     set((s) => {
       if (ids.length === 0 || (dx === 0 && dy === 0)) return {};
+      const selected = new Set(ids);
       const positions = { ...s.positions };
       let changed = false;
       for (const id of ids) {
         const p = positions[id];
         if (!p) continue;
+        // A node whose (grand)parent is moving too is already carried by it.
+        if (hasSelectedPositionedAncestor(id, s.parents, s.positions, selected))
+          continue;
         positions[id] = { x: p.x + dx, y: p.y + dy };
         changed = true;
       }
+      // Everything was carried by an ancestor: keep the previous identity so
+      // subscribers keyed on `positions` don't re-render for a no-op.
       return changed ? { positions } : {};
     }),
   updateShaderSource: (id, patch, rename) => {
@@ -485,6 +553,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       nodes: s.nodes.map((n) => {
         if (n.id !== id || n.kind !== "swizzle") return n;
         return { ...(n as SwizzleGraphNode), mask } as SwizzleGraphNode;
+      }),
+      rev: s.rev + 1,
+    }));
+  },
+  setMeshPrimitive: (id, primitive) => {
+    const target = get().nodes.find((n) => n.id === id);
+    if (!target || target.kind !== "mesh") return;
+    pushHistory(get());
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id || n.kind !== "mesh") return n;
+        // Choosing a built-in primitive releases the custom mesh asset.
+        return { ...(n as MeshGraphNode), primitive, assetId: null };
       }),
       rev: s.rev + 1,
     }));
@@ -634,6 +715,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       parents: {},
       rev: s.rev + 1,
       uniformRev: 0,
+      graphEpoch: s.graphEpoch + 1,
     }));
   },
   addGroup: (label, absolutePosition, size, options) => {
@@ -706,6 +788,12 @@ export const useGraphStore = create<GraphState>((set, get) => ({
             ...filtered.slice(parentIdx + 1),
           ];
         }
+        // Splicing `id` in behind its new parent can push it behind its OWN
+        // descendants (they kept their old slots). Re-run the full ordering
+        // over the freshly computed map so every level of the tree is valid,
+        // not just the one link that moved. Releasing to top-level can't break
+        // ordering, so that path keeps `cur.nodes` as-is.
+        nodes = orderParentsBeforeChildren(nodes, parents);
       }
       return {
         nodes,
@@ -805,10 +893,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }
 
       // 3) Order: group node MUST precede its children in `nodes` for RF.
+      // Hoisting the selection to the back is not enough on its own — when a
+      // selected node is itself a group, its unselected descendants stay in
+      // `restNoSelection` and would then sit *before* their parent. Re-run the
+      // full ordering over the freshly computed map to fix every level.
       const selectedSet = new Set(valid);
       const restNoSelection = cur.nodes.filter((n) => !selectedSet.has(n.id));
       const selectionInOrder = cur.nodes.filter((n) => selectedSet.has(n.id));
-      const nodes = [...restNoSelection, groupNode, ...selectionInOrder];
+      const nodes = orderParentsBeforeChildren(
+        [...restNoSelection, groupNode, ...selectionInOrder],
+        parents,
+      );
 
       return { nodes, positions, parents, rev: cur.rev + 1 };
     });
@@ -945,6 +1040,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         ),
         parents,
         rev: s.rev + 1,
+        graphEpoch: s.graphEpoch + 1,
       };
     }),
 }));

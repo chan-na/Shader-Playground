@@ -456,3 +456,83 @@ describe("writeUniformHints", () => {
     expect(spec.defaultValue).toEqual([0.1, 0.2, 0.3]);
   });
 });
+
+describe("hint survival under comment masking (L20 blocker guard)", () => {
+  // parseUniforms uses the BLOCK-ONLY masker on purpose: the trailing `//` run
+  // is the hint source. Switching it to the combined masker makes
+  // `line.indexOf("//")` return -1 for every line, silently deleting every
+  // @range/@min/@max/@step/@default/@label/@color in the app.
+  it("reads a trailing @range hint", () => {
+    const u = parseUniforms("uniform float u_x; // @range 0..10")[0];
+    expect(u?.min).toBe(0);
+    expect(u?.max).toBe(10);
+  });
+
+  it("reads every managed annotation from a trailing comment", () => {
+    const src = `uniform vec3 u_tint; // @color @range 0..2 @step 0.5 @default 1,1,1 @label "Tint"`;
+    const u = parseUniforms(src)[0];
+    expect(u?.control).toBe("color");
+    expect(u?.min).toBe(0);
+    expect(u?.max).toBe(2);
+    expect(u?.step).toBe(0.5);
+    expect(u?.defaultValue).toEqual([1, 1, 1]);
+    expect(u?.label).toBe("Tint");
+  });
+
+  it("still ignores declarations inside a block comment", () => {
+    const src = `/*
+uniform float u_commented;
+*/
+uniform float u_real;
+`;
+    expect(parseUniforms(src).map((u) => u.name)).toEqual(["u_real"]);
+  });
+
+  it("keeps declarations below a half-typed `/*` — ports must survive", () => {
+    // An unterminated block comment is a transient editing state, not an
+    // instruction to retire every port. `nodeInputPorts` derives from this
+    // function and the store prunes edges for ports that vanish, so masking to
+    // EOF here would delete a node's wiring mid-keystroke.
+    const src = `/*
+uniform float u_a;
+uniform sampler2D u_tex;
+`;
+    expect(parseUniforms(src).map((u) => u.name)).toEqual(["u_a", "u_tex"]);
+  });
+
+  it("keeps a trailing hint when a block comment shares the line", () => {
+    const src = `uniform float u_x; /* note */ // @range 0..4`;
+    const u = parseUniforms(src)[0];
+    expect(u?.min).toBe(0);
+    expect(u?.max).toBe(4);
+  });
+});
+
+describe("writeUniformHints — block-comment awareness (L33)", () => {
+  it("rewrites the live declaration, not a commented-out twin", () => {
+    const src = `/*
+uniform float u_x; // @range 0..1
+*/
+uniform float u_x;
+`;
+    const out = writeUniformHints(src, "u_x", { min: 0, max: 2 });
+    expect(out).not.toBeNull();
+    const lines = out!.split("\n");
+    // The commented-out copy is untouched…
+    expect(lines[1]).toBe("uniform float u_x; // @range 0..1");
+    // …and the real declaration got the new range.
+    expect(lines[3]).toBe("uniform float u_x; // @range 0..2");
+  });
+
+  it("preserves a block comment that sits before the trailing comment", () => {
+    const src = `uniform float u_x; /* keep me */ // @range 0..1`;
+    const out = writeUniformHints(src, "u_x", { min: 0, max: 3 });
+    expect(out).toBe("uniform float u_x; /* keep me */ // @range 0..3");
+  });
+
+  it("is not fooled by a `//` that lives inside a block comment", () => {
+    const src = `uniform float u_x; /* // */ // @range 0..1`;
+    const out = writeUniformHints(src, "u_x", { min: 0, max: 5 });
+    expect(out).toBe("uniform float u_x; /* // */ // @range 0..5");
+  });
+});

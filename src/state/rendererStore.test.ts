@@ -10,6 +10,7 @@ describe("rendererStore", () => {
       canvasSize: { width: 1, height: 1 },
       contextUnavailable: false,
       glRetryTick: 0,
+      snapshotRequested: false,
     });
   });
 
@@ -122,5 +123,51 @@ describe("rendererStore", () => {
     useRendererStore.getState().retryGlContext();
     expect(useRendererStore.getState().glRetryTick).toBe(before + 1);
     expect(useRendererStore.getState().contextUnavailable).toBe(false);
+  });
+
+  // Snapshot request (#3). The Viewport RAF loop reads `snapshotRequested` to
+  // force one draw past the idle gate, then consumes the flag right after
+  // executePlan. Both halves depend on the one-shot semantics below.
+  describe("snapshot request", () => {
+    it("starts with no pending request and consume returns false", () => {
+      expect(useRendererStore.getState().snapshotRequested).toBe(false);
+      expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(false);
+    });
+
+    it("requestSnapshot arms the flag for the idle gate to observe", () => {
+      useRendererStore.getState().requestSnapshot();
+      expect(useRendererStore.getState().snapshotRequested).toBe(true);
+    });
+
+    it("consume is one-shot: true once, false on the next call", () => {
+      useRendererStore.getState().requestSnapshot();
+      expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(true);
+      expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(false);
+      expect(useRendererStore.getState().snapshotRequested).toBe(false);
+    });
+
+    it("repeated requests before a consume still yield a single capture", () => {
+      const store = useRendererStore.getState();
+      store.requestSnapshot();
+      store.requestSnapshot();
+      store.requestSnapshot();
+      expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(true);
+      expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(false);
+    });
+
+    it("a request placed after a consume is served independently", () => {
+      useRendererStore.getState().requestSnapshot();
+      expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(true);
+      useRendererStore.getState().requestSnapshot();
+      expect(useRendererStore.getState().snapshotRequested).toBe(true);
+      expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(true);
+    });
+
+    it("an already-armed request keeps the same state reference (no re-render churn)", () => {
+      useRendererStore.getState().requestSnapshot();
+      const before = useRendererStore.getState();
+      useRendererStore.getState().requestSnapshot();
+      expect(useRendererStore.getState()).toBe(before);
+    });
   });
 });

@@ -179,6 +179,9 @@ export interface SpStores {
         renderTick: number;
         errors: string[];
       };
+      /** One-shot PNG snapshot request served by the RAF loop (#3). */
+      snapshotRequested: boolean;
+      requestSnapshot: () => void;
     };
   };
   gpuTimer: {

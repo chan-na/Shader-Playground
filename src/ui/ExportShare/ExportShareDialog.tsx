@@ -760,6 +760,13 @@ export function ExportShareDialog() {
   // uniform drag elsewhere (new `nodes` array reference, same `rev`) can't
   // re-trigger this string-length recompute.
   const sizeKB = useMemo(() => {
+    // [#41] The dialog is mounted for the whole session but rendered only
+    // while `open`. Without this guard, every structural graph edit — every
+    // node add, every edge, every source recompile that bumps `rev` — built
+    // the entire standalone HTML document just to measure its length, for a
+    // panel nobody is looking at. The hook itself stays above the
+    // `if (!open) return null` early return (biome `useHookAtTopLevel`).
+    if (!open) return 0;
     const s = useGraphStore.getState();
     const html = buildExportedHtml(
       { nodes: s.nodes, edges: s.edges },
@@ -769,7 +776,7 @@ export function ExportShareDialog() {
     // directly so it reads as a real dependency, not just a list entry.
     void rev;
     return Math.max(1, Math.round(html.length / 1024));
-  }, [rev]);
+  }, [rev, open]);
 
   if (!open) return null;
 
@@ -805,6 +812,10 @@ export function ExportShareDialog() {
       const url = await encodeShareUrl(
         { nodes: s.nodes, edges: s.edges },
         s.positions,
+        // Default origin; `parents` is the 4th positional arg (the signature
+        // order is pinned by shareUrl.test / phase-11).
+        undefined,
+        s.parents,
       );
       setShareUrl(url);
       setPhase("done");

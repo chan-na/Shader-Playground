@@ -63,6 +63,26 @@ describe("setUniform", () => {
     expect(spy).toHaveBeenCalledWith(expect.anything(), 1, 2, 3, 4);
   });
 
+  it("dispatches a plain number[] by its runtime length (no tuple re-boxing)", () => {
+    // Callers hand over long-lived scratch arrays and store-shaped number[];
+    // the dispatch must read their length rather than require a tuple type.
+    const gl = createFakeGl();
+    const spy = vi.spyOn(gl, "uniform3f");
+    const scratch: number[] = [7, 8, 9];
+    setUniform(gl, {} as WebGLUniformLocation, scratch);
+    expect(spy).toHaveBeenCalledWith(expect.anything(), 7, 8, 9);
+  });
+
+  it("ignores an array length with no vector entry point", () => {
+    const gl = createFakeGl();
+    const spies = (["uniform2f", "uniform3f", "uniform4f"] as const).map((n) =>
+      vi.spyOn(gl, n),
+    );
+    setUniform(gl, {} as WebGLUniformLocation, [1, 2, 3, 4, 5]);
+    setUniform(gl, {} as WebGLUniformLocation, []);
+    for (const s of spies) expect(s).not.toHaveBeenCalled();
+  });
+
   it("dispatches sampler2D → activeTexture + bindTexture + uniform1i", () => {
     const gl = createFakeGl();
     const active = vi.spyOn(gl, "activeTexture");

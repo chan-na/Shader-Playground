@@ -973,6 +973,9 @@
   // Pointer state for u_mouse (vec4): xy=current, zw=last click. Framebuffer
   // pixels, bottom-left origin (matches gl_FragCoord / u_resolution).
   var mouse = [0, 0, 0, 0];
+  // Same tuple rescaled into the current pass's FBO space (see the per-pass
+  // bind below). Separate output array so `mouse` keeps canvas coordinates.
+  var mousePass = [0, 0, 0, 0];
   function pointerToCanvas(e) {
     var rect = canvas.getBoundingClientRect();
     var sx = canvas.width / Math.max(1, rect.width);
@@ -1131,7 +1134,12 @@
   var sizeDirty = true;
   var frameNum = 0;
   function frame(now) {
-    if (sizeDirty || resize()) {
+    // resize() has the side effect of syncing the drawing buffer to the CSS
+    // box, so it must run unconditionally. Testing sizeDirty first short-
+    // circuits it away on exactly the frame after a window resize, leaving
+    // canvas.width stale while resizePasses() sizes the FBOs from it. (#29)
+    var resized = resize();
+    if (sizeDirty || resized) {
       sizeDirty = false;
       resizePasses();
     }
@@ -1172,12 +1180,24 @@
       var u = pass.program.uniforms;
       setUniform(u["u_time"], t);
       setUniform(u["u_resolution"], [pass.fbo.w, pass.fbo.h]);
-      setUniform(u["u_mouse"], mouse);
+      // u_resolution is the pass FBO size, so u_mouse has to live in the same
+      // space — scale per axis (1 for full-resolution passes).
+      var mx = pass.fbo.w / Math.max(1, canvas.width);
+      var my = pass.fbo.h / Math.max(1, canvas.height);
+      mousePass[0] = mouse[0] * mx;
+      mousePass[1] = mouse[1] * my;
+      mousePass[2] = mouse[2] * mx;
+      mousePass[3] = mouse[3] * my;
+      setUniform(u["u_mouse"], mousePass);
       setUniform(u["u_frame"], frameNum);
       if (!pass.meshIsFullscreen) {
         setUniform(u["u_view"], view);
         setUniform(u["u_proj"], proj);
         setUniform(u["u_model"], model);
+        // Same set the app binds in execute.ts's bindSystemUniforms — without
+        // u_camera any lighting model that needs a view vector reads 0 in the
+        // export and renders differently from the editor. (#27)
+        setUniform(u["u_camera"], eye);
       }
 
       // User uniforms with value-node overrides (param/math/swizzle/combine).
@@ -1246,7 +1266,10 @@
 
     if (drawable.length > 0) {
       var cells = splitLayout(drawable.length, canvas.width, canvas.height);
-      for (var i = 0; i < drawable.length; i++) {
+      // splitLayout tops out at 4 cells, so a graph with 5+ connected outputs
+      // would run off the end and throw on `c.x` every frame. (#28)
+      var drawCount = Math.min(drawable.length, cells.length);
+      for (var i = 0; i < drawCount; i++) {
         var c = cells[i];
         gl.viewport(c.x, c.y, Math.max(1, c.w), Math.max(1, c.h));
         gl.useProgram(blit.program);

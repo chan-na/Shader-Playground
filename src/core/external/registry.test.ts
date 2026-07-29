@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   __setAudioContextFactoryForTests,
   __setGetUserMediaForTests,
@@ -10,6 +10,7 @@ import {
   getExternalTexture,
   getExternalVideoElement,
   reconcileExternal,
+  resetExternalTextures,
   retryExternalSource,
   setAudioBlobResolver,
   setVideoBlobResolver,
@@ -326,6 +327,100 @@ describe("video specs", () => {
     ]);
     expect(getExternalTexture("v1")).toBeNull();
   });
+
+  // --- #26: 'loadeddata' must honour the live spec, not the acquire-time one.
+  // Decoding takes long enough that the user can pause or scrub while the file
+  // is still loading; the deferred onReady used to replay the stale snapshot
+  // and undo them.
+
+  /** Acquire a video handle whose <video> element is under our control. */
+  function acquireProbeVideo(
+    playing: boolean,
+    currentTime: number,
+  ): HTMLVideoElement {
+    setVideoBlobResolver(() => new Blob([new Uint8Array([0])]));
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: "a",
+        playing,
+        loop: true,
+        muted: true,
+        currentTime,
+      },
+    ]);
+    const el = getExternalVideoElement("v1");
+    if (!el) throw new Error("expected a <video> element for the probe handle");
+    return el;
+  }
+
+  it("does not autoplay when the spec was paused while metadata loaded", () => {
+    const el = acquireProbeVideo(true, 0);
+    const play = vi.fn(() => Promise.resolve());
+    const pause = vi.fn();
+    el.play = play;
+    el.pause = pause;
+
+    // User hits pause before 'loadeddata' ever fires.
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: "a",
+        playing: false,
+        loop: true,
+        muted: true,
+        currentTime: 0,
+      },
+    ]);
+    play.mockClear();
+
+    el.dispatchEvent(new Event("loadeddata"));
+
+    expect(play).not.toHaveBeenCalled();
+    expect(getExternalStatus("v1")?.ready).toBe(true);
+  });
+
+  it("still autoplays when the live spec is playing", () => {
+    const el = acquireProbeVideo(true, 0);
+    const play = vi.fn(() => Promise.resolve());
+    el.play = play;
+
+    el.dispatchEvent(new Event("loadeddata"));
+
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it("seeks to the latest requested time, not the acquire-time snapshot", () => {
+    const el = acquireProbeVideo(false, 1);
+    const seeks: number[] = [];
+    Object.defineProperty(el, "currentTime", {
+      configurable: true,
+      get: () => seeks[seeks.length - 1] ?? 0,
+      set: (v: number) => {
+        seeks.push(v);
+      },
+    });
+
+    // User scrubs to 7s while the file is still decoding.
+    reconcileExternal([
+      {
+        nodeId: "v1",
+        kind: "video",
+        assetId: "a",
+        playing: false,
+        loop: true,
+        muted: true,
+        currentTime: 7,
+      },
+    ]);
+    el.dispatchEvent(new Event("loadeddata"));
+
+    // Before the fix the deferred seek replayed the acquire-time 1.
+    expect(seeks[seeks.length - 1]).toBe(7);
+    expect(seeks).not.toContain(1);
+  });
 });
 
 /**
@@ -631,6 +726,38 @@ describe("external texture lifecycle (M3/M5)", () => {
     disposeAllExternal(fake.gl);
     expect(fake.deleted()).toBe(1);
     expect(externalHandleCount()).toBe(0);
+  });
+
+  it("resetExternalTextures drops the dead texture handle without deleting or disposing (#13)", async () => {
+    await readyMicAudio();
+    const fake = makeFakeGl();
+    updateExternalSources(fake.gl);
+    expect(getExternalTexture("a1")).not.toBeNull();
+    const before = getExternalStatus("a1");
+
+    resetExternalTextures();
+
+    // The GPU object died with the context — only the JS reference is cleared.
+    expect(getExternalTexture("a1")).toBeNull();
+    expect(fake.deleted()).toBe(0);
+    // The source itself survives a context loss: handle stays registered and
+    // ready/width/height are untouched.
+    expect(externalHandleCount()).toBe(1);
+    expect(getExternalStatus("a1")).toEqual(before);
+  });
+
+  it("re-creates the texture on the next upload after resetExternalTextures (#13)", async () => {
+    await readyMicAudio();
+    const fake = makeFakeGl();
+    updateExternalSources(fake.gl);
+    expect(fake.created()).toBe(1);
+
+    resetExternalTextures();
+    // Without the reset this tick would take the texSubImage2D fast path into a
+    // dead texture and the source would stay frozen forever.
+    updateExternalSources(fake.gl);
+    expect(fake.created()).toBe(2);
+    expect(getExternalTexture("a1")).not.toBeNull();
   });
 });
 

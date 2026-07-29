@@ -1,4 +1,5 @@
 import { setDiagnostics } from "@codemirror/lint";
+import type { Extension } from "@codemirror/state";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { CSSProperties } from "react";
@@ -7,6 +8,7 @@ import { glslValidator } from "../../core/glsl/glslValidator";
 import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { displayNodeName } from "../../core/nodes/registry";
+import type { NodeDiagnostics } from "../../state/diagnosticsStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
@@ -17,6 +19,7 @@ import { DockPanelHeader } from "../DockPanelHeader";
 import { NODE_GLYPH } from "../NodeEditor/nodeTheme";
 import { AutoOpenToggle } from "./AutoOpenToggle";
 import { setCurrentView } from "./currentView";
+import { pickEditorNodeId } from "./editorNode";
 import { glslExtensions } from "./glslSetup";
 import { toCMDiagnostics } from "./lintAdapter";
 import { MultiSelectBanner } from "./MultiSelectBanner";
@@ -110,6 +113,29 @@ type CommitFn = ((value: string, target: CommitTarget) => void) & {
   flush: () => void;
 };
 
+/** Merge authoritative (recompile) diagnostics with the pre-compile ones from
+ * the live worker. The store is the source of truth; when both have an entry at
+ * the same line and severity we drop the live one to avoid duplicate underlines
+ * (Phase 24). Module-local so both the steady-state diagnostics effect and the
+ * document-swap compensating dispatch compute the exact same set. */
+function mergeDiagnostics(
+  diags: NodeDiagnostics | undefined,
+  stage: "vertex" | "fragment",
+  live: GLSLDiagnostic[],
+): GLSLDiagnostic[] {
+  const stageDiags = diags
+    ? stage === "vertex"
+      ? diags.vertex
+      : diags.fragment
+    : [];
+  const auth = [...stageDiags, ...(diags?.link ?? [])];
+  const authKeys = new Set(auth.map((d) => `${d.line}:${d.severity}`));
+  return [
+    ...auth,
+    ...live.filter((d) => !authKeys.has(`${d.line}:${d.severity}`)),
+  ];
+}
+
 export function CodeEditor() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -122,6 +148,13 @@ export function CodeEditor() {
   // Holds the mount-time debounced commit so the reload effect can flush any
   // pending edit before it replaces the doc on a node/stage switch (L17).
   const commitRef = useRef<CommitFn | null>(null);
+  // The exact extension array the mounted EditorState was built from. Every
+  // `setState` MUST reuse this identical array — see the reload effect (#1a).
+  const extRef = useRef<Extension[] | null>(null);
+  // Mount-time debounced live validator, so the reload effect can kick it for a
+  // swapped-in document (a `setState` produces no ViewUpdate, so the update
+  // listener that normally drives it never runs).
+  const liveValidateRef = useRef<((value: string) => void) | null>(null);
 
   const selectedId = useSelectionStore((s) => s.selectedNodeId);
   const selectedIds = useSelectionStore((s) => s.selectedNodeIds);
@@ -131,10 +164,14 @@ export function CodeEditor() {
   const jumpRequest = useEditorStore((s) => s.jumpRequest);
   const clearJump = useEditorStore((s) => s.clearJump);
 
-  const firstShaderId = useGraphStore(
-    (s) => s.nodes.find((n) => n.kind === "shader")?.id ?? null,
+  // Which node this editor edits — `pickEditorNodeId` is the shared rule (#10),
+  // called *inside* the selector so the component stays reactive to both the
+  // selection and the node list. `rename.ts` reads the same rule through
+  // `currentEditorNodeId()`, so F2's cross-stage context can never disagree
+  // with the document on screen.
+  const effectiveId = useGraphStore((s) =>
+    pickEditorNodeId(selectedId, s.nodes),
   );
-  const effectiveId = selectedId ?? firstShaderId;
 
   const node = useGraphStore(
     (s) =>
@@ -156,6 +193,10 @@ export function CodeEditor() {
   const diags = useDiagnosticsStore((s) =>
     effectiveId ? s.byNode[effectiveId] : undefined,
   );
+  // Read by the reload effect's compensating dispatch without widening that
+  // effect's trigger set (which is deliberately just the document identity).
+  const diagsRef = useRef<NodeDiagnostics | undefined>(undefined);
+  diagsRef.current = diags;
 
   // Multi-select banner (Code Editor.dc.html L56-72) — subscribe to the raw
   // slices (whole nodes array / whole diagnostics map) rather than deriving a
@@ -264,11 +305,17 @@ export function CodeEditor() {
       }
     });
 
+    // ⚠ ONE array, reused by the initial state and by every `setState` in the
+    // reload effect. Rebuilding it there as `glslExtensions()` alone would drop
+    // `updateListener` from the swapped-in state, and from that moment on every
+    // keystroke would stop reaching the store — a silent data-loss regression
+    // that typecheck / lint / knip cannot see (#1a).
+    const extensions: Extension[] = [...glslExtensions(), updateListener];
+    extRef.current = extensions;
+    liveValidateRef.current = liveValidate;
+
     const view = new EditorView({
-      state: EditorState.create({
-        doc: "",
-        extensions: [...glslExtensions(), updateListener],
-      }),
+      state: EditorState.create({ doc: "", extensions }),
       parent: containerRef.current,
     });
     viewRef.current = view;
@@ -277,6 +324,8 @@ export function CodeEditor() {
       commit.cancel();
       liveValidate.cancel();
       commitRef.current = null;
+      liveValidateRef.current = null;
+      extRef.current = null;
       setCurrentView(null);
       view.destroy();
       viewRef.current = null;
@@ -291,6 +340,42 @@ export function CodeEditor() {
   //      so we never wipe in-flight edits. On a true document switch we also
   //      drop any in-flight live diagnostic — the next keystroke (or the
   //      upcoming store recompile) repopulates it.
+  //
+  // (a) replaces the whole EditorState (`view.setState`) rather than dispatching
+  // a {from:0,to:len} change, because vertex.glsl and fragment.glsl of node A
+  // and node B are four *different documents* that happen to share one view.
+  // A change transaction keeps one undo timeline across all of them, so Cmd+Z
+  // right after a switch pops the document-load transaction and pours the
+  // previous document into the current stage — which the 50ms commit debounce
+  // then writes to the store, destroying the real source (#1a).
+  //
+  // What `setState` resets, extension by extension (glslSetup.ts:26-48) — #1e:
+  //   • `history()`            → undo/redo stack. THE POINT: per-document
+  //                              timelines. (`historyCompartment.reconfigure`
+  //                              cannot do this — @codemirror/commands keeps the
+  //                              field on a module singleton and its
+  //                              reconfigure path explicitly *preserves* state.)
+  //   • `foldGutter()`         → folded ranges (fold state field) are lost.
+  //   • `lintGutter()` + the lint field appended by `setDiagnostics`  → gutter
+  //                              markers AND underlines. The lint extension is
+  //                              installed via `StateEffect.appendConfig`, so it
+  //                              is not in `extRef` at all — the compensating
+  //                              dispatch below reinstalls it for the new doc.
+  //   • `glslAutocomplete()`   → an open completion popup closes.
+  //   • `glslHoverTooltip()`   → an open hover tooltip is dismissed.
+  //   • `glslSemanticHighlight()` / `glslReferenceHighlight()` / `bracketMatching()`
+  //     / `highlightActiveLine()` / `drawSelection()` → ViewPlugin instances are
+  //     recreated and their decoration RangeSets rebuilt from the new doc (no
+  //     user-visible loss — they are pure functions of doc+selection).
+  //   • `glsl()` language      → a fresh parse of the new document.
+  //   • selection + scroll position reset to the document start (expected on a
+  //     document switch; the ProblemsPanel jump effect re-positions when asked).
+  //   • Stateless / recomputed, nothing to lose: `lineNumbers()`,
+  //     `indentOnInput()`, `syntaxHighlighting()`, `keymap(defaultKeymap +
+  //     historyKeymap)`, `glslGotoDefinition()`, `glslRename()`,
+  //     `editorChromeTheme`, `EditorView.lineWrapping`.
+  // The EditorView *instance* is deliberately unchanged — `setCurrentView` and
+  // the E2E `__sp.codeEditor.getCursorLine()` bridge hold onto it.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -308,7 +393,42 @@ export function CodeEditor() {
     if (switching) commitRef.current?.flush();
     loadedKeyRef.current = key;
     lastCommittedRef.current = source;
-    if (switching) setLiveDiags([]);
+    // Keep the identity when there is nothing to clear. Handing out a fresh
+    // `[]` on every switch would re-fire the `[diags, stage, liveDiags]`
+    // effect below unconditionally — a duplicate CM dispatch per switch, and
+    // worse, an accidental safety net that hides whether the compensating
+    // dispatch further down actually works (it would silently paper over its
+    // removal). With this bail-out that effect only runs when the merged
+    // diagnostic set can genuinely differ.
+    if (switching) setLiveDiags((prev) => (prev.length === 0 ? prev : []));
+    const extensions = extRef.current;
+    if (switching && extensions) {
+      view.setState(EditorState.create({ doc: source, extensions }));
+      // Two compensating dispatches, because `setState` is not a transaction:
+      // (1) reinstall + repopulate lint for the incoming document. Relying on
+      //     the `[diags, stage, liveDiags]` effect to re-fire is not sound —
+      //     switching between two nodes whose diagnosticsStore entry is the
+      //     same reference (both absent, or literally the same object), on the
+      //     same stage, changes none of its deps, and the `setLiveDiags` above
+      //     deliberately preserves identity when it is already empty. The lint
+      //     field itself did not survive `setState` (it is installed through
+      //     `StateEffect.appendConfig`, so it is not in `extRef`), so without
+      //     this dispatch the incoming document would carry no underlines at
+      //     all. Pinned by "re-applies diagnostics when the switch changes no
+      //     effect dependency" in `index.test.tsx`.
+      view.dispatch(
+        setDiagnostics(
+          view.state,
+          toCMDiagnostics(view, mergeDiagnostics(diagsRef.current, stage, [])),
+        ),
+      );
+      // (2) kick the live validator by hand: `setState` produces no ViewUpdate,
+      //     so `updateListener` (which normally drives it on every doc change,
+      //     including the old reload dispatch) never sees this swap. `commit` is
+      //     deliberately NOT called — the incoming text came *from* the store.
+      liveValidateRef.current?.(source);
+      return;
+    }
     // Same-document external change where the editor already shows exactly
     // `source` (e.g. a cross-stage F2 rename that mutated the doc via its own
     // dispatch *and* committed to the store in the same turn): skip the full
@@ -344,25 +464,13 @@ export function CodeEditor() {
     clearJump();
   }, [jumpRequest, effectiveId, stage, clearJump]);
 
-  // Push diagnostics to CM — merge authoritative (recompile) diagnostics from
-  // diagnosticsStore with pre-compile diagnostics from the live worker. The
-  // store is the source of truth; when both have an entry at the same line
-  // and severity we drop the live one to avoid duplicate underlines (Phase 24).
+  // Push diagnostics to CM (see `mergeDiagnostics`). The document-swap path
+  // above runs the same merge with an empty live set, so the two never
+  // disagree about what should be underlined.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    const stageDiags = diags
-      ? stage === "vertex"
-        ? diags.vertex
-        : diags.fragment
-      : [];
-    const linkDiags = diags?.link ?? [];
-    const auth = [...stageDiags, ...linkDiags];
-    const authKeys = new Set(auth.map((d) => `${d.line}:${d.severity}`));
-    const live = liveDiags.filter(
-      (d) => !authKeys.has(`${d.line}:${d.severity}`),
-    );
-    const all = [...auth, ...live];
+    const all = mergeDiagnostics(diags, stage, liveDiags);
     view.dispatch(setDiagnostics(view.state, toCMDiagnostics(view, all)));
   }, [diags, stage, liveDiags]);
 

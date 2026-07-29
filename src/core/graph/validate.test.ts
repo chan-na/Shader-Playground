@@ -274,6 +274,90 @@ describe("topologicalOrder", () => {
     expect(validateGraph(g)).toEqual([]);
   });
 
+  it("still emits a node whose only incoming edge has a deleted source (#12)", () => {
+    // Primary defect guard. `ghost` is not in `nodes` and — crucially — nothing
+    // live points *at* it, so it can never be queued and can never give back the
+    // in-degree it stole. Without filtering the accumulation loop by source
+    // liveness, `b` keeps indeg 1 forever, is never drained, and vanishes from
+    // the compile plan together with everything downstream of it.
+    // Do NOT add a `live node → ghost` edge here: that lets `ghost` enter the
+    // queue, its drain decrement cancels its own increment, and the buggy code
+    // passes again (which is exactly what the [a, d, e, c, b] case below cannot
+    // catch on its own).
+    const g: Graph = {
+      nodes: [shader("a"), shader("b")],
+      edges: [
+        {
+          id: "e1",
+          source: "ghost",
+          sourceHandle: "texture",
+          target: "b",
+          targetHandle: "u_tex",
+        },
+      ],
+    };
+    expect(topologicalOrder(g).map((n) => n.id)).toEqual(["a", "b"]);
+  });
+
+  it("keeps real dependencies ordered when edges reference a deleted node (#12)", () => {
+    // Half-fix guard, complementing the case above. `ghost` is not in `nodes` —
+    // a dangling edge left behind by a stale save / hand-edited import.
+    // Filtering such edges out of only one of the two loops
+    // is not enough: if the drain walk still sees them, `ghost` gets queued and
+    // decrements `b`'s in-degree, so `b` is emitted before `c`, the shader it
+    // samples. Node order is deliberately [a, d, e, c, b] so the bug surfaces.
+    // (`a → ghost` is what queues `ghost`, so this graph alone does NOT catch a
+    // completely unfiltered accumulation loop — hence the separate case above.)
+    const g: Graph = {
+      nodes: [shader("a"), shader("d"), shader("e"), shader("c"), shader("b")],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "texture",
+          target: "ghost",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e2",
+          source: "ghost",
+          sourceHandle: "texture",
+          target: "b",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e3",
+          source: "c",
+          sourceHandle: "texture",
+          target: "b",
+          targetHandle: "u_other",
+        },
+        {
+          id: "e4",
+          source: "d",
+          sourceHandle: "texture",
+          target: "e",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e5",
+          source: "e",
+          sourceHandle: "texture",
+          target: "c",
+          targetHandle: "u_tex",
+        },
+      ],
+    };
+    const order = topologicalOrder(g).map((n) => n.id);
+    // Every live node is still emitted exactly once, and no phantom appears.
+    expect(order.slice().sort()).toEqual(["a", "b", "c", "d", "e"]);
+    expect(order).not.toContain("ghost");
+    // The live chain d → e → c → b stays in dependency order.
+    expect(order.indexOf("d")).toBeLessThan(order.indexOf("e"));
+    expect(order.indexOf("e")).toBeLessThan(order.indexOf("c"));
+    expect(order.indexOf("c")).toBeLessThan(order.indexOf("b"));
+  });
+
   it("topologicalOrder includes group nodes harmlessly (compile filters them out)", () => {
     const g: Graph = {
       nodes: [

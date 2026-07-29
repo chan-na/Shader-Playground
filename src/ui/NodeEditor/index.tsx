@@ -41,12 +41,22 @@ import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
 import { GraphSkeleton } from "./GraphSkeleton";
 import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
-import { createNodeDataCache } from "./rfNodeData";
+import type { FlowRect } from "./rfNodeData";
+import {
+  addedPanDecision,
+  createNodeDataCache,
+  groupBoxHeight,
+  pendingAddedIds,
+} from "./rfNodeData";
 import { ZoomControls } from "./ZoomControls";
 
 /** Width/height approximation for non-group node cards when picking a target
  *  group on drag-stop. The real measurements come from the DOM but we don't
  *  need pixel accuracy — we just want the drop target picker to be forgiving.
+ *
+ *  Also the last-resort stand-in for the off-screen pan check (addedCardSize),
+ *  which needs a real card box and only reaches this when a node has neither a
+ *  measurement nor an element.
  */
 const DROP_CARD_W = 180;
 const DROP_CARD_H = 64;
@@ -57,7 +67,7 @@ export function NodeEditor() {
   const graphEdges = useGraphStore((s) => s.edges);
   const positions = useGraphStore((s) => s.positions);
   const parents = useGraphStore((s) => s.parents);
-  const rev = useGraphStore((s) => s.rev);
+  const graphEpoch = useGraphStore((s) => s.graphEpoch);
   const updateNodePosition = useGraphStore((s) => s.updateNodePosition);
   const removeNode = useGraphStore((s) => s.removeNode);
   const addEdge = useGraphStore((s) => s.addEdge);
@@ -67,6 +77,19 @@ export function NodeEditor() {
   const setSelectedIds = useSelectionStore((s) => s.setSelectedIds);
   const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds);
   const flowRef = useRef<ReactFlowInstance | null>(null);
+  // The React Flow host box, measured to turn the visible area into flow
+  // coordinates (the instance exposes no container size of its own).
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  // Node ids as of the previous render, plus the epoch they belonged to, so a
+  // freshly added node can be told apart by set difference. Comparing counts
+  // is not enough: removing one node and adding another in the same commit
+  // leaves the count untouched.
+  const prevNodeIdsRef = useRef<ReadonlySet<string> | null>(null);
+  const prevEpochRef = useRef(graphEpoch);
+  // Added ids whose pan decision is still owed. A ref rather than a local,
+  // because the decision happens a frame later and a commit landing in between
+  // cancels that frame — see pendingAddedIds.
+  const pendingAddedRef = useRef<readonly string[]>([]);
   // Per-node `data` wrappers, stable across renders so React Flow only
   // re-renders the card whose graph node actually changed (see rfNodeData).
   // Lazily created once and kept for the component's lifetime.
@@ -89,11 +112,13 @@ export function NodeEditor() {
     Record<string, { width: number; height: number }>
   >({});
 
-  // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear) so
-  // small graph panels still show every node. Triggered by rev bumps, not by
-  // per-node drags (which don't bump rev).
-  const prevCountRef = useRef(graphNodes.length);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: rev is the intentional trigger for wholesale-graph-replace refits
+  // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear,
+  // import, share restore, undo/redo) so small graph panels still show every
+  // node. `graphEpoch` moves only on those replacements [#38] — keying this on
+  // `rev` re-framed the canvas after every structural edit (adding one node,
+  // wiring one edge, each shader recompile), animating the view out from under
+  // the user mid-work.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: graphEpoch is a trigger-only dep (the body deliberately reads nothing from it), and graphNodes is deliberately NOT a dep — it is read only as an at-fire guard and listing it would restore the per-edit refit this fix removes
   useEffect(() => {
     const inst = flowRef.current;
     if (!inst) return;
@@ -107,9 +132,118 @@ export function NodeEditor() {
         duration: MOTION_MAX_MS,
       });
     });
-    prevCountRef.current = graphNodes.length;
     return () => cancelAnimationFrame(id);
-  }, [rev, graphNodes.length]);
+  }, [graphEpoch]);
+
+  // Visibility net for the refit removed above: node adds use fixed flow
+  // coordinates (AddNodePill / CommandPalette), so with the canvas panned away
+  // a new node now lands off-screen and the menu looks like it did nothing.
+  // Pan — never zoom, that is what #38 removed — and only when the node really
+  // is outside the visible area, so an add in plain sight leaves the viewport
+  // untouched. See addedPanDecision for the framing rules.
+  //
+  // Runs a frame after the commit that added the node, so the card it has to
+  // measure has been laid out. Everything it needs lives in refs, so the
+  // callback is stable and both triggers below share the one implementation.
+  const decidePan = useCallback(() => {
+    const addedIds = pendingAddedRef.current;
+    if (addedIds.length === 0) return;
+    const inst = flowRef.current;
+    const pane = paneRef.current;
+    // Nothing to measure against: no answer is possible, so the ids stay
+    // pending rather than being spent on a decision nobody made.
+    if (!inst || !pane) return;
+    const rect = pane.getBoundingClientRect();
+    // A dock panel that is collapsed (or whose sibling is maximized) is hidden
+    // with CSS and keeps its panel *mounted* — so this is a live element
+    // reporting 0×0, nothing can be judged visible against it, and no remount
+    // will ever come to re-run the decision. Keep the ids; the ResizeObserver
+    // below is what retries once the panel has a real box again.
+    if (rect.width === 0 || rect.height === 0) return;
+    const topLeft = inst.screenToFlowPosition({ x: rect.left, y: rect.top });
+    const bottomRight = inst.screenToFlowPosition({
+      x: rect.right,
+      y: rect.bottom,
+    });
+    const view: FlowRect = {
+      x: topLeft.x,
+      y: topLeft.y,
+      width: bottomRight.x - topLeft.x,
+      height: bottomRight.y - topLeft.y,
+    };
+    const { target, pending } = addedPanDecision(
+      view,
+      addedIds,
+      (id) => {
+        const internal = inst.getInternalNode(id);
+        if (!internal) return null;
+        // React Flow has not measured a card mounted this frame (its
+        // ResizeObserver only reports after the rAF callbacks), so read the
+        // element it will measure — same properties, one frame earlier. The
+        // selector matches React Flow's own node lookup.
+        const el = pane.querySelector(`.react-flow__node[data-id="${id}"]`);
+        return {
+          hidden: internal.hidden === true,
+          position: internal.internals.positionAbsolute,
+          measured: internal.measured,
+          dom:
+            el instanceof HTMLElement
+              ? { width: el.offsetWidth, height: el.offsetHeight }
+              : null,
+        };
+      },
+      { width: DROP_CARD_W, height: DROP_CARD_H },
+    );
+    pendingAddedRef.current = pending;
+    if (!target) return;
+    void inst.setCenter(target.x, target.y, {
+      // setCenter defaults to maxZoom — pass the current zoom through so
+      // this stays a pan and the user's zoom level survives.
+      zoom: inst.getViewport().zoom,
+      duration: MOTION_MAX_MS,
+    });
+  }, []);
+
+  useEffect(() => {
+    const prevIds = prevNodeIdsRef.current;
+    const prevEpoch = prevEpochRef.current;
+    const ids = new Set(graphNodes.map((n) => n.id));
+    prevNodeIdsRef.current = ids;
+    prevEpochRef.current = graphEpoch;
+    // A wholesale replacement is the fitView effect's frame to draw; letting
+    // both run would animate the viewport twice at once.
+    if (prevIds === null || prevEpoch !== graphEpoch) {
+      pendingAddedRef.current = [];
+      return;
+    }
+    const addedIds = pendingAddedIds(pendingAddedRef.current, prevIds, ids);
+    pendingAddedRef.current = addedIds;
+    if (addedIds.length === 0) return;
+    const raf = requestAnimationFrame(decidePan);
+    return () => cancelAnimationFrame(raf);
+  }, [graphNodes, graphEpoch, decidePan]);
+
+  // The retry the effect above cannot be: its only triggers are the node array
+  // and the epoch, and expanding a collapsed dock panel changes neither — the
+  // panel is never unmounted, so React Flow does not re-frame either. Watching
+  // the pane turns "the panel has a real box again" into the missing trigger,
+  // so an add made while the panel was hidden is still shown when it comes
+  // back. Cheap when idle: with nothing pending the callback returns at once.
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+    let raf = 0;
+    const observer = new ResizeObserver(() => {
+      if (pendingAddedRef.current.length === 0) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(decidePan);
+    });
+    observer.observe(pane);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [decidePan]);
 
   const rfNodes: Node[] = useMemo(() => {
     const sel = new Set(selectedNodeIds);
@@ -259,7 +393,7 @@ export function NodeEditor() {
           const abs = getAbsolutePosition(g.id, state.positions, state.parents);
           // A collapsed group only occupies its header visually; restrict the
           // drop hit-box to match so nodes don't reparent into empty space.
-          const h = gn.collapsed ? GROUP_COLLAPSED_HEIGHT : gn.height;
+          const h = groupBoxHeight(gn);
           return {
             id: g.id,
             x1: abs.x,
@@ -281,8 +415,14 @@ export function NodeEditor() {
         const abs = getAbsolutePosition(id, fresh.positions, fresh.parents);
         const w =
           node.kind === "group" ? (node as GroupGraphNode).width : DROP_CARD_W;
+        // Same rule as the hit-boxes above: a collapsed group being dragged is
+        // only as tall as its header, so its center sits in the header — using
+        // the stored `height` put the center far below the visible card and
+        // picked whatever group happened to be under that empty point.
         const h =
-          node.kind === "group" ? (node as GroupGraphNode).height : DROP_CARD_H;
+          node.kind === "group"
+            ? groupBoxHeight(node as GroupGraphNode)
+            : DROP_CARD_H;
         const cx = abs.x + w / 2;
         const cy = abs.y + h / 2;
 
@@ -442,7 +582,11 @@ export function NodeEditor() {
     // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the toolbar Import button
     <div className="panel panel--graph" onDragOver={onDragOver} onDrop={onDrop}>
       <DockPanelHeader meta={`${graphNodes.length}N · ${graphEdges.length}E`} />
-      <div className="panel-body" style={{ background: "var(--surface-app)" }}>
+      <div
+        className="panel-body"
+        ref={paneRef}
+        style={{ background: "var(--surface-app)" }}
+      >
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}

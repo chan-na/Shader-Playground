@@ -246,6 +246,18 @@ export function DockPanelHeader({
                   // 드래그 시작(pointerdown)이 ✕까지 먹지 않도록 여기서
                   // 끊는다(탭 선택 onClick과는 별개로 지금 넣는다).
                   onPointerDown={(e) => e.stopPropagation()}
+                  // R10(design/CHANGELOG.md §v1.4): 탭 ✕는 키보드로 도달
+                  // 가능해야 한다. 부모 탭의 onKeyDown이 Enter/Space에
+                  // preventDefault를 걸어 이 버튼의 네이티브 활성화(그리고
+                  // 뒤따르는 click)를 삼키므로, 활성화 키에 한해 전파를
+                  // 끊는다. 통짜 stopPropagation은 금물 — React가 루트
+                  // 컨테이너에서 네이티브 전파까지 끊어 window 리스너
+                  // (Cmd+Z/D/A·화살표 nudge)가 죽는다.
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                    }
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     closeTab(id);

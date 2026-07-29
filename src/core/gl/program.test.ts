@@ -35,6 +35,20 @@ describe("createProgram", () => {
     expect(r.program?.uniforms).toHaveProperty("u_arr");
   });
 
+  it("records each active uniform's GLSL type under the stripped name", () => {
+    const gl = createFakeGl({
+      uniforms: ["u_time", "u_steps", "u_arr[0]"],
+      uniformTypes: { u_steps: 0x1404, "u_arr[0]": 0x8b53 },
+    });
+    const r = createProgram(gl, VS, FS);
+    // Names without an explicit type keep reporting FLOAT (fakeGl default).
+    expect(r.program?.uniformTypes).toEqual({
+      u_time: 0x1406,
+      u_steps: 0x1404,
+      u_arr: 0x8b53,
+    });
+  });
+
   it("reports vertex compile failure and returns no program", () => {
     const gl = createFakeGl({ compileFailure: true });
     const r = createProgram(gl, VS, FS);
@@ -90,6 +104,31 @@ describe("createTransformFeedbackProgram", () => {
     const gl = createFakeGl();
     const r = createTransformFeedbackProgram(gl, VS, FS, []);
     expect(r.program).not.toBeNull();
+  });
+
+  it("reflects uniform types through the same shared tail (#40)", () => {
+    // The reflection loop used to be duplicated per builder, so a fix landing
+    // in only one of them read as "shader nodes work, compute nodes don't".
+    // Compute passes are built here, so this must agree with createProgram.
+    const gl = createFakeGl({
+      uniforms: ["u_dt", "u_frame"],
+      uniformTypes: { u_frame: 0x1404 },
+    });
+    const r = createTransformFeedbackProgram(gl, VS, FS, ["v_out"]);
+    expect(r.program?.uniformTypes).toEqual({ u_dt: 0x1406, u_frame: 0x1404 });
+  });
+
+  it("keeps its own label in the post-link GL error log", () => {
+    // `label` stays a parameter of the shared tail — both callers must remain
+    // distinguishable in the log.
+    clearLogBuffer();
+    const gl = createFakeGl({ glError: 0x0502 });
+    const r = createTransformFeedbackProgram(gl, VS, FS, ["v_out"]);
+    expect(r.program).not.toBeNull();
+    const buf = getLogBuffer();
+    expect(buf[buf.length - 1]?.message).toContain(
+      "createTransformFeedbackProgram",
+    );
   });
 
   it("reports link failure for TF program too", () => {

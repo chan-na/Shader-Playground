@@ -56,6 +56,14 @@ export interface RendererState {
    * createGLContext, since the effect otherwise only runs once on mount.
    */
   glRetryTick: number;
+  /**
+   * One-shot "save the next drawn frame as a PNG" request. Set by the toolbar
+   * and served by the Viewport RAF loop, which is the only place that can read
+   * the drawing buffer while it is still valid (the context is created with
+   * `preserveDrawingBuffer: false`). Also feeds the idle gate so a paused,
+   * static graph still draws the frame the snapshot needs. (#3)
+   */
+  snapshotRequested: boolean;
   setReady: (ready: boolean) => void;
   setStats: (stats: Partial<RendererStats>) => void;
   setGlInfo: (info: GlInfo) => void;
@@ -69,6 +77,15 @@ export interface RendererState {
    *  optimistically clear the blocking screen (the effect re-sets it to
    *  true again if createGLContext still fails). */
   retryGlContext: () => void;
+  /** Ask the render loop to save the next drawn frame as a PNG. Idempotent
+   *  while a request is already pending — repeated clicks yield one file. */
+  requestSnapshot: () => void;
+  /**
+   * Read-and-clear the pending snapshot request. Returns `true` exactly once
+   * per {@link requestSnapshot}, so the frame loop can branch on it directly
+   * without a separate reset call.
+   */
+  consumeSnapshotRequest: () => boolean;
 }
 
 function panesEqual(a: ViewportPane[], b: ViewportPane[]): boolean {
@@ -91,6 +108,7 @@ export const useRendererStore = create<RendererState>((set, get) => ({
   canvasSize: { width: 1, height: 1 },
   contextUnavailable: false,
   glRetryTick: 0,
+  snapshotRequested: false,
   setReady: (ready) => set({ ready }),
   setGlInfo: (glInfo) => set({ glInfo }),
   setStats: (patch) => set((s) => ({ stats: { ...s.stats, ...patch } })),
@@ -123,4 +141,13 @@ export const useRendererStore = create<RendererState>((set, get) => ({
   setContextUnavailable: (v) => set({ contextUnavailable: v }),
   retryGlContext: () =>
     set((s) => ({ glRetryTick: s.glRetryTick + 1, contextUnavailable: false })),
+  requestSnapshot: () => {
+    if (get().snapshotRequested) return;
+    set({ snapshotRequested: true });
+  },
+  consumeSnapshotRequest: () => {
+    if (!get().snapshotRequested) return false;
+    set({ snapshotRequested: false });
+    return true;
+  },
 }));

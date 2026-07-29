@@ -41,28 +41,37 @@ export interface InspectorProps {
 }
 
 /**
+ * [#35] The node's *stored* editable title, i.e. the exact string the Name
+ * field must round-trip. [A-2] A group keeps its title in `label` (that's
+ * where `renameNode` routes it); every other kind keeps it in `name`.
+ *
+ * Deliberately NOT `displayNodeName()`: that falls back to the kind's label
+ * ("Shader", "Output", …) for an unnamed node, and this value is fed straight
+ * back into the draft — so seeding/reverting through it would let a blur
+ * commit the literal string "Shader" as the node's real name.
+ */
+function titleOf(node: GraphNode): string {
+  return node.kind === "group" ? node.label : (node.name ?? "");
+}
+
+/**
  * Common Inspector "Name" field (design/Side Panel.dc.html L75-81, D15).
  * Same rename source as the node card header's inline edit
- * (NodeCardHeader.tsx): `node.name` / `graphStore.renameNode`. Never
- * rendered for "group" — a group's rename affordance is its `label` field
- * (GroupInspector's Label input + GroupNodeView's header inline edit),
- * which `displayNodeName()` already treats as the sole source of truth for
- * group naming, so a second Name field here would just be a redundant
- * second writer of the same concept.
+ * (NodeCardHeader.tsx): `renameNode`, which writes `label` for groups and
+ * `name` for everything else — so this one field renames every kind and
+ * GroupInspector deliberately offers no competing Label input [A-2].
  *
- * Value is a local draft, not a direct binding to `node.name` — committing
- * on every keystroke would push a history entry per character. Only
- * Enter/blur call `renameNode`; Escape reverts the draft. The parent keys
- * this component on `${node.id}:${node.name ?? ""}` so an external rename
+ * Value is a local draft, not a direct binding to the stored title —
+ * committing on every keystroke would push a history entry per character.
+ * Only Enter/blur call `renameNode`; Escape reverts the draft. The parent
+ * keys this component on `${node.id}:${titleOf(node)}` so an external rename
  * (card double-click edit, undo/redo) remounts it and re-syncs the draft.
+ * Seed, Escape-revert and that remount key all read `titleOf` so the three
+ * never disagree [#35].
  */
 function NodeNameField({ node }: { node: GraphNode }) {
   const renameNode = useGraphStore((s) => s.renameNode);
-  // [A-2] A group's title is stored in `label`, not `name` (renameNode routes
-  // it there) — so seed the draft from whichever field is that kind's source.
-  const [draft, setDraft] = useState(
-    node.kind === "group" ? node.label : (node.name ?? ""),
-  );
+  const [draft, setDraft] = useState(() => titleOf(node));
 
   // Mirrors displayNodeName()'s final fallback (registry.ts) without
   // consulting `name` — the placeholder must show what the title would
@@ -91,7 +100,7 @@ function NodeNameField({ node }: { node: GraphNode }) {
               renameNode(node.id, draft);
             } else if (e.key === "Escape") {
               e.preventDefault();
-              setDraft(node.name ?? "");
+              setDraft(titleOf(node));
             }
           }}
           placeholder={fallback}
@@ -212,10 +221,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
 
           {/* [A-1·A-2] One Name field for every kind — params and groups
               included. Their old per-kind Label fields are gone. */}
-          <NodeNameField
-            key={`${node.id}:${node.kind === "group" ? node.label : (node.name ?? "")}`}
-            node={node}
-          />
+          <NodeNameField key={`${node.id}:${titleOf(node)}`} node={node} />
 
           {node.kind === "group" && (
             <GroupInspector node={node as GroupGraphNode} />
@@ -414,93 +420,105 @@ export function Inspector({ embedded = false }: InspectorProps) {
                     controls here.
                   </div>
                 )}
-                {filteredVisible.map((spec) => (
-                  <div
-                    key={spec.name}
-                    style={{ marginBottom: 10 }}
-                    data-testid="uniform-row"
-                    data-uniform-name={spec.name}
-                    data-uniform-control={spec.control}
-                  >
+                {filteredVisible.map((spec) => {
+                  // [#8] The open-hint-editor marker is scoped to
+                  // (node, uniform), not to the bare uniform name: two nodes
+                  // that both declare `u_time` are different rows, and
+                  // selecting the other one used to leave its editor
+                  // spring-loaded open (and the gear lit) for a spec it was
+                  // never opened on. Compared as a whole string — never
+                  // `.split(":")`, since node ids come from serialized
+                  // projects and may themselves contain ":".
+                  const hintKey = `${uniformOwner.id}:${spec.name}`;
+                  return (
                     <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 7,
-                      }}
+                      key={spec.name}
+                      style={{ marginBottom: 10 }}
+                      data-testid="uniform-row"
+                      data-uniform-name={spec.name}
+                      data-uniform-control={spec.control}
                     >
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 11.5,
-                          color: tokens.syntax.variable,
-                        }}
-                      >
-                        {spec.label ?? spec.name}
-                      </span>
-                      <span
+                      <div
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 6,
+                          justifyContent: "space-between",
+                          marginBottom: 7,
                         }}
                       >
                         <span
                           style={{
                             fontFamily: "var(--font-mono)",
-                            fontSize: 10,
-                            color: "var(--text-muted)",
+                            fontSize: 11.5,
+                            color: tokens.syntax.variable,
                           }}
                         >
-                          {spec.type}
+                          {spec.label ?? spec.name}
                         </span>
-                        <button
-                          type="button"
-                          title="범위·기본값·라벨 편집 (소스 주석에 기록)"
-                          data-testid="uniform-edit-toggle"
-                          data-edit-uniform={spec.name}
-                          onClick={() =>
-                            setEditingHint((cur) =>
-                              cur === spec.name ? null : spec.name,
-                            )
-                          }
+                        <span
                           style={{
-                            padding: 0,
-                            fontSize: 11,
-                            lineHeight: 1,
-                            background: "none",
-                            border: "none",
-                            color:
-                              editingHint === spec.name
-                                ? "var(--accent-default)"
-                                : "var(--text-muted)",
-                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
                           }}
                         >
-                          ⚙
-                        </button>
-                      </span>
-                    </div>
-                    <UniformControl
-                      spec={spec}
-                      value={uniformOwner.uniformValues[spec.name]}
-                      onChange={(v) =>
-                        setUniformValue(uniformOwner.id, spec.name, v)
-                      }
-                    />
-                    {editingHint === spec.name && (
-                      <UniformHintEditor
+                          <span
+                            style={{
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 10,
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            {spec.type}
+                          </span>
+                          <button
+                            type="button"
+                            title="범위·기본값·라벨 편집 (소스 주석에 기록)"
+                            data-testid="uniform-edit-toggle"
+                            data-edit-uniform={spec.name}
+                            onClick={() =>
+                              setEditingHint((cur) =>
+                                cur === hintKey ? null : hintKey,
+                              )
+                            }
+                            style={{
+                              padding: 0,
+                              fontSize: 11,
+                              lineHeight: 1,
+                              background: "none",
+                              border: "none",
+                              color:
+                                editingHint === hintKey
+                                  ? "var(--accent-default)"
+                                  : "var(--text-muted)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ⚙
+                          </button>
+                        </span>
+                      </div>
+                      <UniformControl
                         spec={spec}
-                        onApply={(hints) => {
-                          setUniformHints(uniformOwner.id, spec.name, hints);
-                          setEditingHint(null);
-                        }}
-                        onClose={() => setEditingHint(null)}
+                        value={uniformOwner.uniformValues[spec.name]}
+                        onChange={(v) =>
+                          setUniformValue(uniformOwner.id, spec.name, v)
+                        }
                       />
-                    )}
-                  </div>
-                ))}
+                      {editingHint === hintKey && (
+                        <UniformHintEditor
+                          key={hintKey}
+                          spec={spec}
+                          onApply={(hints) => {
+                            setUniformHints(uniformOwner.id, spec.name, hints);
+                            setEditingHint(null);
+                          }}
+                          onClose={() => setEditingHint(null)}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {samplers.length > 0 && filteredSamplers.length > 0 && (

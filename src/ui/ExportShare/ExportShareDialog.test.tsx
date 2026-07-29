@@ -109,6 +109,35 @@ describe("ExportShareDialog", () => {
     expect(screen.queryByTestId("export-share-dialog")).toBeNull();
   });
 
+  // [#41] The dialog is mounted for the whole session. The KB estimate memo
+  // used to key on `rev` alone, so every structural graph edit built the
+  // entire standalone HTML document just to measure its length — for a panel
+  // that isn't on screen.
+  it("does not build the exported HTML until the dialog is opened", () => {
+    render(<ExportShareDialog />);
+    expect(htmlExport.buildExportedHtml).not.toHaveBeenCalled();
+
+    act(() => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "m2", kind: "mesh", primitive: "cube" });
+    });
+    // `rev` moved, but the closed dialog still measures nothing.
+    expect(htmlExport.buildExportedHtml).not.toHaveBeenCalled();
+
+    act(() => {
+      useExportShareStore.getState().openWith("html");
+    });
+    expect(htmlExport.buildExportedHtml).toHaveBeenCalledTimes(1);
+
+    const expectedKB = Math.round(FIXED_HTML_LENGTH / 1024);
+    expect(
+      screen.getByText(
+        `${expectedKB} KB · WebGL2 · self-contained · timestamp added on download`,
+      ),
+    ).not.toBeNull();
+  });
+
   it("openWith('html') shows all 4 rail items and the HTML configure panel with a KB estimate", () => {
     useExportShareStore.getState().openWith("html");
     const { container } = render(<ExportShareDialog />);
@@ -174,6 +203,28 @@ describe("ExportShareDialog", () => {
     fireEvent.click(screen.getByTestId("es-copy-link"));
     expect(await screen.findByText("Copied ✓")).not.toBeNull();
     expect(writeText).toHaveBeenCalledWith("http://x/#share=abc");
+  });
+
+  it("Create link forwards positions AND the parents map (grouping survives the link)", async () => {
+    useGraphStore
+      .getState()
+      .setGraph(
+        TRIVIAL_GRAPH,
+        { m1: { x: 10, y: 20 }, o1: { x: 30, y: 40 } },
+        { m1: "g1" },
+      );
+    useExportShareStore.getState().openWith("link");
+    render(<ExportShareDialog />);
+
+    fireEvent.click(screen.getByTestId("es-create-link"));
+    expect(await screen.findByTestId("es-share-url")).not.toBeNull();
+
+    const call = vi.mocked(shareUrlModule.encodeShareUrl).mock.calls[0];
+    expect(call?.[1]).toEqual({ m1: { x: 10, y: 20 }, o1: { x: 30, y: 40 } });
+    // 3rd arg is the origin (default), 4th is the parent map — dropping it
+    // used to flatten every group out of the shared project.
+    expect(call?.[2]).toBeUndefined();
+    expect(call?.[3]).toEqual({ m1: "g1" });
   });
 
   it("clicking a rail item switches target and resets to the configure phase", () => {

@@ -19,6 +19,7 @@ import { useGifRecorderStore } from "../state/gifRecorder";
 import { redoGraph, undoGraph, useGraphStore } from "../state/graphStore";
 import { useHistoryStore } from "../state/historyStore";
 import { useRecorderStore } from "../state/recorder";
+import { useRendererStore } from "../state/rendererStore";
 import { deserializeProject, serializeProject } from "../state/serialization";
 import { toast } from "../state/toastStore";
 import { tokens, withAlpha } from "../theme";
@@ -160,20 +161,16 @@ export function AppToolbar() {
     }
   };
 
+  /**
+   * Queue a viewport PNG. The capture itself happens inside the Viewport RAF
+   * loop, immediately after the frame is drawn — reading the canvas from this
+   * click handler returned an empty image whenever the idle gate had skipped
+   * the draw, because the GL context uses `preserveDrawingBuffer: false`. The
+   * request also wakes the loop for one frame, so a paused static graph still
+   * produces a file. (#3)
+   */
   const screenshot = () => {
-    const canvas = document.querySelector(
-      ".viewport-canvas",
-    ) as HTMLCanvasElement | null;
-    if (!canvas) return;
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = exportFileName(DEFAULT_EXPORT_BASE, "png");
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }, "image/png");
+    useRendererStore.getState().requestSnapshot();
   };
 
   const recorderStatus = useRecorderStore((r) => r.status);

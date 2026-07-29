@@ -13,13 +13,22 @@ vi.mock("../core/assets/gltfLoader", () => ({
 vi.mock("../core/assets/imageLoader", () => ({
   loadImageFromFile: vi.fn(),
 }));
+// The factory must cover *every* named export assetActions imports, video and
+// audio included — a missing key resolves to `undefined` at the call site and
+// blows up the moment a test exercises that path.
 vi.mock("../core/assets/cache", () => ({
+  cacheAudio: vi.fn().mockResolvedValue(undefined),
   cacheImage: vi.fn().mockResolvedValue(undefined),
   cacheMesh: vi.fn().mockResolvedValue(undefined),
+  cacheVideo: vi.fn().mockResolvedValue(undefined),
+  deleteCachedAudio: vi.fn().mockResolvedValue(undefined),
   deleteCachedImage: vi.fn().mockResolvedValue(undefined),
   deleteCachedMesh: vi.fn().mockResolvedValue(undefined),
+  deleteCachedVideo: vi.fn().mockResolvedValue(undefined),
+  loadCachedAudio: vi.fn(),
   loadCachedImage: vi.fn(),
   loadCachedMesh: vi.fn(),
+  loadCachedVideo: vi.fn(),
 }));
 
 import {
@@ -27,12 +36,15 @@ import {
   cacheMesh,
   deleteCachedImage,
   deleteCachedMesh,
+  loadCachedAudio,
   loadCachedImage,
   loadCachedMesh,
+  loadCachedVideo,
 } from "../core/assets/cache";
 import { loadGltfFromFile } from "../core/assets/gltfLoader";
 import { loadImageFromFile } from "../core/assets/imageLoader";
 import { loadObjFromFile } from "../core/assets/objLoader";
+import { clearLogBuffer, getLogBuffer } from "../utils/log";
 import {
   classifyFile,
   forgetImage,
@@ -157,6 +169,82 @@ describe("importFiles", () => {
     const results = await importFiles([mockFile("readme.txt")]);
     expect(results).toEqual([]);
     expect(useGraphStore.getState().nodes).toHaveLength(0);
+  });
+
+  // --- #34: unsupported files used to vanish without a word --------------
+
+  it("raises a single aggregate warning when nothing could be imported", async () => {
+    useToastStore.getState().clear();
+
+    const results = await importFiles([
+      mockFile("readme.txt"),
+      mockFile("notes.md"),
+    ]);
+
+    expect(results).toEqual([]);
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.kind).toBe("warning");
+    expect(toasts[0]?.message).toContain("readme.txt");
+    expect(toasts[0]?.message).toContain("notes.md");
+  });
+
+  it("stays quiet about skipped sidecars when at least one file imported", async () => {
+    // Selecting cube.obj together with its cube.mtl is the normal flow; the
+    // ignored sidecar must not be reported as a failure.
+    useToastStore.getState().clear();
+    vi.mocked(loadObjFromFile).mockResolvedValue(meshHandle("mesh-sidecar"));
+
+    const results = await importFiles([
+      mockFile("cube.obj"),
+      mockFile("cube.mtl"),
+    ]);
+
+    expect(results).toHaveLength(1);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
+  // --- #23: best-effort cache writes are logged, never toasted ------------
+
+  it("logs a warning when priming the IndexedDB cache fails", async () => {
+    const handle = meshHandle("mesh-quota");
+    vi.mocked(loadObjFromFile).mockResolvedValue(handle);
+    vi.mocked(cacheMesh).mockRejectedValueOnce(new Error("QuotaExceededError"));
+    useToastStore.getState().clear();
+    clearLogBuffer();
+
+    const results = await importFiles([mockFile("cube.obj")]);
+
+    // The import itself still succeeds — the cache is an optimisation.
+    expect(results).toHaveLength(1);
+    await vi.waitFor(() => {
+      const hit = getLogBuffer().find((e) =>
+        e.message.includes("asset cache write failed"),
+      );
+      expect(hit).toBeDefined();
+      expect(hit?.level).toBe("warn");
+      // Same category cache.ts uses for its own read-path warnings.
+      expect(hit?.category).toBe("autosave");
+      expect(hit?.message).toContain("mesh-quota");
+    });
+  });
+
+  it("does not toast when the cache write fails", async () => {
+    // Private-mode windows reject every IDB put; an error banner per dropped
+    // file would make the app unusable there.
+    vi.mocked(loadImageFromFile).mockResolvedValue(imageHandle("img-private"));
+    vi.mocked(cacheImage).mockRejectedValueOnce(new Error("SecurityError"));
+    useToastStore.getState().clear();
+
+    const results = await importFiles([mockFile("a.png")]);
+    await vi.waitFor(() => {
+      expect(
+        getLogBuffer().some((e) => e.message.includes("image img-private")),
+      ).toBe(true);
+    });
+
+    expect(results).toHaveLength(1);
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 
   it("logs and continues when a loader rejects, importing other files", async () => {
@@ -326,6 +414,69 @@ describe("hydrateGraphAssets (H5)", () => {
     });
     expect(loadCachedMesh).toHaveBeenCalledTimes(1);
     expect(loadCachedMesh).toHaveBeenCalledWith("mesh1");
+  });
+
+  // #30 — hydrateAssetsFor snapshots the store once, before its first await,
+  // so duplicate ids all clear the "already loaded?" guard and each fires its
+  // own IndexedDB read plus a redundant store write.
+  it("de-duplicates repeated assetIds across all four asset lists", async () => {
+    const m = meshHandle("shared-mesh");
+    vi.mocked(loadCachedMesh).mockResolvedValue(m);
+    vi.mocked(loadCachedImage).mockResolvedValue(null);
+    vi.mocked(loadCachedVideo).mockResolvedValue(null);
+    vi.mocked(loadCachedAudio).mockResolvedValue(null);
+
+    hydrateGraphAssets([
+      { id: "n1", kind: "mesh", primitive: "cube", assetId: "shared-mesh" },
+      { id: "n2", kind: "mesh", primitive: "sphere", assetId: "shared-mesh" },
+      { id: "n3", kind: "image", assetId: "shared-img" },
+      { id: "n4", kind: "image", assetId: "shared-img" },
+      {
+        id: "n5",
+        kind: "video",
+        assetId: "shared-vid",
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+      {
+        id: "n6",
+        kind: "video",
+        assetId: "shared-vid",
+        playing: true,
+        loop: true,
+        muted: true,
+      },
+      {
+        id: "n7",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: "shared-aud",
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+      {
+        id: "n8",
+        kind: "audio",
+        sourceKind: "file",
+        assetId: "shared-aud",
+        fftSize: 256,
+        smoothing: 0.8,
+        playing: true,
+        loop: true,
+      },
+    ]);
+
+    await vi.waitFor(() => {
+      expect(useAssetStore.getState().meshes["shared-mesh"]).toBe(m);
+      expect(loadCachedAudio).toHaveBeenCalled();
+    });
+    expect(loadCachedMesh).toHaveBeenCalledTimes(1);
+    expect(loadCachedImage).toHaveBeenCalledTimes(1);
+    expect(loadCachedVideo).toHaveBeenCalledTimes(1);
+    expect(loadCachedAudio).toHaveBeenCalledTimes(1);
   });
 
   it("does not touch IndexedDB when no node references an asset", async () => {

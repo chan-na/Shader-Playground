@@ -46,6 +46,17 @@ const groupNode: GraphNode = {
   height: 120,
 };
 
+const otherGroupNode: GraphNode = {
+  id: "g2",
+  kind: "group",
+  label: "Second Group",
+  width: 200,
+  height: 120,
+};
+
+/** A second shader declaring the *same* uniform name as `shaderNode`. */
+const otherShaderNode: ShaderGraphNode = { ...shaderNode, id: "s2" };
+
 describe("Inspector (smoke)", () => {
   it("renders one auto-generated uniform row with a slider control and the AUTO badge", () => {
     useGraphStore.getState().addNode(shaderNode);
@@ -168,5 +179,126 @@ describe("Inspector — Name field (D15)", () => {
     expect(
       (screen.getByTestId("node-name-input") as HTMLInputElement).value,
     ).toBe("Renamed via card");
+  });
+
+  // [#35] Seed, Escape-revert and the remount key must all read the same
+  // field. Escape used to revert to `node.name ?? ""`, which for a group is
+  // always "" — abandoning an edit blanked the field of a group that has a
+  // perfectly good `label`.
+  it("Escape reverts a group's draft to its label, not to blank", () => {
+    useGraphStore.getState().addNode(groupNode);
+    useSelectionStore.getState().select("g1");
+    render(<Inspector embedded />);
+
+    const input = screen.getByTestId("node-name-input") as HTMLInputElement;
+    expect(input.value).toBe("My Group");
+
+    fireEvent.change(input, { target: { value: "Half-typed name" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(input.value).toBe("My Group");
+  });
+
+  it("Escape still reverts a non-group draft to its name", () => {
+    useGraphStore.getState().addNode(shaderNode);
+    useGraphStore.getState().renameNode("s1", "Blur pass");
+    useSelectionStore.getState().select("s1");
+    render(<Inspector embedded />);
+
+    const input = screen.getByTestId("node-name-input") as HTMLInputElement;
+    expect(input.value).toBe("Blur pass");
+
+    fireEvent.change(input, { target: { value: "Half-typed name" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(input.value).toBe("Blur pass");
+  });
+});
+
+// [#8] The open-hint-editor marker used to be the bare uniform name, which is
+// not unique across nodes.
+describe("Inspector — hint editor is scoped to the owning node (#8)", () => {
+  it("closes the editor when a different node with the same uniform name is selected", () => {
+    useGraphStore.getState().addNode(shaderNode);
+    useGraphStore.getState().addNode(otherShaderNode);
+    useSelectionStore.getState().select("s1");
+    render(<Inspector embedded />);
+
+    fireEvent.click(screen.getByTestId("uniform-edit-toggle"));
+    expect(screen.getByTestId("uniform-hint-editor")).not.toBeNull();
+
+    act(() => {
+      useSelectionStore.getState().select("s2");
+    });
+    // s2 declares u_a too — it must not inherit s1's open editor.
+    expect(
+      screen.getByTestId("uniform-row").getAttribute("data-uniform-name"),
+    ).toBe("u_a");
+    expect(screen.queryByTestId("uniform-hint-editor")).toBeNull();
+
+    // …and re-selecting s1 brings its own editor back.
+    act(() => {
+      useSelectionStore.getState().select("s1");
+    });
+    expect(screen.getByTestId("uniform-hint-editor")).not.toBeNull();
+  });
+
+  it("opens for the newly selected node when its own gear is clicked", () => {
+    useGraphStore.getState().addNode(shaderNode);
+    useGraphStore.getState().addNode(otherShaderNode);
+    useSelectionStore.getState().select("s1");
+    render(<Inspector embedded />);
+
+    fireEvent.click(screen.getByTestId("uniform-edit-toggle"));
+    act(() => {
+      useSelectionStore.getState().select("s2");
+    });
+    fireEvent.click(screen.getByTestId("uniform-edit-toggle"));
+
+    expect(screen.getByTestId("uniform-hint-editor")).not.toBeNull();
+    // Applying writes to the selected node, not the one the editor was first
+    // opened on.
+    fireEvent.click(screen.getByTestId("uniform-hint-cancel"));
+    expect(screen.queryByTestId("uniform-hint-editor")).toBeNull();
+  });
+});
+
+// [#25] GroupInspector is rendered unkeyed, so switching groups reuses the
+// component instance. A boolean `confirmingDelete` survived the switch and
+// left the destructive confirm box armed on a group the user never opened it
+// on — only reproducible from the Inspector, not by rendering GroupInspector
+// directly.
+describe("Inspector — group delete confirmation is per group (#25)", () => {
+  it("drops the armed confirm box when another group is selected", () => {
+    useGraphStore.getState().addNode(groupNode);
+    useGraphStore.getState().addNode(otherGroupNode);
+    useSelectionStore.getState().select("g1");
+    render(<Inspector embedded />);
+
+    fireEvent.click(screen.getByTestId("group-delete-cascade"));
+    expect(screen.getByTestId("group-delete-confirm")).not.toBeNull();
+
+    act(() => {
+      useSelectionStore.getState().select("g2");
+    });
+
+    expect(
+      screen.getByTestId("group-inspector").getAttribute("data-group-id"),
+    ).toBe("g2");
+    expect(screen.queryByTestId("group-delete-confirm")).toBeNull();
+  });
+
+  it("still confirms for the group it was armed on", () => {
+    useGraphStore.getState().addNode(groupNode);
+    useGraphStore.getState().addNode(otherGroupNode);
+    useSelectionStore.getState().select("g1");
+    render(<Inspector embedded />);
+
+    fireEvent.click(screen.getByTestId("group-delete-cascade"));
+    fireEvent.click(screen.getByTestId("group-delete-confirm-ok"));
+
+    const ids = useGraphStore.getState().nodes.map((n) => n.id);
+    expect(ids).not.toContain("g1");
+    expect(ids).toContain("g2");
   });
 });

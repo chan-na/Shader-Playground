@@ -1047,6 +1047,53 @@ describe("insertDetachedLeaf — B4-U1 (dc dockGhost L466-487)", () => {
     expect(asSplit(asSplit(next).b).a).toBe(originalNodeEditor);
   });
 
+  it("expands a collapsed center-merge target — the dropped tab must not vanish behind the 34px rail", () => {
+    const tree = createDefaultDockTree();
+    const path: DockPath = ["b", "b", "b"]; // l2: inspector/assets
+    const collapsedTree = setNodeAt(tree, path, {
+      type: "leaf",
+      id: "l2",
+      tabs: ["inspector", "assets"],
+      active: "inspector",
+      collapsed: true,
+    });
+    const mergeLeaf: DockLeaf = {
+      type: "leaf",
+      id: "new",
+      tabs: ["nodeEditor"],
+      active: "nodeEditor",
+    };
+
+    const next = insertDetachedLeaf(
+      collapsedTree,
+      regionTarget("center", path),
+      mergeLeaf,
+    );
+
+    expect(getNodeAt(next, path)).toEqual({
+      type: "leaf",
+      id: "l2",
+      tabs: ["inspector", "assets", "nodeEditor"],
+      active: "nodeEditor",
+      collapsed: false,
+    });
+  });
+
+  it("does not introduce a `collapsed` key on a target that never had one (conditional spread)", () => {
+    const tree = createDefaultDockTree();
+    const path: DockPath = ["b", "b", "b"]; // l2 has no `collapsed` key
+    const next = insertDetachedLeaf(tree, regionTarget("center", path), {
+      type: "leaf",
+      id: "new",
+      tabs: ["nodeEditor"],
+      active: "nodeEditor",
+    });
+    const merged = getNodeAt(next, path);
+    if (merged === null) throw new Error("expected the merged leaf");
+
+    expect(Object.keys(merged)).not.toContain("collapsed");
+  });
+
   describe("T1 (S5, v2.0) — viewport/code are excluded from heterogeneous center merges", () => {
     it("(a) still merges a non-exclusive tab (inspector) into the nodeEditor leaf — existing merge behavior preserved", () => {
       const tree = createDefaultDockTree();

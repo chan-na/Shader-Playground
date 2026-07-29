@@ -39,7 +39,16 @@ const TONE_DOT_GLOW: Partial<Record<StatusTone, string>> = {
 const TIME_SAMPLE_INTERVAL_MS = 250;
 
 export function StatusBar() {
-  const stats = useRendererStore((s) => s.stats);
+  // [#42] Field selectors, not `s.stats`. Every RAF frame that does GPU work
+  // calls `bumpRenderTick()`, which spreads a *new* `stats` object — so
+  // subscribing to the object re-rendered this whole bar ~60x/sec even though
+  // `renderTick` is never displayed here. `fps` changes about once a second,
+  // `drawCalls` only on recompile, and `errors` keeps its array identity until
+  // something is actually pushed. `renderTick` deliberately stays *inside*
+  // `stats` (six e2e specs and tests/e2e/helpers/sp.ts read it there).
+  const fps = useRendererStore((s) => s.stats.fps);
+  const drawCalls = useRendererStore((s) => s.stats.drawCalls);
+  const errors = useRendererStore((s) => s.stats.errors);
   const ready = useRendererStore((s) => s.ready);
   const paneCount = useRendererStore((s) => s.panes.length);
   const contextUnavailable = useRendererStore((s) => s.contextUnavailable);
@@ -95,7 +104,7 @@ export function StatusBar() {
     return () => clearInterval(id);
   }, []);
 
-  const errorCount = stats.errors.length;
+  const errorCount = errors.length;
   const problemCount = diagnosticsProblemCount + errorCount;
   const showGpu = gpuSupported && gpuEnabled;
 
@@ -133,8 +142,8 @@ export function StatusBar() {
       >
         {dockedCount} panel{dockedCount === 1 ? "" : "s"} docked
       </span>
-      <span title="Frames per second">{stats.fps} FPS</span>
-      <span title="Draw calls per frame">{stats.drawCalls} draws</span>
+      <span title="Frames per second">{fps} FPS</span>
+      <span title="Draw calls per frame">{drawCalls} draws</span>
       {showGpu ? (
         <span
           title="Sum of GPU pass times (EXT_disjoint_timer_query_webgl2, EMA-smoothed)"
@@ -161,9 +170,7 @@ export function StatusBar() {
             : "statusbar-problems statusbar-muted"
         }
         onClick={toggleProblems}
-        title={
-          errorCount > 0 ? stats.errors.join("\n") : "Open the problems list"
-        }
+        title={errorCount > 0 ? errors.join("\n") : "Open the problems list"}
         data-testid="status-problems"
       >
         {problemCount > 0

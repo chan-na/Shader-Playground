@@ -5,6 +5,7 @@ import {
   render,
   screen,
 } from "@testing-library/react";
+import { Profiler } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useDebugUiStore } from "../../state/debugUiStore";
@@ -188,5 +189,68 @@ describe("StatusBar — 'N panels docked' (B6-U2)", () => {
     expect(screen.getByTestId("status-docked").textContent).toBe(
       "0 panels docked",
     );
+  });
+});
+
+// [#42] The bar subscribes to individual `stats` fields, not to the `stats`
+// object. `bumpRenderTick()` runs on every RAF frame that does GPU work and
+// spreads a fresh `stats` object each time, so an object-level subscription
+// re-rendered the whole bar ~60x/sec for a counter it never displays.
+// A React Profiler commit counter is the assertion: no commit in the subtree
+// means the component did not re-render.
+describe("StatusBar — stats field selectors (#42)", () => {
+  const initialRenderer = useRendererStore.getState();
+
+  afterEach(() => {
+    cleanup();
+    useRendererStore.setState(initialRenderer, true);
+  });
+
+  it("does not re-render when only stats.renderTick changes", () => {
+    let commits = 0;
+    render(
+      <Profiler
+        id="statusbar"
+        onRender={() => {
+          commits += 1;
+        }}
+      >
+        <StatusBar />
+      </Profiler>,
+    );
+    const afterMount = commits;
+    expect(afterMount).toBeGreaterThan(0);
+
+    act(() => {
+      useRendererStore.getState().bumpRenderTick();
+      useRendererStore.getState().bumpRenderTick();
+    });
+    expect(commits).toBe(afterMount);
+    // The counter really did advance — the bar just doesn't care.
+    expect(useRendererStore.getState().stats.renderTick).toBe(2);
+
+    act(() => {
+      useRendererStore.getState().setStats({ fps: 42 });
+    });
+    expect(commits).toBeGreaterThan(afterMount);
+    expect(screen.getByTitle("Frames per second").textContent).toBe("42 FPS");
+  });
+
+  it("still tracks drawCalls and runtime errors through their own selectors", () => {
+    render(<StatusBar />);
+
+    act(() => {
+      useRendererStore.getState().setStats({ drawCalls: 7 });
+    });
+    expect(screen.getByTitle("Draw calls per frame").textContent).toBe(
+      "7 draws",
+    );
+
+    act(() => {
+      useRendererStore.getState().pushError("boom");
+    });
+    const problems = screen.getByTestId("status-problems");
+    expect(problems.textContent).toBe("⚠ 1 problem");
+    expect(problems.getAttribute("title")).toBe("boom");
   });
 });

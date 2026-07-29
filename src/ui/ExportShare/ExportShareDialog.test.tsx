@@ -109,6 +109,35 @@ describe("ExportShareDialog", () => {
     expect(screen.queryByTestId("export-share-dialog")).toBeNull();
   });
 
+  // [#41] The dialog is mounted for the whole session. The KB estimate memo
+  // used to key on `rev` alone, so every structural graph edit built the
+  // entire standalone HTML document just to measure its length — for a panel
+  // that isn't on screen.
+  it("does not build the exported HTML until the dialog is opened", () => {
+    render(<ExportShareDialog />);
+    expect(htmlExport.buildExportedHtml).not.toHaveBeenCalled();
+
+    act(() => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "m2", kind: "mesh", primitive: "cube" });
+    });
+    // `rev` moved, but the closed dialog still measures nothing.
+    expect(htmlExport.buildExportedHtml).not.toHaveBeenCalled();
+
+    act(() => {
+      useExportShareStore.getState().openWith("html");
+    });
+    expect(htmlExport.buildExportedHtml).toHaveBeenCalledTimes(1);
+
+    const expectedKB = Math.round(FIXED_HTML_LENGTH / 1024);
+    expect(
+      screen.getByText(
+        `${expectedKB} KB · WebGL2 · self-contained · timestamp added on download`,
+      ),
+    ).not.toBeNull();
+  });
+
   it("openWith('html') shows all 4 rail items and the HTML configure panel with a KB estimate", () => {
     useExportShareStore.getState().openWith("html");
     const { container } = render(<ExportShareDialog />);

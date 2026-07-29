@@ -20,7 +20,13 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
   const setGroupColor = useGraphStore((s) => s.setGroupColor);
   const removeGroup = useGraphStore((s) => s.removeGroup);
   const select = useSelectionStore((s) => s.select);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // [#25] Which group the confirm box is armed for — not a bare boolean.
+  // The Inspector renders this panel unkeyed, so selecting a different group
+  // reuses the same component instance and a boolean would carry the armed
+  // state over: the new group's panel would open already showing "Permanently
+  // remove this group and its N children?", one stray click from a cascade
+  // delete the user never asked for.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const childCount = useGraphStore(
     (s) => directChildren(node.id, s.nodes, s.parents).length,
@@ -100,14 +106,14 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
           type="button"
           className="ctl-btn ctl-btn--danger"
           style={{ flex: 1 }}
-          onClick={() => setConfirmingDelete(true)}
+          onClick={() => setConfirmingId(node.id)}
           data-testid="group-delete-cascade"
         >
           Delete with children…
         </button>
       </div>
 
-      {confirmingDelete && (
+      {confirmingId === node.id && (
         <div
           data-testid="group-delete-confirm"
           style={{
@@ -138,7 +144,7 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
               onClick={() => {
                 removeGroup(node.id, "delete-children");
                 select(null);
-                setConfirmingDelete(false);
+                setConfirmingId(null);
               }}
               data-testid="group-delete-confirm-ok"
             >
@@ -148,7 +154,7 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
               type="button"
               className="ctl-btn ctl-btn--ghost"
               style={{ flex: 1 }}
-              onClick={() => setConfirmingDelete(false)}
+              onClick={() => setConfirmingId(null)}
             >
               Cancel
             </button>

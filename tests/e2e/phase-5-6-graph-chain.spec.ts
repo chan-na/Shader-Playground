@@ -235,6 +235,85 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
     ]);
   });
 
+  // Regression [#38 follow-up]: every add path drops its node at a fixed flow
+  // coordinate, and the editor no longer refits the canvas on a plain add — so
+  // with the view parked elsewhere the new node appeared outside the viewport
+  // with no feedback at all, as if the menu had done nothing. It has to be
+  // panned back into sight, at the zoom the user left behind.
+  test("a node added while the canvas is framed elsewhere is panned into view", async ({
+    page,
+  }) => {
+    // setGraph is a wholesale replace, so the editor's auto-fit frames this
+    // lone node at (6000, 6000) — the same end state as panning there by hand,
+    // minus a flake-prone pointer drag.
+    await setGraph(
+      page,
+      {
+        nodes: [{ id: "far1", kind: "param", paramKind: "float", value: 0.5 }],
+        edges: [],
+      },
+      { far1: { x: 6000, y: 6000 } },
+    );
+    const pane = await stableBox(page, ".panel--graph .panel-body");
+    // The auto-fit puts a lone node dead center. Waiting for that (rather than
+    // for two equal box reads) is what makes the zoom check below meaningful:
+    // the fit's zoom animation can stall for >80ms mid-flight, and a box
+    // sampled there reports a zoom the user never actually sat at.
+    await expect
+      .poll(
+        async () => {
+          const box = await page.locator("[data-id='far1']").boundingBox();
+          if (!box) return Number.POSITIVE_INFINITY;
+          return Math.max(
+            Math.abs(box.x + box.width / 2 - (pane.x + pane.width / 2)),
+            Math.abs(box.y + box.height / 2 - (pane.y + pane.height / 2)),
+          );
+        },
+        {
+          message: "the auto-fit never centered the far node",
+          intervals: [80],
+        },
+      )
+      .toBeLessThan(2);
+    const framed = await page.locator("[data-id='far1']").boundingBox();
+    const framedWidth = framed?.width ?? 0;
+    expect(framedWidth).toBeGreaterThan(0);
+
+    // The pill adds an Image node at its fixed (-200, 200) — 6000px away.
+    await page
+      .getByTestId("add-node-pill")
+      .getByRole("button", { name: "Image" })
+      .click();
+    const added = page.locator(".react-flow__node[data-id^='image_']");
+    await expect(added).toHaveCount(1);
+
+    await expect
+      .poll(
+        async () => {
+          const box = await added.boundingBox();
+          if (!box) return false;
+          return (
+            box.x < pane.x + pane.width &&
+            box.x + box.width > pane.x &&
+            box.y < pane.y + pane.height &&
+            box.y + box.height > pane.y
+          );
+        },
+        { message: "the added node never entered the viewport" },
+      )
+      .toBe(true);
+
+    // Pan, not fit: the untouched node's rendered width is a direct read of
+    // the zoom, which the move must leave alone. The band is wide on purpose —
+    // it only has to separate "same zoom" from the two ways this goes wrong,
+    // and both miss it by a mile: refitting over both nodes 6000px apart drops
+    // the zoom to ~0.09 (≈18px), and setCenter without an explicit zoom snaps
+    // to maxZoom (≈2×).
+    const farAfter = await page.locator("[data-id='far1']").boundingBox();
+    expect(farAfter?.width ?? 0).toBeGreaterThan(framedWidth * 0.75);
+    expect(farAfter?.width ?? 0).toBeLessThan(framedWidth * 1.25);
+  });
+
   test("cycle is rejected by validateGraph (would-be edge prevents compile)", async ({
     page,
   }) => {

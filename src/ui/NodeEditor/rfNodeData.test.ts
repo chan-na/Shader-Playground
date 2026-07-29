@@ -5,7 +5,11 @@ import type {
   ShaderGraphNode,
 } from "../../core/graph/types";
 import { GROUP_COLLAPSED_HEIGHT } from "../../core/graph/types";
-import { createNodeDataCache, groupBoxHeight } from "./rfNodeData";
+import {
+  createNodeDataCache,
+  groupBoxHeight,
+  offscreenPanTarget,
+} from "./rfNodeData";
 
 function paramNode(id: string): ParamGraphNode {
   return { id, kind: "param", paramKind: "float", value: 0 };
@@ -38,6 +42,83 @@ describe("groupBoxHeight", () => {
   it("ignores the stored height entirely while collapsed", () => {
     expect(groupBoxHeight(group({ collapsed: true, height: 2000 }))).toBe(
       GROUP_COLLAPSED_HEIGHT,
+    );
+  });
+});
+
+describe("offscreenPanTarget", () => {
+  // 1000×600 of flow space starting at the origin.
+  const view = { x: 0, y: 0, width: 1000, height: 600 };
+  const card = (x: number, y: number) => ({ x, y, width: 180, height: 64 });
+
+  it("returns null when nothing was added", () => {
+    expect(offscreenPanTarget(view, [])).toBeNull();
+  });
+
+  it("returns null for a node fully inside the viewport", () => {
+    // [#38] The whole point of dropping the per-edit refit was that the
+    // viewport stops moving while the user works — an add in plain sight must
+    // not move it either.
+    expect(offscreenPanTarget(view, [card(400, 200)])).toBeNull();
+  });
+
+  it("returns null for a node only partly on screen", () => {
+    // 20px of the card pokes over the left edge: still visible feedback.
+    expect(offscreenPanTarget(view, [card(-160, 200)])).toBeNull();
+  });
+
+  it("treats a node touching the edge exactly as off-screen", () => {
+    // Right edge at x=0 shares no area with the viewport.
+    expect(offscreenPanTarget(view, [card(-180, 200)])).toEqual({
+      x: -90,
+      y: 232,
+    });
+  });
+
+  it("centers a node that sits past the right edge", () => {
+    expect(offscreenPanTarget(view, [card(4000, 0)])).toEqual({
+      x: 4090,
+      y: 32,
+    });
+  });
+
+  it("measures against a panned viewport, not the flow origin", () => {
+    // The user panned to (6000, 6000); the fixed add coordinate near the flow
+    // origin is what lands off-screen.
+    const panned = { x: 5800, y: 5800, width: 1000, height: 600 };
+    expect(offscreenPanTarget(panned, [card(-200, 200)])).toEqual({
+      x: -110,
+      y: 232,
+    });
+    expect(offscreenPanTarget(panned, [card(6000, 6000)])).toBeNull();
+  });
+
+  it("stays put when any one of several added nodes is visible", () => {
+    expect(
+      offscreenPanTarget(view, [card(4000, 0), card(100, 100)]),
+    ).toBeNull();
+  });
+
+  it("centers the union of a batch that is entirely off-screen", () => {
+    // Union spans x 4000..4380, y 0..364 → center (4190, 182).
+    expect(offscreenPanTarget(view, [card(4000, 0), card(4200, 300)])).toEqual({
+      x: 4190,
+      y: 182,
+    });
+  });
+
+  it("frames the first node when the batch is larger than the viewport", () => {
+    // Union is 3180 wide against a 1000-wide viewport: its center would show
+    // the empty gap between the two nodes instead of either node.
+    expect(offscreenPanTarget(view, [card(4000, 0), card(7000, 0)])).toEqual({
+      x: 4090,
+      y: 32,
+    });
+  });
+
+  it("frames the first node when the batch is taller than the viewport", () => {
+    expect(offscreenPanTarget(view, [card(4000, 0), card(4000, 2000)])).toEqual(
+      { x: 4090, y: 32 },
     );
   });
 });

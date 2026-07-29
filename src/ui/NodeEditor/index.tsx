@@ -41,7 +41,12 @@ import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
 import { GraphSkeleton } from "./GraphSkeleton";
 import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
-import { createNodeDataCache, groupBoxHeight } from "./rfNodeData";
+import type { FlowRect } from "./rfNodeData";
+import {
+  createNodeDataCache,
+  groupBoxHeight,
+  offscreenPanTarget,
+} from "./rfNodeData";
 import { ZoomControls } from "./ZoomControls";
 
 /** Width/height approximation for non-group node cards when picking a target
@@ -67,6 +72,15 @@ export function NodeEditor() {
   const setSelectedIds = useSelectionStore((s) => s.setSelectedIds);
   const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds);
   const flowRef = useRef<ReactFlowInstance | null>(null);
+  // The React Flow host box, measured to turn the visible area into flow
+  // coordinates (the instance exposes no container size of its own).
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  // Node ids as of the previous render, plus the epoch they belonged to, so a
+  // freshly added node can be told apart by set difference. Comparing counts
+  // is not enough: removing one node and adding another in the same commit
+  // leaves the count untouched.
+  const prevNodeIdsRef = useRef<ReadonlySet<string> | null>(null);
+  const prevEpochRef = useRef(graphEpoch);
   // Per-node `data` wrappers, stable across renders so React Flow only
   // re-renders the card whose graph node actually changed (see rfNodeData).
   // Lazily created once and kept for the component's lifetime.
@@ -111,6 +125,74 @@ export function NodeEditor() {
     });
     return () => cancelAnimationFrame(id);
   }, [graphEpoch]);
+
+  // Visibility net for the refit removed above: node adds use fixed flow
+  // coordinates (AddNodePill / CommandPalette), so with the canvas panned away
+  // a new node now lands off-screen and the menu looks like it did nothing.
+  // Pan — never zoom, that is what #38 removed — and only when the node really
+  // is outside the visible area, so an add in plain sight leaves the viewport
+  // untouched. See offscreenPanTarget for the framing rules.
+  useEffect(() => {
+    const prevIds = prevNodeIdsRef.current;
+    const prevEpoch = prevEpochRef.current;
+    const ids = new Set(graphNodes.map((n) => n.id));
+    prevNodeIdsRef.current = ids;
+    prevEpochRef.current = graphEpoch;
+    // A wholesale replacement is the fitView effect's frame to draw; letting
+    // both run would animate the viewport twice at once.
+    if (prevIds === null || prevEpoch !== graphEpoch) return;
+    const addedIds: string[] = [];
+    for (const id of ids) {
+      if (!prevIds.has(id)) addedIds.push(id);
+    }
+    if (addedIds.length === 0) return;
+    const inst = flowRef.current;
+    const pane = paneRef.current;
+    if (!inst || !pane) return;
+    // Defer a frame so a card mounted by this commit has been measured.
+    const raf = requestAnimationFrame(() => {
+      const rect = pane.getBoundingClientRect();
+      // A collapsed/hidden dock panel measures 0×0 — nothing is visible there
+      // by definition, so panning would be noise.
+      if (rect.width === 0 || rect.height === 0) return;
+      const topLeft = inst.screenToFlowPosition({ x: rect.left, y: rect.top });
+      const bottomRight = inst.screenToFlowPosition({
+        x: rect.right,
+        y: rect.bottom,
+      });
+      const view: FlowRect = {
+        x: topLeft.x,
+        y: topLeft.y,
+        width: bottomRight.x - topLeft.x,
+        height: bottomRight.y - topLeft.y,
+      };
+      const boxes: FlowRect[] = [];
+      for (const id of addedIds) {
+        const internal = inst.getInternalNode(id);
+        // Descendants of a collapsed group render nowhere — panning to one
+        // would move the canvas to a point with nothing on it.
+        if (!internal || internal.hidden === true) continue;
+        const pos = internal.internals.positionAbsolute;
+        boxes.push({
+          x: pos.x,
+          y: pos.y,
+          // Unmeasured on the frame a card mounts; the drop-target picker's
+          // rough card size is accurate enough for a visibility test.
+          width: internal.measured.width ?? DROP_CARD_W,
+          height: internal.measured.height ?? DROP_CARD_H,
+        });
+      }
+      const target = offscreenPanTarget(view, boxes);
+      if (!target) return;
+      void inst.setCenter(target.x, target.y, {
+        // setCenter defaults to maxZoom — pass the current zoom through so
+        // this stays a pan and the user's zoom level survives.
+        zoom: inst.getViewport().zoom,
+        duration: MOTION_MAX_MS,
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [graphNodes, graphEpoch]);
 
   const rfNodes: Node[] = useMemo(() => {
     const sel = new Set(selectedNodeIds);
@@ -449,7 +531,11 @@ export function NodeEditor() {
     // biome-ignore lint/a11y/noStaticElementInteractions: file drop zone; keyboard alternative is the toolbar Import button
     <div className="panel panel--graph" onDragOver={onDragOver} onDrop={onDrop}>
       <DockPanelHeader meta={`${graphNodes.length}N · ${graphEdges.length}E`} />
-      <div className="panel-body" style={{ background: "var(--surface-app)" }}>
+      <div
+        className="panel-body"
+        ref={paneRef}
+        style={{ background: "var(--surface-app)" }}
+      >
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}

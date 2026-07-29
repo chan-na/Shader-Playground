@@ -35,8 +35,23 @@ const ASSETS_DIR = "dist/assets";
 // PASS on Node >= 24 does not mean the CI `bundle-size` job passes. Re-measure
 // on Node 22 before spending headroom (`npm i --prefix <tmp> node@22`, then run
 // this script with that binary against an already-built dist).
+//
+// Full-project code review (review/2026-07): bumped 393 → 396. The review
+// landed 42 adversarially-verified fixes across ten batches and they cost
+// +1.97 KiB gzip in total (Node 22: 391.98 → 393.95), overshooting the old
+// ceiling by 0.95 KiB. No single item is the culprit — the cost is spread
+// thinly (largest contributors: B4 GLSL comment masker +0.54, B9 viewport
+// +0.32, B10 assets/GIF +0.30) and every byte belongs to a defect fix, not a
+// feature. The three standalone-player fixes were measured as revert
+// candidates first, per the plan's deferral clause: reverting them moves the
+// total to 393.96 KiB (+6 B — gzip noise), because minifyStandalonePlayer
+// runs esbuild over that file before inlining it, so their real code is below
+// measurement resolution. Dropping them would have lost three export bugs and
+// still left CI red. Raised with explicit user sign-off; the ~2.05 KiB
+// headroom is deliberate slack for gzip variance, since the previous nominal
+// headroom turned out to be measurement error.
 const LIMITS_KIB = {
-  js: 393,
+  js: 396,
 };
 
 /** Node major that CI pins via `.nvmrc`; null when unreadable. */

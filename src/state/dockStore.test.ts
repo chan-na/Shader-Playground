@@ -342,6 +342,52 @@ describe("addPanel", () => {
     expect(useDockStore.getState().nextLeafId).toBe(6);
   });
 
+  // 2026-07 리뷰 #22 — 재도킹된 패널이 최대화 오버레이에 가려질 때만
+  // maximized를 해제한다(정본 X3의 의도적 예외).
+  describe("maximized interaction (#22)", () => {
+    it("clears maximized when the panel merges into a leaf that is NOT the maximized one", () => {
+      useDockStore.getState().toggleMaximized("l1"); // viewport leaf
+      useDockStore.getState().closeTab("assets");
+      expect(useDockStore.getState().maximized).toBe("l1");
+
+      useDockStore.getState().addPanel("assets"); // merges into l3
+
+      expect(useDockStore.getState().maximized).toBeNull();
+    });
+
+    it("keeps maximized when the panel merges into the maximized leaf itself", () => {
+      useDockStore.getState().closeTab("assets");
+      useDockStore.getState().toggleMaximized("l3"); // nodeEditor leaf
+      expect(useDockStore.getState().maximized).toBe("l3");
+
+      useDockStore.getState().addPanel("assets"); // merges into l3
+
+      expect(useDockStore.getState().maximized).toBe("l3");
+      expect(nodeAt(useDockStore.getState().tree, ["b", "a"])).toMatchObject({
+        id: "l3",
+        tabs: ["nodeEditor", "assets"],
+      });
+    });
+
+    it("clears maximized on the T1 outer-right fallback — the fresh leaf would sit behind the overlay", () => {
+      useDockStore.getState().closeTab("viewport");
+      useDockStore.getState().toggleMaximized("l4"); // code leaf
+      expect(useDockStore.getState().maximized).toBe("l4");
+
+      useDockStore.getState().addPanel("viewport");
+
+      expect(useDockStore.getState().maximized).toBeNull();
+    });
+
+    it("leaves maximized untouched when addPanel is a no-op (panel already docked)", () => {
+      useDockStore.getState().toggleMaximized("l1");
+
+      useDockStore.getState().addPanel("viewport");
+
+      expect(useDockStore.getState().maximized).toBe("l1");
+    });
+  });
+
   it("creates a fresh leaf and bumps nextLeafId when the tree is empty", () => {
     let path = anyLeafPath(useDockStore.getState().tree);
     let guard = 0;

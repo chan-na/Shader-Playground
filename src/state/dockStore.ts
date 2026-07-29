@@ -83,7 +83,14 @@ export interface DockState {
    * leaf가 생기지 않는 첫 leaf에만 병합한다. 그런 leaf가 없으면(트리에
    * viewport/code leaf뿐이거나 `id` 자체가 viewport/code인 경우 — 실사용의
    * 기본 케이스) outer-right에 새 leaf를 만들어 패널을 유실 없이
-   * 재도킹한다. */
+   * 재도킹한다.
+   *
+   * 최대화 상호작용(2026-07 리뷰 #22): 재도킹된 패널이 최대화 오버레이에
+   * **가려질 때만** `maximized`를 해제한다 — outer-right 새 leaf는 항상
+   * 가려지므로 해제, 탭 병합은 대상 leaf가 최대화된 leaf 자신일 때만 유지.
+   * 정본 X3(`design/CHANGELOG.md:50`, "무관한 최대화 패널은 안 풀림")의
+   * 의도적 예외다(`temp/design-followup-review-2026-07.md` 기록) — 그대로
+   * 두면 패널을 다시 열어도 화면에 아무 변화가 없어 유실처럼 보인다. */
   addPanel: (id: DockPanelId) => void;
   /** 트리/최대화/leaf id 카운터를 기본값으로 되돌린다. dc
    * `resetLayout`(L524-526) 이식. */
@@ -233,7 +240,7 @@ export const useDockStore = create<DockState>((set, get) => ({
   },
 
   addPanel: (id) => {
-    const { tree, nextLeafId } = get();
+    const { tree, nextLeafId, maximized } = get();
     if (collectPanelIds(tree).includes(id)) return;
     if (tree === null) {
       set({
@@ -254,6 +261,9 @@ export const useDockStore = create<DockState>((set, get) => ({
           { type: "leaf", id: `l${nextLeafId}`, tabs: [id], active: id },
         ),
         nextLeafId: nextLeafId + 1,
+        // 새 leaf는 최대화 오버레이 뒤에 생긴다 — 그대로 두면 "패널을 다시
+        // 열었는데 아무 일도 안 일어난" 것처럼 보인다.
+        maximized: null,
       });
       return;
     }
@@ -266,6 +276,10 @@ export const useDockStore = create<DockState>((set, get) => ({
         active: id,
         collapsed: false,
       }),
+      // 병합 대상이 지금 최대화된 leaf 자신이면 새 탭이 그 오버레이 안에
+      // 그대로 보인다 → 최대화 유지(X3). 다른 leaf에 병합했다면 가려지므로
+      // 해제한다. ⚠ `leaf.id`(leaf id)와 비교한다 — `id`는 패널 id다.
+      maximized: maximized === leaf.id ? maximized : null,
     });
   },
 

@@ -137,6 +137,50 @@ describe("buildExportedHtml", () => {
   });
 });
 
+/**
+ * standalonePlayer.js is a standalone ES5 runtime with no module surface — it
+ * cannot be imported and exercised the way the app's twin (`execute.ts`) is.
+ * These guards pin the three frame-loop invariants that must stay in sync with
+ * the app, asserted against the inlined player text the export actually ships.
+ */
+describe("standalone player frame-loop invariants", () => {
+  // The whole document, not a prefix: the player itself reads
+  // `window.__SP_PROJECT` well before its frame loop, so splitting on that
+  // marker would silently cut away everything under test.
+  const playerSource = (): string => buildExportedHtml(sample, {});
+
+  it("binds u_camera on non-fullscreen passes, like execute.ts does (#27)", () => {
+    // Without it, any lighting model reading the view vector renders black in
+    // the export while looking correct in the editor.
+    const src = playerSource();
+    expect(src).toContain('setUniform(u["u_camera"], eye)');
+    // …and only inside the non-fullscreen branch, next to the other matrices.
+    const viewIdx = src.indexOf('setUniform(u["u_view"], view)');
+    const camIdx = src.indexOf('setUniform(u["u_camera"], eye)');
+    expect(viewIdx).toBeGreaterThan(-1);
+    expect(camIdx).toBeGreaterThan(viewIdx);
+  });
+
+  it("bounds the composite loop by the cell count, not the output count (#28)", () => {
+    // splitLayout tops out at 4 cells (see splitLayout.test.ts), so a graph
+    // with 5+ connected outputs used to read cells[4] === undefined and throw
+    // on `c.x` every single frame.
+    const src = playerSource();
+    expect(src).toContain("Math.min(drawable.length, cells.length)");
+    expect(src).not.toMatch(/i\s*<\s*drawable\.length\s*;\s*i\+\+/);
+  });
+
+  it("evaluates resize() unconditionally every frame (#29)", () => {
+    // `sizeDirty || resize()` short-circuits on exactly the frame after a
+    // window resize, so the drawing buffer stays stale while resizePasses()
+    // sizes the FBOs from it.
+    const src = playerSource();
+    expect(src).not.toContain("sizeDirty || resize()");
+    expect(src).toMatch(/var resized = resize\(\)\s*;/);
+    expect(src).toContain("if (sizeDirty || resized)");
+  });
+});
+
 describe("downloadExportedHtml", () => {
   beforeEach(() => {
     vi.useFakeTimers();

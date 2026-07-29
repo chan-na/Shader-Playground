@@ -1134,7 +1134,12 @@
   var sizeDirty = true;
   var frameNum = 0;
   function frame(now) {
-    if (sizeDirty || resize()) {
+    // resize() has the side effect of syncing the drawing buffer to the CSS
+    // box, so it must run unconditionally. Testing sizeDirty first short-
+    // circuits it away on exactly the frame after a window resize, leaving
+    // canvas.width stale while resizePasses() sizes the FBOs from it. (#29)
+    var resized = resize();
+    if (sizeDirty || resized) {
       sizeDirty = false;
       resizePasses();
     }
@@ -1189,6 +1194,10 @@
         setUniform(u["u_view"], view);
         setUniform(u["u_proj"], proj);
         setUniform(u["u_model"], model);
+        // Same set the app binds in execute.ts's bindSystemUniforms — without
+        // u_camera any lighting model that needs a view vector reads 0 in the
+        // export and renders differently from the editor. (#27)
+        setUniform(u["u_camera"], eye);
       }
 
       // User uniforms with value-node overrides (param/math/swizzle/combine).
@@ -1257,7 +1266,10 @@
 
     if (drawable.length > 0) {
       var cells = splitLayout(drawable.length, canvas.width, canvas.height);
-      for (var i = 0; i < drawable.length; i++) {
+      // splitLayout tops out at 4 cells, so a graph with 5+ connected outputs
+      // would run off the end and throw on `c.x` every frame. (#28)
+      var drawCount = Math.min(drawable.length, cells.length);
+      for (var i = 0; i < drawCount; i++) {
         var c = cells[i];
         gl.viewport(c.x, c.y, Math.max(1, c.w), Math.max(1, c.h));
         gl.useProgram(blit.program);

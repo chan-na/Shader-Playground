@@ -652,9 +652,14 @@ function acquireVideo(spec: VideoExternalSpec): VideoHandle {
   const onReady = () => {
     if (handle.disposed) return;
     handle.ready = true;
-    if (typeof spec.currentTime === "number") {
+    // `spec` is the acquire-time snapshot. Decoding metadata takes a few frames,
+    // and `applyInPlace`/`applyVideoSpec` may have swapped in a newer spec while
+    // we waited — pausing, seeking, or muting. Honour the *live* spec so a pause
+    // issued during load isn't undone by a stale autoplay. (#26)
+    const live = handle.spec;
+    if (typeof live.currentTime === "number") {
       try {
-        handle.video.currentTime = spec.currentTime;
+        handle.video.currentTime = live.currentTime;
       } catch (e) {
         log.debug(
           "external",
@@ -663,7 +668,7 @@ function acquireVideo(spec: VideoExternalSpec): VideoHandle {
         );
       }
     }
-    if (spec.playing && typeof handle.video.play === "function") {
+    if (live.playing && typeof handle.video.play === "function") {
       try {
         const p = handle.video.play();
         if (p && typeof p.catch === "function") p.catch(() => {});

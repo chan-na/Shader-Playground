@@ -3,6 +3,7 @@ import type { GifFrame } from "../core/gif/encode";
 import { gifEncoder } from "../core/gif/gifEncoderClient";
 import { log, normalizeError } from "../utils/log";
 import { toast } from "./toastStore";
+import { useViewportStore } from "./viewportStore";
 
 type GifRecorderStatus = "idle" | "recording" | "encoding";
 
@@ -75,25 +76,49 @@ interface ActiveGif {
 let _active: ActiveGif | null = null;
 
 /**
+ * Ceiling on a single frame's on-screen duration. Capture is driven by the RAF
+ * loop, which the browser throttles to ~1 Hz (or suspends entirely) while the
+ * tab is hidden, and which also stalls behind a long recompile. The resulting
+ * multi-second — sometimes multi-minute — gap between two consecutive captures
+ * would otherwise be baked in verbatim, freezing the GIF on one frame. (#31)
+ */
+const MAX_FRAME_DELAY_MS = 1000;
+
+/**
  * Per-frame display durations (ms) from capture timestamps. Each frame shows
  * until the next was captured; the final frame falls back to the nominal
- * interval. Exported for unit testing.
+ * interval. Gaps are clamped to `MAX_FRAME_DELAY_MS` (or 4× the nominal
+ * interval, whichever is larger, so deliberately slow recordings survive).
+ * Exported for unit testing.
  */
 export function frameDelays(
   timestamps: ReadonlyArray<number>,
   fallbackMs: number,
 ): number[] {
+  const cap = Math.max(MAX_FRAME_DELAY_MS, fallbackMs * 4);
   const delays: number[] = [];
   for (let i = 0; i < timestamps.length; i++) {
     if (i < timestamps.length - 1) {
       const a = timestamps[i] ?? 0;
       const b = timestamps[i + 1] ?? 0;
-      delays.push(Math.max(0, b - a));
+      delays.push(Math.min(cap, Math.max(0, b - a)));
     } else {
       delays.push(fallbackMs);
     }
   }
   return delays;
+}
+
+/**
+ * The viewport's clear colour as a CSS `rgb()` string. GIF has no alpha channel
+ * worth the name, so the scratch canvas needs an opaque backdrop that matches
+ * what the user sees in the viewport — the background is user-configurable
+ * (`viewportStore.setBackground`), so it cannot be hard-coded. (#16)
+ */
+function matteColor(): string {
+  const [r, g, b] = useViewportStore.getState().background;
+  const to255 = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
+  return `rgb(${to255(r)}, ${to255(g)}, ${to255(b)})`;
 }
 
 /** Downscaled target dimensions preserving aspect, longest edge ≤ maxLongEdge. */
@@ -180,6 +205,15 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
     }
 
     try {
+      // Opaque matte first. The WebGL canvas is drawn with premultiplied alpha,
+      // so anything the shader left semi-transparent (particle rims, additive
+      // glows) lands on the scratch canvas as partially transparent pixels; the
+      // GIF encoder then discards alpha and those pixels read as black. Filling
+      // with the viewport's own clear colour makes the composite match what the
+      // user sees. `clearRect` is deliberately NOT used — it would reset the
+      // canvas to transparent and reintroduce the same hard-edged rims. (#16)
+      active.ctx.fillStyle = matteColor();
+      active.ctx.fillRect(0, 0, active.width, active.height);
       active.ctx.drawImage(canvas, 0, 0, active.width, active.height);
       const image = active.ctx.getImageData(0, 0, active.width, active.height);
       active.frames.push({ rgba: new Uint8Array(image.data), at: now });

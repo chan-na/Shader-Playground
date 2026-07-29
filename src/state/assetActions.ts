@@ -19,6 +19,7 @@ import { loadObjFromFile } from "../core/assets/objLoader";
 import { loadVideoFromFile } from "../core/assets/videoLoader";
 import type { GraphNode } from "../core/graph/types";
 import { nextId } from "../utils/id";
+import { log, normalizeError } from "../utils/log";
 import { useAssetStore } from "./assetStore";
 import { useGraphStore } from "./graphStore";
 import { useSelectionStore } from "./selectionStore";
@@ -76,6 +77,22 @@ export interface ImportResult {
   assetId: string;
 }
 
+/**
+ * Priming the IndexedDB cache is best-effort: private-mode windows reject every
+ * `put`, and a quota-exceeded origin starts failing once the store fills up.
+ * Losing the cache only costs a re-import after reload, so this must never
+ * become a toast — otherwise a private-mode user gets an error banner for every
+ * 4 KB PNG they drop in. Log it instead so the diagnostics panel can show it.
+ * Same category as `cache.ts`'s own read-path warnings. (#23)
+ */
+function warnCacheWriteFailed(kind: AssetKind, id: string, e: unknown): void {
+  log.warn(
+    "autosave",
+    `asset cache write failed (${kind} ${id})`,
+    normalizeError(e),
+  );
+}
+
 async function importFile(
   file: File,
   position?: { x: number; y: number },
@@ -88,7 +105,9 @@ async function importFile(
   if (kind === "obj") {
     const handle = await loadObjFromFile(file);
     assetStore.addMesh(handle);
-    void cacheMesh(handle).catch(() => {});
+    void cacheMesh(handle).catch((e) =>
+      warnCacheWriteFailed(kind, handle.id, e),
+    );
     const id = nextId("mesh");
     const node: GraphNode = {
       id,
@@ -104,7 +123,9 @@ async function importFile(
   if (kind === "gltf") {
     const handle = await loadGltfFromFile(file);
     assetStore.addMesh(handle);
-    void cacheMesh(handle).catch(() => {});
+    void cacheMesh(handle).catch((e) =>
+      warnCacheWriteFailed(kind, handle.id, e),
+    );
     const id = nextId("mesh");
     const node: GraphNode = {
       id,
@@ -120,7 +141,9 @@ async function importFile(
   if (kind === "image") {
     const handle = await loadImageFromFile(file);
     assetStore.addImage(handle);
-    void cacheImage(handle, file).catch(() => {});
+    void cacheImage(handle, file).catch((e) =>
+      warnCacheWriteFailed(kind, handle.id, e),
+    );
     const id = nextId("image");
     const node: GraphNode = { id, kind: "image", assetId: handle.id };
     graphStore.addNode(node, position ?? { x: -240, y: 160 });
@@ -131,7 +154,9 @@ async function importFile(
   if (kind === "video") {
     const { handle, blob } = await loadVideoFromFile(file);
     assetStore.addVideo(handle, blob);
-    void cacheVideo(handle, blob).catch(() => {});
+    void cacheVideo(handle, blob).catch((e) =>
+      warnCacheWriteFailed(kind, handle.id, e),
+    );
     const id = nextId("video");
     const node: GraphNode = {
       id,
@@ -149,7 +174,9 @@ async function importFile(
   if (kind === "audio") {
     const { handle, blob } = await loadAudioFromFile(file);
     assetStore.addAudio(handle, blob);
-    void cacheAudio(handle, blob).catch(() => {});
+    void cacheAudio(handle, blob).catch((e) =>
+      warnCacheWriteFailed(kind, handle.id, e),
+    );
     const id = nextId("audio");
     const node: GraphNode = {
       id,
@@ -174,20 +201,31 @@ async function importFile(
  * asset store from IndexedDB. Single entry point for every load path (JSON
  * import, session/share restore) so cached custom meshes/images/videos/audio
  * survive a reload instead of silently falling back to placeholders.
+ *
+ * Ids are de-duplicated per list: several nodes may reference the same asset
+ * (two mesh nodes sharing one OBJ, a duplicated image node…). `hydrateAssetsFor`
+ * snapshots the store once, before its first `await`, so every copy of an id
+ * would clear the "already present?" guard and fire its own IndexedDB read plus
+ * a redundant `addImage`/`addMesh` store write. (#30)
  */
 export function hydrateGraphAssets(nodes: GraphNode[]): void {
-  const meshes: string[] = [];
-  const images: string[] = [];
-  const videos: string[] = [];
-  const audios: string[] = [];
+  const meshes = new Set<string>();
+  const images = new Set<string>();
+  const videos = new Set<string>();
+  const audios = new Set<string>();
   for (const n of nodes) {
-    if (n.kind === "mesh" && n.assetId) meshes.push(n.assetId);
-    else if (n.kind === "image" && n.assetId) images.push(n.assetId);
-    else if (n.kind === "video" && n.assetId) videos.push(n.assetId);
-    else if (n.kind === "audio" && n.assetId) audios.push(n.assetId);
+    if (n.kind === "mesh" && n.assetId) meshes.add(n.assetId);
+    else if (n.kind === "image" && n.assetId) images.add(n.assetId);
+    else if (n.kind === "video" && n.assetId) videos.add(n.assetId);
+    else if (n.kind === "audio" && n.assetId) audios.add(n.assetId);
   }
-  if (meshes.length || images.length || videos.length || audios.length) {
-    void hydrateAssetsFor({ meshes, images, videos, audios });
+  if (meshes.size || images.size || videos.size || audios.size) {
+    void hydrateAssetsFor({
+      meshes: [...meshes],
+      images: [...images],
+      videos: [...videos],
+      audios: [...audios],
+    });
   }
 }
 
@@ -266,17 +304,30 @@ export async function importFiles(
 ): Promise<ImportResult[]> {
   const arr = Array.from(files);
   const results: ImportResult[] = [];
+  const skipped: string[] = [];
   for (const [i, file] of arr.entries()) {
     const offset = basePosition ?? { x: -240, y: 0 };
     const pos = { x: offset.x, y: offset.y + i * 100 };
     try {
       const r = await importFile(file, pos);
       if (r) results.push(r);
+      else {
+        skipped.push(file.name);
+        log.warn("assets", `unsupported file skipped: ${file.name}`);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("Asset import failed:", file.name, e);
       toast.error(`자산 임포트 실패 (${file.name}): ${msg}`);
     }
+  }
+  // One aggregate warning, and only when *nothing* landed: multi-selecting a
+  // model with its sidecars (.obj + .mtl, .gltf + .bin) is the normal case and
+  // must not scold the user for the sidecars that were correctly ignored. (#34)
+  if (skipped.length > 0 && results.length === 0) {
+    const names = skipped.slice(0, 3).join(", ");
+    const more = skipped.length > 3 ? ` 외 ${skipped.length - 3}개` : "";
+    toast.warning(`지원하지 않는 파일 형식입니다: ${names}${more}`);
   }
   return results;
 }

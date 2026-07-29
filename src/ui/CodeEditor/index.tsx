@@ -393,15 +393,29 @@ export function CodeEditor() {
     if (switching) commitRef.current?.flush();
     loadedKeyRef.current = key;
     lastCommittedRef.current = source;
-    if (switching) setLiveDiags([]);
+    // Keep the identity when there is nothing to clear. Handing out a fresh
+    // `[]` on every switch would re-fire the `[diags, stage, liveDiags]`
+    // effect below unconditionally — a duplicate CM dispatch per switch, and
+    // worse, an accidental safety net that hides whether the compensating
+    // dispatch further down actually works (it would silently paper over its
+    // removal). With this bail-out that effect only runs when the merged
+    // diagnostic set can genuinely differ.
+    if (switching) setLiveDiags((prev) => (prev.length === 0 ? prev : []));
     const extensions = extRef.current;
     if (switching && extensions) {
       view.setState(EditorState.create({ doc: source, extensions }));
       // Two compensating dispatches, because `setState` is not a transaction:
       // (1) reinstall + repopulate lint for the incoming document. Relying on
       //     the `[diags, stage, liveDiags]` effect to re-fire is not sound —
-      //     switching between two nodes that both have no entry in
-      //     diagnosticsStore, on the same stage, changes none of its deps.
+      //     switching between two nodes whose diagnosticsStore entry is the
+      //     same reference (both absent, or literally the same object), on the
+      //     same stage, changes none of its deps, and the `setLiveDiags` above
+      //     deliberately preserves identity when it is already empty. The lint
+      //     field itself did not survive `setState` (it is installed through
+      //     `StateEffect.appendConfig`, so it is not in `extRef`), so without
+      //     this dispatch the incoming document would carry no underlines at
+      //     all. Pinned by "re-applies diagnostics when the switch changes no
+      //     effect dependency" in `index.test.tsx`.
       view.dispatch(
         setDiagnostics(
           view.state,

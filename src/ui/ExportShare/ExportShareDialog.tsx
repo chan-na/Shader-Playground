@@ -805,6 +805,10 @@ export function ExportShareDialog() {
       const url = await encodeShareUrl(
         { nodes: s.nodes, edges: s.edges },
         s.positions,
+        // Default origin; `parents` is the 4th positional arg (the signature
+        // order is pinned by shareUrl.test / phase-11).
+        undefined,
+        s.parents,
       );
       setShareUrl(url);
       setPhase("done");

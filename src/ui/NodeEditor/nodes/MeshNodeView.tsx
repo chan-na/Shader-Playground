@@ -12,21 +12,15 @@ import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
 export function MeshNodeView({ id, data }: NodeProps) {
   const node = data.node as MeshGraphNode;
-  const setGraph = useGraphStore((s) => s.setGraph);
+  // Targeted action rather than a whole-graph `setGraph`: the latter resets
+  // the parent map, so picking a primitive used to dissolve every group.
+  const setMeshPrimitive = useGraphStore((s) => s.setMeshPrimitive);
   const asset = useAssetStore((s) =>
     node.assetId ? s.meshes[node.assetId] : undefined,
   );
 
   const setPrimitive = (p: PrimitiveName) => {
-    const s = useGraphStore.getState();
-    setGraph({
-      nodes: s.nodes.map((n) =>
-        n.id === id
-          ? ({ ...n, primitive: p, assetId: null } as MeshGraphNode)
-          : n,
-      ),
-      edges: s.edges,
-    });
+    setMeshPrimitive(id, p);
   };
 
   const usingAsset = !!asset;

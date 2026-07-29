@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { getAbsolutePosition } from "../core/graph/parents";
 import type {
   CombineGraphNode,
   ComputeGraphNode,
   MathGraphNode,
+  MeshGraphNode,
   ParamGraphNode,
   ShaderGraphNode,
   SwizzleGraphNode,
@@ -95,6 +97,76 @@ describe("graphStore", () => {
     expect(useGraphStore.getState().positions.a).toEqual({ x: 10, y: 20 });
     useGraphStore.getState().nudgeNodes(["a"], 0, 0);
     expect(useGraphStore.getState().positions.a).toEqual({ x: 10, y: 20 });
+  });
+
+  it("nudgeNodes moves a selected group once, not once per nested child", () => {
+    const s = useGraphStore.getState();
+    const gid = s.addGroup(
+      "G",
+      { x: 100, y: 100 },
+      { width: 400, height: 300 },
+    );
+    s.addNode(
+      { id: "child", kind: "mesh", primitive: "cube" },
+      { x: 150, y: 150 },
+    );
+    useGraphStore.getState().setParent("child", gid);
+    // child is now stored parent-relative at (50, 50).
+
+    useGraphStore.getState().nudgeNodes([gid, "child"], 10, 5);
+
+    const after = useGraphStore.getState();
+    expect(after.positions[gid]).toEqual({ x: 110, y: 105 });
+    // Carried by the group — its own relative offset must NOT change, or the
+    // child drifts by twice the nudge.
+    expect(after.positions.child).toEqual({ x: 50, y: 50 });
+    expect(
+      getAbsolutePosition("child", after.positions, after.parents),
+    ).toEqual({ x: 160, y: 155 });
+  });
+
+  it("nudgeNodes skips a transitively nested descendant", () => {
+    const s = useGraphStore.getState();
+    const outer = s.addGroup(
+      "outer",
+      { x: 0, y: 0 },
+      { width: 600, height: 500 },
+    );
+    const inner = s.addGroup(
+      "inner",
+      { x: 50, y: 50 },
+      { width: 300, height: 200 },
+    );
+    s.addNode(
+      { id: "leaf", kind: "mesh", primitive: "cube" },
+      { x: 80, y: 80 },
+    );
+    useGraphStore.getState().setParent(inner, outer);
+    useGraphStore.getState().setParent("leaf", inner);
+    expect(useGraphStore.getState().positions.leaf).toEqual({ x: 30, y: 30 });
+
+    // Only the outermost group and the deepest leaf are selected — the middle
+    // group is not, but it still carries the leaf.
+    useGraphStore.getState().nudgeNodes([outer, "leaf"], 7, -3);
+
+    const after = useGraphStore.getState();
+    expect(after.positions[outer]).toEqual({ x: 7, y: -3 });
+    expect(after.positions.leaf).toEqual({ x: 30, y: 30 });
+  });
+
+  it("nudgeNodes keeps the positions identity when every id is carried", () => {
+    const s = useGraphStore.getState();
+    s.addNode({ id: "a", kind: "mesh", primitive: "cube" }, { x: 10, y: 10 });
+    s.addNode({ id: "b", kind: "mesh", primitive: "cube" }, { x: 20, y: 20 });
+    // Malformed (cyclic) parent map — unreachable through setParent, which
+    // rejects cycles, but a corrupted share URL can produce one. The walk is
+    // depth-capped, and with every id carried by a "parent" nothing moves.
+    useGraphStore.setState({ parents: { a: "b", b: "a" } });
+    const before = useGraphStore.getState().positions;
+
+    useGraphStore.getState().nudgeNodes(["a", "b"], 5, 5);
+
+    expect(useGraphStore.getState().positions).toBe(before);
   });
 
   it("cloneNode deep-copies under a new id, offsets, and skips edges", () => {
@@ -618,6 +690,72 @@ void main(){}`,
     expect((useGraphStore.getState().nodes[0] as SwizzleGraphNode).mask).toBe(
       "yzw",
     );
+  });
+
+  describe("setMeshPrimitive", () => {
+    it("swaps the primitive, releases the asset, and bumps rev + history", () => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "m1", kind: "mesh", primitive: "cube", assetId: "a1" });
+      useHistoryStore.getState().clear();
+      const beforeRev = useGraphStore.getState().rev;
+
+      useGraphStore.getState().setMeshPrimitive("m1", "torus");
+
+      const node = useGraphStore
+        .getState()
+        .nodes.find((n) => n.id === "m1") as MeshGraphNode;
+      expect(node.primitive).toBe("torus");
+      expect(node.assetId).toBeNull();
+      expect(useGraphStore.getState().rev).toBe(beforeRev + 1);
+      expect(useHistoryStore.getState().past).toHaveLength(1);
+    });
+
+    it("leaves parents and positions untouched, so a grouped mesh stays grouped", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup(
+        "G",
+        { x: 100, y: 100 },
+        { width: 400, height: 300 },
+      );
+      s.addNode(
+        { id: "m1", kind: "mesh", primitive: "cube" },
+        { x: 150, y: 150 },
+      );
+      s.addNode(makeShader("sh"), { x: 400, y: 400 });
+      useGraphStore.getState().setParent("m1", gid);
+
+      const before = useGraphStore.getState();
+      const parentsBefore = before.parents;
+      const positionsBefore = before.positions;
+
+      useGraphStore.getState().setMeshPrimitive("m1", "sphere");
+
+      const after = useGraphStore.getState();
+      // The old `setGraph` round-trip reset `parents` to {} — the group would
+      // silently dissolve on a dropdown change.
+      expect(after.parents.m1).toBe(gid);
+      expect(after.parents).toBe(parentsBefore);
+      expect(after.positions).toBe(positionsBefore);
+      expect(after.positions.m1).toEqual({ x: 50, y: 50 });
+      expect(after.nodes.map((n) => n.id)).toEqual(
+        before.nodes.map((n) => n.id),
+      );
+    });
+
+    it("is a no-op for non-mesh and unknown ids", () => {
+      useGraphStore.getState().addNode(makeShader("sh"));
+      useHistoryStore.getState().clear();
+      const beforeRev = useGraphStore.getState().rev;
+      const beforeNodes = useGraphStore.getState().nodes;
+
+      useGraphStore.getState().setMeshPrimitive("sh", "quad");
+      useGraphStore.getState().setMeshPrimitive("nope", "quad");
+
+      expect(useGraphStore.getState().rev).toBe(beforeRev);
+      expect(useGraphStore.getState().nodes).toBe(beforeNodes);
+      expect(useHistoryStore.getState().past).toHaveLength(0);
+    });
   });
 
   it("setCombineConfig patches arity/values and falls back when omitted", () => {
@@ -1263,6 +1401,129 @@ void main(){}`,
       // The toggle participates in undo (exact restored value depends on the
       // store's history model, exercised in the dedicated undo tests).
       expect(undoGraph()).toBe(true);
+    });
+
+    /** Every child must sit after its parent in `nodes` (React Flow's rule). */
+    const parentOrderViolations = (): string[] => {
+      const s = useGraphStore.getState();
+      const indexOf = new Map(s.nodes.map((n, i) => [n.id, i] as const));
+      const bad: string[] = [];
+      for (const [child, parent] of Object.entries(s.parents)) {
+        const ci = indexOf.get(child);
+        const pi = indexOf.get(parent);
+        if (ci === undefined || pi === undefined) continue;
+        if (pi > ci) bad.push(`${parent} after ${child}`);
+      }
+      return bad;
+    };
+
+    it("setParent re-orders a whole subtree when a populated group is reparented", () => {
+      const s = useGraphStore.getState();
+      const inner = s.addGroup(
+        "inner",
+        { x: 0, y: 0 },
+        { width: 300, height: 200 },
+      );
+      s.addNode(
+        { id: "leaf", kind: "mesh", primitive: "cube" },
+        { x: 20, y: 20 },
+      );
+      useGraphStore.getState().setParent("leaf", inner);
+      // `groupSelected` appends its new group after the untouched nodes, so
+      // this lands `outer` behind `inner`'s child in the array.
+      s.addNode(
+        { id: "solo", kind: "mesh", primitive: "cube" },
+        { x: 500, y: 0 },
+      );
+      const outer = useGraphStore.getState().groupSelected(["solo"]);
+      if (!outer) throw new Error("groupSelected returned null");
+
+      expect(useGraphStore.getState().setParent(inner, outer)).toBe(true);
+
+      // Naive "splice the child in behind its new parent" pushed `inner`
+      // behind its OWN child, which React Flow renders as a detached node.
+      expect(parentOrderViolations()).toEqual([]);
+      const ids = useGraphStore.getState().nodes.map((n) => n.id);
+      expect(ids.indexOf(outer)).toBeLessThan(ids.indexOf(inner));
+      expect(ids.indexOf(inner)).toBeLessThan(ids.indexOf("leaf"));
+    });
+
+    it("setParent releasing to top-level keeps the nodes array identity", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup("G", { x: 0, y: 0 }, { width: 300, height: 200 });
+      s.addNode({ id: "a", kind: "mesh", primitive: "cube" }, { x: 20, y: 20 });
+      useGraphStore.getState().setParent("a", gid);
+      const before = useGraphStore.getState().nodes;
+
+      expect(useGraphStore.getState().setParent("a", undefined)).toBe(true);
+
+      expect(useGraphStore.getState().nodes).toBe(before);
+    });
+
+    it("groupSelected orders the new group ahead of descendants it did not select", () => {
+      const s = useGraphStore.getState();
+      const inner = s.addGroup(
+        "inner",
+        { x: 100, y: 100 },
+        { width: 300, height: 200 },
+      );
+      s.addNode(
+        { id: "leaf", kind: "mesh", primitive: "cube" },
+        { x: 120, y: 120 },
+      );
+      useGraphStore.getState().setParent("leaf", inner);
+
+      // Wrapping only the group: `leaf` stays unselected and used to be
+      // hoisted in front of the new group it now transitively belongs to.
+      const outer = useGraphStore.getState().groupSelected([inner]);
+      if (!outer) throw new Error("groupSelected returned null");
+
+      expect(parentOrderViolations()).toEqual([]);
+      const ids = useGraphStore.getState().nodes.map((n) => n.id);
+      expect(ids.indexOf(outer)).toBeLessThan(ids.indexOf(inner));
+      expect(ids.indexOf(inner)).toBeLessThan(ids.indexOf("leaf"));
+    });
+
+    it("cloneNode inherits the source's group so the copy lands inside it", () => {
+      const s = useGraphStore.getState();
+      const gid = s.addGroup(
+        "G",
+        { x: 100, y: 100 },
+        { width: 400, height: 300 },
+      );
+      s.addNode(
+        { id: "a", kind: "mesh", primitive: "cube" },
+        { x: 150, y: 150 },
+      );
+      useGraphStore.getState().setParent("a", gid);
+      // a is stored parent-relative at (50, 50).
+
+      const newId = useGraphStore.getState().cloneNode("a");
+      if (!newId) throw new Error("cloneNode returned null");
+
+      const after = useGraphStore.getState();
+      expect(after.parents[newId]).toBe(gid);
+      expect(after.positions[newId]).toEqual({ x: 90, y: 90 });
+      // Without the inherited parent the +40 offset is read against the canvas
+      // origin, dropping the copy at (90, 90) absolute instead of (190, 190).
+      expect(
+        getAbsolutePosition(newId, after.positions, after.parents),
+      ).toEqual({ x: 190, y: 190 });
+      expect(parentOrderViolations()).toEqual([]);
+    });
+
+    it("cloneNode of a top-level node leaves the parents map identical", () => {
+      const s = useGraphStore.getState();
+      s.addGroup("G", { x: 0, y: 0 }, { width: 300, height: 200 });
+      s.addNode({ id: "a", kind: "mesh", primitive: "cube" }, { x: 10, y: 10 });
+      const before = useGraphStore.getState().parents;
+
+      const newId = useGraphStore.getState().cloneNode("a");
+      if (!newId) throw new Error("cloneNode returned null");
+
+      const after = useGraphStore.getState();
+      expect(after.parents).toBe(before);
+      expect(after.parents[newId]).toBeUndefined();
     });
 
     it("toggleGroupCollapsed is a no-op on non-group and unknown ids", () => {

@@ -176,6 +176,28 @@ describe("ExportShareDialog", () => {
     expect(writeText).toHaveBeenCalledWith("http://x/#share=abc");
   });
 
+  it("Create link forwards positions AND the parents map (grouping survives the link)", async () => {
+    useGraphStore
+      .getState()
+      .setGraph(
+        TRIVIAL_GRAPH,
+        { m1: { x: 10, y: 20 }, o1: { x: 30, y: 40 } },
+        { m1: "g1" },
+      );
+    useExportShareStore.getState().openWith("link");
+    render(<ExportShareDialog />);
+
+    fireEvent.click(screen.getByTestId("es-create-link"));
+    expect(await screen.findByTestId("es-share-url")).not.toBeNull();
+
+    const call = vi.mocked(shareUrlModule.encodeShareUrl).mock.calls[0];
+    expect(call?.[1]).toEqual({ m1: { x: 10, y: 20 }, o1: { x: 30, y: 40 } });
+    // 3rd arg is the origin (default), 4th is the parent map — dropping it
+    // used to flatten every group out of the shared project.
+    expect(call?.[2]).toBeUndefined();
+    expect(call?.[3]).toEqual({ m1: "g1" });
+  });
+
   it("clicking a rail item switches target and resets to the configure phase", () => {
     useExportShareStore.getState().openWith("html");
     const { container } = render(<ExportShareDialog />);

@@ -106,6 +106,21 @@ function offscreenPanTarget(
  * Ids that disappeared again before the decision are dropped either way:
  * panning to a node that no longer renders would park the canvas on an empty
  * point.
+ *
+ * ## Constraint this trades on — check it before adding a new add path
+ *
+ * Replacing rather than unioning means that when two nodes are added while the
+ * graph panel is collapsed, expanding it frames only the newer one. That is
+ * harmless *only* because every add path in the app drops at a fixed flow
+ * coordinate within a few hundred units of the origin (`AddNodePill.tsx`
+ * -200/0, -200/200, 100/0, 400/0, and the same set in `CommandPalette`), so
+ * framing the newest brings the older one into view with it — measured, not
+ * assumed. An add path that can place nodes thousands of flow units apart
+ * (paste-at-cursor, scripted or plugin adds) breaks that and would silently
+ * strand the older node off-screen, which is the whole failure this module
+ * exists to prevent. If such a path is added, switch back to a union here and
+ * bound it another way (drop ids older than the newest commit, or expire by
+ * commit count) instead of discarding the undecided id.
  */
 export function pendingAddedIds(
   pending: readonly string[],

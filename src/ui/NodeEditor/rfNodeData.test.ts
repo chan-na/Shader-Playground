@@ -1,10 +1,46 @@
 import { describe, expect, it } from "vitest";
-import type { ParamGraphNode, ShaderGraphNode } from "../../core/graph/types";
-import { createNodeDataCache } from "./rfNodeData";
+import type {
+  GroupGraphNode,
+  ParamGraphNode,
+  ShaderGraphNode,
+} from "../../core/graph/types";
+import { GROUP_COLLAPSED_HEIGHT } from "../../core/graph/types";
+import { createNodeDataCache, groupBoxHeight } from "./rfNodeData";
 
 function paramNode(id: string): ParamGraphNode {
   return { id, kind: "param", paramKind: "float", value: 0 };
 }
+
+describe("groupBoxHeight", () => {
+  const group = (patch: Partial<GroupGraphNode> = {}): GroupGraphNode => ({
+    id: "g1",
+    kind: "group",
+    label: "G",
+    width: 400,
+    height: 300,
+    ...patch,
+  });
+
+  it("returns the stored height for an expanded group", () => {
+    expect(groupBoxHeight(group())).toBe(300);
+    expect(groupBoxHeight(group({ collapsed: false }))).toBe(300);
+  });
+
+  it("returns the header height for a collapsed group", () => {
+    // [#37] The drop-target math used the stored `height` for the node being
+    // dragged, so a collapsed group's "center" sat ~135px below its visible
+    // 30px header and reparented against whatever was under that empty point.
+    expect(groupBoxHeight(group({ collapsed: true }))).toBe(
+      GROUP_COLLAPSED_HEIGHT,
+    );
+  });
+
+  it("ignores the stored height entirely while collapsed", () => {
+    expect(groupBoxHeight(group({ collapsed: true, height: 2000 }))).toBe(
+      GROUP_COLLAPSED_HEIGHT,
+    );
+  });
+});
 
 describe("createNodeDataCache", () => {
   it("wraps a node as { node }", () => {

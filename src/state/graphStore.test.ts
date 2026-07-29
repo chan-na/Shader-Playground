@@ -1537,4 +1537,97 @@ void main(){}`,
       expect(node && "collapsed" in node).toBe(false);
     });
   });
+
+  // [#38] The node editor refits its viewport on `graphEpoch`. The counter is
+  // only useful if it separates "a different graph is now loaded" from "the
+  // user edited the graph they are looking at" — every assertion below pins
+  // one side of that split.
+  describe("graphEpoch (wholesale-replace counter)", () => {
+    const epoch = () => useGraphStore.getState().graphEpoch;
+
+    it("setGraph bumps the epoch (demo load / import / share restore)", () => {
+      const before = epoch();
+      useGraphStore.getState().setGraph(
+        {
+          nodes: [
+            { id: "a", kind: "mesh", primitive: "cube" },
+            makeShader("b"),
+          ],
+          edges: [],
+        },
+        { a: { x: 0, y: 0 }, b: { x: 10, y: 10 } },
+      );
+      expect(epoch()).toBe(before + 1);
+    });
+
+    it("reset bumps the epoch (Clear)", () => {
+      useGraphStore.getState().addNode(makeShader("n1"));
+      const before = epoch();
+      useGraphStore.getState().reset();
+      expect(epoch()).toBe(before + 1);
+    });
+
+    it("applySnapshot bumps the epoch, so undo/redo still refits", () => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "a", kind: "mesh", primitive: "cube" });
+      useGraphStore
+        .getState()
+        .addNode({ id: "b", kind: "mesh", primitive: "sphere" });
+
+      const beforeUndo = epoch();
+      expect(undoGraph()).toBe(true);
+      expect(epoch()).toBe(beforeUndo + 1);
+
+      const beforeRedo = epoch();
+      expect(redoGraph()).toBe(true);
+      expect(epoch()).toBe(beforeRedo + 1);
+    });
+
+    it("incremental structural edits bump rev but never the epoch", () => {
+      useGraphStore.getState().addNode(makeShader("s1"), { x: 0, y: 0 });
+      useGraphStore
+        .getState()
+        .addNode({ id: "m1", kind: "mesh", primitive: "cube" }, { x: 0, y: 0 });
+      const gid = useGraphStore
+        .getState()
+        .addGroup("G", { x: 0, y: 0 }, { width: 400, height: 300 });
+
+      const before = epoch();
+      const beforeRev = useGraphStore.getState().rev;
+
+      useGraphStore.getState().addEdge({
+        id: "e1",
+        source: "m1",
+        sourceHandle: "mesh",
+        target: "s1",
+        targetHandle: "mesh",
+      });
+      useGraphStore
+        .getState()
+        .updateShaderSource("s1", { fragmentSource: "void main(){ }" });
+      useGraphStore.getState().setParent("m1", gid);
+      useGraphStore.getState().toggleGroupCollapsed(gid);
+      useGraphStore.getState().removeEdge("e1");
+      useGraphStore.getState().removeNode("m1");
+
+      // Every one of these used to re-frame and animate the canvas.
+      expect(useGraphStore.getState().rev).toBeGreaterThan(beforeRev);
+      expect(epoch()).toBe(before);
+    });
+
+    it("position-only edits bump neither rev nor the epoch", () => {
+      useGraphStore
+        .getState()
+        .addNode({ id: "a", kind: "mesh", primitive: "cube" }, { x: 0, y: 0 });
+      const before = epoch();
+      const beforeRev = useGraphStore.getState().rev;
+
+      useGraphStore.getState().updateNodePosition("a", { x: 90, y: 90 });
+      useGraphStore.getState().nudgeNodes(["a"], 10, 10);
+
+      expect(useGraphStore.getState().rev).toBe(beforeRev);
+      expect(epoch()).toBe(before);
+    });
+  });
 });

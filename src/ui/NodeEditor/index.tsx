@@ -41,7 +41,7 @@ import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
 import { GraphSkeleton } from "./GraphSkeleton";
 import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
-import { createNodeDataCache } from "./rfNodeData";
+import { createNodeDataCache, groupBoxHeight } from "./rfNodeData";
 import { ZoomControls } from "./ZoomControls";
 
 /** Width/height approximation for non-group node cards when picking a target
@@ -57,7 +57,7 @@ export function NodeEditor() {
   const graphEdges = useGraphStore((s) => s.edges);
   const positions = useGraphStore((s) => s.positions);
   const parents = useGraphStore((s) => s.parents);
-  const rev = useGraphStore((s) => s.rev);
+  const graphEpoch = useGraphStore((s) => s.graphEpoch);
   const updateNodePosition = useGraphStore((s) => s.updateNodePosition);
   const removeNode = useGraphStore((s) => s.removeNode);
   const addEdge = useGraphStore((s) => s.addEdge);
@@ -89,11 +89,13 @@ export function NodeEditor() {
     Record<string, { width: number; height: number }>
   >({});
 
-  // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear) so
-  // small graph panels still show every node. Triggered by rev bumps, not by
-  // per-node drags (which don't bump rev).
-  const prevCountRef = useRef(graphNodes.length);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: rev is the intentional trigger for wholesale-graph-replace refits
+  // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear,
+  // import, share restore, undo/redo) so small graph panels still show every
+  // node. `graphEpoch` moves only on those replacements [#38] — keying this on
+  // `rev` re-framed the canvas after every structural edit (adding one node,
+  // wiring one edge, each shader recompile), animating the view out from under
+  // the user mid-work.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: graphEpoch is a trigger-only dep (the body deliberately reads nothing from it), and graphNodes is deliberately NOT a dep — it is read only as an at-fire guard and listing it would restore the per-edit refit this fix removes
   useEffect(() => {
     const inst = flowRef.current;
     if (!inst) return;
@@ -107,9 +109,8 @@ export function NodeEditor() {
         duration: MOTION_MAX_MS,
       });
     });
-    prevCountRef.current = graphNodes.length;
     return () => cancelAnimationFrame(id);
-  }, [rev, graphNodes.length]);
+  }, [graphEpoch]);
 
   const rfNodes: Node[] = useMemo(() => {
     const sel = new Set(selectedNodeIds);
@@ -259,7 +260,7 @@ export function NodeEditor() {
           const abs = getAbsolutePosition(g.id, state.positions, state.parents);
           // A collapsed group only occupies its header visually; restrict the
           // drop hit-box to match so nodes don't reparent into empty space.
-          const h = gn.collapsed ? GROUP_COLLAPSED_HEIGHT : gn.height;
+          const h = groupBoxHeight(gn);
           return {
             id: g.id,
             x1: abs.x,
@@ -281,8 +282,14 @@ export function NodeEditor() {
         const abs = getAbsolutePosition(id, fresh.positions, fresh.parents);
         const w =
           node.kind === "group" ? (node as GroupGraphNode).width : DROP_CARD_W;
+        // Same rule as the hit-boxes above: a collapsed group being dragged is
+        // only as tall as its header, so its center sits in the header — using
+        // the stored `height` put the center far below the visible card and
+        // picked whatever group happened to be under that empty point.
         const h =
-          node.kind === "group" ? (node as GroupGraphNode).height : DROP_CARD_H;
+          node.kind === "group"
+            ? groupBoxHeight(node as GroupGraphNode)
+            : DROP_CARD_H;
         const cx = abs.x + w / 2;
         const cy = abs.y + h / 2;
 

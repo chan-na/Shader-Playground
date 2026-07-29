@@ -1,4 +1,5 @@
-import type { GraphNode } from "../../core/graph/types";
+import type { GraphNode, GroupGraphNode } from "../../core/graph/types";
+import { GROUP_COLLAPSED_HEIGHT } from "../../core/graph/types";
 
 /** The `data` payload React Flow hands to each node-card view (`data.node`).
  *  A `type` alias (not an `interface`) so it satisfies React Flow's
@@ -6,6 +7,19 @@ import type { GraphNode } from "../../core/graph/types";
 export type NodeCardData = {
   node: GraphNode;
 };
+
+/**
+ * The height a group node actually occupies on the canvas.
+ *
+ * A collapsed group draws only its header bar; `height` keeps the container
+ * size it will return to when expanded. Every piece of drop-target geometry
+ * has to agree on which of the two applies — the group's own hit-box *and*
+ * the box of a group being dragged — or a collapsed group is measured 200px
+ * tall while it looks 30px tall and lands in the wrong parent.
+ */
+export function groupBoxHeight(gn: GroupGraphNode): number {
+  return gn.collapsed === true ? GROUP_COLLAPSED_HEIGHT : gn.height;
+}
 
 /**
  * Build a memoizer that returns a stable `{ node }` wrapper for a graph node.

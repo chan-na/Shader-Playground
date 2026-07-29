@@ -54,6 +54,20 @@ export interface GraphState {
   parents: ParentsMap;
   rev: number; // bumped on structural change (re-compile trigger)
   uniformRev: number; // bumped on uniform-only change
+  /**
+   * Bumped only when the graph is replaced *wholesale* — `setGraph` (demo
+   * load, import, share/session restore), `reset` (Clear) and `applySnapshot`
+   * (undo/redo). Incremental edits (add node, wire an edge, type in a shader)
+   * bump `rev` but leave this alone.
+   *
+   * The node editor refits its viewport on this counter [#38]: keying the
+   * refit on `rev` re-framed and animated the canvas after *every* structural
+   * edit, so the view jumped away while the user was still working. Node count
+   * is not a usable proxy either — the demo graph and `trivialMeshGraph()`
+   * both have exactly 3 nodes, so a count-based trigger would silently drop
+   * the refit on the share/restore path.
+   */
+  graphEpoch: number;
 
   setGraph: (
     g: Graph,
@@ -209,7 +223,9 @@ export interface GraphState {
    */
   toggleGroupCollapsed: (id: string) => void;
 
-  /** Replace state without bumping history (used by undo/redo). */
+  /** Replace state without bumping history (used by undo/redo). Counts as a
+   *  wholesale replace (`graphEpoch`), so stepping through history refits the
+   *  editor viewport the same way loading a graph does. */
   applySnapshot: (snap: {
     nodes: GraphNode[];
     edges: GraphEdge[];
@@ -307,6 +323,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   parents: {},
   rev: 0,
   uniformRev: 0,
+  graphEpoch: 0,
   setGraph: (g, positions, parents) => {
     pushHistory(get());
     set((s) => {
@@ -317,6 +334,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         positions: positions ?? s.positions,
         parents: nextParents,
         rev: s.rev + 1,
+        graphEpoch: s.graphEpoch + 1,
       };
     });
   },
@@ -697,6 +715,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       parents: {},
       rev: s.rev + 1,
       uniformRev: 0,
+      graphEpoch: s.graphEpoch + 1,
     }));
   },
   addGroup: (label, absolutePosition, size, options) => {
@@ -1021,6 +1040,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         ),
         parents,
         rev: s.rev + 1,
+        graphEpoch: s.graphEpoch + 1,
       };
     }),
 }));

@@ -46,10 +46,10 @@ function overlaps(view: FlowRect, r: FlowRect): boolean {
  * fix: the *caller* pans (never zooms — re-framing is precisely what #38
  * removed), and only when there is nothing to see otherwise.
  *
- * Lives here rather than inline in index.tsx so it is unit-testable, the same
- * reason `groupBoxHeight` was extracted.
+ * Module-local: `addedPanDecision` is the one entry point the editor calls, so
+ * that the decision it makes and the decision the tests make are the same code.
  */
-export function offscreenPanTarget(
+function offscreenPanTarget(
   view: FlowRect,
   added: readonly FlowRect[],
 ): { x: number; y: number } | null {
@@ -84,34 +84,40 @@ export function offscreenPanTarget(
 
 /**
  * The added-node ids that still owe a pan decision, after folding in whatever
- * this commit added and dropping whatever it took away.
+ * this commit did to the node set.
  *
  * The decision itself is deferred one frame (a card that mounted this commit
  * has no size yet), and the effect that arms that frame is torn down by *any*
  * later commit touching the node array. Consuming the added ids where they are
  * computed would therefore lose them whenever a second commit lands inside the
  * same frame: the cancelled frame never decided, and the next run sees no
- * additions because the set difference was already spent. Carrying them
- * forward until the frame actually fires is what keeps that case working —
- * which is why this returns the *whole* pending list, not just this commit's
- * additions.
+ * additions because the set difference was already spent. So a commit that
+ * added nothing carries the previous list forward instead of clearing it.
  *
- * Ids that disappeared again before the decision are dropped: panning to a node
- * that no longer renders would park the canvas on an empty point.
+ * A commit that *did* add something replaces the list rather than growing it.
+ * Pending ids are held until they can actually be judged (a 0×0 dock panel or a
+ * card inside a collapsed group has no box to judge — see `addedPanDecision`),
+ * and an unbounded list of those would drag long-forgotten nodes into the union
+ * box of a much later add, framing a stale id instead of the one the user just
+ * created. Dropping them at the moment a newer add arrives keeps the list
+ * finite without an expiry timer, and matches where the user is looking: at
+ * what they added last.
+ *
+ * Ids that disappeared again before the decision are dropped either way:
+ * panning to a node that no longer renders would park the canvas on an empty
+ * point.
  */
 export function pendingAddedIds(
   pending: readonly string[],
   prevIds: ReadonlySet<string>,
   ids: ReadonlySet<string>,
 ): string[] {
-  const next: string[] = [];
-  for (const id of pending) {
-    if (ids.has(id)) next.push(id);
-  }
+  const added: string[] = [];
   for (const id of ids) {
-    if (!prevIds.has(id) && !next.includes(id)) next.push(id);
+    if (!prevIds.has(id)) added.push(id);
   }
-  return next;
+  if (added.length > 0) return added;
+  return pending.filter((id) => ids.has(id));
 }
 
 /**
@@ -132,7 +138,7 @@ export function pendingAddedIds(
  * already flow units) and it is correct from the first frame. The stand-in
  * stays as the last resort, for a node with no element at all.
  */
-export function addedCardSize(
+function addedCardSize(
   measured: { width?: number | undefined; height?: number | undefined },
   dom: { width: number; height: number } | null,
   fallback: { width: number; height: number },
@@ -143,6 +149,62 @@ export function addedCardSize(
   }
   if (dom !== null && dom.width > 0 && dom.height > 0) return dom;
   return fallback;
+}
+
+/** Everything the pan decision needs to know about one just-added node, read
+ *  out of React Flow (and the card's element) by the caller. `null` when React
+ *  Flow has no internal node under that id — it has not processed the add yet. */
+export type AddedNodeProbe = {
+  /** Descendant of a collapsed group: React Flow renders it nowhere at all. */
+  hidden: boolean;
+  /** The card's top-left in absolute flow coordinates. */
+  position: { x: number; y: number };
+  /** React Flow's own measurement — empty until its ResizeObserver has run. */
+  measured: { width?: number | undefined; height?: number | undefined };
+  /** The mounted element's layout box, or `null` when there is no element. */
+  dom: { width: number; height: number } | null;
+};
+
+/**
+ * The whole one-frame pan decision: given the visible area and the ids that
+ * still owe an answer, where the canvas has to be centered (or `null` to leave
+ * it alone) *and* which ids remain undecided.
+ *
+ * The split between "decided" and "still pending" is the point of returning
+ * both. An id can only be judged against a real box, and two cases have none:
+ *
+ *  • `probe` returns `null` — React Flow has not taken the node yet.
+ *  • `hidden` — the node is inside a collapsed group, so it renders nowhere;
+ *    panning to it would park the canvas on a point with nothing on it.
+ *
+ * Neither is an answer of "no pan needed", so neither consumes the id: it stays
+ * pending for the next run (expanding the group re-writes the node array, which
+ * re-arms the decision). Treating "cannot judge" as "judged no" is what silently
+ * dropped adds made under a collapsed dock panel.
+ */
+export function addedPanDecision(
+  view: FlowRect,
+  addedIds: readonly string[],
+  probe: (id: string) => AddedNodeProbe | null,
+  fallback: { width: number; height: number },
+): { target: { x: number; y: number } | null; pending: string[] } {
+  const boxes: FlowRect[] = [];
+  const pending: string[] = [];
+  for (const id of addedIds) {
+    const p = probe(id);
+    if (p === null || p.hidden) {
+      pending.push(id);
+      continue;
+    }
+    const size = addedCardSize(p.measured, p.dom, fallback);
+    boxes.push({
+      x: p.position.x,
+      y: p.position.y,
+      width: size.width,
+      height: size.height,
+    });
+  }
+  return { target: offscreenPanTarget(view, boxes), pending };
 }
 
 /**

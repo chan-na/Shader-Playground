@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered, readCanvasStats } from "./helpers/canvas";
 import { bootApp, setGraph } from "./helpers/fixtures";
@@ -52,10 +52,23 @@ async function viewportTransform(
   return t;
 }
 
+/** Long enough that any canvas animation the app can start has finished: the
+ *  editor arms its fitView / setCenter one frame after the commit and runs it
+ *  for MOTION_MAX_MS (`src/ui/motion.ts`, 150ms), and the dock's CSS
+ *  transitions sit in the same 90–150ms band. */
+const MOTION_SETTLE_MS = 400;
+
 /** Block until the canvas transform stops changing — every graph replace runs
  *  an animated fitView (MOTION_MAX_MS), and a transform sampled mid-flight is
- *  not one the user ever sat at. */
+ *  not one the user ever sat at.
+ *
+ *  The unconditional wait first is load-bearing, not padding: sampling alone
+ *  cannot tell "at rest" from "has not started moving yet", and the fit only
+ *  begins a frame after the commit. Two equal samples taken inside that gap
+ *  report a framing the canvas is about to leave, which is exactly how a caller
+ *  ends up computing against a stale transform. */
 async function settledViewport(page: Page): Promise<void> {
+  await page.waitForTimeout(MOTION_SETTLE_MS);
   let previous = "";
   await expect
     .poll(
@@ -69,6 +82,18 @@ async function settledViewport(page: Page): Promise<void> {
       { message: "the canvas transform never settled", intervals: [80] },
     )
     .toBe(true);
+}
+
+/** A locator's box, or a thrown error naming it — `boundingBox()` returns null
+ *  only for something not laid out at all, which is never a case these specs
+ *  want to fold into an arithmetic default. */
+async function boxOf(
+  locator: Locator,
+  what: string,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`${what} has no layout box`);
+  return box;
 }
 
 /**
@@ -121,6 +146,28 @@ async function edgesInto(
         )
         .map((e) => ({ source: e.source, sourceHandle: e.sourceHandle })),
     { nodeId, handleId },
+  );
+}
+
+/** Add an Image node at an exact flow coordinate. The add paths a user has
+ *  (AddNodePill, ⌘K) drop their node at a *fixed* coordinate, which is the
+ *  whole reason the pan-into-view net exists — but it also means they cannot
+ *  place a card at a computed spot, so the store's own add is used instead. It
+ *  is the same code path from the editor's point of view: one commit that grew
+ *  the node array. */
+async function addImageNode(
+  page: Page,
+  id: string,
+  position: { x: number; y: number },
+): Promise<void> {
+  await withSp(
+    page,
+    (sp, args) => {
+      sp.graph
+        .getState()
+        .addNode({ id: args.id, kind: "image", assetId: null }, args.position);
+    },
+    { id, position },
   );
 }
 
@@ -365,86 +412,93 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
   test("an added node that is only partly on screen leaves the viewport alone", async ({
     page,
   }) => {
-    const anchor = {
-      id: "anchor",
-      kind: "param" as const,
-      paramKind: "float",
-      value: 0.5,
-    };
-    // Park the viewport's top-left corner at (LEFT_FLOW, TOP_FLOW) by fitting on
-    // a lone anchor node and moving it until the fit lands there. TOP_FLOW cuts
-    // the Image card the pill drops at flow (-200, 200) across its top edge and
-    // nothing else: the real box (~148x163, bottom at y≈363) still shows below
-    // that edge, while the 180x64 stand-in (bottom at y=264) is entirely above
-    // it. LEFT_FLOW only keeps the card clear of the side edges.
-    const LEFT_FLOW = -320;
-    const TOP_FLOW = 310;
-    const anchorAt = { x: 0, y: 0 };
+    // The setup has to put an added card across the viewport's top edge with
+    // more of it above that edge than the 180x64 stand-in box is tall. Nothing
+    // below steers the canvas to get there — an earlier version of this spec
+    // walked a lone node until the *animated* fit happened to land on a chosen
+    // framing, and every pass of that loop had to guess whether the value it
+    // read was resting or still on its way, which it got wrong about half the
+    // time. Here the canvas is left wherever the one replace put it, and the
+    // card's position is derived from what is actually on screen.
     await setGraph(
       page,
-      { nodes: [anchor], edges: [] },
-      { anchor: { ...anchorAt } },
+      {
+        nodes: [
+          { id: "anchor", kind: "param", paramKind: "float", value: 0.5 },
+        ],
+        edges: [],
+      },
+      { anchor: { x: 0, y: 0 } },
     );
-    // A closed loop rather than one computed jump: a graph replace also resizes
-    // the dock (the code panel closes with no shader selected) and the first fit
-    // runs before the card has been measured, so where the framing lands is only
-    // knowable afterwards. Each pass reads a *resting* canvas — a fit sampled
-    // mid-animation reports a framing that is merely on the way somewhere else,
-    // and a pass that believed one would leave the whole test misaimed.
-    await expect
-      .poll(
-        async () => {
-          await settledViewport(page);
-          const t = await viewportTransform(page);
-          const dx = LEFT_FLOW - -t.x / t.zoom;
-          const dy = TOP_FLOW - -t.y / t.zoom;
-          const off = Math.max(Math.abs(dx), Math.abs(dy));
-          if (off > 2) {
-            anchorAt.x += dx;
-            anchorAt.y += dy;
-            await setGraph(
-              page,
-              { nodes: [anchor], edges: [] },
-              { anchor: { ...anchorAt } },
-            );
-          }
-          return off;
-        },
-        {
-          message: "the viewport never parked at the intended top-left corner",
-          intervals: [120],
-          timeout: 20_000,
-        },
-      )
-      .toBeLessThan(2);
+    await expect(page.locator("[data-id='anchor']")).toHaveCount(1);
     await settledViewport(page);
-    const before = await viewportTransform(page);
 
-    await page
-      .getByTestId("add-node-pill")
-      .getByRole("button", { name: "Image" })
-      .click();
-    const added = page.locator(".react-flow__node[data-id^='image_']");
+    const pane = await stableBox(page, ".panel--graph .panel-body");
+    const framing = await viewportTransform(page);
+    // The anchor card's top-left *is* flow (0, 0), so its box hands over the
+    // flow→screen origin outright. Measuring it beats deriving it from the
+    // pane's own box, which would silently fold in any padding/border between
+    // the panel body and React Flow's transform origin.
+    const origin = await boxOf(page.locator("[data-id='anchor']"), "anchor");
+    const flowAt = (screenX: number, screenY: number) => ({
+      x: (screenX - origin.x) / framing.zoom,
+      y: (screenY - origin.y) / framing.zoom,
+    });
+
+    // A probe card of the very kind under test, dropped in plain sight. Its
+    // rendered height is the one number this spec cannot know up front, and
+    // hardcoding it (~163px) is precisely the kind of assumption the regression
+    // was about — so it is measured instead.
+    await addImageNode(
+      page,
+      "image_probe",
+      flowAt(pane.x + pane.width * 0.45, pane.y + pane.height * 0.35),
+    );
+    const probe = page.locator(".react-flow__node[data-id='image_probe']");
+    await expect(probe).toBeVisible();
+    await page.waitForTimeout(MOTION_SETTLE_MS);
+    const probeBox = await boxOf(probe, "probe card");
+    // An add in plain sight moves nothing — the same rule this spec is about,
+    // asserted here so that the framing everything below is computed against is
+    // known to still be the framing.
+    const before = await viewportTransform(page);
+    expect(before).toEqual(framing);
+
+    // The case under test: the same card, placed so that only its bottom
+    // VISIBLE_PX show below the pane's top edge. The rest of it — 130px-odd,
+    // far more than the 64px stand-in is tall — sits above, so a decision made
+    // on the stand-in box concludes "fully off-screen" and pans.
+    const VISIBLE_PX = 30;
+    await addImageNode(
+      page,
+      "image_edge",
+      flowAt(
+        pane.x + pane.width * 0.06,
+        pane.y - (probeBox.height - VISIBLE_PX),
+      ),
+    );
+    const added = page.locator(".react-flow__node[data-id='image_edge']");
     await expect(added).toHaveCount(1);
     // Longer than the pan animation (MOTION_MAX_MS) plus the frame it is armed
     // on — a pan, if one were wrongly started, has finished by now.
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(MOTION_SETTLE_MS);
+
+    // The behavior under test comes first on purpose: a regression pans the
+    // canvas, which drags the card fully into view and would otherwise trip a
+    // precondition below instead — reporting a real bug as a setup miss.
+    expect(await viewportTransform(page)).toEqual(before);
 
     // Preconditions, asserted rather than assumed: were the card fully visible
     // "don't move" would be trivially true, and were the stand-in box on screen
     // too this would not be covering the band it exists for. Both come off the
     // geometry as rendered, against a pane measured after everything settled.
-    const pane = await stableBox(page, ".panel--graph .panel-body");
-    const box = await added.boundingBox();
-    expect(box).not.toBeNull();
-    const cardTop = box?.y ?? 0;
-    expect(cardTop).toBeLessThan(pane.y);
-    expect(cardTop + (box?.height ?? 0)).toBeGreaterThan(pane.y);
-    expect(box?.x ?? 0).toBeLessThan(pane.x + pane.width);
-    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeGreaterThan(pane.x);
-    expect(cardTop + 64 * before.zoom).toBeLessThan(pane.y);
-
-    expect(await viewportTransform(page)).toEqual(before);
+    const paneNow = await stableBox(page, ".panel--graph .panel-body");
+    const box = await boxOf(added, "added card");
+    expect(box.y).toBeLessThan(paneNow.y);
+    expect(box.y + box.height).toBeGreaterThan(paneNow.y);
+    expect(box.x).toBeLessThan(paneNow.x + paneNow.width);
+    expect(box.x + box.width).toBeGreaterThan(paneNow.x);
+    expect(box.y + 64 * before.zoom).toBeLessThan(paneNow.y);
   });
 
   // Regression [#38 follow-up, round 2]: the pan is armed as a single

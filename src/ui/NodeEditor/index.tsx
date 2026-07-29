@@ -43,10 +43,9 @@ import { HelpModal } from "./HelpModal";
 import { minimapColorFor, NODE_TYPES } from "./nodeUiRegistry";
 import type { FlowRect } from "./rfNodeData";
 import {
-  addedCardSize,
+  addedPanDecision,
   createNodeDataCache,
   groupBoxHeight,
-  offscreenPanTarget,
   pendingAddedIds,
 } from "./rfNodeData";
 import { ZoomControls } from "./ZoomControls";
@@ -141,7 +140,70 @@ export function NodeEditor() {
   // a new node now lands off-screen and the menu looks like it did nothing.
   // Pan — never zoom, that is what #38 removed — and only when the node really
   // is outside the visible area, so an add in plain sight leaves the viewport
-  // untouched. See offscreenPanTarget for the framing rules.
+  // untouched. See addedPanDecision for the framing rules.
+  //
+  // Runs a frame after the commit that added the node, so the card it has to
+  // measure has been laid out. Everything it needs lives in refs, so the
+  // callback is stable and both triggers below share the one implementation.
+  const decidePan = useCallback(() => {
+    const addedIds = pendingAddedRef.current;
+    if (addedIds.length === 0) return;
+    const inst = flowRef.current;
+    const pane = paneRef.current;
+    // Nothing to measure against: no answer is possible, so the ids stay
+    // pending rather than being spent on a decision nobody made.
+    if (!inst || !pane) return;
+    const rect = pane.getBoundingClientRect();
+    // A dock panel that is collapsed (or whose sibling is maximized) is hidden
+    // with CSS and keeps its panel *mounted* — so this is a live element
+    // reporting 0×0, nothing can be judged visible against it, and no remount
+    // will ever come to re-run the decision. Keep the ids; the ResizeObserver
+    // below is what retries once the panel has a real box again.
+    if (rect.width === 0 || rect.height === 0) return;
+    const topLeft = inst.screenToFlowPosition({ x: rect.left, y: rect.top });
+    const bottomRight = inst.screenToFlowPosition({
+      x: rect.right,
+      y: rect.bottom,
+    });
+    const view: FlowRect = {
+      x: topLeft.x,
+      y: topLeft.y,
+      width: bottomRight.x - topLeft.x,
+      height: bottomRight.y - topLeft.y,
+    };
+    const { target, pending } = addedPanDecision(
+      view,
+      addedIds,
+      (id) => {
+        const internal = inst.getInternalNode(id);
+        if (!internal) return null;
+        // React Flow has not measured a card mounted this frame (its
+        // ResizeObserver only reports after the rAF callbacks), so read the
+        // element it will measure — same properties, one frame earlier. The
+        // selector matches React Flow's own node lookup.
+        const el = pane.querySelector(`.react-flow__node[data-id="${id}"]`);
+        return {
+          hidden: internal.hidden === true,
+          position: internal.internals.positionAbsolute,
+          measured: internal.measured,
+          dom:
+            el instanceof HTMLElement
+              ? { width: el.offsetWidth, height: el.offsetHeight }
+              : null,
+        };
+      },
+      { width: DROP_CARD_W, height: DROP_CARD_H },
+    );
+    pendingAddedRef.current = pending;
+    if (!target) return;
+    void inst.setCenter(target.x, target.y, {
+      // setCenter defaults to maxZoom — pass the current zoom through so
+      // this stays a pan and the user's zoom level survives.
+      zoom: inst.getViewport().zoom,
+      duration: MOTION_MAX_MS,
+    });
+  }, []);
+
   useEffect(() => {
     const prevIds = prevNodeIdsRef.current;
     const prevEpoch = prevEpochRef.current;
@@ -157,69 +219,31 @@ export function NodeEditor() {
     const addedIds = pendingAddedIds(pendingAddedRef.current, prevIds, ids);
     pendingAddedRef.current = addedIds;
     if (addedIds.length === 0) return;
-    const inst = flowRef.current;
-    const pane = paneRef.current;
-    // Nothing to pan with yet — the ids stay pending so the next commit that
-    // touches the graph retries instead of forgetting them.
-    if (!inst || !pane) return;
-    // Defer a frame so a card mounted by this commit has been laid out.
-    const raf = requestAnimationFrame(() => {
-      // The frame fired, so the decision is being made now — whatever it turns
-      // out to be. Leaving ids pending past this point would let an unrelated
-      // later commit pan to a node the user has long since seen.
-      pendingAddedRef.current = [];
-      const rect = pane.getBoundingClientRect();
-      // A collapsed/hidden dock panel measures 0×0 — nothing is visible there
-      // by definition, so panning would be noise.
-      if (rect.width === 0 || rect.height === 0) return;
-      const topLeft = inst.screenToFlowPosition({ x: rect.left, y: rect.top });
-      const bottomRight = inst.screenToFlowPosition({
-        x: rect.right,
-        y: rect.bottom,
-      });
-      const view: FlowRect = {
-        x: topLeft.x,
-        y: topLeft.y,
-        width: bottomRight.x - topLeft.x,
-        height: bottomRight.y - topLeft.y,
-      };
-      const boxes: FlowRect[] = [];
-      for (const id of addedIds) {
-        const internal = inst.getInternalNode(id);
-        // Descendants of a collapsed group render nowhere — panning to one
-        // would move the canvas to a point with nothing on it.
-        if (!internal || internal.hidden === true) continue;
-        const pos = internal.internals.positionAbsolute;
-        // React Flow has not measured a card mounted this frame (its
-        // ResizeObserver only reports after the rAF callbacks), so read the
-        // element it will measure — same properties, one frame earlier. The
-        // selector matches React Flow's own node lookup.
-        const el = pane.querySelector(`.react-flow__node[data-id="${id}"]`);
-        const size = addedCardSize(
-          internal.measured,
-          el instanceof HTMLElement
-            ? { width: el.offsetWidth, height: el.offsetHeight }
-            : null,
-          { width: DROP_CARD_W, height: DROP_CARD_H },
-        );
-        boxes.push({
-          x: pos.x,
-          y: pos.y,
-          width: size.width,
-          height: size.height,
-        });
-      }
-      const target = offscreenPanTarget(view, boxes);
-      if (!target) return;
-      void inst.setCenter(target.x, target.y, {
-        // setCenter defaults to maxZoom — pass the current zoom through so
-        // this stays a pan and the user's zoom level survives.
-        zoom: inst.getViewport().zoom,
-        duration: MOTION_MAX_MS,
-      });
-    });
+    const raf = requestAnimationFrame(decidePan);
     return () => cancelAnimationFrame(raf);
-  }, [graphNodes, graphEpoch]);
+  }, [graphNodes, graphEpoch, decidePan]);
+
+  // The retry the effect above cannot be: its only triggers are the node array
+  // and the epoch, and expanding a collapsed dock panel changes neither — the
+  // panel is never unmounted, so React Flow does not re-frame either. Watching
+  // the pane turns "the panel has a real box again" into the missing trigger,
+  // so an add made while the panel was hidden is still shown when it comes
+  // back. Cheap when idle: with nothing pending the callback returns at once.
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+    let raf = 0;
+    const observer = new ResizeObserver(() => {
+      if (pendingAddedRef.current.length === 0) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(decidePan);
+    });
+    observer.observe(pane);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [decidePan]);
 
   const rfNodes: Node[] = useMemo(() => {
     const sel = new Set(selectedNodeIds);

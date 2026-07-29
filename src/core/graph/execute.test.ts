@@ -367,6 +367,143 @@ describe("executePlan — u_mouse pass-space transform (#19)", () => {
   });
 });
 
+describe("executePlan — int/ivec uniform dispatch (#11)", () => {
+  // GLSL type enums live on the context in the real and the fake gl alike —
+  // read them from a throwaway instance instead of re-typing hex literals.
+  const glConst = createFakeGl();
+
+  // A separate gl factory rather than an edit to `makeGl`: the existing
+  // `uniforms`-only call sites stay untouched, `uniformTypes` is additive.
+  function typedGl(
+    uniforms: string[],
+    uniformTypes: Record<string, number>,
+  ): WebGL2RenderingContext {
+    return createFakeGl({
+      attributes: ["a_position", "a_pos"],
+      uniforms,
+      uniformTypes,
+    });
+  }
+
+  function shaderPlan(
+    gl: WebGL2RenderingContext,
+    uniformValues: Record<string, number | number[]> = {},
+  ) {
+    const s: ShaderGraphNode = { ...shaderNode("s1"), uniformValues };
+    const graph: Graph = {
+      nodes: [s, outputNode("o1")],
+      edges: [edge("e1", "s1", "o1", "texture")],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const sp = plan.passes.find((p) => p.nodeId === "s1");
+    if (!sp || sp.kind !== "shader") throw new Error("missing shader pass");
+    return { graph, plan, sp };
+  }
+
+  /** Args of the single spy call made against `loc`. */
+  function argsFor(
+    calls: unknown[][],
+    loc: WebGLUniformLocation,
+  ): unknown[] | undefined {
+    return calls.find((c) => c[0] === loc)?.slice(1);
+  }
+
+  it("uploads an int system uniform with uniform1i, not uniform1f", () => {
+    const gl = typedGl(["u_time", "u_frame"], { u_frame: glConst.INT });
+    const { graph, plan, sp } = shaderPlan(gl);
+    const loc = sp.program.uniforms.u_frame;
+    if (!loc) throw new Error("u_frame location was not resolved");
+    const i1 = vi.spyOn(gl, "uniform1i");
+    const f1 = vi.spyOn(gl, "uniform1f");
+    executePlan(gl, plan, { ...frameCtx(graph), frame: 7 }, 32, 32);
+    expect(argsFor(i1.mock.calls, loc)).toEqual([7]);
+    expect(argsFor(f1.mock.calls, loc)).toBeUndefined();
+    plan.dispose();
+  });
+
+  it("leaves float vectors on the float path (gate is int types, not !FLOAT)", () => {
+    // Gating on "anything that isn't GL_FLOAT" would drag FLOAT_VEC2 (and
+    // SAMPLER_2D) into the integer entry points and break working shaders.
+    const gl = typedGl(["u_resolution", "u_src"], {
+      u_resolution: glConst.FLOAT_VEC2,
+      u_src: glConst.SAMPLER_2D,
+    });
+    const { graph, plan, sp } = shaderPlan(gl);
+    const loc = sp.program.uniforms.u_resolution;
+    if (!loc) throw new Error("u_resolution location was not resolved");
+    const f2 = vi.spyOn(gl, "uniform2f");
+    const i2 = vi.spyOn(gl, "uniform2i");
+    executePlan(gl, plan, frameCtx(graph), 32, 32);
+    expect(argsFor(f2.mock.calls, loc)).toEqual([32, 32]);
+    expect(i2).not.toHaveBeenCalled();
+    plan.dispose();
+  });
+
+  it("keeps BOOL on the float path (a float upload is legal in GLES3)", () => {
+    const gl = typedGl(["u_flag"], { u_flag: glConst.BOOL });
+    const { graph, plan, sp } = shaderPlan(gl, { u_flag: 1 });
+    const loc = sp.program.uniforms.u_flag;
+    if (!loc) throw new Error("u_flag location was not resolved");
+    const f1 = vi.spyOn(gl, "uniform1f");
+    const i1 = vi.spyOn(gl, "uniform1i");
+    executePlan(gl, plan, frameCtx(graph), 32, 32);
+    expect(argsFor(f1.mock.calls, loc)).toEqual([1]);
+    expect(argsFor(i1.mock.calls, loc)).toBeUndefined();
+    plan.dispose();
+  });
+
+  it("rounds user int/ivec values into uniform1i/2i/3i/4i", () => {
+    const gl = typedGl(["u_steps", "u_cell", "u_rgb", "u_box"], {
+      u_steps: glConst.INT,
+      u_cell: glConst.INT_VEC2,
+      u_rgb: glConst.INT_VEC3,
+      u_box: glConst.INT_VEC4,
+    });
+    const { graph, plan, sp } = shaderPlan(gl, {
+      u_steps: 2.6,
+      u_cell: [1.4, 2.6],
+      u_rgb: [-1.6, 1.5, 2],
+      u_box: [0, 1, 2.5, 3.49],
+    });
+    const u = sp.program.uniforms;
+    const spies = {
+      1: vi.spyOn(gl, "uniform1i"),
+      2: vi.spyOn(gl, "uniform2i"),
+      3: vi.spyOn(gl, "uniform3i"),
+      4: vi.spyOn(gl, "uniform4i"),
+    };
+    executePlan(gl, plan, frameCtx(graph), 32, 32);
+    expect(argsFor(spies[1].mock.calls, u.u_steps!)).toEqual([3]);
+    expect(argsFor(spies[2].mock.calls, u.u_cell!)).toEqual([1, 3]);
+    expect(argsFor(spies[3].mock.calls, u.u_rgb!)).toEqual([-2, 2, 2]);
+    expect(argsFor(spies[4].mock.calls, u.u_box!)).toEqual([0, 1, 3, 3]);
+    plan.dispose();
+  });
+
+  it("dispatches int uniforms for compute passes too (#40 shared reflection)", () => {
+    // Compute programs are linked by createTransformFeedbackProgram; before the
+    // shared tail existed this path could silently keep the float dispatch.
+    const gl = typedGl(["u_frame", "u_steps"], {
+      u_frame: glConst.INT,
+      u_steps: glConst.INT,
+    });
+    const c: ComputeGraphNode = {
+      ...computeNode("c1"),
+      uniformValues: { u_steps: 4.2 },
+    };
+    const graph: Graph = { nodes: [c], edges: [] };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const cp = plan.passes[0];
+    if (!cp || cp.kind !== "compute") throw new Error("missing compute pass");
+    const u = cp.program.uniforms;
+    const i1 = vi.spyOn(gl, "uniform1i");
+    executePlan(gl, plan, { ...frameCtx(graph), frame: 5 }, 32, 32);
+    expect(argsFor(i1.mock.calls, u.u_frame!)).toEqual([5]);
+    expect(argsFor(i1.mock.calls, u.u_steps!)).toEqual([4]);
+    plan.dispose();
+  });
+});
+
 describe("executePlan — dispose", () => {
   it("plan.dispose deletes programs, framebuffers, buffers, and TF objects", () => {
     const gl = makeGl();

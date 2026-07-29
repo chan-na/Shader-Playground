@@ -12,6 +12,12 @@ interface FakeGlOptions {
   attributes?: string[];
   /** Names returned by getActiveUniform. */
   uniforms?: string[];
+  /**
+   * GLSL type enum reported by getActiveUniform, keyed by the same name as it
+   * appears in `uniforms`. Purely additive — names not listed here keep
+   * reporting FLOAT, so existing `uniforms`-only callers are unaffected. (#11)
+   */
+  uniformTypes?: Record<string, number>;
   /** Force linkProgram to report failure. */
   linkFailure?: boolean;
   /** Force compileShader to report failure. */
@@ -40,6 +46,16 @@ const CONSTANTS = {
   LINES: 1,
   TRIANGLES: 4,
   FLOAT: 5126,
+  // Uniform type enums — the int family drives the integer upload path, BOOL
+  // and SAMPLER_2D exist so tests can pin that they are *not* treated as int.
+  INT: 0x1404,
+  INT_VEC2: 0x8b53,
+  INT_VEC3: 0x8b54,
+  INT_VEC4: 0x8b55,
+  BOOL: 0x8b56,
+  FLOAT_VEC2: 0x8b50,
+  FLOAT_VEC4: 0x8b52,
+  SAMPLER_2D: 0x8b5e,
   UNSIGNED_BYTE: 5121,
   UNSIGNED_SHORT: 5123,
   UNSIGNED_INT: 5125,
@@ -112,7 +128,9 @@ export function createFakeGl(opts: FakeGlOptions = {}): WebGL2RenderingContext {
     },
     getActiveUniform: (_p: unknown, i: number) => {
       const n = opts.uniforms?.[i];
-      return n ? { name: n, size: 1, type: CONSTANTS.FLOAT } : null;
+      return n
+        ? { name: n, size: 1, type: opts.uniformTypes?.[n] ?? CONSTANTS.FLOAT }
+        : null;
     },
     getAttribLocation: (_p: unknown, name: string) =>
       opts.attributes?.indexOf(name) ?? -1,
@@ -177,6 +195,9 @@ export function createFakeGl(opts: FakeGlOptions = {}): WebGL2RenderingContext {
     uniform3f: noop,
     uniform4f: noop,
     uniform1i: noop,
+    uniform2i: noop,
+    uniform3i: noop,
+    uniform4i: noop,
     uniform1fv: noop,
     uniform2fv: noop,
     uniform3fv: noop,

@@ -9,6 +9,23 @@ import { setMinLevel } from "./utils/log";
 // own level).
 setMinLevel("error");
 
+// `Range.prototype.getClientRects` polyfill — jsdom implements it on Element
+// but not on Range (see jsdom's Element-impl.js vs its Range impl). CodeMirror's
+// `clientRectsFor()` calls it on a text-node range from inside its rAF measure
+// loop (`DocView.measureTextSize`), so any test that mounts a real EditorView
+// and then lets a frame run throws an *unhandled* TypeError that vitest fails
+// the whole file on. An empty list is the honest answer under jsdom's zero-size
+// layout model, and CodeMirror already handles it (`rect && rect.width ? … : 7`
+// falls back to its default char width / line height).
+if (typeof Range.prototype.getClientRects !== "function") {
+  Range.prototype.getClientRects = function getClientRects(): DOMRectList {
+    const rects: DOMRect[] = [];
+    return Object.assign(rects, {
+      item: (i: number): DOMRect | null => rects[i] ?? null,
+    });
+  };
+}
+
 // Minimal ImageData polyfill for jsdom (which omits the Canvas/ImageData APIs).
 if (typeof globalThis.ImageData === "undefined") {
   class ImageDataPolyfill {

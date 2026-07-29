@@ -612,14 +612,25 @@ ui/CodeEditor/rename.ts
       ├─ collectSites — crossStage 가 있으면 findReferencesAcrossStages,
       │                 없으면 Phase 27 의 findReferences
       ├─ split → localSites (= origin stage) + otherSites
-      ├─ if crossStage && otherSites.length > 0:
+      ├─ wroteOtherStage = crossStage && otherSites.length > 0
+      ├─ if wroteOtherStage:
       │     newOrigin = applyEdits(source, localSites, next)
       │     newOther  = applyEdits(crossStage.otherStageSource, otherSites, next)
       │     crossStage.applyBothStages(newOrigin, newOther)   // 한 history push
-      └─ view.dispatch({ changes: localSites })               // CM undo step
+      └─ view.dispatch({
+            changes: localSites,
+            // wroteOtherStage 면 CM undo 스택 제외 (#1c)
+            ...(wroteOtherStage
+                 ? { annotations: Transaction.addToHistory.of(false) } : {}),
+         })
+
+   ui/CodeEditor/editorNode.ts   (leaf — index.tsx 와 rename.ts 의 공용 규칙)
+      pickEditorNodeId(selectedId, nodes)
+         = selectedId ?? nodes.find(kind === 'shader')?.id ?? null
+      currentEditorNodeId() = pickEditorNodeId(selection.getState(), graph.getState())
 
    resolveCrossStageContext()  (module-private)
-      ├─ selectionStore.getState().selectedNodeId → ShaderGraphNode 이어야
+      ├─ currentEditorNodeId() → ShaderGraphNode 이어야  (#10)
       ├─ editorStore.getState().activeStage → originStage
       └─ applyBothStages = (newOrigin, newOther) =>
             graphStore.updateShaderSource(sn.id, {
@@ -631,8 +642,10 @@ ui/CodeEditor/rename.ts
 - **`CROSS_STAGE_KINDS`**: `uniform / in / out / attribute / varying / const / function / struct`. 로컬 / 파라미터는 GLSL 링커가 다른 binding 으로 보므로 의도적으로 제외 — vertex `main` 의 `float k` 와 fragment `main` 의 `float k` 는 이름만 같은 별개 변수. 같은 stage 안에서는 Phase 27 의 shadowing 규칙 그대로.
 - **Partial rename**: other stage 에 동명 글로벌이 없으면 (예: vertex 의 `in a_position`) origin-stage 단독 rewrite. 결과는 partial 이지만 정상 종료 — 오류 아님.
 - **Other-stage shadowing**: other stage 의 글로벌 binding 은 잡되, 그 안에서 같은 이름의 로컬이 가린 곳(`resolveSymbol` 이 로컬을 돌려주는 위치)은 자동 제외. global rename 이 local 을 망가뜨리지 않는다.
-- **Single graph-history push**: `applyBothStages` 가 한 `updateShaderSource({ vertexSource, fragmentSource })` 패치로 양 stage 를 동시에 set. 이후 CM dispatch 가 origin stage 의 view 를 갱신하고, 50 ms 후 commit debounce 가 다시 `updateShaderSource(...)` 를 부를 때는 store 값이 같아 early-return → 추가 push 없음. Cmd+Z 한 번에 전체 rename 이 되돌려진다.
-- **ComputeNode / 비-Shader 선택**: `resolveCrossStageContext()` 가 `undefined` 반환 → `runRename` 은 Phase 27 의 single-document 경로로 폴백. 단위 테스트와 ComputeNode 편집기에서 기존 동작 변화 없음.
+- **Single graph-history push**: `applyBothStages` 가 한 `updateShaderSource({ vertexSource, fragmentSource })` 패치로 양 stage 를 동시에 set. 이후 CM dispatch 가 origin stage 의 view 를 갱신하고, 50 ms 후 commit debounce 가 다시 `updateShaderSource(...)` 를 부를 때는 store 값이 같아 early-return → 추가 push 없음.
+- **Undo 범위 (2026-07 리뷰 #1c)**: other stage 를 실제로 쓴 CM dispatch 는 `Transaction.addToHistory.of(false)` 라 **CM undo 스택에 없다**. CM history 는 view 의 한 문서만 커버하므로 undo 를 허용하면 보이는 stage 만 되돌아가고 짝 stage 는 새 이름으로 남아 링크가 깨진다. 대가: `KeyboardShortcuts.tsx` 가 `.cm-editor` 안을 editing target 으로 보고 Cmd+Z 를 CodeMirror 에 양보하므로 **에디터 포커스 상태에서는 cross-stage rename 이 키보드로 되돌려지지 않는다**. graph history 의 단일 엔트리는 살아 있으므로 에디터 밖에서 Cmd+Z 를 누르면 전체가 한 번에 복구된다. partial rename(other stage 미기록)과 단일 문서 rename 은 종전대로 CM undo 1 스텝.
+- **ComputeNode / 비-Shader 편집 대상**: `resolveCrossStageContext()` 가 `undefined` 반환 → `runRename` 은 Phase 27 의 single-document 경로로 폴백. 단위 테스트와 ComputeNode 편집기에서 기존 동작 변화 없음.
+- **편집 대상 노드의 단일 규칙 (#10)**: Code 패널은 선택이 없어도 그래프의 첫 `shader` 노드를 연다. 그 규칙은 `ui/CodeEditor/editorNode.ts` 의 `pickEditorNodeId(selectedId, nodes)` 하나뿐이고, `CodeEditor/index.tsx` 는 zustand 셀렉터 **안에서**(reactive 유지), `rename.ts` 는 `currentEditorNodeId()` 로 같은 규칙을 읽는다. 예전에 rename 이 `selectionStore.selectedNodeId` 만 보던 시절엔 선택이 빈 상태의 F2 가 cross-stage 를 못 타고 절반만 rename 했다. 별도 leaf 모듈인 이유는 순환 회피 — `rename.ts → index.tsx → glslSetup.ts → rename.ts` 는 `npm run circular`(dpdm) 하드 게이트에 걸린다.
 
 ### 8.4 라이브 GLSL 검증 (Phase 24)
 
@@ -669,6 +682,7 @@ CM updateListener (doc 변경)
 - **실패 모델**: 워커 construct/post/error 어느 단계 실패해도 클라이언트는 `[]` resolve. 권위 recompile 경로가 source of truth 로 그대로 동작 — 라이브는 *보조* 채널이다. 워커 미가용 환경에서는 기존 동작(컴파일 후 진단)만 남는다.
 - **머지/우선순위**: CodeEditor 진단 push effect 가 `auth = diagnosticsStore[stage] + link` 와 `live = liveDiags` 를 합성하되 *같은 `line:severity` 가 양쪽에 있으면 라이브 드롭*. 사용자가 에러를 고치는 순간 — 라이브는 즉시 비고, 권위는 다음 recompile 까지 잠시 stale — 잠깐 권위가 살아 있는 동안 라이브가 추가로 중복 표시하지 않는다.
 - **switch race**: `liveValidate` 가 dispatch 한 promise 가 다른 노드/스테이지로 전환된 뒤 도착하면 `ctxRef` 가 다른 `(id, stage)` 라 그대로 폐기. doc 교체 effect 는 switching 일 때 `setLiveDiags([])` 로 초기화.
+- **문서 교체 = `view.setState` (2026-07 리뷰 #1a)**: 노드/스테이지 전환은 `{from:0,to:len}` 변경 트랜잭션이 아니라 **`view.setState(EditorState.create({ doc, extensions }))`** 로 처리한다. 한 view 가 (노드 × stage) 개의 서로 다른 문서를 돌려쓰는데 트랜잭션으로 갈아끼우면 undo 타임라인이 문서 경계를 넘어 이어져, 전환 직후 Cmd+Z 가 *문서 로드 트랜잭션* 을 pop 해 이전 문서를 현재 stage 에 쏟아붓고 50 ms commit debounce 가 그걸 store 에 써 버린다. 구현 계약 3 가지: (1) `extensions` 는 마운트 때 만든 **동일 배열**(`glslExtensions() + updateListener`)을 재사용한다 — `glslExtensions()` 만 다시 담으면 update listener 가 사라져 이후 모든 타이핑이 store 에 커밋되지 않는다. (2) `setState` 는 트랜잭션이 아니므로 보상 dispatch 2 개가 뒤따른다 — lint 재설치·재적용(`setDiagnostics`; lint 는 `StateEffect.appendConfig` 로 설치돼 extensions 배열에 없다)과 `liveValidate(source)` 명시 호출(`commit` 은 호출하지 않는다 — 들어온 텍스트의 출처가 store 다). (3) `EditorView` 인스턴스는 그대로 유지 — `currentView.ts` 브리지가 붙들고 있다. 잃는 상태는 fold 범위 / lint 마커 / 열린 자동완성·hover 팝업 / 커서·스크롤 위치이며, 나머지 확장은 doc+selection 의 순수 함수라 재계산된다. `historyCompartment.reconfigure(history())` 는 대안이 되지 못한다 — `@codemirror/commands` 의 history 필드는 모듈 싱글턴이라 reconfigure 경로가 기존 상태를 **보존**한다.
 
 ### 8.8 디버깅 · 진단 인프라 (Phase 16)
 
@@ -969,6 +983,7 @@ ShaderPlayground/
    │  │  ├─ rename.ts                # Phase 27 — F2 keymap + single-transaction rewrite + reserved-word 검증 (+ test)
    │  │  ├─ referenceHighlight.ts    # Phase 27 — StateField → Decoration set (커서 위 심볼의 occurrence 페인트) (+ test)
    │  │  ├─ currentView.ts           # Phase 27 — module-level EditorView ref (DEV bridge 관찰 전용)
+   │  │  ├─ editorNode.ts            # 편집 대상 노드 선택 규칙 (index.tsx ↔ rename.ts 공용 leaf, #10) (+ test)
    │  │  └─ lintAdapter.ts
    │  │
    │  ├─ Viewport/

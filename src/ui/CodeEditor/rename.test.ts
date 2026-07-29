@@ -1,3 +1,4 @@
+import { history, undo } from "@codemirror/commands";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
@@ -11,6 +12,19 @@ function viewOf(doc: string, cursorAt: number): EditorView {
   const state = EditorState.create({
     doc,
     selection: EditorSelection.cursor(cursorAt),
+  });
+  const parent = document.createElement("div");
+  return new EditorView({ state, parent });
+}
+
+/** Same as {@link viewOf} but with CodeMirror's history installed, so a test
+ * can actually run `undo(view)` — the production editor always has it
+ * (`glslSetup.ts`), the bare `viewOf` above does not. */
+function viewWithHistory(doc: string, cursorAt: number): EditorView {
+  const state = EditorState.create({
+    doc,
+    selection: EditorSelection.cursor(cursorAt),
+    extensions: [history()],
   });
   const parent = document.createElement("div");
   return new EditorView({ state, parent });
@@ -269,6 +283,58 @@ void main() {
       expect(captured.value?.x).not.toContain("u_amount");
       view.destroy();
     });
+
+    it("keeps the rewrite out of the CM undo stack when it wrote the other stage (#1c)", () => {
+      const view = viewWithHistory(VERT, VERT.indexOf("u_amount") + 1);
+      let committed = false;
+      const ctx: CrossStageRenameContext = {
+        originStage: "vertex",
+        otherStageSource: FRAG_X,
+        applyBothStages() {
+          committed = true;
+        },
+      };
+      const result = runRename(view, () => "u_strength", ctx);
+      expect(result.applied).toBe(true);
+      expect(committed).toBe(true);
+      const renamed = view.state.doc.toString();
+      expect(renamed).not.toContain("u_amount");
+
+      // Undo must NOT roll the visible stage back: the paired stage was already
+      // committed to the graph store, so a CM-only revert would leave a program
+      // where vertex says `u_amount` and fragment says `u_strength`.
+      undo(view);
+      expect(view.state.doc.toString()).toBe(renamed);
+      view.destroy();
+    });
+
+    it("keeps a partial (origin-only) cross-stage rename undoable", () => {
+      // a_position exists only in the vertex stage → no other-stage commit →
+      // nothing to desynchronise, so the normal single-undo step is preserved.
+      const view = viewWithHistory(VERT, VERT.indexOf("a_position") + 1);
+      const ctx: CrossStageRenameContext = {
+        originStage: "vertex",
+        otherStageSource: FRAG_X,
+        applyBothStages() {
+          throw new Error("must not commit the other stage");
+        },
+      };
+      expect(runRename(view, () => "a_pos", ctx).applied).toBe(true);
+      expect(view.state.doc.toString()).not.toContain("a_position");
+      undo(view);
+      expect(view.state.doc.toString()).toBe(VERT);
+      view.destroy();
+    });
+  });
+
+  it("keeps a single-document rename undoable in one step", () => {
+    const uPos = FRAG.indexOf("u_strength", FRAG.indexOf("vec4(")) + 1;
+    const view = viewWithHistory(FRAG, uPos);
+    expect(runRename(view, () => "u_amount").applied).toBe(true);
+    expect(view.state.doc.toString()).not.toContain("u_strength");
+    undo(view);
+    expect(view.state.doc.toString()).toBe(FRAG);
+    view.destroy();
   });
 
   it("scopes a local rename to its function body only", () => {

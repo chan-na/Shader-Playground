@@ -1,5 +1,6 @@
 import {
   cleanup,
+  createEvent,
   fireEvent,
   render,
   screen,
@@ -238,6 +239,56 @@ describe("DockPanelHeader", () => {
       fireEvent.pointerDown(closeAssets);
 
       expect(onPointerDown).not.toHaveBeenCalled();
+    });
+
+    // R10(design/CHANGELOG.md §v1.4) 이행 — 탭 ✕는 키보드로 도달 가능해야
+    // 한다. 부모 탭의 onKeyDown이 Enter/Space를 preventDefault하면 버튼의
+    // 네이티브 활성화(→ click)가 통째로 죽는다.
+    it.each([
+      ["Enter"],
+      [" "],
+    ])("keeps %s on the tab ✕ from reaching the tab handler (no preventDefault, no tab activation)", (key) => {
+      render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
+      const closeAssets = within(screen.getByTestId("tab-assets")).getByRole(
+        "button",
+        { name: "Close Assets tab" },
+      );
+
+      const ev = createEvent.keyDown(closeAssets, { key });
+      fireEvent(closeAssets, ev);
+
+      expect(ev.defaultPrevented).toBe(false);
+      const tree = useDockStore.getState().tree;
+      if (tree === null) throw new Error("unreachable");
+      expect(getNodeAt(tree, ["b", "b", "b"])).toMatchObject({
+        active: "inspector",
+      });
+    });
+
+    // 통짜 stopPropagation이면 Cmd+Z/D/A와 화살표 nudge가 window 리스너에
+    // 닿지 못한다(React는 루트 컨테이너에서 네이티브 전파까지 끊는다) —
+    // KeyboardShortcuts가 정확히 window keydown을 듣는다.
+    it("lets non-activation keys keep bubbling past the tab ✕ to window", () => {
+      const onWindowKey = vi.fn();
+      window.addEventListener("keydown", onWindowKey);
+      try {
+        render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
+        const closeAssets = within(screen.getByTestId("tab-assets")).getByRole(
+          "button",
+          { name: "Close Assets tab" },
+        );
+
+        fireEvent.keyDown(closeAssets, { key: "z", metaKey: true });
+        fireEvent.keyDown(closeAssets, { key: "ArrowRight" });
+        expect(onWindowKey).toHaveBeenCalledTimes(2);
+
+        // 알려진 부수효과: 활성화 키는 여기서 멈춘다 — 포커스된 ✕ 위 Space는
+        // 재생 토글이 아니라 버튼을 누른다(#36 followup).
+        fireEvent.keyDown(closeAssets, { key: " " });
+        expect(onWindowKey).toHaveBeenCalledTimes(2);
+      } finally {
+        window.removeEventListener("keydown", onWindowKey);
+      }
     });
 
     it("renders a per-tab count badge from the `badges` prop", () => {

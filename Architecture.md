@@ -942,7 +942,7 @@ ShaderPlayground/
    │
    ├─ ui/                            # ── React 컴포넌트 ────────────────
    │  ├─ BootstrapGate.tsx           # share / autosave 복구 / 데모 분기 + 다이얼로그
-   │  ├─ KeyboardShortcuts.tsx       # 전역 단축키 — Cmd+Z/Y(undo/redo), Cmd+D(복제), Cmd+A(전체 선택), 화살표(선택 일괄 이동, Phase 23), Space(play/pause), Cmd+K
+   │  ├─ KeyboardShortcuts.tsx       # 전역 단축키 — Cmd+Z/Y(undo/redo), Cmd+D(복제), Cmd+A(전체 선택), 화살표(선택 일괄 이동, Phase 23), Space(play/pause — 텍스트 입력 + 활성화 가능 컨트롤(button/a[href]/summary/role=button·menuitem·tab) 포커스 시 제외), Cmd+K
    │  ├─ ErrorBoundary.tsx           # 최상위 에러 경계 → RecoveryDialog + 로그 export (+ test)
    │  ├─ RecoveryDialog.tsx          # 크래시 복구 다이얼로그 (ESC 격리 · 로그 복사) (+ test)
    │  ├─ Toasts.tsx                  # toastStore 구독 → ToastRow 리스트

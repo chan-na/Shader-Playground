@@ -189,7 +189,7 @@ raw WebGL2를 직접 쓰되, 유니폼 setter·텍스처 생성·FBO 등 보일�
 
 ### Phase 9 — 에디터 경험 강화 (완료)
 - **GLSL 주석 힌트**(`// @range a..b`, `// @min/@max`, `// @step`, `// @default`, `// @label "..."`)로 인스펙터 컨트롤 메타 오버라이드. 동일 라인 트레일링 주석과 바로 위 주석 양쪽 모두 지원. (Phase 12 에서 `// @color` / `// @slider` / `// @multi` 추가로 컨트롤 종류 자체도 오버라이드 가능.)
-- **시간 컨트롤**: `simTime`이 wall-clock과 분리된 별도 store. 재생/정지, 스크럽 슬라이더, 0~4× 배속, Spacebar 토글. `u_time`은 `simTime`을 받음.
+- **시간 컨트롤**: `simTime`이 wall-clock과 분리된 별도 store. 재생/정지, 스크럽 슬라이더, 0~4× 배속, Spacebar 토글(텍스트 입력 포커스뿐 아니라 **버튼/링크/탭 등 활성화 가능한 컨트롤에 포커스가 있을 때도 토글하지 않는다** — 그 경우 Space는 해당 컨트롤을 누른다. 캔버스/빈 영역은 종전대로 토글). `u_time`은 `simTime`을 받음.
 - **카메라 컨트롤 UI**: 인스펙터에 Reset 버튼 + FOV 슬라이더(10°~120°).
 - **배경색 피커**: 출력 없을 때 placeholder 색, Output 합성 시 클리어 색에 사용.
 - **Problems 패널**(Inspector ↔ Assets ↔ Problems 탭 전환): 모든 노드의 GLSL Diagnostic + 런타임 에러를 한 곳에 모음. 클릭 시 해당 노드 선택 + vertex/fragment 탭 자동 전환. 탭 헤더에 에러 카운트 빨간 뱃지. (Phase 12 에서 **CodeEditor 라인 점프**까지 확장 — 항목 클릭 시 진단 위치로 커서 이동 + 가운데 정렬 스크롤 + 포커스.)

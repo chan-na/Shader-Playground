@@ -238,6 +238,37 @@ describe("createCameraController", () => {
     expect(updates).toEqual([]);
   });
 
+  it("a drag started after an external state assignment builds on it", () => {
+    // Viewport subscribes to cameraStore and pushes external writes (Reset
+    // view, zoom buttons, share restore) into `ctrl.state`. Without that
+    // mirror the controller kept mutating its own stale copy, so the first
+    // drag after such a write snapped the pose back. (#6)
+    const ctrl = createCameraController();
+    ctrl.attach(canvas);
+
+    // Drag once so the controller's private copy is no longer the default.
+    canvas.dispatchEvent(
+      pointer("pointerdown", { button: 0, clientX: 0, clientY: 0 }),
+    );
+    canvas.dispatchEvent(pointer("pointermove", { clientX: 80, clientY: 0 }));
+    canvas.dispatchEvent(pointer("pointerup", {}));
+    const draggedYaw = ctrl.state.yaw;
+    expect(draggedYaw).not.toBeCloseTo(0, 5);
+
+    // An external write lands (the store-driven mirror).
+    ctrl.state = { ...ctrl.state, yaw: 0, distance: 5 };
+
+    // The next drag must start from the assigned pose: dx=10 at the default
+    // 0.005 rad/px orbit speed is exactly -0.05 rad off the assigned yaw.
+    // Ignoring the assignment would land near `draggedYaw - 0.05` instead.
+    canvas.dispatchEvent(
+      pointer("pointerdown", { button: 0, clientX: 0, clientY: 0 }),
+    );
+    canvas.dispatchEvent(pointer("pointermove", { clientX: 10, clientY: 0 }));
+    expect(ctrl.state.yaw).toBeCloseTo(-0.05, 5);
+    expect(ctrl.state.distance).toBe(5);
+  });
+
   it("pointerdown is a no-op when no canvas is attached (no throw)", () => {
     const ctrl = createCameraController();
     // Don't attach. Dispatch through a detached element shouldn't reach the

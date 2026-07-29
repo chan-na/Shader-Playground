@@ -16,7 +16,7 @@ import type { CompiledProgram } from "../gl/program";
 import { setUniform } from "../gl/uniforms";
 import { resolveValueFor, type Value } from "../nodes/utility";
 import type { ComputePass, ExecutionPlan, ShaderPass } from "./compile";
-import type { Graph, GraphNode } from "./types";
+import type { Graph } from "./types";
 import {
   snapshotUniformValue,
   type UniformValue,
@@ -38,12 +38,12 @@ export interface FrameContext {
   frame?: number;
   /** Background color shown by the placeholder/empty pass. */
   background?: [number, number, number];
-  /** Snapshot of parameter-node values keyed by node ID (read each frame). */
-  params?: Record<string, GraphNode>;
   /**
-   * Full graph snapshot — required when math/swizzle/combine utility nodes
-   * appear as upstream value sources, since their output depends on inbound
-   * edges (which `params` alone does not capture).
+   * Full graph snapshot. This is the *only* source for upstream value
+   * resolution: math/swizzle/combine utility nodes depend on their inbound
+   * edges, so a per-node value map keyed by id could never describe them. A
+   * `params` field that carried exactly that map used to sit alongside this
+   * one; nothing ever read it, so it is gone. (#39)
    */
   graph?: Graph;
 }

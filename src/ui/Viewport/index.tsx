@@ -17,6 +17,10 @@ import { parseShaderInfoLog } from "../../core/graph/diagnostics";
 import { executePlan, resetComposite } from "../../core/graph/execute";
 import type { GraphNode } from "../../core/graph/types";
 import { AsyncThumbnailReadback } from "../../core/thumbnail/asyncReadback";
+import {
+  DEFAULT_EXPORT_BASE,
+  exportFileName,
+} from "../../export/exportFileName";
 import { snapshotAssets, useAssetStore } from "../../state/assetStore";
 import { useCameraStore } from "../../state/cameraStore";
 import {
@@ -30,6 +34,7 @@ import { mouseVec4, useMouseStore } from "../../state/mouseStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { thumbnailScheduler } from "../../state/thumbnailScheduler";
 import { useTimeStore } from "../../state/timeStore";
+import { toast } from "../../state/toastStore";
 import { useViewportStore } from "../../state/viewportStore";
 import { log, normalizeError } from "../../utils/log";
 import { DockPanelHeader } from "../DockPanelHeader";
@@ -45,6 +50,28 @@ function splitLabel(outputCount: number): string {
   if (outputCount === 2) return "split";
   if (outputCount === 3) return "triple";
   return "quad";
+}
+
+/**
+ * Save the canvas' current drawing buffer as a PNG download. Must be called
+ * from inside the RAF tick that drew the frame: the GL context is created with
+ * `preserveDrawingBuffer: false`, so reading the canvas from an event handler
+ * (as the toolbar used to) hands back an already-cleared buffer. Not exported
+ * — the request is placed through `rendererStore.requestSnapshot()`. (#3)
+ */
+function downloadCanvasPng(canvas: HTMLCanvasElement) {
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      toast.error("스냅샷 저장 실패 — 캔버스를 읽지 못했습니다.");
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = exportFileName(DEFAULT_EXPORT_BASE, "png");
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, "image/png");
 }
 
 export function Viewport() {
@@ -101,6 +128,17 @@ export function Viewport() {
     const cameraCtl = createCameraController(useCameraStore.getState().camera);
     cameraCtl.setOnChange((c) => useCameraStore.getState().setCamera(c));
     cameraCtl.attach(canvas);
+    // The controller owns a private copy of the pose and only ever reads the
+    // store once, at construction. Anything that writes the camera from
+    // outside the canvas (TransportBar's Reset view / zoom buttons, share
+    // restore) would therefore be discarded by the next drag, which resumes
+    // from the controller's stale copy. Mirror external writes back into it.
+    // Placed *after* the createGLContext try/catch: the catch path returns
+    // without running this cleanup, so subscribing earlier would leak. zustand
+    // 5 takes a single listener argument (no selector overload). (#6)
+    const unsubscribeCamera = useCameraStore.subscribe((s) => {
+      cameraCtl.state = s.camera;
+    });
 
     // Feed pointer position to mouseStore for the u_mouse system uniform.
     // Coordinates are converted to framebuffer pixels with a bottom-left
@@ -144,15 +182,14 @@ export function Viewport() {
     let lastTimeRev = -1;
     let lastViewportRev = -1;
     let lastMouseRev = -1;
-    // Per-tick derived snapshots (node lookup + param map) rebuilt only when
-    // the graph's `nodes` array identity changes. Every store mutation that
-    // alters a node — structural (rev) or uniform/param (uniformRev) —
-    // produces a fresh `nodes` array via map/spread, so reference equality is
-    // a precise, never-stale cache key. (Keying on `rev` alone would miss
-    // param value edits, which bump only `uniformRev`.)
+    // Per-tick derived node lookup, rebuilt only when the graph's `nodes`
+    // array identity changes. Every store mutation that alters a node —
+    // structural (rev) or uniform/param (uniformRev) — produces a fresh
+    // `nodes` array via map/spread, so reference equality is a precise,
+    // never-stale cache key. (Keying on `rev` alone would miss param value
+    // edits, which bump only `uniformRev`.)
     let cachedNodes: GraphNode[] | null = null;
     let cachedNodeById = new Map<string, GraphNode>();
-    let cachedParams: Record<string, GraphNode> = {};
     let alive = true;
     let rafId = 0;
     let prev = performance.now();
@@ -301,6 +338,12 @@ export function Viewport() {
     const tick = () => {
       if (!alive) return;
       if (contextLost) {
+        // A snapshot can't be served while the context is gone, and holding
+        // the request would fire it on some arbitrary frame long after the
+        // user asked. Drop it and say so. (#3)
+        if (useRendererStore.getState().consumeSnapshotRequest()) {
+          toast.error("GPU 컨텍스트 손실 — 스냅샷을 저장하지 못했습니다.");
+        }
         // Park the loop until the browser fires `webglcontextrestored`.
         rafId = requestAnimationFrame(tick);
         return;
@@ -361,11 +404,16 @@ export function Viewport() {
       // arriving at a steady cadence even on an otherwise-static graph.
       const gifRecording =
         useGifRecorderStore.getState().status === "recording";
+      // A pending PNG snapshot must force one real draw: the capture reads the
+      // drawing buffer right after executePlan, and on a paused static graph
+      // the idle gate below would otherwise skip straight past it forever. (#3)
+      const snapshotPending = useRendererStore.getState().snapshotRequested;
 
       const needsRender =
         playing ||
         plan.hasExternal ||
         gifRecording ||
+        snapshotPending ||
         structuralDirty ||
         uniformChanged ||
         cameraChanged ||
@@ -439,20 +487,16 @@ export function Viewport() {
       // compute passes carry slider-driven uniformValues that get hot-patched
       // every frame without recompile.
       const graph = useGraphStore.getState();
-      // Rebuild the node lookup and param snapshot only when the graph's
-      // `nodes` array identity changes (see the cachedNodes declaration). Both
-      // are pure functions of `graph.nodes`, so an unchanged reference means an
-      // identical result — skipping the O(nodes) Map/object construction every
-      // steady-state frame. The pass-patch loop below still runs each frame
-      // because `plan.passes` can be rebuilt (e.g. on resize) while
-      // `graph.nodes` stays put, and the new pass objects need re-patching.
+      // Rebuild the node lookup only when the graph's `nodes` array identity
+      // changes (see the cachedNodes declaration). It is a pure function of
+      // `graph.nodes`, so an unchanged reference means an identical result —
+      // skipping the O(nodes) Map construction every steady-state frame. The
+      // pass-patch loop below still runs each frame because `plan.passes` can
+      // be rebuilt (e.g. on resize) while `graph.nodes` stays put, and the new
+      // pass objects need re-patching.
       if (graph.nodes !== cachedNodes) {
         cachedNodes = graph.nodes;
         cachedNodeById = new Map(graph.nodes.map((n) => [n.id, n]));
-        const nextParams: Record<string, GraphNode> = {};
-        for (const n of graph.nodes)
-          if (n.kind === "param") nextParams[n.id] = n;
-        cachedParams = nextParams;
       }
       const nodeById = cachedNodeById;
       for (const pass of plan.passes) {
@@ -468,7 +512,6 @@ export function Viewport() {
 
       const t = useTimeStore.getState().simTime;
       const bg = useViewportStore.getState().background;
-      const params = cachedParams;
       const timerEnabled = useGpuTimerStore.getState().enabled;
       executePlan(
         gl,
@@ -479,7 +522,6 @@ export function Viewport() {
           height: plan.height,
           camera: useCameraStore.getState().camera,
           background: bg,
-          params,
           graph: { nodes: graph.nodes, edges: graph.edges },
           mouse: mouseVec4(useMouseStore.getState()),
           frame: renderFrame++,
@@ -497,6 +539,13 @@ export function Viewport() {
         const gif = useGifRecorderStore.getState();
         gif.captureFrame(canvas);
         gif.tick();
+      }
+
+      // Same constraint as the GIF capture above: the PNG snapshot has to read
+      // the drawing buffer in the tick that drew it. `snapshotPending` above
+      // already forced this frame past the idle gate. (#3)
+      if (useRendererStore.getState().consumeSnapshotRequest()) {
+        downloadCanvasPng(canvas);
       }
 
       // DEV-only GL error probe, throttled — gl.getError() forces a sync GPU
@@ -568,6 +617,7 @@ export function Viewport() {
       canvas.removeEventListener("pointerdown", onMousePointerDown);
       canvas.removeEventListener("pointerup", onMousePointerUp);
       canvas.removeEventListener("pointercancel", onMousePointerUp);
+      unsubscribeCamera();
       cameraCtl.detach();
       asyncReadback.disposeAll(gl);
       disposeAllExternal(gl);

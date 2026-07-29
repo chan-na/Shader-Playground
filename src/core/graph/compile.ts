@@ -153,7 +153,13 @@ export interface ExecutionPlan {
   compiledVertexSource: Record<string, string>;
   width: number;
   height: number;
-  /** True when at least one ComputePass exists — RAF idle gate checks this. */
+  /**
+   * True when at least one ComputePass exists. Purely descriptive — the RAF
+   * idle gate does *not* consult it (compute passes are driven by the same
+   * store revs as everything else, and a paused static compute graph is
+   * correctly allowed to stay idle). Kept as part of the plan's public shape:
+   * compile.test and e2e phase-13 assert it. (#39)
+   */
   hasCompute: boolean;
   /**
    * True when at least one external source (webcam/video/audio) is in the

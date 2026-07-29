@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered } from "./helpers/canvas";
 import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
-import { readSp } from "./helpers/sp";
+import { readSp, withSp } from "./helpers/sp";
 
 test.describe("Phase 11 — share URL & HTML export", () => {
   test("encodeShareUrl → reload with #share=... → graph restored", async ({
@@ -74,6 +74,63 @@ test.describe("Phase 11 — share URL & HTML export", () => {
     // The standalone player must be present (look for a function we know it
     // defines).
     expect(html.length).toBeGreaterThan(15_000);
+  });
+
+  // #3 — "Snap PNG" no longer reads the canvas from the click handler (the
+  // context uses preserveDrawingBuffer: false, so that returned a blank image
+  // whenever the idle gate had skipped the draw). It now arms a one-shot
+  // request that the RAF loop serves right after executePlan. Pausing first
+  // puts the loop in exactly the idle state the old code failed in.
+  test("Snap PNG downloads a frame captured inside the render loop", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await bootApp(page);
+    await setGraph(page, trivialMeshGraph(), {});
+    await expectCanvasRendered(page.getByTestId("viewport-canvas"));
+
+    // Pause and let the loop go idle (phase-9's B2 idle pattern): renderTick
+    // freezes because executePlan is skipped entirely.
+    await withSp(
+      page,
+      (sp) => {
+        sp.time.getState().setPlaying(false);
+      },
+      undefined,
+    );
+    await page.waitForTimeout(400);
+    const idleStart = await readSp(
+      page,
+      (sp) => sp.renderer.getState().stats.renderTick,
+    );
+    await page.waitForTimeout(500);
+    const idleEnd = await readSp(
+      page,
+      (sp) => sp.renderer.getState().stats.renderTick,
+    );
+    expect(idleEnd).toBe(idleStart);
+
+    const downloadPromise = page.waitForEvent("download", { timeout: 15_000 });
+    await page.getByRole("button", { name: "File" }).click();
+    await page.getByRole("menuitem", { name: "Save viewport as PNG" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.png$/);
+
+    // The request must have woken the loop for a real draw — that draw is the
+    // whole point, since the drawing buffer the PNG reads is only valid inside
+    // the tick that produced it.
+    const afterSnapshot = await readSp(
+      page,
+      (sp) => sp.renderer.getState().stats.renderTick,
+    );
+    expect(afterSnapshot).toBeGreaterThan(idleEnd);
+
+    // The one-shot flag must be cleared, or every later frame would re-download.
+    const pending = await readSp(
+      page,
+      (sp) => sp.renderer.getState().snapshotRequested,
+    );
+    expect(pending).toBe(false);
   });
 
   test("exported HTML loaded in iframe renders pixels", async ({ page }) => {

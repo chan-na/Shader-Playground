@@ -24,9 +24,52 @@ const ASSETS_DIR = "dist/assets";
 // measured 388.48 KiB locally. Same rationale as the reskin bump: core layout
 // code, not deferrable behind a dynamic import. Raised with explicit user
 // sign-off; ~4.5 KiB headroom left for the v1.5 follow-ups.
+//
+// Measurement correction (2026-07-29, review/2026-07): every "measured … KiB
+// locally" figure above was taken on a dev machine's Node, not CI's, and the
+// two do not agree. Node >= 24 bundles zlib-ng; Node 22 (`.nvmrc`, what all
+// three CI jobs pin via node-version-file) bundles stock zlib. Same dist, same
+// level 9, ~1.8 KiB apart on this bundle — Node 26 reports 390.18 KiB for
+// `main` (ea2de84) where Node 22 reports 391.98 KiB. So the real headroom under
+// this 393 KiB ceiling is 1.02 KiB, not the ~4.5 KiB quoted above, and a local
+// PASS on Node >= 24 does not mean the CI `bundle-size` job passes. Re-measure
+// on Node 22 before spending headroom (`npm i --prefix <tmp> node@22`, then run
+// this script with that binary against an already-built dist).
 const LIMITS_KIB = {
   js: 393,
 };
+
+/** Node major that CI pins via `.nvmrc`; null when unreadable. */
+function ciNodeMajor() {
+  try {
+    const raw = readFileSync(".nvmrc", "utf8").trim().replace(/^v/, "");
+    const major = Number.parseInt(raw, 10);
+    return Number.isNaN(major) ? null : major;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * gzip output is implementation-defined, so the number this script prints is
+ * only the gate's number when the running Node matches CI's. Announce the
+ * mismatch loudly instead of letting a local PASS masquerade as a green gate.
+ */
+function reportNodeContext() {
+  const running = Number.parseInt(process.versions.node, 10);
+  const ci = ciNodeMajor();
+  console.log(
+    `[bundle-size] node ${process.versions.node} (zlib ${process.versions.zlib})`,
+  );
+  if (ci === null || ci === running) return;
+  console.warn(
+    `[bundle-size] WARNING: CI runs Node ${ci} (.nvmrc) — this is Node ${running}.\n` +
+      `[bundle-size] Node >= 24 uses zlib-ng and compressed this bundle ~1.8 KiB\n` +
+      `[bundle-size] tighter than Node ${ci} at the same level, so this run's\n` +
+      `[bundle-size] total is NOT the gate's number. A PASS here does not mean\n` +
+      `[bundle-size] the CI bundle-size job passes — re-measure on Node ${ci}.`,
+  );
+}
 
 const KIB = 1024;
 
@@ -84,6 +127,8 @@ function checkGroup(label, paths, limitKiB) {
   console.log(`  OK`);
   return true;
 }
+
+reportNodeContext();
 
 const jsFiles = listAssets(".js");
 if (jsFiles.length === 0) {

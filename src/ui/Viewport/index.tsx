@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { createCameraController } from "../../core/camera/input";
 import {
   disposeAllExternal,
+  resetExternalTextures,
   updateExternalSources,
 } from "../../core/external/registry";
 import { createGLContext } from "../../core/gl/context";
@@ -218,6 +219,12 @@ export function Viewport() {
         }
         useRendererStore.getState().setPanes(panes);
       } catch (e) {
+        // `plan.dispose()` already ran above, so the previous plan's GL objects
+        // are gone. Leaving `plan` pointing at it would have the frame loop
+        // keep executing a disposed plan every tick. Swap in an empty plan
+        // instead — its `dispose` is a no-op, so the next recompile's leading
+        // dispose stays safe. (#7)
+        plan = emptyPlan(w, h);
         pushError(String(e));
         useRendererStore.getState().setPanes([]);
       }
@@ -270,6 +277,11 @@ export function Viewport() {
       // to clear the cached JS references.
       resetComposite(gl);
       asyncReadback.disposeAll(gl);
+      // Live external sources (webcam/video/audio) outlive the plan, so their
+      // cached GL textures are not covered by the recompile above. Drop the now
+      // dead texture handles so the first tick after restore re-creates them
+      // instead of texSubImage2D-ing into nothing. (#13)
+      resetExternalTextures();
     };
     const onContextRestored = () => {
       contextLost = false;

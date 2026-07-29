@@ -10,6 +10,7 @@ import {
   getExternalTexture,
   getExternalVideoElement,
   reconcileExternal,
+  resetExternalTextures,
   retryExternalSource,
   setAudioBlobResolver,
   setVideoBlobResolver,
@@ -631,6 +632,38 @@ describe("external texture lifecycle (M3/M5)", () => {
     disposeAllExternal(fake.gl);
     expect(fake.deleted()).toBe(1);
     expect(externalHandleCount()).toBe(0);
+  });
+
+  it("resetExternalTextures drops the dead texture handle without deleting or disposing (#13)", async () => {
+    await readyMicAudio();
+    const fake = makeFakeGl();
+    updateExternalSources(fake.gl);
+    expect(getExternalTexture("a1")).not.toBeNull();
+    const before = getExternalStatus("a1");
+
+    resetExternalTextures();
+
+    // The GPU object died with the context — only the JS reference is cleared.
+    expect(getExternalTexture("a1")).toBeNull();
+    expect(fake.deleted()).toBe(0);
+    // The source itself survives a context loss: handle stays registered and
+    // ready/width/height are untouched.
+    expect(externalHandleCount()).toBe(1);
+    expect(getExternalStatus("a1")).toEqual(before);
+  });
+
+  it("re-creates the texture on the next upload after resetExternalTextures (#13)", async () => {
+    await readyMicAudio();
+    const fake = makeFakeGl();
+    updateExternalSources(fake.gl);
+    expect(fake.created()).toBe(1);
+
+    resetExternalTextures();
+    // Without the reset this tick would take the texSubImage2D fast path into a
+    // dead texture and the source would stay frozen forever.
+    updateExternalSources(fake.gl);
+    expect(fake.created()).toBe(2);
+    expect(getExternalTexture("a1")).not.toBeNull();
   });
 });
 

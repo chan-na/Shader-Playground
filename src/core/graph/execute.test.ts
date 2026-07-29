@@ -22,9 +22,11 @@ function makeGl(): WebGL2RenderingContext {
   // The fullscreen quad needs `a_position`; compute passes read `a_pos`. All
   // sampler/system uniforms the tests touch must be "active" so getUniformLocation
   // resolves them.
+  // `u_mouse` must be listed or getUniformLocation never resolves it and the
+  // pass-space transform assertions below would silently check nothing (#19).
   return createFakeGl({
     attributes: ["a_position", "a_pos"],
-    uniforms: ["u_time", "u_resolution", "u_src"],
+    uniforms: ["u_time", "u_resolution", "u_src", "u_mouse"],
   });
 }
 
@@ -249,6 +251,118 @@ describe("executePlan — L5 stale-texture placeholder", () => {
     // No placeholder is created — an unloaded image just leaves the unit as-is
     // rather than forcing it black.
     expect(created).toHaveLength(0);
+    plan.dispose();
+  });
+});
+
+describe("executePlan — u_mouse pass-space transform (#19)", () => {
+  /**
+   * Build a single shader → output plan at `scale` and return the pass plus the
+   * `uniform4f` spy. Asserting on the *argument values* (not merely that
+   * uniform4f was called) is deliberate: a later refactor of
+   * `bindSystemUniforms` that drops the transform must fail here.
+   */
+  function setup(scale: 0.25 | 0.5 | 1, w: number, h: number) {
+    const gl = makeGl();
+    const s: ShaderGraphNode = { ...shaderNode("s1"), resolutionScale: scale };
+    const graph: Graph = {
+      nodes: [s, outputNode("o1")],
+      edges: [edge("e1", "s1", "o1", "texture")],
+    };
+    const plan = compileGraph(gl, graph, { width: w, height: h });
+    const sp = plan.passes.find((p) => p.nodeId === "s1");
+    if (!sp || sp.kind !== "shader") throw new Error("missing shader pass");
+    const loc = sp.program.uniforms.u_mouse;
+    // Guard, not a courtesy: if `u_mouse` never resolved every assertion below
+    // would look for a call that is never made and the suite would be vacuous.
+    if (!loc) throw new Error("u_mouse location was not resolved");
+    const uniform4f = vi.spyOn(gl, "uniform4f");
+    return { gl, graph, plan, sp, loc, uniform4f };
+  }
+
+  type Uniform4fCall = [
+    WebGLUniformLocation | null,
+    number,
+    number,
+    number,
+    number,
+  ];
+
+  function mouseArgs(
+    calls: Uniform4fCall[],
+    loc: WebGLUniformLocation,
+  ): number[] {
+    // uniform4f is also used for the composite cell rects, so filter by the
+    // location object rather than taking the first call.
+    const call = calls.find((c) => c[0] === loc);
+    if (!call) throw new Error("u_mouse was never uploaded");
+    return [call[1], call[2], call[3], call[4]];
+  }
+
+  it("passes the pointer through unchanged for a full-resolution pass", () => {
+    const { gl, graph, plan, sp, loc, uniform4f } = setup(1, 32, 32);
+    expect([sp.width, sp.height]).toEqual([32, 32]);
+    executePlan(
+      gl,
+      plan,
+      { ...frameCtx(graph), width: 32, height: 32, mouse: [24, 12, 8, 4] },
+      32,
+      32,
+    );
+    expect(mouseArgs(uniform4f.mock.calls, loc)).toEqual([24, 12, 8, 4]);
+    plan.dispose();
+  });
+
+  it("rescales xy and zw into a downsampled pass's own pixel space", () => {
+    const { gl, graph, plan, sp, loc, uniform4f } = setup(0.5, 32, 32);
+    expect([sp.width, sp.height]).toEqual([16, 16]);
+    executePlan(
+      gl,
+      plan,
+      { ...frameCtx(graph), width: 32, height: 32, mouse: [24, 12, 8, 4] },
+      32,
+      32,
+    );
+    // Both the live position (xy) and the last-click position (zw) move, so
+    // `u_mouse.xy / u_resolution` still lands in 0..1 inside the small pass.
+    expect(mouseArgs(uniform4f.mock.calls, loc)).toEqual([12, 6, 4, 2]);
+    plan.dispose();
+  });
+
+  it("uses the width ratio for x/z and the height ratio for y/w", () => {
+    // Per-axis pin: a resolutionScale is uniform, so the only way to tell an
+    // axis swap apart is to feed a context whose two ratios differ.
+    const { gl, graph, plan, loc, uniform4f } = setup(0.5, 32, 32);
+    executePlan(
+      gl,
+      plan,
+      { ...frameCtx(graph), width: 32, height: 16, mouse: [24, 12, 8, 4] },
+      32,
+      16,
+    );
+    // x/z: 16/32 = 0.5 · y/w: 16/16 = 1.
+    expect(mouseArgs(uniform4f.mock.calls, loc)).toEqual([12, 12, 4, 4]);
+    plan.dispose();
+  });
+
+  it("guards a zero-sized context instead of producing NaN", () => {
+    const { gl, graph, plan, loc, uniform4f } = setup(1, 32, 32);
+    executePlan(
+      gl,
+      plan,
+      { ...frameCtx(graph), width: 0, height: 0, mouse: [1, 1, 0, 0] },
+      32,
+      32,
+    );
+    // Math.max(1, 0) keeps the divisor finite: 32/1 on both axes.
+    expect(mouseArgs(uniform4f.mock.calls, loc)).toEqual([32, 32, 0, 0]);
+    plan.dispose();
+  });
+
+  it("defaults to an all-zero pointer when ctx.mouse is omitted", () => {
+    const { gl, graph, plan, loc, uniform4f } = setup(0.5, 32, 32);
+    executePlan(gl, plan, frameCtx(graph), 32, 32);
+    expect(mouseArgs(uniform4f.mock.calls, loc)).toEqual([0, 0, 0, 0]);
     plan.dispose();
   });
 });

@@ -33,6 +33,19 @@ describe("emptyPlan", () => {
     expect(typeof plan.dispose).toBe("function");
     expect(() => plan.dispose()).not.toThrow();
   });
+
+  it("dispose is a repeatable no-op (#7 failure-fallback invariant)", () => {
+    // On a compile throw the Viewport installs `emptyPlan(w, h)` so the frame
+    // loop stops executing the already-disposed plan. The very next recompile
+    // opens with `plan.dispose()` again, so that must stay safe — this is why
+    // the fallback needs no extra guard.
+    const plan = emptyPlan(320, 240);
+    expect(() => {
+      plan.dispose();
+      plan.dispose();
+    }).not.toThrow();
+    expect(plan.passes).toEqual([]);
+  });
 });
 
 describe("scaledDimensions", () => {

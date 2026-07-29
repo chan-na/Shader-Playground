@@ -973,6 +973,9 @@
   // Pointer state for u_mouse (vec4): xy=current, zw=last click. Framebuffer
   // pixels, bottom-left origin (matches gl_FragCoord / u_resolution).
   var mouse = [0, 0, 0, 0];
+  // Same tuple rescaled into the current pass's FBO space (see the per-pass
+  // bind below). Separate output array so `mouse` keeps canvas coordinates.
+  var mousePass = [0, 0, 0, 0];
   function pointerToCanvas(e) {
     var rect = canvas.getBoundingClientRect();
     var sx = canvas.width / Math.max(1, rect.width);
@@ -1172,7 +1175,15 @@
       var u = pass.program.uniforms;
       setUniform(u["u_time"], t);
       setUniform(u["u_resolution"], [pass.fbo.w, pass.fbo.h]);
-      setUniform(u["u_mouse"], mouse);
+      // u_resolution is the pass FBO size, so u_mouse has to live in the same
+      // space — scale per axis (1 for full-resolution passes).
+      var mx = pass.fbo.w / Math.max(1, canvas.width);
+      var my = pass.fbo.h / Math.max(1, canvas.height);
+      mousePass[0] = mouse[0] * mx;
+      mousePass[1] = mouse[1] * my;
+      mousePass[2] = mouse[2] * mx;
+      mousePass[3] = mouse[3] * my;
+      setUniform(u["u_mouse"], mousePass);
       setUniform(u["u_frame"], frameNum);
       if (!pass.meshIsFullscreen) {
         setUniform(u["u_view"], view);

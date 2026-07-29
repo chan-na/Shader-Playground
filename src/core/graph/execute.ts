@@ -50,6 +50,12 @@ export interface FrameContext {
 const _view = mat4.create();
 const _proj = mat4.create();
 const _model = mat4.create();
+/**
+ * Scratch tuple for the pass-space `u_mouse` value. Module scope because
+ * `bindSystemUniforms` runs once per pass per frame on the RAF hot path — a
+ * fresh literal there would allocate for every pass of every frame.
+ */
+const _mouse: [number, number, number, number] = [0, 0, 0, 0];
 
 function bindComputeSystemUniforms(
   gl: WebGL2RenderingContext,
@@ -69,7 +75,19 @@ function bindSystemUniforms(
   const u = pass.program.uniforms;
   setUniform(gl, u.u_time ?? null, ctx.time);
   setUniform(gl, u.u_resolution ?? null, [pass.width, pass.height]);
-  setUniform(gl, u.u_mouse ?? null, ctx.mouse ?? [0, 0, 0, 0]);
+  // `ctx.mouse` is in canvas/plan framebuffer pixels, but `u_resolution` is the
+  // *pass* size — a pass rendering at resolutionScale < 1 would otherwise see a
+  // pointer far outside its own frame, so `u_mouse.xy / u_resolution` (the
+  // Shadertoy idiom) blew past 1.0. Rescale per axis; x/z ride the width ratio,
+  // y/w the height ratio. Scales are 1 for full-resolution passes. (#19)
+  const m: [number, number, number, number] = ctx.mouse ?? [0, 0, 0, 0];
+  const mx = pass.width / Math.max(1, ctx.width);
+  const my = pass.height / Math.max(1, ctx.height);
+  _mouse[0] = m[0] * mx;
+  _mouse[1] = m[1] * my;
+  _mouse[2] = m[2] * mx;
+  _mouse[3] = m[3] * my;
+  setUniform(gl, u.u_mouse ?? null, _mouse);
   setUniform(gl, u.u_frame ?? null, ctx.frame ?? 0);
   if (!pass.meshIsFullscreen) {
     viewMatrix(ctx.camera, _view);

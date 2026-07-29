@@ -274,6 +274,62 @@ describe("topologicalOrder", () => {
     expect(validateGraph(g)).toEqual([]);
   });
 
+  it("keeps real dependencies ordered when edges reference a deleted node (#12)", () => {
+    // `ghost` is not in `nodes` — a dangling edge left behind by a stale save /
+    // hand-edited import. Filtering such edges out of only one of the two loops
+    // is not enough: if the drain walk still sees them, `ghost` gets queued and
+    // decrements `b`'s in-degree, so `b` is emitted before `c`, the shader it
+    // samples. Node order is deliberately [a, d, e, c, b] so the bug surfaces.
+    const g: Graph = {
+      nodes: [shader("a"), shader("d"), shader("e"), shader("c"), shader("b")],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "texture",
+          target: "ghost",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e2",
+          source: "ghost",
+          sourceHandle: "texture",
+          target: "b",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e3",
+          source: "c",
+          sourceHandle: "texture",
+          target: "b",
+          targetHandle: "u_other",
+        },
+        {
+          id: "e4",
+          source: "d",
+          sourceHandle: "texture",
+          target: "e",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e5",
+          source: "e",
+          sourceHandle: "texture",
+          target: "c",
+          targetHandle: "u_tex",
+        },
+      ],
+    };
+    const order = topologicalOrder(g).map((n) => n.id);
+    // Every live node is still emitted exactly once, and no phantom appears.
+    expect(order.slice().sort()).toEqual(["a", "b", "c", "d", "e"]);
+    expect(order).not.toContain("ghost");
+    // The live chain d → e → c → b stays in dependency order.
+    expect(order.indexOf("d")).toBeLessThan(order.indexOf("e"));
+    expect(order.indexOf("e")).toBeLessThan(order.indexOf("c"));
+    expect(order.indexOf("c")).toBeLessThan(order.indexOf("b"));
+  });
+
   it("topologicalOrder includes group nodes harmlessly (compile filters them out)", () => {
     const g: Graph = {
       nodes: [

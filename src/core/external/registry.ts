@@ -352,6 +352,26 @@ export function updateExternalSources(gl: WebGL2RenderingContext) {
   }
 }
 
+/**
+ * Drop every live handle's cached GL texture reference after a WebGL context
+ * loss. The textures themselves died with the context, so there is nothing to
+ * delete — this only clears the stale JS handles. Without it `uploadFrame`
+ * keeps taking the `texSubImage2D` fast path against a dead texture and the
+ * source appears permanently frozen once the context is restored; nulling the
+ * reference forces the next tick back through `createTexture`. (#13)
+ *
+ * Deliberately does NOT take a `gl` and does NOT call `deleteTexture`: the
+ * objects are already gone, and the media sources (stream / video element /
+ * AudioContext) survive the loss untouched. `width`/`height`/`ready` are left
+ * alone for the same reason — the source is still ready and still the same
+ * size; the re-upload path re-checks both anyway.
+ */
+export function resetExternalTextures(): void {
+  for (const h of handles.values()) {
+    h.glTexture = null;
+  }
+}
+
 export function disposeAllExternal(gl?: WebGL2RenderingContext) {
   for (const h of Array.from(handles.values())) {
     disposeHandle(h, gl);

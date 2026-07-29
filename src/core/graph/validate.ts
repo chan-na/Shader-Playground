@@ -94,9 +94,18 @@ export function topologicalOrder(graph: Graph): GraphNode[] {
     indeg.set(n.id, 0);
     byId.set(n.id, n);
   }
-  for (const e of graph.edges) {
-    if (indeg.has(e.target))
-      indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1);
+  // Only edges whose *both* endpoints still exist take part in the sort.
+  // Dangling edges (a node was deleted but an edge referencing it survived in a
+  // stale/imported graph) must be excluded from the in-degree accumulation AND
+  // from the drain walk — filtering just one of the two reintroduces the bug in
+  // a different shape: a phantom target id gets pushed onto the queue and is
+  // drained before real nodes, so a live node can be emitted ahead of the
+  // dependency it samples. (#12)
+  const live = graph.edges.filter(
+    (e) => byId.has(e.source) && byId.has(e.target),
+  );
+  for (const e of live) {
+    indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1);
   }
   const queue: string[] = [];
   for (const [id, d] of indeg) if (d === 0) queue.push(id);
@@ -106,7 +115,7 @@ export function topologicalOrder(graph: Graph): GraphNode[] {
     const id = queue.shift()!;
     const n = byId.get(id);
     if (n) out.push(n);
-    for (const e of graph.edges) {
+    for (const e of live) {
       if (e.source === id) {
         const d = (indeg.get(e.target) ?? 1) - 1;
         indeg.set(e.target, d);

@@ -27,8 +27,10 @@
 
 import { SYSTEM_UNIFORMS } from "../graph/uniformParser";
 import { BUILTIN_FUNCTIONS } from "./builtins";
+import { maskComments } from "./stripComments";
 import {
   buildSymbolTable,
+  precededByDot,
   resolveSymbol,
   type SymbolTable,
 } from "./symbolTable";
@@ -66,27 +68,6 @@ export interface SemanticToken {
  * tag a word inside a comment.
  */
 const IDENT_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
-
-/**
- * Strip block comments (`/* ... *​/`) preserving newlines so line numbers and
- * column offsets stay aligned with the original source. Mirrors the helper
- * in `symbolTable.ts`; kept local to avoid widening that module's API.
- */
-function stripBlockComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-}
-
-/**
- * Strip a `//` line comment by replacing the comment portion with spaces, so
- * column indices in the returned line still map 1:1 onto the source line.
- * Returning the modified line (rather than a slice) lets the identifier
- * scanner skip the comment naturally.
- */
-function maskLineComment(line: string): string {
-  const idx = line.indexOf("//");
-  if (idx < 0) return line;
-  return line.slice(0, idx) + " ".repeat(line.length - idx);
-}
 
 /** Map a symbol-table entry's `kind` to the highlighter token kind. */
 function tokenKindForSymbol(
@@ -157,8 +138,7 @@ export function classifyIdentifier(
  */
 export function classifySemanticTokens(source: string): SemanticToken[] {
   const table = buildSymbolTable(source);
-  const noBlock = stripBlockComments(source);
-  const lines = noBlock.split(/\r?\n/);
+  const lines = maskComments(source).split(/\r?\n/);
 
   const tokens: SemanticToken[] = [];
   // Running absolute offset to the start of the current line. Mirrors CM's
@@ -168,14 +148,16 @@ export function classifySemanticTokens(source: string): SemanticToken[] {
   let lineStart = 0;
 
   for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i]!;
-    const masked = maskLineComment(raw);
+    const line = lines[i]!;
     const lineNo = i + 1;
 
     IDENT_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
     // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
-    while ((m = IDENT_RE.exec(masked)) !== null) {
+    while ((m = IDENT_RE.exec(line)) !== null) {
+      // `v.xyz` / `light.color` name a member, not the same-named global —
+      // painting them with the global's colour is a lie (L5).
+      if (precededByDot(line, m.index)) continue;
       const name = m[0];
       const kind = classifyIdentifier(table, name, lineNo);
       if (kind === null) continue;
@@ -188,7 +170,7 @@ export function classifySemanticTokens(source: string): SemanticToken[] {
 
     // +1 for the newline separator that `split(/\r?\n/)` consumed. The last
     // line has no trailing newline but we won't iterate again, so harmless.
-    lineStart += raw.length + 1;
+    lineStart += line.length + 1;
   }
 
   return tokens;

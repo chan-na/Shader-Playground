@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildSymbolTable,
   parseFunctionParameters,
+  precededByDot,
   resolveSymbol,
+  structBodyRanges,
   symbolsVisibleAt,
 } from "./symbolTable";
 
@@ -346,5 +348,180 @@ void main() {
 
   it("returns null for unknown names", () => {
     expect(resolveSymbol(T, "does_not_exist", 7)).toBeNull();
+  });
+});
+
+describe("parameter columns (L32)", () => {
+  it("anchors a parameter past its own type token", () => {
+    // `indexOf("m", afterParen)` lands on the `m` of `mat3` — the parameter
+    // column would point at the type, so F12 on `m` jumped one token left.
+    const src = `void apply(mat3 m) {
+  float x = 0.0;
+}
+`;
+    const p = buildSymbolTable(src).symbols.find((s) => s.kind === "parameter");
+    expect(p?.name).toBe("m");
+    expect(src.split("\n")[0]?.[p!.column - 1]).toBe("m");
+    // `mat3 ` starts at column 12, so `m` is at column 17.
+    expect(p?.column).toBe(17);
+  });
+
+  it("advances a running cursor across parameters", () => {
+    // The second parameter is named `f`, which also occurs inside `float` —
+    // and inside the first parameter's type. Both anchors are needed.
+    const src = `void go(vec3 v, float f) {
+  float x = 0.0;
+}
+`;
+    const params = buildSymbolTable(src).symbols.filter(
+      (s) => s.kind === "parameter",
+    );
+    expect(params.map((p) => p.name)).toEqual(["v", "f"]);
+    const line = src.split("\n")[0] ?? "";
+    for (const p of params) {
+      expect(line[p.column - 1]).toBe(p.name);
+    }
+    // `f` is the parameter, not the `f` of `float`.
+    expect(params[1]?.column).toBe(23);
+  });
+
+  it("keeps repeated type/name spellings on distinct columns", () => {
+    const src = `vec3 blend(vec3 base, vec3 baseColor) {
+  return base;
+}
+`;
+    const params = buildSymbolTable(src).symbols.filter(
+      (s) => s.kind === "parameter",
+    );
+    const line = src.split("\n")[0] ?? "";
+    expect(params).toHaveLength(2);
+    expect(line.slice(params[0]!.column - 1, params[0]!.column + 3)).toBe(
+      "base",
+    );
+    expect(line.slice(params[1]!.column - 1, params[1]!.column + 8)).toBe(
+      "baseColor",
+    );
+  });
+});
+
+describe("symbolsVisibleAt memoization (L21)", () => {
+  const SRC = `uniform float u_time;
+float helper(float x) {
+  float inner = x;
+  return inner;
+}
+void main() {
+  float a = 0.0;
+}
+`;
+
+  it("returns identical content for repeated (table, line) queries", () => {
+    const t = buildSymbolTable(SRC);
+    const a = symbolsVisibleAt(t, 7);
+    const b = symbolsVisibleAt(t, 7);
+    expect(b).toEqual(a);
+  });
+
+  it("hands out a fresh array — mutating a result cannot poison the cache", () => {
+    // `main.tsx` publishes symbolsVisibleAt on the DEV `window.__sp` bridge,
+    // so E2E page code holds a reference to whatever comes back.
+    const t = buildSymbolTable(SRC);
+    const first = symbolsVisibleAt(t, 7);
+    const second = symbolsVisibleAt(t, 7);
+    expect(second).not.toBe(first);
+    second.length = 0;
+    second.push({
+      name: "poison",
+      type: "float",
+      kind: "local",
+      line: 1,
+      column: 1,
+      scope: null,
+    });
+    const third = symbolsVisibleAt(t, 7);
+    expect(third).toEqual(first);
+    expect(third.some((s) => s.name === "poison")).toBe(false);
+  });
+
+  it("keys on table identity, not on the line number alone", () => {
+    // findReferencesAcrossStages builds two tables per call; a line-only key
+    // would serve the vertex stage's symbols to the fragment stage.
+    const other = buildSymbolTable(`uniform vec3 u_other;
+void main() { float b = 0.0; }
+`);
+    const t = buildSymbolTable(SRC);
+    expect(symbolsVisibleAt(t, 7).map((s) => s.name)).toContain("u_time");
+    expect(symbolsVisibleAt(other, 7).map((s) => s.name)).toContain("u_other");
+    expect(symbolsVisibleAt(other, 7).map((s) => s.name)).not.toContain(
+      "u_time",
+    );
+  });
+});
+
+describe("precededByDot (L5)", () => {
+  it("detects member and swizzle access", () => {
+    const line = "  outColor = vec4(light.color, v.x);";
+    expect(precededByDot(line, line.indexOf("color,"))).toBe(true);
+    expect(precededByDot(line, line.indexOf("x)"))).toBe(true);
+  });
+
+  it("skips intervening spaces and tabs only", () => {
+    expect(precededByDot("a .\tb", 4)).toBe(true);
+    expect(precededByDot("a b", 2)).toBe(false);
+    expect(precededByDot("color", 0)).toBe(false);
+  });
+});
+
+describe("structBodyRanges (L5)", () => {
+  it("covers the body of a multi-line struct", () => {
+    const src = `struct Light {
+  vec3 color;
+};
+uniform vec3 color;
+`;
+    const [range] = structBodyRanges(src);
+    expect(range).toBeDefined();
+    const body = src.slice(range!.from, range!.to);
+    expect(body).toContain("vec3 color;");
+    // The declaration outside the struct must fall outside the range.
+    expect(src.indexOf("uniform vec3 color")).toBeGreaterThan(range!.to);
+  });
+
+  it("handles a single-line struct", () => {
+    const src = `struct P { float a; };\n`;
+    const [range] = structBodyRanges(src);
+    expect(src.slice(range!.from, range!.to)).toBe(" float a; ");
+  });
+
+  it("runs an unbalanced struct body to end of source", () => {
+    const src = `struct Broken {\n  float a;\n`;
+    const [range] = structBodyRanges(src);
+    expect(range?.to).toBe(src.length);
+  });
+});
+
+describe("comment masking in the symbol walk (L20)", () => {
+  it("ignores declarations that live inside a block comment", () => {
+    const src = `/*
+uniform float u_commented;
+*/
+uniform float u_real;
+`;
+    const names = buildSymbolTable(src).symbols.map((s) => s.name);
+    expect(names).toContain("u_real");
+    expect(names).not.toContain("u_commented");
+  });
+
+  it("does not let a `/*` inside a line comment swallow real code", () => {
+    // The old two-pass stripper matched this `/*` against the `*/` two lines
+    // down and blanked the declaration between them.
+    const src = `// /* opens?
+uniform float u_kept;
+// */ closes?
+uniform float u_after;
+`;
+    const names = buildSymbolTable(src).symbols.map((s) => s.name);
+    expect(names).toContain("u_kept");
+    expect(names).toContain("u_after");
   });
 });

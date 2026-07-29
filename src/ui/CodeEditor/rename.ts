@@ -30,6 +30,7 @@ import {
   findReferencesAcrossStages,
   type ShaderStage,
 } from "../../core/glsl/references";
+import { precededByDot } from "../../core/glsl/symbolTable";
 import type { PortRename } from "../../core/graph/edgePrune";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { useEditorStore } from "../../state/editorStore";
@@ -136,6 +137,13 @@ export function runRename(
   const line = view.state.doc.lineAt(pos);
   const ident = identifierAt(line.text, line.from, pos);
   if (!ident) return { applied: false, reason: "not-on-identifier" };
+  // Cursor on a member / swizzle (`v.xyz`, `light.color`): the reference
+  // finder excludes such occurrences, so without this guard F2 would prompt
+  // and then rename the unrelated same-named global everywhere *except* under
+  // the cursor. Clean no-op instead (L5).
+  if (precededByDot(line.text, ident.from - line.from)) {
+    return { applied: false, reason: "no-binding" };
+  }
 
   const source = view.state.doc.toString();
   // Probe references before prompting so we can bail early on "cursor is on a

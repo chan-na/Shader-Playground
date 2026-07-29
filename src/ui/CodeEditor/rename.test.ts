@@ -295,3 +295,42 @@ void main() {
     view.destroy();
   });
 });
+
+describe("runRename — member access guard (L5)", () => {
+  const SRC = `uniform vec3 color;
+uniform Light u_light;
+out vec4 outColor;
+void main() {
+  outColor = vec4(color + u_light.color, 1.0);
+}
+`;
+
+  it("no-ops on a struct-member access without prompting", () => {
+    // Without the guard the reference finder skips the occurrence under the
+    // cursor but still returns the uniform's other sites — F2 would prompt and
+    // rename a symbol the user was not pointing at.
+    const memberOffset = SRC.indexOf("color", SRC.indexOf("u_light."));
+    const view = viewOf(SRC, memberOffset + 1);
+    let prompted = false;
+    const res = runRename(view, () => {
+      prompted = true;
+      return "tint";
+    });
+    expect(res.applied).toBe(false);
+    expect(res.applied === false && res.reason).toBe("no-binding");
+    expect(prompted).toBe(false);
+    expect(view.state.doc.toString()).toBe(SRC);
+    view.destroy();
+  });
+
+  it("still renames when the cursor is on the bare occurrence", () => {
+    const bareOffset = SRC.indexOf("vec4(color") + 5;
+    const view = viewOf(SRC, bareOffset + 1);
+    const res = runRename(view, () => "tint");
+    expect(res.applied).toBe(true);
+    const out = view.state.doc.toString();
+    expect(out).toContain("uniform vec3 tint;");
+    expect(out).toContain("vec4(tint + u_light.color, 1.0)");
+    view.destroy();
+  });
+});

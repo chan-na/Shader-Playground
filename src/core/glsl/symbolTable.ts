@@ -21,6 +21,8 @@
 
 // biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + regex captures with documented length guards
 
+import { maskComments } from "./stripComments";
+
 // One union literal kept inline on `GlslSymbol.kind` — exporting it as a named
 // alias used to land in knip's "unused export" report (consumers always read
 // the field through `GlslSymbol`, never the alias).
@@ -148,24 +150,83 @@ const NOT_A_FUNCTION = new Set([
 ]);
 
 /**
- * Strip block comments (`/* ... *​/`) while preserving newlines so line and
- * column numbers stay aligned with the original source. Line comments are
- * left intact and handled per-line by the walkers below.
+ * Struct head, mirroring {@link RE_STRUCT} but matched against a whole masked
+ * source with the `m` flag (`[ \t]*` rather than `\s*` so `^` really means
+ * start-of-line). Drives {@link structBodyRanges}.
  */
-function stripBlockComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
+const RE_STRUCT_HEAD = /^[ \t]*struct\s+[A-Za-z_][\w]*\s*\{/gm;
+
+/**
+ * Absolute offset ranges covering struct *bodies* — the span strictly between
+ * a `struct Foo {` head's `{` and its matching `}` — in a comment-masked
+ * source.
+ *
+ * Struct members are not indexed by this parser (see `structDepth` in
+ * {@link parseSymbolTable}), so an identifier inside a struct body resolves to
+ * whatever *global* happens to share its name. That is harmless for hover but
+ * catastrophic for rename: renaming `uniform vec3 color` would also rewrite
+ * the unrelated member declaration `vec3 color;` inside `struct Light`, while
+ * every `light.color` access is skipped by the member-access guard — the
+ * shader stops compiling. Reference consumers therefore drop matches that land
+ * in one of these ranges.
+ *
+ * `masked` must already have comments blanked (see `stripComments.ts`) so a
+ * brace inside a comment cannot move the walk.
+ */
+export function structBodyRanges(
+  masked: string,
+): Array<{ from: number; to: number }> {
+  const ranges: Array<{ from: number; to: number }> = [];
+  RE_STRUCT_HEAD.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
+  while ((m = RE_STRUCT_HEAD.exec(masked)) !== null) {
+    const open = masked.indexOf("{", m.index);
+    if (open < 0) break;
+    let depth = 0;
+    // An unbalanced body runs to end-of-source, matching how parseSymbolTable
+    // keeps `structDepth` raised until brace depth returns to zero.
+    let close = masked.length;
+    for (let k = open; k < masked.length; k++) {
+      const ch = masked[k];
+      if (ch === "{") depth += 1;
+      else if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          close = k;
+          break;
+        }
+      }
+    }
+    ranges.push({ from: open + 1, to: close });
+    // Nested heads inside this body are already covered by the range.
+    RE_STRUCT_HEAD.lastIndex = close;
+  }
+  return ranges;
 }
 
 /**
- * Drop everything from `//` to end-of-line. Returns the trimmed line plus its
- * original length so callers can map identifier offsets back to source
- * columns; the comment portion is replaced with spaces so character indices
- * up to the comment remain identical.
+ * True when the identifier starting at `index` is a member/swizzle access —
+ * i.e. the nearest preceding non-blank character on the same line is `.`.
+ *
+ * `v.xyz`, `light.color` and `s.color.rgb` all bind to a *member*, never to
+ * the global that happens to share the name, so reference/rename consumers
+ * must not treat them as occurrences.
+ *
+ * Known limitation, deliberately left unhandled: a dot separated from its
+ * member by a **line break** (`light\n  .color`) is not detected — the guard
+ * only looks backwards within the current line. GLSL style in this playground
+ * never wraps member access, and a cross-line walk would need the caller to
+ * pass the whole document rather than one masked line.
  */
-function stripLineComment(line: string): string {
-  const idx = line.indexOf("//");
-  if (idx < 0) return line;
-  return line.slice(0, idx);
+export function precededByDot(line: string, index: number): boolean {
+  let k = index - 1;
+  while (k >= 0) {
+    const ch = line[k];
+    if (ch !== " " && ch !== "\t") break;
+    k -= 1;
+  }
+  return k >= 0 && line[k] === ".";
 }
 
 /**
@@ -214,10 +275,12 @@ function formatParameters(
 // sources — vertex + fragment — within a single call, so a size-1 cache would
 // thrash; we keep a small LRU keyed by the source string.
 //
-// Safety: the returned SymbolTable and its GlslSymbol entries are read-only for
-// every consumer (`symbolsVisibleAt`/`resolveSymbol` filter+copy before
-// sorting; references/semanticTokens only read via those helpers). Sharing a
-// cached instance across callers is therefore safe — no consumer mutates it.
+// Safety: the returned SymbolTable and its GlslSymbol entries are treated as
+// read-only by every consumer. `symbolsVisibleAt` builds its result from a
+// fresh array (and hands out a copy of the memoized one — see
+// VISIBLE_AT_CACHE), `resolveSymbol` only reads, and references/semanticTokens
+// reach the table exclusively through those two helpers. Sharing a cached
+// instance across callers is therefore safe — no consumer mutates it.
 const SYMBOL_TABLE_CACHE_MAX = 8;
 const symbolTableCache = new Map<string, SymbolTable>();
 
@@ -249,7 +312,8 @@ export function buildSymbolTable(source: string): SymbolTable {
  * Parse a shader source into its symbol table (uncached).
  *
  * Algorithm sketch (line-oriented walker with brace-depth tracking):
- *   1. Strip block comments (replace with spaces, preserve newlines).
+ *   1. Mask block *and* line comments with spaces (length-preserving, see
+ *      `stripComments.ts`) so column arithmetic below stays source-accurate.
  *   2. Walk lines top-to-bottom maintaining a brace-depth counter and the
  *      name of the function we're currently inside (only one level deep —
  *      GLSL has no nested function declarations).
@@ -262,8 +326,7 @@ export function buildSymbolTable(source: string): SymbolTable {
  *      strings; comments are stripped before counting).
  */
 function parseSymbolTable(source: string): SymbolTable {
-  const noBlock = stripBlockComments(source);
-  const lines = noBlock.split(/\r?\n/);
+  const lines = maskComments(source).split(/\r?\n/);
   const symbols: GlslSymbol[] = [];
 
   let depth = 0;
@@ -273,8 +336,9 @@ function parseSymbolTable(source: string): SymbolTable {
   let structDepth = 0;
 
   for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i]!;
-    const code = stripLineComment(raw);
+    // Already comment-masked: comment runs are spaces, so every index within
+    // the line is still the index it had in the original source.
+    const code = lines[i]!;
     const lineNo = i + 1;
 
     // Handle declarations BEFORE updating depth so a function header on this
@@ -335,11 +399,22 @@ function parseSymbolTable(source: string): SymbolTable {
               scope: null,
               parameters: formatParameters(params),
             });
-            // Parameters belong inside the function body. They share the
-            // header's line/column for go-to purposes (we don't attempt to
-            // compute parameter offsets).
+            // Parameters belong inside the function body; they are recorded
+            // on the header's line at their own column. Two anchors keep that
+            // column honest (L32): a running cursor so parameter N is searched
+            // after parameter N-1's name, and each parameter's own type token
+            // so the search starts *after* the type. Without them a bare
+            // `indexOf(name, afterParen)` matches inside an earlier token —
+            // `void f(mat3 m)` would report the `m` of `mat3`, and
+            // `void f(vec3 v, float f)` the `f` of `float`. Falls back to the
+            // function name's column when a parameter can't be located.
+            let searchFrom = code.indexOf("(") + 1;
             for (const p of params) {
-              const pCol = code.indexOf(p.name, code.indexOf("(") + 1);
+              const typeIdx = code.indexOf(p.type, searchFrom);
+              const anchor =
+                typeIdx >= 0 ? typeIdx + p.type.length : searchFrom;
+              const pCol = code.indexOf(p.name, anchor);
+              if (pCol >= 0) searchFrom = pCol + p.name.length;
               symbols.push({
                 name: p.name,
                 type: p.type,
@@ -457,6 +532,34 @@ function parseSymbolTable(source: string): SymbolTable {
   return { symbols };
 }
 
+// Memoization (L21). `symbolsVisibleAt` is a pure function of (table, line)
+// but sits on the hottest path in the editor: `classifySemanticTokens` calls
+// `resolveSymbol` — hence this — once per *identifier*, and each uncached call
+// walks the whole symbol list twice (function scan + sort, then bucket) for
+// every identifier on the same line. Keyed by table **identity** (a WeakMap,
+// so the entry dies with the table) and then by line; keying on the line alone
+// would return one source's symbols for another's, which
+// `findReferencesAcrossStages` — two tables per call — would hit immediately.
+//
+// The cached array is never handed out directly: `symbolsVisibleAt` returns a
+// copy. `main.tsx` publishes this function on the DEV `window.__sp` bridge, so
+// E2E page code could otherwise sort or splice the cache in place.
+const VISIBLE_AT_CACHE = new WeakMap<SymbolTable, Map<number, GlslSymbol[]>>();
+
+/** Memoized inner form. Callers must not mutate the returned array. */
+function visibleAtCached(table: SymbolTable, line: number): GlslSymbol[] {
+  let perLine = VISIBLE_AT_CACHE.get(table);
+  if (perLine === undefined) {
+    perLine = new Map();
+    VISIBLE_AT_CACHE.set(table, perLine);
+  }
+  const hit = perLine.get(line);
+  if (hit !== undefined) return hit;
+  const computed = computeVisibleAt(table, line);
+  perLine.set(line, computed);
+  return computed;
+}
+
 /**
  * Returns symbols visible at the given line — globals plus any symbols whose
  * `scope` matches the function containing that line. The result is ordered:
@@ -466,11 +569,18 @@ function parseSymbolTable(source: string): SymbolTable {
  * Duplicate names (e.g. a local shadowing a global) keep only the first
  * entry — which is the in-scope one — so consumers can treat the list as
  * deduplicated by name.
+ *
+ * Memoized per (table identity, line). The returned array is a fresh copy on
+ * every call, so callers may sort or splice it freely.
  */
 export function symbolsVisibleAt(
   table: SymbolTable,
   line: number,
 ): GlslSymbol[] {
+  return visibleAtCached(table, line).slice();
+}
+
+function computeVisibleAt(table: SymbolTable, line: number): GlslSymbol[] {
   // Find the function whose declaration line is the latest one at or before
   // `line` AND whose body still contains `line`. We approximate "body
   // contains" by looking for the next function declaration after it: if
@@ -518,7 +628,9 @@ export function resolveSymbol(
   name: string,
   line: number,
 ): GlslSymbol | null {
-  for (const s of symbolsVisibleAt(table, line)) {
+  // Reads the memoized array directly — no copy — because this loop only
+  // reads. Every identifier in the document funnels through here.
+  for (const s of visibleAtCached(table, line)) {
     if (s.name === name) return s;
   }
   return null;

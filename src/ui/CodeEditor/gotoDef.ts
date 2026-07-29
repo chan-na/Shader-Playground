@@ -14,7 +14,11 @@
 
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { buildSymbolTable, resolveSymbol } from "../../core/glsl/symbolTable";
+import {
+  buildSymbolTable,
+  precededByDot,
+  resolveSymbol,
+} from "../../core/glsl/symbolTable";
 import { identifierAt } from "./hover";
 
 export interface DefinitionTarget {
@@ -40,6 +44,10 @@ export function findDefinitionAt(
   const lineObj = view.state.doc.lineAt(pos);
   const ident = identifierAt(lineObj.text, lineObj.from, pos);
   if (!ident) return null;
+  // Member / swizzle access (`v.xyz`, `light.color`) has no document-level
+  // declaration this parser indexes; jumping to a same-named global would be
+  // actively misleading. Silent no-op, like builtins (L5).
+  if (precededByDot(lineObj.text, ident.from - lineObj.from)) return null;
   const source = view.state.doc.toString();
   const table = buildSymbolTable(source);
   const sym = resolveSymbol(table, ident.word, lineObj.number);

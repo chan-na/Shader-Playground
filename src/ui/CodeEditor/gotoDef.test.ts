@@ -98,3 +98,22 @@ describe("gotoDefinition", () => {
     view.destroy();
   });
 });
+
+describe("findDefinitionAt — member access guard (L5)", () => {
+  it("returns null on a swizzle letter that collides with a global", () => {
+    const src = `uniform float x;
+out vec4 outColor;
+void main() {
+  vec3 v = vec3(x);
+  outColor = vec4(v.x, 1.0, 1.0, 1.0);
+}
+`;
+    const view = viewOf(src);
+    const swizzle = src.indexOf("v.x") + 2;
+    expect(findDefinitionAt(view, swizzle)).toBeNull();
+    // The bare `x` argument still jumps to the uniform declaration.
+    const bare = src.indexOf("vec3(x)") + 5;
+    expect(findDefinitionAt(view, bare)?.line).toBe(1);
+    view.destroy();
+  });
+});

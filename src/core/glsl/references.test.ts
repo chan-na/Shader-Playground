@@ -371,3 +371,86 @@ void main() { outColor = vec4(u_time); }
     expect(fragLines).toEqual([3, 9]);
   });
 });
+
+describe("member access and struct bodies are not references (L5)", () => {
+  const SRC = `#version 300 es
+precision highp float;
+
+struct Light {
+  vec3 color;
+  float intensity;
+};
+
+uniform vec3 color;
+uniform Light u_light;
+out vec4 outColor;
+
+void main() {
+  vec3 c = color * u_light.color;
+  outColor = vec4(c.xyz, 1.0);
+}
+`;
+
+  it("excludes `light.color` — it binds to the member, not the uniform", () => {
+    const sites = findReferences(SRC, "color", 9);
+    // Declaration (line 9) + the bare use on line 14. NOT `u_light.color`
+    // on the same line, and NOT the struct member declaration on line 5.
+    expect(sites.map((s) => s.line)).toEqual([9, 14]);
+    expect(sites.filter((s) => s.isDefinition)).toHaveLength(1);
+    const bare = sites.find((s) => !s.isDefinition);
+    // The accepted line-14 site is the one *before* the dot access.
+    expect(bare!.from).toBeLessThan(SRC.indexOf("u_light.color"));
+  });
+
+  it("excludes the struct member declaration — renaming it breaks the shader", () => {
+    // With only the member-access guard, the member declaration would be
+    // rewritten while every `u_light.color` access stayed put.
+    const sites = findReferences(SRC, "color", 9);
+    const memberDeclOffset = SRC.indexOf("vec3 color;");
+    expect(
+      sites.some(
+        (s) => s.from >= memberDeclOffset && s.from < memberDeclOffset + 11,
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps swizzle letters out of the result", () => {
+    const src = `uniform float x;
+out vec4 outColor;
+void main() {
+  vec3 v = vec3(x);
+  outColor = vec4(v.x, v.x, x, 1.0);
+}
+`;
+    const sites = findReferences(src, "x", 1);
+    // Declaration on line 1, the `vec3(x)` use on line 4, and the bare `x`
+    // argument on line 5 — but neither `v.x`.
+    expect(sites).toHaveLength(3);
+    expect(sites.map((s) => s.line)).toEqual([1, 4, 5]);
+  });
+});
+
+describe("comment masking (L20)", () => {
+  it("does not report occurrences inside block or line comments", () => {
+    const src = `uniform float u_amp;
+/* u_amp mentioned in a block comment */
+void main() {
+  float a = u_amp; // u_amp again
+}
+`;
+    const sites = findReferences(src, "u_amp", 1);
+    expect(sites.map((s) => s.line)).toEqual([1, 4]);
+    for (const s of sites) expect(src.slice(s.from, s.to)).toBe("u_amp");
+  });
+
+  it("keeps offsets aligned when a line comment precedes the match", () => {
+    const src = `uniform float u_amp;
+void main() {
+  // set below
+  float a = u_amp;
+}
+`;
+    const sites = findReferences(src, "u_amp", 1);
+    for (const s of sites) expect(src.slice(s.from, s.to)).toBe("u_amp");
+  });
+});

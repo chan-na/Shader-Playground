@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { nodeInputPorts } from "../nodes/registry";
 import {
   applyPortRename,
   pruneDeadEdges,
@@ -282,5 +283,47 @@ describe("pruneDeadEdges", () => {
     const out = pruneDeadEdges([...graphNodes], edges);
     expect(out.edges).toBe(edges);
     expect(out.dropped).toEqual([]);
+  });
+});
+
+describe("half-typed block comment must not retire ports (L20 blocker)", () => {
+  // The editor commits through a 50 ms debounce, so the instant a user types
+  // `/*` the store re-derives this node's port surface. If an unterminated
+  // block comment masked to end of source, every uniform port would vanish and
+  // `pruneEdgesForNode` would delete the wiring — permanently, since typing the
+  // closing `*/` restores the ports but not the edges.
+  const OPEN_ONLY = `/*\n${FRAG_BOTH}`;
+
+  it("keeps the uniform ports while the comment is still open", () => {
+    const before = nodeInputPorts(shader(FRAG_BOTH)).map((p) => p.name);
+    expect(before).toContain("u_a");
+    expect(before).toContain("u_tex");
+    expect(nodeInputPorts(shader(OPEN_ONLY)).map((p) => p.name)).toEqual(
+      before,
+    );
+  });
+
+  it("keeps the edges into those ports", () => {
+    const edges = [
+      edge("e1", "p1", "value", "s1", "u_a"),
+      edge("e2", "img1", "texture", "s1", "u_tex"),
+    ];
+    expect(pruneEdgesForNode(shader(OPEN_ONLY), edges)).toBe(edges);
+  });
+
+  it("still retires ports for a genuinely closed-out declaration", () => {
+    // The guard is scoped to the unterminated case — a real block comment
+    // around a uniform must still retire its port.
+    const commentedOut = `precision highp float;
+/*
+uniform sampler2D u_tex;
+*/
+uniform float u_a;
+void main(){}`;
+    const names = nodeInputPorts(shader(commentedOut)).map((p) => p.name);
+    expect(names).toContain("u_a");
+    expect(names).not.toContain("u_tex");
+    const edges = [edge("e2", "img1", "texture", "s1", "u_tex")];
+    expect(pruneEdgesForNode(shader(commentedOut), edges)).toEqual([]);
   });
 });

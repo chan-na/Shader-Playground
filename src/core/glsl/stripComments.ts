@@ -35,9 +35,23 @@
  *
  * ## Documented behaviour on malformed input
  *
- * An unterminated `/*` masks everything to end of input. That mirrors how a
- * GLSL compiler lexes it (the rest of the file *is* comment) and is fixed by
- * unit test rather than left to chance.
+ * An unterminated `/*` is the one place the two entry points disagree, and the
+ * split is deliberate:
+ *
+ * - {@link maskComments} masks everything to end of input, mirroring how a
+ *   GLSL compiler lexes it (the rest of the file *is* comment). Its consumers
+ *   only feed editor affordances — symbols, highlighting, reference sites — so
+ *   the worst case while the closing `*\/` is still untyped is that those
+ *   affordances go quiet for a keystroke.
+ * - {@link maskBlockComments} leaves it as plain text. Its consumers derive a
+ *   node's **port surface** (`parseUniforms` → `nodeInputPorts`), and the store
+ *   prunes every edge whose port disappeared. Masking to EOF there would turn
+ *   the instant a user types `/*` into "all uniforms vanished", and the 50 ms
+ *   editor debounce would delete the node's incoming edges for good — typing
+ *   the closing `*\/` brings the ports back but not the wiring. A transient,
+ *   syntactically incomplete edit must not destroy graph state.
+ *
+ * Both behaviours are pinned by unit test rather than left to chance.
  */
 
 /** Replace every character except line terminators with a space. */
@@ -48,9 +62,16 @@ function blank(text: string): string {
 /**
  * Single scanner behind both entry points. Walks the source once, classifying
  * `/*` and `//` starts in source order so neither can be recognised inside the
- * other. `maskLine` decides whether a line-comment run is blanked or kept.
+ * other. `maskLine` decides whether a line-comment run is blanked or kept;
+ * `maskUnterminated` decides what an unopened-but-never-closed block does (see
+ * the module docs — the port-deriving callers must not lose the rest of the
+ * file mid-keystroke).
  */
-function scan(source: string, maskLine: boolean): string {
+function scan(
+  source: string,
+  maskLine: boolean,
+  maskUnterminated: boolean,
+): string {
   // Cheap bail-out: no comment can exist without a slash. Shader sources are
   // re-masked on every keystroke by the live-validation path.
   if (!source.includes("/")) return source;
@@ -69,6 +90,12 @@ function scan(source: string, maskLine: boolean): string {
     const next = source.charCodeAt(i + 1);
     if (next === 42 /* "*" */) {
       const end = source.indexOf("*/", i + 2);
+      if (end < 0 && !maskUnterminated) {
+        // Treat the half-typed opener as ordinary text so the declarations
+        // below it keep producing ports — see module docs.
+        i += 2;
+        continue;
+      }
       // Unterminated block comment swallows the remainder — see module docs.
       const stop = end < 0 ? n : end + 2;
       out += source.slice(plainStart, i) + blank(source.slice(i, stop));
@@ -99,16 +126,22 @@ function scan(source: string, maskLine: boolean): string {
  * Blank block comments (`/* … *\/`) only, preserving length and newlines.
  * Line comments survive untouched — callers that parse `//` annotations
  * (`parseUniforms`, `writeUniformHints`) depend on that.
+ *
+ * An unterminated `/*` is left as plain text: these callers derive port
+ * surfaces, and a half-typed opener must not retire every uniform port (and
+ * with it every incoming edge). See the module docs.
  */
 export function maskBlockComments(source: string): string {
-  return scan(source, false);
+  return scan(source, false, false);
 }
 
 /**
  * Blank both block and line comments, preserving length and newlines. The
  * result is safe to run identifier scanners over: no match can land inside a
  * comment, and every match index still maps 1:1 onto the original source.
+ *
+ * An unterminated `/*` masks through end of input, as a GLSL lexer would.
  */
 export function maskComments(source: string): string {
-  return scan(source, true);
+  return scan(source, true, true);
 }

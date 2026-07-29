@@ -428,6 +428,35 @@ void main() {
     expect(sites).toHaveLength(3);
     expect(sites.map((s) => s.line)).toEqual([1, 4, 5]);
   });
+
+  // The struct guard excludes member *names* only. Excluding the whole body
+  // would strand the uses below when their declaration is renamed — the same
+  // broken-shader failure, entered from the other side.
+  it("keeps a struct type used as another struct's member type", () => {
+    const src = `struct Inner { float a; };
+struct Outer {
+  Inner i;
+};
+uniform Outer o;
+void main() {}
+`;
+    const sites = findReferences(src, "Inner", 1);
+    expect(sites.map((s) => s.line)).toEqual([1, 3]);
+    expect(src.slice(sites[1]!.from, sites[1]!.to)).toBe("Inner");
+  });
+
+  it("keeps a const used as an array size inside a struct body", () => {
+    const src = `const int MAX = 4;
+struct Buf {
+  float v[MAX];
+};
+uniform Buf b;
+void main() {}
+`;
+    const sites = findReferences(src, "MAX", 1);
+    expect(sites.map((s) => s.line)).toEqual([1, 3]);
+    expect(src.slice(sites[1]!.from, sites[1]!.to)).toBe("MAX");
+  });
 });
 
 describe("comment masking (L20)", () => {

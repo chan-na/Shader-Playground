@@ -17,10 +17,12 @@
  *   - **Member / swizzle access** — the `color` in `light.color`, the `xyz` in
  *     `v.xyz`. See `precededByDot`, including its documented line-break
  *     limitation.
- *   - **Struct member declarations** — the `color` in `struct Light { vec3
- *     color; }`. See `structBodyRanges`. Excluding only the first class would
- *     make rename *break* shaders: the member declaration would be rewritten
- *     while every access to it was left alone.
+ *   - **Struct member declarator names** — the `color` in `struct Light { vec3
+ *     color; }`. See `structMemberNameOffsets`. Excluding only the first class
+ *     would make rename *break* shaders: the member declaration would be
+ *     rewritten while every access to it was left alone. Only the name
+ *     position is excluded — a member's type token and array-size expression
+ *     still reference real globals and must stay renameable.
  *
  * Not goals: cross-file references (GLSL has no imports), preprocessor
  * expansion, or overload resolution. Two functions with the same name are
@@ -37,7 +39,7 @@ import {
   precededByDot,
   resolveSymbol,
   type SymbolTable,
-  structBodyRanges,
+  structMemberNameOffsets,
 } from "./symbolTable";
 
 export interface ReferenceSite {
@@ -117,9 +119,10 @@ export function findReferencesOf(
 ): ReferenceSite[] {
   const masked = maskComments(source);
   const lines = masked.split(/\r?\n/);
-  // Struct members share the global namespace's spelling but not its binding
-  // (L5) — see `structBodyRanges`.
-  const structRanges = structBodyRanges(masked);
+  // Struct member *names* share the global namespace's spelling but not its
+  // binding (L5) — see `structMemberNameOffsets`. Member types and array sizes
+  // are deliberately NOT excluded: they are real uses of real globals.
+  const memberNameOffsets = structMemberNameOffsets(masked);
   const sites: ReferenceSite[] = [];
 
   let lineStart = 0;
@@ -135,7 +138,7 @@ export function findReferencesOf(
       // `v.color` / `s.xyz` bind to a member, never to the same-named global.
       if (precededByDot(line, m.index)) continue;
       const from = lineStart + m.index;
-      if (structRanges.some((r) => from >= r.from && from < r.to)) continue;
+      if (memberNameOffsets.has(from)) continue;
       // Ask the symbol table what binding is in scope at this occurrence.
       // If it isn't the target, we hit a shadowed name (e.g. a global `foo`
       // shadowed by a local `foo` inside a function body). Skip it.

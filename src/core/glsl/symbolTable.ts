@@ -159,28 +159,17 @@ const RE_STRUCT_HEAD = /^[ \t]*struct\s+[A-Za-z_][\w]*\s*\{/gm;
 /**
  * Absolute offset ranges covering struct *bodies* — the span strictly between
  * a `struct Foo {` head's `{` and its matching `}` — in a comment-masked
- * source.
- *
- * Struct members are not indexed by this parser (see `structDepth` in
- * {@link parseSymbolTable}), so an identifier inside a struct body resolves to
- * whatever *global* happens to share its name. That is harmless for hover but
- * catastrophic for rename: renaming `uniform vec3 color` would also rewrite
- * the unrelated member declaration `vec3 color;` inside `struct Light`, while
- * every `light.color` access is skipped by the member-access guard — the
- * shader stops compiling. Reference consumers therefore drop matches that land
- * in one of these ranges.
+ * source. Module-local: consumers want the narrower
+ * {@link structMemberNameOffsets}.
  *
  * `masked` must already have comments blanked (see `stripComments.ts`) so a
  * brace inside a comment cannot move the walk.
  */
-export function structBodyRanges(
-  masked: string,
-): Array<{ from: number; to: number }> {
+function structBodyRanges(masked: string): Array<{ from: number; to: number }> {
   const ranges: Array<{ from: number; to: number }> = [];
   RE_STRUCT_HEAD.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
-  while ((m = RE_STRUCT_HEAD.exec(masked)) !== null) {
+  let m = RE_STRUCT_HEAD.exec(masked);
+  while (m !== null) {
     const open = masked.indexOf("{", m.index);
     if (open < 0) break;
     let depth = 0;
@@ -201,8 +190,121 @@ export function structBodyRanges(
     ranges.push({ from: open + 1, to: close });
     // Nested heads inside this body are already covered by the range.
     RE_STRUCT_HEAD.lastIndex = close;
+    m = RE_STRUCT_HEAD.exec(masked);
   }
   return ranges;
+}
+
+/** Qualifiers that may precede a struct member's type token. */
+const MEMBER_TYPE_QUALIFIERS = new Set(["highp", "mediump", "lowp", "struct"]);
+
+function isIdentStart(ch: string): boolean {
+  return /[A-Za-z_]/.test(ch);
+}
+
+function isIdentPart(ch: string): boolean {
+  return /[A-Za-z0-9_]/.test(ch);
+}
+
+/**
+ * Absolute offsets of every struct **member declarator name** in a
+ * comment-masked source — the `color` in `struct Light { vec3 color; };`.
+ *
+ * Struct members are not indexed by this parser (see `structDepth` in
+ * {@link parseSymbolTable}), so an identifier inside a struct body resolves to
+ * whatever *global* happens to share its name. That is harmless for hover but
+ * catastrophic for rename: renaming `uniform vec3 color` would also rewrite
+ * the unrelated member declaration `vec3 color;` inside `struct Light`, while
+ * every `light.color` access is skipped by the member-access guard — the
+ * shader stops compiling. Reference consumers therefore drop matches that
+ * start at one of these offsets.
+ *
+ * Only the *name* position is excluded, never the whole body. A member's type
+ * token and any array-size expression are ordinary references to real globals:
+ * `struct Outer { Inner i; };` genuinely uses the struct `Inner`, and
+ * `float v[MAX];` genuinely uses the const `MAX`. Skipping those would recreate
+ * the same broken-shader failure from the other side — the declaration renamed,
+ * the use left behind.
+ *
+ * Known limitation: members of an *embedded* struct definition
+ * (`struct Outer { struct Inner { float a; } i; };`) are not collected — only
+ * the outer declarator `i` is. GLSL ES forbids embedded struct definitions, so
+ * this shape cannot compile in the playground anyway.
+ */
+export function structMemberNameOffsets(masked: string): Set<number> {
+  const out = new Set<number>();
+  for (const body of structBodyRanges(masked)) {
+    collectMemberNames(masked, body.from, body.to, out);
+  }
+  return out;
+}
+
+/**
+ * Walk one struct body, recording the offset of each declarator name. State is
+ * a three-way "what does the next depth-0 identifier mean" flag: the type comes
+ * first, then one name per depth-0 comma-separated declarator, reset at each
+ * depth-0 `;`. Identifiers nested in `[...]` / `(...)` / an embedded body are
+ * never names.
+ */
+function collectMemberNames(
+  masked: string,
+  from: number,
+  to: number,
+  out: Set<number>,
+): void {
+  let depth = 0;
+  let expectType = true;
+  let expectName = false;
+  let i = from;
+  while (i < to) {
+    const ch = masked[i]!;
+    if (ch === "[" || ch === "(" || ch === "{") {
+      depth += 1;
+      i += 1;
+      continue;
+    }
+    if (ch === "]" || ch === ")" || ch === "}") {
+      depth = Math.max(0, depth - 1);
+      // Closing an embedded `struct … { … }`: the identifier that follows is
+      // the member declarator for it.
+      if (ch === "}" && depth === 0) {
+        expectType = false;
+        expectName = true;
+      }
+      i += 1;
+      continue;
+    }
+    if (depth === 0 && ch === ",") {
+      expectName = true;
+      i += 1;
+      continue;
+    }
+    if (depth === 0 && ch === ";") {
+      expectType = true;
+      expectName = false;
+      i += 1;
+      continue;
+    }
+    if (!isIdentStart(ch)) {
+      i += 1;
+      continue;
+    }
+    let j = i + 1;
+    while (j < to && isIdentPart(masked[j]!)) j += 1;
+    if (depth === 0) {
+      if (expectName) {
+        out.add(i);
+        expectName = false;
+      } else if (
+        expectType &&
+        !MEMBER_TYPE_QUALIFIERS.has(masked.slice(i, j))
+      ) {
+        expectType = false;
+        expectName = true;
+      }
+    }
+    i = j;
+  }
 }
 
 /**

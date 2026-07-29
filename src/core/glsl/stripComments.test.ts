@@ -97,4 +97,22 @@ describe("maskBlockComments — block only", () => {
     const src = "// /* opens?\nuniform float u_kept;\n";
     expect(maskBlockComments(src)).toBe(src);
   });
+
+  it("leaves an unterminated block comment as plain text", () => {
+    // Deliberately divergent from `maskComments` (which masks to EOF). This
+    // entry point feeds `parseUniforms` → `nodeInputPorts`, and the graph store
+    // prunes every edge whose port disappeared. Masking here would mean that
+    // typing `/*` deletes the node's incoming edges after the 50 ms editor
+    // debounce, and typing the closing `*/` would not bring them back.
+    const src = "/* never closed\nuniform float u_x;\n";
+    expect(maskBlockComments(src)).toBe(src);
+    expect(maskComments(src)).toBe(`${" ".repeat(15)}\n${" ".repeat(18)}\n`);
+  });
+
+  it("still masks a block comment that does close", () => {
+    const src = "/* closed */\nuniform float u_x;\n";
+    expect(maskBlockComments(src)).toBe(
+      `${" ".repeat(12)}\nuniform float u_x;\n`,
+    );
+  });
 });

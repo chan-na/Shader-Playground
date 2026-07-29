@@ -488,6 +488,18 @@ uniform float u_real;
     expect(parseUniforms(src).map((u) => u.name)).toEqual(["u_real"]);
   });
 
+  it("keeps declarations below a half-typed `/*` — ports must survive", () => {
+    // An unterminated block comment is a transient editing state, not an
+    // instruction to retire every port. `nodeInputPorts` derives from this
+    // function and the store prunes edges for ports that vanish, so masking to
+    // EOF here would delete a node's wiring mid-keystroke.
+    const src = `/*
+uniform float u_a;
+uniform sampler2D u_tex;
+`;
+    expect(parseUniforms(src).map((u) => u.name)).toEqual(["u_a", "u_tex"]);
+  });
+
   it("keeps a trailing hint when a block comment shares the line", () => {
     const src = `uniform float u_x; /* note */ // @range 0..4`;
     const u = parseUniforms(src)[0];

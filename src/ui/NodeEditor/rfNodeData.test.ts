@@ -6,9 +6,11 @@ import type {
 } from "../../core/graph/types";
 import { GROUP_COLLAPSED_HEIGHT } from "../../core/graph/types";
 import {
+  addedCardSize,
   createNodeDataCache,
   groupBoxHeight,
   offscreenPanTarget,
+  pendingAddedIds,
 } from "./rfNodeData";
 
 function paramNode(id: string): ParamGraphNode {
@@ -120,6 +122,99 @@ describe("offscreenPanTarget", () => {
     expect(offscreenPanTarget(view, [card(4000, 0), card(4000, 2000)])).toEqual(
       { x: 4090, y: 32 },
     );
+  });
+
+  it("keeps a real-sized card visible where a 64px stand-in reads off-screen", () => {
+    // The band the stand-in box gets wrong: an Image card added at (-200, 200)
+    // is 148×162, so with the view starting at y=300 its bottom 62px are on
+    // screen — but the 180×64 stand-in ends at y=264, entirely above the view.
+    // Deciding on the stand-in pans away from a node the user can already see.
+    const panned = { x: -223, y: 300, width: 640, height: 792 };
+    const real = { x: -200, y: 200, width: 148, height: 162 };
+    const standIn = { x: -200, y: 200, width: 180, height: 64 };
+    expect(offscreenPanTarget(panned, [real])).toBeNull();
+    expect(offscreenPanTarget(panned, [standIn])).not.toBeNull();
+  });
+});
+
+describe("addedCardSize", () => {
+  const fallback = { width: 180, height: 64 };
+  const dom = { width: 148, height: 162 };
+
+  it("prefers React Flow's measurement once it exists", () => {
+    expect(addedCardSize({ width: 200, height: 90 }, dom, fallback)).toEqual({
+      width: 200,
+      height: 90,
+    });
+  });
+
+  it("reads the mounted element while measured is still empty", () => {
+    // The always-taken path on the frame a card mounts: React Flow fills
+    // `measured` from a ResizeObserver, which the browser delivers after the
+    // frame's rAF callbacks — i.e. after the pan decision has been made.
+    expect(addedCardSize({}, dom, fallback)).toEqual(dom);
+  });
+
+  it("reads the element when only one dimension was measured", () => {
+    expect(addedCardSize({ width: 200 }, dom, fallback)).toEqual(dom);
+    expect(addedCardSize({ height: 90 }, dom, fallback)).toEqual(dom);
+  });
+
+  it("skips a zero measurement rather than treating it as a real box", () => {
+    expect(addedCardSize({ width: 0, height: 0 }, dom, fallback)).toEqual(dom);
+  });
+
+  it("falls back to the stand-in when there is no element", () => {
+    expect(addedCardSize({}, null, fallback)).toEqual(fallback);
+  });
+
+  it("falls back to the stand-in for an element with no layout box", () => {
+    // display:none / not laid out yet — offsetWidth/Height read 0.
+    expect(addedCardSize({}, { width: 0, height: 0 }, fallback)).toEqual(
+      fallback,
+    );
+  });
+});
+
+describe("pendingAddedIds", () => {
+  const set = (...ids: string[]) => new Set(ids);
+
+  it("returns the ids this commit added", () => {
+    expect(pendingAddedIds([], set("a"), set("a", "b"))).toEqual(["b"]);
+  });
+
+  it("returns nothing when the node set is unchanged", () => {
+    expect(pendingAddedIds([], set("a", "b"), set("a", "b"))).toEqual([]);
+  });
+
+  it("spots an add that keeps the node count the same", () => {
+    // Remove one, add one: comparing counts would see nothing happen.
+    expect(pendingAddedIds([], set("a", "b"), set("a", "c"))).toEqual(["c"]);
+  });
+
+  it("carries a still-undecided add through an unrelated commit", () => {
+    // The regression this exists for: the pan is armed as a single frame, and
+    // any commit landing before it fires cancels that frame. The added id has
+    // to survive into the next run — the set difference there is empty, since
+    // the node was already present in the previous render.
+    expect(pendingAddedIds(["b"], set("a", "b"), set("a", "b"))).toEqual(["b"]);
+  });
+
+  it("does not duplicate an id that is pending and added again", () => {
+    expect(pendingAddedIds(["b"], set("a"), set("a", "b"))).toEqual(["b"]);
+  });
+
+  it("drops a pending id whose node was removed before the decision", () => {
+    // Panning to a node that no longer renders would park the canvas on an
+    // empty point.
+    expect(pendingAddedIds(["b"], set("a", "b"), set("a"))).toEqual([]);
+  });
+
+  it("accumulates adds from several undecided commits", () => {
+    expect(pendingAddedIds(["b"], set("a", "b"), set("a", "b", "c"))).toEqual([
+      "b",
+      "c",
+    ]);
   });
 });
 

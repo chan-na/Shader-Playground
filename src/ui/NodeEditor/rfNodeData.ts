@@ -83,6 +83,69 @@ export function offscreenPanTarget(
 }
 
 /**
+ * The added-node ids that still owe a pan decision, after folding in whatever
+ * this commit added and dropping whatever it took away.
+ *
+ * The decision itself is deferred one frame (a card that mounted this commit
+ * has no size yet), and the effect that arms that frame is torn down by *any*
+ * later commit touching the node array. Consuming the added ids where they are
+ * computed would therefore lose them whenever a second commit lands inside the
+ * same frame: the cancelled frame never decided, and the next run sees no
+ * additions because the set difference was already spent. Carrying them
+ * forward until the frame actually fires is what keeps that case working —
+ * which is why this returns the *whole* pending list, not just this commit's
+ * additions.
+ *
+ * Ids that disappeared again before the decision are dropped: panning to a node
+ * that no longer renders would park the canvas on an empty point.
+ */
+export function pendingAddedIds(
+  pending: readonly string[],
+  prevIds: ReadonlySet<string>,
+  ids: ReadonlySet<string>,
+): string[] {
+  const next: string[] = [];
+  for (const id of pending) {
+    if (ids.has(id)) next.push(id);
+  }
+  for (const id of ids) {
+    if (!prevIds.has(id) && !next.includes(id)) next.push(id);
+  }
+  return next;
+}
+
+/**
+ * The flow-space size of a just-added node card, from the most trustworthy
+ * source that has an answer yet.
+ *
+ * React Flow only ever learns a card's size from a ResizeObserver, and the
+ * browser delivers those callbacks *after* the frame's requestAnimationFrame
+ * callbacks — so on the frame right after a card mounts, which is exactly the
+ * frame the pan decision runs on, `measured` is still empty. Falling straight
+ * through to a stand-in size makes that decision against a box that is not the
+ * card: a real Image card is about 148×162 against a 180×64 stand-in, so a card
+ * with 60px of itself on screen reads as fully off-screen and the canvas pans
+ * away from something the user can already see.
+ *
+ * The mounted element is the very source React Flow measures (`offsetWidth`/
+ * `offsetHeight` — layout px, unaffected by the viewport's zoom transform, so
+ * already flow units) and it is correct from the first frame. The stand-in
+ * stays as the last resort, for a node with no element at all.
+ */
+export function addedCardSize(
+  measured: { width?: number | undefined; height?: number | undefined },
+  dom: { width: number; height: number } | null,
+  fallback: { width: number; height: number },
+): { width: number; height: number } {
+  const { width, height } = measured;
+  if (width !== undefined && height !== undefined && width > 0 && height > 0) {
+    return { width, height };
+  }
+  if (dom !== null && dom.width > 0 && dom.height > 0) return dom;
+  return fallback;
+}
+
+/**
  * Build a memoizer that returns a stable `{ node }` wrapper for a graph node.
  *
  * React Flow decides whether to re-render a node's card by the reference

@@ -32,6 +32,45 @@ async function stableBox(
   return box;
 }
 
+/** React Flow's flow→pane transform, read straight off the DOM: the editor
+ *  exposes no viewport getter on `window.__sp`, and this matrix *is* the thing
+ *  a pan changes — `zoom` is the scale, `x`/`y` the pane-local px the flow
+ *  origin sits at (so the flow y at the pane's top edge is `-y / zoom`). */
+async function viewportTransform(
+  page: Page,
+): Promise<{ zoom: number; x: number; y: number }> {
+  const t = await page.evaluate(() => {
+    const el = document.querySelector(
+      ".panel--graph .panel-body .react-flow__viewport",
+    );
+    if (!el) return null;
+    const raw = getComputedStyle(el).transform;
+    const m = new DOMMatrixReadOnly(raw === "none" ? "" : raw);
+    return { zoom: m.a, x: m.e, y: m.f };
+  });
+  if (!t) throw new Error("react flow viewport not mounted");
+  return t;
+}
+
+/** Block until the canvas transform stops changing — every graph replace runs
+ *  an animated fitView (MOTION_MAX_MS), and a transform sampled mid-flight is
+ *  not one the user ever sat at. */
+async function settledViewport(page: Page): Promise<void> {
+  let previous = "";
+  await expect
+    .poll(
+      async () => {
+        const t = await viewportTransform(page);
+        const key = `${t.zoom.toFixed(3)}:${Math.round(t.x)}:${Math.round(t.y)}`;
+        const settled = key === previous;
+        previous = key;
+        return settled;
+      },
+      { message: "the canvas transform never settled", intervals: [80] },
+    )
+    .toBe(true);
+}
+
 /**
  * Drag a real connection between two port handles, pointer-event faithful:
  * React Flow starts the drag on pointerdown, resolves the drop target on
@@ -312,6 +351,162 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
     const farAfter = await page.locator("[data-id='far1']").boundingBox();
     expect(farAfter?.width ?? 0).toBeGreaterThan(framedWidth * 0.75);
     expect(farAfter?.width ?? 0).toBeLessThan(framedWidth * 1.25);
+  });
+
+  // Regression [#38 follow-up, round 2]: the "is it visible?" test above only
+  // means anything if it runs against the card's real box. React Flow fills
+  // `measured` from a ResizeObserver, and the browser delivers those callbacks
+  // *after* the frame's requestAnimationFrame callbacks — so on the frame the
+  // decision runs, a card that mounted with this commit has no measurement at
+  // all, every time. Deciding on a rough stand-in size instead (180x64, versus
+  // a real Image card's ~148x162) made a node with its lower half on screen
+  // read as fully off-screen, and the canvas panned away from something the
+  // user could already see — the exact opposite of the rule above.
+  test("an added node that is only partly on screen leaves the viewport alone", async ({
+    page,
+  }) => {
+    const anchor = {
+      id: "anchor",
+      kind: "param" as const,
+      paramKind: "float",
+      value: 0.5,
+    };
+    // Park the viewport's top-left corner at (LEFT_FLOW, TOP_FLOW) by fitting on
+    // a lone anchor node and moving it until the fit lands there. TOP_FLOW cuts
+    // the Image card the pill drops at flow (-200, 200) across its top edge and
+    // nothing else: the real box (~148x163, bottom at y≈363) still shows below
+    // that edge, while the 180x64 stand-in (bottom at y=264) is entirely above
+    // it. LEFT_FLOW only keeps the card clear of the side edges.
+    const LEFT_FLOW = -320;
+    const TOP_FLOW = 310;
+    const anchorAt = { x: 0, y: 0 };
+    await setGraph(
+      page,
+      { nodes: [anchor], edges: [] },
+      { anchor: { ...anchorAt } },
+    );
+    // A closed loop rather than one computed jump: a graph replace also resizes
+    // the dock (the code panel closes with no shader selected) and the first fit
+    // runs before the card has been measured, so where the framing lands is only
+    // knowable afterwards. Each pass reads a *resting* canvas — a fit sampled
+    // mid-animation reports a framing that is merely on the way somewhere else,
+    // and a pass that believed one would leave the whole test misaimed.
+    await expect
+      .poll(
+        async () => {
+          await settledViewport(page);
+          const t = await viewportTransform(page);
+          const dx = LEFT_FLOW - -t.x / t.zoom;
+          const dy = TOP_FLOW - -t.y / t.zoom;
+          const off = Math.max(Math.abs(dx), Math.abs(dy));
+          if (off > 2) {
+            anchorAt.x += dx;
+            anchorAt.y += dy;
+            await setGraph(
+              page,
+              { nodes: [anchor], edges: [] },
+              { anchor: { ...anchorAt } },
+            );
+          }
+          return off;
+        },
+        {
+          message: "the viewport never parked at the intended top-left corner",
+          intervals: [120],
+          timeout: 20_000,
+        },
+      )
+      .toBeLessThan(2);
+    await settledViewport(page);
+    const before = await viewportTransform(page);
+
+    await page
+      .getByTestId("add-node-pill")
+      .getByRole("button", { name: "Image" })
+      .click();
+    const added = page.locator(".react-flow__node[data-id^='image_']");
+    await expect(added).toHaveCount(1);
+    // Longer than the pan animation (MOTION_MAX_MS) plus the frame it is armed
+    // on — a pan, if one were wrongly started, has finished by now.
+    await page.waitForTimeout(500);
+
+    // Preconditions, asserted rather than assumed: were the card fully visible
+    // "don't move" would be trivially true, and were the stand-in box on screen
+    // too this would not be covering the band it exists for. Both come off the
+    // geometry as rendered, against a pane measured after everything settled.
+    const pane = await stableBox(page, ".panel--graph .panel-body");
+    const box = await added.boundingBox();
+    expect(box).not.toBeNull();
+    const cardTop = box?.y ?? 0;
+    expect(cardTop).toBeLessThan(pane.y);
+    expect(cardTop + (box?.height ?? 0)).toBeGreaterThan(pane.y);
+    expect(box?.x ?? 0).toBeLessThan(pane.x + pane.width);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeGreaterThan(pane.x);
+    expect(cardTop + 64 * before.zoom).toBeLessThan(pane.y);
+
+    expect(await viewportTransform(page)).toEqual(before);
+  });
+
+  // Regression [#38 follow-up, round 2]: the pan is armed as a single
+  // requestAnimationFrame, and React runs the effect's cleanup — cancelling
+  // that frame — the moment any later commit changes the node array. The set
+  // difference that spotted the add was consumed by the run that got cancelled,
+  // so a second commit landing inside the same 16ms frame dropped the pan
+  // outright and left the node 6000px off-screen with no feedback at all.
+  test("an add whose frame is cancelled by a later commit still pans into view", async ({
+    page,
+  }) => {
+    await setGraph(
+      page,
+      {
+        nodes: [
+          { id: "far1", kind: "param", paramKind: "float", value: 0.5 },
+          { id: "far2", kind: "param", paramKind: "float", value: 0.25 },
+        ],
+        edges: [],
+      },
+      { far1: { x: 6000, y: 6000 }, far2: { x: 6000, y: 6200 } },
+    );
+    const pane = await stableBox(page, ".panel--graph .panel-body");
+    await expect(page.locator("[data-id='far1']")).toHaveCount(1);
+    await settledViewport(page);
+
+    // The add, then a commit that only *removes* a node — nothing for the next
+    // run's set difference to rediscover. setTimeout rather than a second
+    // synchronous call because React batches one task into one commit, and one
+    // commit is not the case under test.
+    await withSp(
+      page,
+      (sp) => {
+        sp.graph
+          .getState()
+          .addNode(
+            { id: "image_probe", kind: "image", assetId: null },
+            { x: -200, y: 200 },
+          );
+        setTimeout(() => sp.graph.getState().removeNode("far2"), 0);
+      },
+      undefined,
+    );
+    await expect(page.locator("[data-id='far2']")).toHaveCount(0);
+    const added = page.locator(".react-flow__node[data-id='image_probe']");
+    await expect(added).toHaveCount(1);
+
+    await expect
+      .poll(
+        async () => {
+          const box = await added.boundingBox();
+          if (!box) return false;
+          return (
+            box.x < pane.x + pane.width &&
+            box.x + box.width > pane.x &&
+            box.y < pane.y + pane.height &&
+            box.y + box.height > pane.y
+          );
+        },
+        { message: "the added node never entered the viewport" },
+      )
+      .toBe(true);
   });
 
   test("cycle is rejected by validateGraph (would-be edge prevents compile)", async ({

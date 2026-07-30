@@ -138,13 +138,21 @@ export function classifyIdentifier(
  */
 export function classifySemanticTokens(source: string): SemanticToken[] {
   const table = buildSymbolTable(source);
-  const lines = maskComments(source).split(/\r?\n/);
+  // Split on "\n" alone so a CRLF line keeps its trailing `\r` — see the same
+  // split in `references.ts` for the full rationale. In short: the `lineStart`
+  // walk below only accounts for the `\n`, so stripping the `\r` here would
+  // under-advance by one character per preceding line. The only production
+  // caller is `semanticHighlight.ts`, which feeds `view.state.doc.toString()`
+  // and CodeMirror normalises CRLF to LF on doc construction — so this walk is
+  // not reachable with `\r` today. It is kept exact anyway: the defect is the
+  // same one that corrupted CRLF renames, and `main.tsx` exposes `classify`
+  // as a dev hook that takes an arbitrary string.
+  const lines = maskComments(source).split("\n");
 
   const tokens: SemanticToken[] = [];
   // Running absolute offset to the start of the current line. Mirrors CM's
-  // doc.lineAt(...).from semantics — we advance by `line.length + 1` to
-  // account for the stripped `\n`, which matches the original source layout
-  // because stripBlockComments preserves newlines.
+  // doc.lineAt(...).from semantics — every offset stays 1:1 with the original
+  // source because `maskComments` preserves length and line terminators.
   let lineStart = 0;
 
   for (let i = 0; i < lines.length; i++) {
@@ -168,7 +176,8 @@ export function classifySemanticTokens(source: string): SemanticToken[] {
       });
     }
 
-    // +1 for the newline separator that `split(/\r?\n/)` consumed. The last
+    // +1 for the `\n` that `split("\n")` consumed. A CRLF line's `\r` is still
+    // part of `line`, so this stays exact for both line-ending styles. The last
     // line has no trailing newline but we won't iterate again, so harmless.
     lineStart += line.length + 1;
   }

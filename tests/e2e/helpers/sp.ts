@@ -181,7 +181,8 @@ export interface SpStores {
       };
       /** One-shot PNG snapshot request served by the RAF loop (#3). */
       snapshotRequested: boolean;
-      requestSnapshot: () => void;
+      /** Returns false — and arms nothing — when no render loop is running (F1). */
+      requestSnapshot: () => boolean;
     };
   };
   gpuTimer: {

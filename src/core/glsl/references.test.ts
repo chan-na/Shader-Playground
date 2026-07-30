@@ -483,3 +483,110 @@ void main() {
     for (const s of sites) expect(src.slice(s.from, s.to)).toBe("u_amp");
   });
 });
+
+/**
+ * CRLF sources (F3). The reported offsets are absolute document offsets, and
+ * `rename.ts` feeds them straight into `String.prototype.slice` on the paired
+ * stage's source (`applyEdits`) as well as into CodeMirror edit ranges. The
+ * walk used to `split(/\r?\n/)`, which drops each line's `\r` while the
+ * `lineStart` cursor only advances past the `\n` — so every offset after line 1
+ * drifted by one character per preceding line and a cross-stage rename rewrote
+ * the wrong characters.
+ *
+ * This is reachable: CodeMirror normalises CRLF to LF for the *edited* document,
+ * but `rename.ts`'s `otherStageSource` is read straight out of `graphStore`, and
+ * `deserializeProject` → `safeShaderSource` passes shader sources through
+ * verbatim. A project JSON authored with CRLF therefore lands in the store with
+ * `\r\n` intact.
+ *
+ * Every assertion here slices the source with the returned offsets: that is the
+ * property `rename.ts` actually depends on, and the only one that catches a
+ * drift of exactly one character.
+ */
+describe("CRLF sources (F3)", () => {
+  const LF = `uniform float u_amp;
+float scale(float x) { return x * u_amp; }
+void main() { gl_FragColor = vec4(u_amp); }
+`;
+  const CRLF = LF.replace(/\n/g, "\r\n");
+
+  function slices(src: string, sites: Array<{ from: number; to: number }>) {
+    return sites.map((s) => src.slice(s.from, s.to));
+  }
+
+  it("every offset still slices to the identifier", () => {
+    const sites = findReferences(CRLF, "u_amp", 1);
+    expect(sites).toHaveLength(3);
+    expect(slices(CRLF, sites)).toEqual(["u_amp", "u_amp", "u_amp"]);
+  });
+
+  it("reports the same lines, columns and definition flag as the LF source", () => {
+    const lf = findReferences(LF, "u_amp", 1);
+    const crlf = findReferences(CRLF, "u_amp", 1);
+    expect(crlf.map((s) => [s.line, s.column, s.isDefinition])).toEqual(
+      lf.map((s) => [s.line, s.column, s.isDefinition]),
+    );
+  });
+
+  it("handles endings mixed within one document (hand-edited JSON)", () => {
+    const mixed = `uniform float u_amp;\r
+void main() {
+  float a = u_amp;\r
+  float b = u_amp;
+}
+`;
+    const sites = findReferences(mixed, "u_amp", 1);
+    expect(sites).toHaveLength(3);
+    expect(slices(mixed, sites)).toEqual(["u_amp", "u_amp", "u_amp"]);
+  });
+
+  it("still excludes struct member names — the drift resurrected them", () => {
+    // `structMemberNameOffsets` works on absolute offsets of the masked source,
+    // so it was always CRLF-correct. The drifted `from` simply stopped matching
+    // it, which re-admitted the member declarator as a rename site: renaming
+    // then edited *inside* the struct body while leaving every `.color` access
+    // untouched — the exact broken-shader failure the exclusion exists to stop.
+    const src = `struct Light {
+  vec3 color;
+};
+uniform vec3 color;
+uniform Light u_light;
+void main() {
+  gl_FragColor = vec4(color * u_light.color, 1.0);
+}
+`.replace(/\n/g, "\r\n");
+    const sites = findReferences(src, "color", 4);
+    expect(sites.map((s) => s.line)).toEqual([4, 7]);
+    expect(slices(src, sites)).toEqual(["color", "color"]);
+  });
+
+  it("keeps comment masking aligned under CRLF", () => {
+    const src = `uniform float u_amp;
+/* u_amp in a block comment */
+void main() {
+  float a = u_amp; // u_amp again
+}
+`.replace(/\n/g, "\r\n");
+    const sites = findReferences(src, "u_amp", 1);
+    expect(sites.map((s) => s.line)).toEqual([1, 4]);
+    expect(slices(src, sites)).toEqual(["u_amp", "u_amp"]);
+  });
+
+  it("cross-stage: the other stage's offsets slice its own CRLF source", () => {
+    // The damaging shape: the edited stage comes from CodeMirror (already LF),
+    // the paired stage comes raw from the store and can still be CRLF.
+    const vertex = `uniform float u_amp;
+out float v_a;
+void main() { v_a = u_amp; gl_Position = vec4(u_amp); }
+`.replace(/\n/g, "\r\n");
+    const sites = findReferencesAcrossStages(
+      { vertex, fragment: LF },
+      "u_amp",
+      "fragment",
+      1,
+    );
+    const other = sites.filter((s) => s.stage === "vertex");
+    expect(other).toHaveLength(3);
+    expect(slices(vertex, other)).toEqual(["u_amp", "u_amp", "u_amp"]);
+  });
+});

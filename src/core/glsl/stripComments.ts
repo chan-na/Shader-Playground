@@ -106,8 +106,12 @@ function scan(
     if (next === 47 /* "/" */) {
       const nl = source.indexOf("\n", i + 2);
       let stop = nl < 0 ? n : nl;
-      // Keep a CRLF's `\r` out of the masked run so line lengths measured by
-      // `split(/\r?\n/)` stay consistent with the unmasked source.
+      // Stop the masked run before a CRLF's `\r` so `stop` lands on a true line
+      // boundary. `blank()` already leaves `\r` alone, so the returned string is
+      // identical either way — this only keeps the scanner's own `i`/`plainStart`
+      // bookkeeping pointing at the start of the terminator rather than inside
+      // it. (Offset consumers no longer depend on it: `references.ts` and
+      // `semanticTokens.ts` split on "\n" and keep the `\r` in the line.)
       if (stop > i && source.charCodeAt(stop - 1) === 13 /* "\r" */) stop -= 1;
       if (maskLine) {
         out += source.slice(plainStart, i) + blank(source.slice(i, stop));

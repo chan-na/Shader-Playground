@@ -400,3 +400,97 @@ void main() {
     view.destroy();
   });
 });
+
+/**
+ * CRLF in the paired stage (F3) — the *call site*, not the helper.
+ *
+ * `findReferencesOf`'s offsets are exercised by `references.test.ts`, but the
+ * damage happened here: `resolveCrossStageContext` reads `otherStageSource`
+ * straight out of `graphStore`, which `deserializeProject` fills verbatim, so
+ * it can hold `\r\n` while the edited document — created by CodeMirror, which
+ * normalises line endings — cannot. `applyEdits` then slices that raw string
+ * with the reported offsets and the result is committed through
+ * `applyBothStages`. A one-character-per-line drift therefore wrote mangled
+ * GLSL into the store and into graph history.
+ */
+describe("runRename — CRLF in the other stage (F3)", () => {
+  const VERT_CRLF = `#version 300 es
+in vec4 a_position;
+uniform float u_amount;
+out vec2 v_uv;
+
+void main() {
+  v_uv = a_position.xy * u_amount;
+  gl_Position = a_position;
+}
+`.replace(/\n/g, "\r\n");
+
+  // Origin stage as CodeMirror hands it over: already LF-normalised.
+  const FRAG_LF = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform float u_amount;
+out vec4 outColor;
+
+void main() {
+  outColor = vec4(v_uv * u_amount, 0.0, 1.0);
+}
+`;
+
+  it("rewrites the CRLF stage at the right offsets and keeps its line endings", () => {
+    const view = viewOf(FRAG_LF, FRAG_LF.indexOf("u_amount") + 1);
+    const captured: { other: string | null } = { other: null };
+    const ctx: CrossStageRenameContext = {
+      originStage: "fragment",
+      otherStageSource: VERT_CRLF,
+      applyBothStages(_newOrigin, newOther) {
+        captured.other = newOther;
+      },
+    };
+
+    const result = runRename(view, () => "u_strength", ctx);
+    expect(result.applied).toBe(true);
+    if (result.applied) expect(result.otherStageSites).toBe(2);
+
+    const other = captured.other;
+    expect(other).not.toBeNull();
+    // The whole point: the rewritten source must be exactly the original with
+    // both `u_amount` occurrences replaced — no characters eaten anywhere else.
+    expect(other).toBe(VERT_CRLF.replace(/u_amount/g, "u_strength"));
+    // Which implies all of the following, spelled out because each one was a
+    // distinct symptom of the drift.
+    expect(other).not.toContain("u_amount");
+    expect(other?.match(/u_strength/g)).toHaveLength(2);
+    expect(other).toContain("gl_Position = a_position;");
+    expect(other?.match(/\r\n/g)).toHaveLength(9);
+
+    view.destroy();
+  });
+
+  it("still parses as the same shader when both stages are CRLF", () => {
+    // Both sides CRLF in the store; CodeMirror normalises only the doc it holds,
+    // so the origin stage arrives LF while the pair stays CRLF. The commit must
+    // not depend on the two agreeing.
+    const fragCrlf = FRAG_LF.replace(/\n/g, "\r\n");
+    const view = viewOf(FRAG_LF, FRAG_LF.indexOf("u_amount") + 1);
+    const captured: { origin: string | null; other: string | null } = {
+      origin: null,
+      other: null,
+    };
+    const ctx: CrossStageRenameContext = {
+      originStage: "fragment",
+      otherStageSource: fragCrlf,
+      applyBothStages(newOrigin, newOther) {
+        captured.origin = newOrigin;
+        captured.other = newOther;
+      },
+    };
+
+    expect(runRename(view, () => "u_gain", ctx).applied).toBe(true);
+    expect(captured.other).toBe(fragCrlf.replace(/u_amount/g, "u_gain"));
+    // The origin commit follows CodeMirror's document, so it is LF — a known,
+    // accepted asymmetry (the store can end up with per-stage line endings).
+    expect(captured.origin).toBe(FRAG_LF.replace(/u_amount/g, "u_gain"));
+    view.destroy();
+  });
+});

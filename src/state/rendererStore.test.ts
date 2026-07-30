@@ -128,14 +128,24 @@ describe("rendererStore", () => {
   // Snapshot request (#3). The Viewport RAF loop reads `snapshotRequested` to
   // force one draw past the idle gate, then consumes the flag right after
   // executePlan. Both halves depend on the one-shot semantics below.
+  //
+  // `ready` is the "is that loop alive?" signal — written only by the Viewport
+  // effect (true after createGLContext succeeds, false in its cleanup), so these
+  // tests arm it explicitly to stand in for a mounted Viewport. The
+  // module-level beforeEach leaves it false on purpose: that is the
+  // panel-closed state, which F1's guard has to refuse.
   describe("snapshot request", () => {
+    beforeEach(() => {
+      useRendererStore.getState().setReady(true);
+    });
+
     it("starts with no pending request and consume returns false", () => {
       expect(useRendererStore.getState().snapshotRequested).toBe(false);
       expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(false);
     });
 
     it("requestSnapshot arms the flag for the idle gate to observe", () => {
-      useRendererStore.getState().requestSnapshot();
+      expect(useRendererStore.getState().requestSnapshot()).toBe(true);
       expect(useRendererStore.getState().snapshotRequested).toBe(true);
     });
 
@@ -148,9 +158,9 @@ describe("rendererStore", () => {
 
     it("repeated requests before a consume still yield a single capture", () => {
       const store = useRendererStore.getState();
-      store.requestSnapshot();
-      store.requestSnapshot();
-      store.requestSnapshot();
+      expect(store.requestSnapshot()).toBe(true);
+      expect(store.requestSnapshot()).toBe(true);
+      expect(store.requestSnapshot()).toBe(true);
       expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(true);
       expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(false);
     });
@@ -168,6 +178,52 @@ describe("rendererStore", () => {
       const before = useRendererStore.getState();
       useRendererStore.getState().requestSnapshot();
       expect(useRendererStore.getState()).toBe(before);
+    });
+
+    // F1. `snapshotRequested` must never survive a Viewport lifetime boundary:
+    // the flag has exactly one server, so a request that outlives the loop that
+    // was meant to serve it fires on the *next* mount — an unrequested PNG
+    // download. Two windows let that happen, and both are closed here.
+    describe("must not outlive the Viewport that would serve it (F1)", () => {
+      it("refuses to arm while no render loop is running", () => {
+        useRendererStore.getState().setReady(false);
+        expect(useRendererStore.getState().requestSnapshot()).toBe(false);
+        expect(useRendererStore.getState().snapshotRequested).toBe(false);
+      });
+
+      it("a refused request keeps the same state reference", () => {
+        useRendererStore.getState().setReady(false);
+        const before = useRendererStore.getState();
+        useRendererStore.getState().requestSnapshot();
+        expect(useRendererStore.getState()).toBe(before);
+      });
+
+      // W2 — the reported bug: File ▸ Snap PNG pressed with the Viewport panel
+      // closed. Remounting the panel must not download anything.
+      it("armed while unmounted → nothing pending for the next mount", () => {
+        useRendererStore.getState().setReady(false); // panel closed
+        useRendererStore.getState().requestSnapshot(); // user clicks Snap PNG
+        useRendererStore.getState().setReady(true); // panel reopened
+        expect(useRendererStore.getState().snapshotRequested).toBe(false);
+        expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(
+          false,
+        );
+      });
+
+      // W1 — armed while mounted, then torn down before the next RAF tick could
+      // serve it. The effect cleanup consumes the request (see Viewport's
+      // cleanup); this pins the store half of that contract.
+      it("armed then torn down → the cleanup's consume leaves nothing pending", () => {
+        expect(useRendererStore.getState().requestSnapshot()).toBe(true);
+        // Viewport cleanup: consume the orphaned request, then drop `ready`.
+        expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(true);
+        useRendererStore.getState().setReady(false);
+        useRendererStore.getState().setReady(true); // next mount
+        expect(useRendererStore.getState().snapshotRequested).toBe(false);
+        expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(
+          false,
+        );
+      });
     });
   });
 });

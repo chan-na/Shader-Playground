@@ -308,3 +308,34 @@ void main() {
     for (const t of hits) expect(src.slice(t.from, t.to)).toBe("u_time");
   });
 });
+
+// CRLF sources (F3). The line walk here shares its offset arithmetic with
+// `references.ts`, where a `\r` stripped by `split(/\r?\n/)` made every offset
+// after line 1 drift by one character per preceding line. The only production
+// caller feeds `view.state.doc.toString()`, which CodeMirror has already
+// normalised to LF, so this path is not reachable with `\r` today — but the
+// arithmetic is pinned anyway: the defect is identical, `main.tsx` exposes
+// `classify` as a dev hook taking an arbitrary string, and a mis-offset token
+// paints the wrong span of text.
+describe("CRLF sources (F3)", () => {
+  const LF = `uniform float u_amp;
+float scale(float x) { return x * u_amp; }
+void main() { gl_FragColor = vec4(u_amp); }
+`;
+
+  it("token offsets slice to the identifier under CRLF", () => {
+    const src = LF.replace(/\n/g, "\r\n");
+    const hits = classifySemanticTokens(src).filter(
+      (t) => t.kind === "uniform",
+    );
+    expect(hits).toHaveLength(3);
+    for (const t of hits) expect(src.slice(t.from, t.to)).toBe("u_amp");
+  });
+
+  it("emits the same token stream shape as the LF source", () => {
+    const crlf = LF.replace(/\n/g, "\r\n");
+    const lfKinds = classifySemanticTokens(LF).map((t) => t.kind);
+    const crlfKinds = classifySemanticTokens(crlf).map((t) => t.kind);
+    expect(crlfKinds).toEqual(lfKinds);
+  });
+});

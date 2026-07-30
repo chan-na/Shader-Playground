@@ -118,7 +118,18 @@ export function findReferencesOf(
   target: GlslSymbol,
 ): ReferenceSite[] {
   const masked = maskComments(source);
-  const lines = masked.split(/\r?\n/);
+  // Split on "\n" alone so a CRLF document keeps each line's trailing `\r`.
+  // The `lineStart` walk below advances by `line.length + 1`, i.e. it accounts
+  // for the `\n` only; `split(/\r?\n/)` stripped the `\r` and so under-advanced
+  // by one character per preceding line. These offsets become raw string slices
+  // and CodeMirror edit ranges in `rename.ts`, so on a CRLF source the drift
+  // rewrote the wrong characters. Line *numbering* is identical either way
+  // (same piece count, same 1-based indices), so it still agrees with
+  // `symbolTable.ts`'s own `/\r?\n/` walk — that module derives line/column
+  // only and does no offset arithmetic. `\r` is not an identifier character and
+  // sits after every identifier on its line, so keeping it cannot affect
+  // `IDENT_RE`, `column`, or `precededByDot`.
+  const lines = masked.split("\n");
   // Struct member *names* share the global namespace's spelling but not its
   // binding (L5) — see `structMemberNameOffsets`. Member types and array sizes
   // are deliberately NOT excluded: they are real uses of real globals.
@@ -156,6 +167,8 @@ export function findReferencesOf(
       });
     }
 
+    // +1 for the `\n` that `split("\n")` consumed. A CRLF line's `\r` is still
+    // part of `line`, so this stays exact for both line-ending styles.
     lineStart += line.length + 1;
   }
 

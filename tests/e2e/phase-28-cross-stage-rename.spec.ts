@@ -469,4 +469,94 @@ void main() {
       .poll(() => readSp(page, (sp) => sp.codeEditor.getCursorLine()))
       .toBe(cursorBefore);
   });
+  // F3 — CRLF in the paired stage. The reference finder reports absolute
+  // document offsets and `rename.ts` slices the OTHER stage's source with them
+  // directly (`applyEdits`), but that source comes raw out of graphStore, not
+  // out of CodeMirror: `deserializeProject` passes shader sources through
+  // verbatim, so a project authored on Windows lands in the store with `\r\n`.
+  // The line walk used to drop each line's `\r` while only advancing past the
+  // `\n`, so every offset after line 1 drifted by one character per preceding
+  // line and the rename rewrote the wrong characters — mangled GLSL, committed
+  // to graph history. Unit tests pin the arithmetic and `runRename`; this pins
+  // the production wiring that feeds it (`resolveCrossStageContext` reading the
+  // store, CodeMirror normalising only the document it holds).
+  test("renaming into a CRLF paired stage rewrites the right offsets", async ({
+    page,
+  }) => {
+    const vertCrlf = VERT.replace(/\n/g, "\r\n");
+
+    await page.evaluate(
+      async ({ v, f }) => {
+        const sp = window.__sp;
+        if (!sp) throw new Error("__sp not exposed");
+        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
+        if (!node) throw new Error("no shader node");
+        sp.selection.getState().select(node.id);
+        sp.graph
+          .getState()
+          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
+      },
+      { v: vertCrlf, f: FRAG },
+    );
+
+    // The store really is holding CRLF — nothing on the way in normalised it,
+    // and the fragment-only editor never rewrites the vertex stage.
+    expect(
+      await readSp(page, (sp) => {
+        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
+        const n = (node ?? {}) as { vertexSource?: string };
+        return n.vertexSource?.includes("\r\n") ?? false;
+      }),
+    ).toBe(true);
+
+    // A CRLF vertex source must still compile, or the rename below would be
+    // renaming a shader that never linked.
+    await expect
+      .poll(() =>
+        readSp(page, (sp) => sp.renderer.getState().stats.errors.length),
+      )
+      .toBe(0);
+
+    await page.getByTestId("stage-tab-fragment").click();
+    const content = page.locator(".cm-content").first();
+    await expect
+      .poll(async () => (await content.textContent())?.includes("u_amount"))
+      .toBe(true);
+
+    await content.getByText("u_amount", { exact: true }).last().click();
+    page.once("dialog", (d) => {
+      void d.accept("u_strength");
+    });
+    await page.keyboard.press("F2");
+
+    await expect
+      .poll(async () =>
+        readSp(page, (sp) => {
+          const node = sp.graph
+            .getState()
+            .nodes.find((n) => n.kind === "shader");
+          const n = (node ?? {}) as { vertexSource?: string };
+          return n.vertexSource?.includes("u_strength") ?? false;
+        }),
+      )
+      .toBe(true);
+
+    // The vertex stage must be EXACTLY the original with both `u_amount`
+    // occurrences swapped: same CRLF terminators, nothing else touched. On the
+    // unfixed build the two edits landed one and two characters late, eating
+    // parts of `a_position.xy` and `vec4(a_position`.
+    const vertexAfter = await readSp(page, (sp) => {
+      const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
+      const n = (node ?? {}) as { vertexSource?: string };
+      return n.vertexSource ?? "";
+    });
+    expect(vertexAfter).toBe(vertCrlf.replace(/u_amount/g, "u_strength"));
+
+    // …and the rewritten program still compiles.
+    await expect
+      .poll(() =>
+        readSp(page, (sp) => sp.renderer.getState().stats.errors.length),
+      )
+      .toBe(0);
+  });
 });

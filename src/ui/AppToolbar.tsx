@@ -168,9 +168,17 @@ export function AppToolbar() {
    * the draw, because the GL context uses `preserveDrawingBuffer: false`. The
    * request also wakes the loop for one frame, so a paused static graph still
    * produces a file. (#3)
+   *
+   * The request is refused outright when no render loop is running — with the
+   * Viewport panel closed there is nothing to serve it, and the old code left
+   * the flag armed so reopening the panel downloaded a PNG nobody asked for.
+   * Report the refusal instead of dropping it silently. (F1)
    */
   const screenshot = () => {
-    useRendererStore.getState().requestSnapshot();
+    if (useRendererStore.getState().requestSnapshot()) return;
+    toast.error(
+      "Viewport가 렌더링 중이 아니어서 스냅샷을 저장하지 못했습니다 — Viewport 패널을 열어 주세요.",
+    );
   };
 
   const recorderStatus = useRecorderStore((r) => r.status);

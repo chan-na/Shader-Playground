@@ -608,6 +608,22 @@ export function Viewport() {
     return () => {
       alive = false;
       cancelAnimationFrame(rafId);
+      // A pending snapshot has exactly one server — this loop. Leaving the flag
+      // armed would fire it on the first frame after the *next* mount, so a
+      // reopened (or merely re-docked) Viewport downloads a PNG nobody asked
+      // for. Same hazard the context-loss path above already handles, same
+      // treatment: drop it and say so. (F1)
+      //
+      // The window is at most one frame wide — `snapshotPending` forces the idle
+      // gate open, so the tick that follows a request always consumes it — and
+      // the teardown is not necessarily a panel close: removing *any* leaf, a
+      // tab drag, or `addPanel` reshapes the tree enough for React to remount
+      // this subtree. Hence the deliberately cause-neutral wording.
+      if (useRendererStore.getState().consumeSnapshotRequest()) {
+        toast.error(
+          "Viewport 렌더 루프가 중단되어 스냅샷을 저장하지 못했습니다.",
+        );
+      }
       canvas.removeEventListener(
         "webglcontextlost",
         onContextLost as EventListener,

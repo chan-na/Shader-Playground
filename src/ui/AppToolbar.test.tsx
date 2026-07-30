@@ -6,6 +6,8 @@ import { collectPanelIds } from "../state/dockTree";
 import { useGifRecorderStore } from "../state/gifRecorder";
 import { useGraphStore } from "../state/graphStore";
 import { useHistoryStore } from "../state/historyStore";
+import { useRendererStore } from "../state/rendererStore";
+import { useToastStore } from "../state/toastStore";
 import { AppToolbar } from "./AppToolbar";
 
 beforeEach(() => {
@@ -16,6 +18,10 @@ beforeEach(() => {
   useHistoryStore.getState().clear();
   useCommandPaletteStore.getState().setOpen(false);
   useDockStore.getState().resetLayout();
+  // The Snap PNG tests below assert on both of these, and neither store is
+  // reset by the others' helpers.
+  useRendererStore.setState({ ready: false, snapshotRequested: false });
+  useToastStore.getState().clear();
 });
 
 afterEach(() => {
@@ -133,6 +139,40 @@ describe("AppToolbar", () => {
       createSpy.mockRestore();
     },
   );
+});
+
+// F1 — the call site, not just the store. `Viewport/index.tsx` has 0% line
+// coverage, so nothing else in `npm run check` observes how the toolbar reacts
+// to a refused snapshot request. These drive the real menu item.
+describe("AppToolbar — Snap PNG guard (F1)", () => {
+  const clickSnapPng = () => {
+    render(<AppToolbar />);
+    fireEvent.click(screen.getByRole("button", { name: "File" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Save viewport as PNG" }),
+    );
+  };
+
+  it("arms the request and stays quiet while a render loop is running", () => {
+    useRendererStore.getState().setReady(true);
+    clickSnapPng();
+
+    expect(useRendererStore.getState().snapshotRequested).toBe(true);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  it("with the Viewport unmounted: reports the refusal and arms nothing", () => {
+    // `ready === false` is the panel-closed state — there is no RAF loop to read
+    // the drawing buffer. Arming the flag anyway is what made a later remount
+    // download an unrequested PNG.
+    clickSnapPng();
+
+    expect(useRendererStore.getState().snapshotRequested).toBe(false);
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.kind).toBe("error");
+    expect(toasts[0]?.message).toContain("Viewport");
+  });
 });
 
 describe("AppToolbar — ＋ Panel / Reset layout (B6-U2)", () => {

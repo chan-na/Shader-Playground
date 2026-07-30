@@ -77,9 +77,24 @@ export interface RendererState {
    *  optimistically clear the blocking screen (the effect re-sets it to
    *  true again if createGLContext still fails). */
   retryGlContext: () => void;
-  /** Ask the render loop to save the next drawn frame as a PNG. Idempotent
-   *  while a request is already pending — repeated clicks yield one file. */
-  requestSnapshot: () => void;
+  /**
+   * Ask the render loop to save the next drawn frame as a PNG. Idempotent while
+   * a request is already pending — repeated clicks yield one file.
+   *
+   * Returns whether the request was accepted. It is **refused** when `ready` is
+   * false, because this flag has exactly one server (the Viewport RAF loop) and
+   * arming it with no loop running would leave it set until the *next* Viewport
+   * mount, which then downloads a PNG nobody asked for. Callers should surface
+   * the refusal; silently dropping it is what the flag's one-shot contract is
+   * there to prevent. (F1)
+   *
+   * ⚠ `ready` only means "the loop is alive", not "the canvas is visible". A
+   * Viewport inside a collapsed rail or behind a maximised sibling is
+   * `display:none` with `ready === true`, and the capture then reads a clamped
+   * 1×1 buffer. That is a separate gap (§4 F21), deliberately not papered over
+   * here.
+   */
+  requestSnapshot: () => boolean;
   /**
    * Read-and-clear the pending snapshot request. Returns `true` exactly once
    * per {@link requestSnapshot}, so the frame loop can branch on it directly
@@ -142,8 +157,12 @@ export const useRendererStore = create<RendererState>((set, get) => ({
   retryGlContext: () =>
     set((s) => ({ glRetryTick: s.glRetryTick + 1, contextUnavailable: false })),
   requestSnapshot: () => {
-    if (get().snapshotRequested) return;
+    // No render loop, no server: refuse rather than arm a flag that would fire
+    // on the first frame after the next Viewport mount. See the interface doc.
+    if (!get().ready) return false;
+    if (get().snapshotRequested) return true;
     set({ snapshotRequested: true });
+    return true;
   },
   consumeSnapshotRequest: () => {
     if (!get().snapshotRequested) return false;

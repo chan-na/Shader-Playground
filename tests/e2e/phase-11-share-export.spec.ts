@@ -133,6 +133,75 @@ test.describe("Phase 11 — share URL & HTML export", () => {
     expect(pending).toBe(false);
   });
 
+  // F1 — the snapshot request must not survive the Viewport that would serve
+  // it. `snapshotRequested` has exactly one reader (the RAF loop above), so a
+  // request armed while the Viewport panel is closed used to sit there until
+  // the panel was reopened, at which point the first frame downloaded a PNG
+  // nobody had asked for. `src/ui/Viewport/index.tsx` has 0% line coverage, so
+  // only an end-to-end run observes the real wiring: a closed panel means an
+  // unmounted component, `setReady(false)`, and a refused request.
+  test("Snap PNG with the Viewport panel closed is refused, and reopening downloads nothing", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await bootApp(page);
+    await setGraph(page, trivialMeshGraph(), {});
+    await expectCanvasRendered(page.getByTestId("viewport-canvas"));
+
+    // Any download from here on is a failure — register before the first click
+    // so nothing can slip through between steps.
+    const downloads: string[] = [];
+    page.on("download", (d) => {
+      downloads.push(d.suggestedFilename());
+    });
+
+    // Close the Viewport tab. The panel leaves the dock tree entirely, so
+    // DockLayout stops rendering <Viewport /> and its effect cleanup runs.
+    await page.getByTestId("tab-viewport").locator(".panel-tab-close").click();
+    await expect(page.getByTestId("viewport-canvas")).toHaveCount(0);
+    await expect
+      .poll(() => readSp(page, (sp) => sp.renderer.getState().ready), {
+        message: "renderer never reported the loop as stopped",
+      })
+      .toBe(false);
+
+    await page.getByRole("button", { name: "File" }).click();
+    await page.getByRole("menuitem", { name: "Save viewport as PNG" }).click();
+
+    // Refused, and the refusal is reported rather than dropped silently.
+    await expect(page.getByTestId("toast")).toHaveCount(1);
+    expect(
+      await readSp(page, (sp) => sp.renderer.getState().snapshotRequested),
+    ).toBe(false);
+
+    // Reopen the panel and let the restored loop draw for a while. On the
+    // unfixed build the armed flag is consumed by the first tick here and a
+    // PNG lands; the renderTick wait guarantees we are well past that frame,
+    // and the negative waitForEvent gives the async canvas.toBlob →
+    // anchor.click() path (see downloadCanvasPng) time to surface a download.
+    await page.getByTestId("dock-add-panel").click();
+    await page.getByTestId("dock-add-panel-viewport").click();
+    await expect
+      .poll(() => readSp(page, (sp) => sp.renderer.getState().ready), {
+        message: "renderer never came back up after re-docking",
+      })
+      .toBe(true);
+    await expect
+      .poll(
+        () => readSp(page, (sp) => sp.renderer.getState().stats.renderTick),
+        { message: "the re-docked Viewport never rendered a frame" },
+      )
+      .toBeGreaterThan(30);
+    await expect(
+      page.waitForEvent("download", { timeout: 5_000 }),
+    ).rejects.toThrow();
+
+    expect(downloads).toEqual([]);
+    expect(
+      await readSp(page, (sp) => sp.renderer.getState().snapshotRequested),
+    ).toBe(false);
+  });
+
   test("exported HTML loaded in iframe renders pixels", async ({ page }) => {
     await page.goto("/");
     await bootApp(page);

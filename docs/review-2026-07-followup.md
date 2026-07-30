@@ -36,6 +36,7 @@
 - **D4. 전역 Space 단축키의 범위가 좁아졌다.** `button, a[href], summary, [role=button|menuitem|tab]`에 포커스가 있으면 재생 토글 대신 그 요소가 활성화된다. 캔버스/body에서는 종전대로 재생 토글. HelpModal / SPEC.md / Architecture.md 카피도 함께 갱신됨.
 - **D5. 실패한 컴파일은 더 이상 매 프레임 재시도되지 않는다.** `recompile()`의 catch가 `emptyPlan`으로 교체하므로, 리사이즈가 유발한 실패의 프레임당 재시도 루프가 사라진다. 대신 다음 `rev`/리사이즈까지 대기한다 — 일시적 실패의 자가 회복이 없어지는 대신, dispose된 플랜을 계속 실행하며 GPU 리소스를 누수하던 동작이 사라졌다.
 - **D6. cross-stage rename은 에디터에 포커스가 있는 동안 Cmd+Z로 되돌릴 수 없다.** 두 스테이지를 한 번에 고치는 rename의 CM 트랜잭션에 `addToHistory.of(false)`가 붙는다(반쪽만 되돌아가 varying이 어긋나는 것을 막기 위함). `KeyboardShortcuts`가 `.cm-editor` 안을 편집 타깃으로 보므로 그래프 undo로도 흐르지 않는다. **에디터 밖에 포커스를 두고 Cmd+Z를 누르면 그래프 히스토리에서 원자적으로 되돌아간다.**
+- **D7. Viewport 패널이 닫혀 있으면 File ▸ Snap PNG가 거절되고 그 사실을 토스트로 알린다** (F1 해소). `snapshotRequested`의 서버는 Viewport RAF 루프 **하나뿐**인데, 종전에는 서버 없이도 플래그가 켜져 **다음 Viewport 마운트 첫 프레임이 요청하지 않은 PNG를 내려받았다**. 창이 둘이라 처방도 둘이다: ① `requestSnapshot()`이 `ready === false`면 무장을 거부하고 `false`를 반환(불변식을 스토어에 둬서 호출부가 늘어도 안전) → 툴바가 토스트로 보고, ② 효과 cleanup이 남은 요청을 소비 + 토스트(컨텍스트 손실 경로 `:344`와 같은 처방). ②의 창은 최대 1프레임이고(`snapshotPending`이 idle 게이트를 열므로 다음 틱이 반드시 소비한다), **teardown이 곧 패널 닫기는 아니다** — 임의 leaf 제거·탭 드래그·`addPanel`도 트리를 재구성해 이 서브트리를 리마운트한다. 그래서 ②의 문구는 의도적으로 **원인 중립**이다. 가드: `rendererStore.test`(원샷 + 두 창), `AppToolbar.test`(호출부), `phase-11` additive E2E(닫기→거절→재개봉→다운로드 0건).
 
 ---
 
@@ -46,6 +47,7 @@
 - **L3. 줄바꿈으로 분리된 멤버 접근(`light\n  .color`)은 dot 가드가 감지하지 못한다.** 가드는 현재 라인 안만 뒤로 훑는다.
 - **L4. `pendingAddedIds`의 "교체" 의미론은 현재 추가 경로 좌표에 기댄다.** 접힌 패널에서 두 노드를 추가하면 최신 것만 프레이밍하는데, 앱의 모든 추가 경로가 원점 근처 고정 좌표라 최신 것을 프레이밍하면 이전 것도 함께 들어온다(실측). **좌표가 멀리 떨어질 수 있는 추가 경로(커서 위치 붙여넣기, 스크립트/플러그인 추가)를 만들면 이 전제가 깨진다** — 함수 docstring에 조치 지침이 있다.
 - **L5. compute 노드에서 stage 탭을 눌러도 CM undo 히스토리가 초기화된다.** 문서 내용은 그대로인데 key가 바뀌어 `setState`가 도는 경우다. 회귀는 아니지만 미문서화된 상태 손실이라 F12에 후속으로 올려둠.
+- **L6. 단독 `\r`(구 Mac) 개행은 심볼 테이블이 한 줄로 본다.** CodeMirror의 `DefaultSplit`(`/\r\n?|\n/`)은 단독 `\r`를 개행으로 취급하지만 `symbolTable.ts`/`references.ts`의 라인 walk는 그렇지 않다(둘 다 `\n`만 기준). 실측: `"a\rb\rc"`는 CM에서 3줄, `buildSymbolTable`에서는 1줄이 되어 선언 4건 중 1건만 수집된다. F3 수정은 이 동작을 **바꾸지 않는다**(offset 자체는 정확히 유지되므로 소스가 깨지지는 않고, 대신 rename이 조용히 부분 적용된다). CRLF·LF는 이제 정확하므로 실사용 도달 가능성이 매우 낮아 수용한다.
 
 ---
 
@@ -57,9 +59,9 @@
 
 | # | 내용 | 위치 |
 |---|---|---|
-| **F1** | Viewport가 마운트되지 않은 상태에서 스냅샷을 요청하면 플래그만 켜진 채 남아, **다음 Viewport 마운트 때 예고 없이 PNG가 다운로드**된다. 컨텍스트 손실 경로에는 드롭+토스트를 넣었지만 언마운트 경로가 빠졌다. 효과 cleanup에서 요청을 소비/해제하면 된다. | `src/ui/Viewport/index.tsx` |
+| ~~**F1**~~ | ✅ **해소** — 아래 §2 D7 참조. | `rendererStore.ts` / `AppToolbar.tsx` / `Viewport/index.tsx` |
 | **F2** | 원 상태로 무장했던 그룹으로 **되돌아가면 삭제 확인 블록이 다시 무장된 채 표시**된다. 다른 그룹으로 새는 문제는 고쳤지만 원 그룹 복귀는 남았다. `node.id` 변경 시 `confirmingId`를 비우면 닫힌다. | `src/ui/Panels/GroupInspector.tsx` |
-| **F3** | `findReferences`가 **CRLF 소스에서 라인당 1씩 offset이 어긋난다.** 이번 라운드가 만든 것이 아니라 선행 결함으로, B4 검증 중 발견됐다. rename 편집 범위가 그 offset을 쓰므로 CRLF 파일에서는 rename이 어긋난다. | `src/core/glsl/references.ts` |
+| ~~**F3**~~ | ✅ **해소** — 도달 가능으로 실증됐고 offset 산술을 고쳤다. 아래 §3 L6·§4 F22 참조. | `references.ts` / `semanticTokens.ts` |
 | **F4** | 접힌 조상 아래의 보이지 않는 그룹이 여전히 유효한 드롭 타깃이다(`groupBoxes`에 `hasCollapsedAncestor` 필터 없음). | `src/ui/NodeEditor/index.tsx` |
 | **F5** | 출력 4개 초과 그래프의 **저작·임포트 구멍**이 남아 있다 — `cloneNode`가 MAX_OUTPUTS를 강제하지 않고, `deserializeProject`는 경고만 한다. standalone 플레이어 쪽 클램프만 이번에 넣었다. | `graphStore.ts` / `serialization.ts` |
 | **F6** | GIF 레코더에 `visibilitychange` 처리가 없다. 프레임 지연 상한 클램프만 넣었으므로, 탭을 백그라운드로 두고 녹화하면 여전히 짧고 시간이 왜곡된 클립이 나온다. | `src/state/gifRecorder.ts` |
@@ -81,12 +83,22 @@
 | # | 내용 |
 |---|---|
 | **F14** | `FrameContext.mouse` jsdoc이 `#19` 이후 사실과 다르다 — 이제 ctx로 들어오는 값은 캔버스(플랜) 프레임버퍼 공간이고, 패스 공간 변환은 `bindSystemUniforms`가 축별로 한다. |
-| **F15** | `semanticTokens.ts`에 삭제된 `stripBlockComments`를 가리키는 죽은 참조 주석이 남았다(1줄). |
+| ~~**F15**~~ | ✅ **해소** — F3가 고친 `lineStart` 근거 주석이 바로 그 줄이라 재작성하며 함께 사라졌다. |
 | **F16** | `Architecture.md`의 `u_frame` (float) 서술이 int 선언도 합법이 된 새 동작을 반영하지 못한다. |
 | **F17** | `fakeGl`의 `FLOAT_VEC4` 상수가 어디서도 읽히지 않는다. |
 | **F18** | 길이 1 배열에서 int 경로와 float 경로가 다르게 동작한다(`setTypedUniform`은 `case 1` 처리, `setUniform`은 no-op). 실사용 도달 가능성은 낮으나 어느 쪽으로 맞출지 명시 필요. |
 | **F19** | B8이 제거한 동작을 E2E 스펙 헤더 주석이 여전히 설명한다. |
 | **F20** | `editorNode.ts`는 'import 0건 store-free leaf'가 아니다(스토어를 직접 import). 순환은 0건이고 `rename.ts`가 이미 두 스토어를 import하므로 도달 가능성은 늘지 않았지만, 원래 의도한 미래 보증은 성립하지 않는다. |
+
+### F1·F3 처리 중 적대적 검증이 새로 찾은 것 (미해결 — 다음 라운드 후보)
+
+F1/F3 자체는 해소됐다. 아래는 그 과정에서 **실증까지 끝났지만 두 항목의 범위 밖**이라 손대지 않은 것들이다. 전부 선행 결함이다.
+
+| # | 내용 | 위치 |
+|---|---|---|
+| **F21** | **접힌 레일/최대화된 형제 뒤의 Viewport에서 Snap PNG를 누르면 1×1 PNG가 내려온다.** `ready`는 "루프가 살아 있다"만 뜻하고 캔버스 가시성은 보지 않는다 — `display:none` 상태에서 `clientWidth/Height === 0`이 되고 `resize()`가 `Math.max(1, …)`로 클램프한다. F1의 `ready` 가드는 이 창을 **닫지 않는다**(스토어 jsdoc에 명시해 둠). 요청 시점에 캔버스 크기를 함께 보거나, 접힌 Viewport에서도 거절해야 한다. | `Viewport/index.tsx:270-287` · `rendererStore.ts` |
+| **F22** | **스토어가 CRLF를 담고 있으면 그래프 redo 스택이 영구히 망가진다.** `deserializeProject`는 CRLF를 그대로 통과시키는데(`safeShaderSource`) CodeMirror는 문서를 LF로 정규화한다. 그래서 외부 변경 dispatch(`CodeEditor/index.tsx:439-441`)가 `docChanged`를 만들고 → commit(`:258-270`)이 스토어의 CRLF와 doc의 LF를 다르다고 보고 `updateShaderSource`를 호출 → `pushHistory`가 **`future: []`로 redo를 비운다**. undo로 CRLF 소스를 되살리는 순간 즉시 LF 쌍둥이로 재커밋되므로 그 경계를 넘을 수 없다. F3의 offset 수정과 **무관한 별개 결함**이며 offset 수정으로 닫히지 않는다. 유력 처방은 `safeShaderSource`에서 개행을 정규화하는 것(=CM과 같은 규칙)이지만 프로젝트 임포트 의미론을 바꾸므로 별도 합의가 필요하다. | `projectSanitize.ts:85-95` · `CodeEditor/index.tsx` · `graphStore.ts:456` |
+| **F23** | **스토어의 개행은 스테이지별로 갈릴 수 있다.** `writeUniformHints`가 소스 전체를 `join("\n")`으로 재작성하고(`uniformParser.ts:328,361` — 인스펙터 힌트 저장 경로), cross-stage rename은 origin만 CM 유래 LF로 커밋하고 짝 스테이지는 CRLF로 남긴다(`rename.test.ts`가 이 비대칭을 명시적으로 고정해 둠). 즉 "스토어가 CRLF를 일관되게 나른다"는 전제는 성립하지 않는다 — F22를 정규화로 해결하면 함께 사라진다. | `uniformParser.ts` · `rename.ts` |
 
 ---
 
@@ -96,11 +108,17 @@
 
 로컬 Node 26은 zlib **1.2.12**, CI가 `.nvmrc`로 고정하는 Node 22는 zlib **1.3.1**이다. 같은 dist·같은 level 9에서 **약 1.8 KiB** 벌어진다 — 로컬 PASS는 CI green의 근거가 아니다. 이번 라운드에서 "여유 4 KiB"로 알던 값이 실제로는 1.02 KiB였고, 이전 라운드들의 "measured … locally" 수치도 전부 같은 오류였다.
 
-`scripts/check-bundle-size.mjs`가 실행 Node major와 `.nvmrc` 불일치를 경고하도록 고쳐 뒀다. 한도 상향 이력과 사유도 그 파일 헤더에 있다(현재 396 KiB, 여유 약 1.15 KiB).
+`scripts/check-bundle-size.mjs`가 실행 Node major와 `.nvmrc` 불일치를 경고하도록 고쳐 뒀다. 한도 상향 이력과 사유도 그 파일 헤더에 있다.
+
+측정 절차(스크립트 헤더에도 있음): `npm i --prefix <tmp> node@22` → 그 바이너리로 이미 빌드된 dist에 대해 스크립트를 돌린다.
+
+**현재 수치(Node 22 실측):** 한도 396 KiB. F1·F3 직전 main = **394.85 KiB**, F1·F3 반영 후 = **395.02 KiB**(+0.17 KiB, 토스트 문자열 2개 + `ready` 가드). 남은 여유 **0.98 KiB**. 참고로 같은 dist를 로컬 Node 26으로 재면 393.16 KiB로 약 1.9 KiB 낙관적으로 나온다 — 여유가 1 KiB 아래인 지금은 **로컬 수치로 판단하면 확실히 틀린다**.
 
 ### 단위 가드가 없는 파일
 
 `src/ui/Viewport/index.tsx`와 `src/ui/KeyboardShortcuts.tsx`는 **라인 커버리지 0%**다. 이 파일들을 건드리는 변경은 게이트가 사실상 검증하지 못하므로 E2E나 수동 확인에 의존해야 한다. `src/ui/NodeEditor/index.tsx`는 이번 라운드에서 `index.test.tsx`가 생겨 해소됐다.
+
+F1(D7)에서 쓴 우회 패턴: **불변식을 스토어로 내리고**(`rendererStore.test`가 원샷·두 창을 고정) **호출부를 별도로 테스트하고**(`AppToolbar.test`) **배선만 additive E2E로 덮는다**. Viewport 안의 cleanup 한 줄은 여전히 단위 커버리지가 0이므로 E2E가 유일한 가드다 — 그 스펙(`phase-11`의 "Snap PNG with the Viewport panel closed")은 **수정 전 코드에서 실제로 빨간지 확인한 뒤** 커밋했다(다운로드 0건 단언이 헛단언이 아님을 실측: 미수정 빌드에서 PNG가 실제로 떨어진다). 이 영역에 스펙을 추가할 때 같은 절차를 밟을 것.
 
 ### 게이트를 통과하면서 런타임에서 틀리는 패턴
 

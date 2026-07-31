@@ -81,18 +81,22 @@ export interface RendererState {
    * Ask the render loop to save the next drawn frame as a PNG. Idempotent while
    * a request is already pending — repeated clicks yield one file.
    *
-   * Returns whether the request was accepted. It is **refused** when `ready` is
-   * false, because this flag has exactly one server (the Viewport RAF loop) and
-   * arming it with no loop running would leave it set until the *next* Viewport
-   * mount, which then downloads a PNG nobody asked for. Callers should surface
-   * the refusal; silently dropping it is what the flag's one-shot contract is
-   * there to prevent. (F1)
+   * Returns whether the request was accepted. There are two refusals, and
+   * callers should surface both — silently dropping one is what the flag's
+   * one-shot contract is there to prevent.
    *
-   * ⚠ `ready` only means "the loop is alive", not "the canvas is visible". A
-   * Viewport inside a collapsed rail or behind a maximised sibling is
-   * `display:none` with `ready === true`, and the capture then reads a clamped
-   * 1×1 buffer. That is a separate gap (§4 F21), deliberately not papered over
-   * here.
+   * 1. `ready === false`: the flag has exactly one server (the Viewport RAF
+   *    loop), so arming it with no loop running would leave it set until the
+   *    *next* Viewport mount, which then downloads a PNG nobody asked for. (F1)
+   * 2. The drawing buffer is at its 1×1 floor: `ready` only means "the loop is
+   *    alive", not "the canvas is visible". A Viewport inside a collapsed rail
+   *    or behind a maximised sibling is `display:none`, so `clientWidth/Height`
+   *    read 0 and `resize()` clamps them to 1. The loop keeps ticking, and the
+   *    capture used to hand the user a 1×1 PNG with no warning. (F21)
+   *
+   * Callers distinguish the two by reading `ready` after a refusal — refused
+   * with `ready === true` means (2). Keep that in step if a third reason is
+   * ever added here.
    */
   requestSnapshot: () => boolean;
   /**
@@ -160,6 +164,13 @@ export const useRendererStore = create<RendererState>((set, get) => ({
     // No render loop, no server: refuse rather than arm a flag that would fire
     // on the first frame after the next Viewport mount. See the interface doc.
     if (!get().ready) return false;
+    // Mounted but not on screen. `resize()` floors a `display:none` canvas at
+    // 1×1, and capturing that is strictly worse than refusing: the user gets a
+    // 1×1 PNG and no indication anything went wrong. Both axes must be at the
+    // floor — a real viewport is never 1×1, and requiring both keeps an
+    // extremely thin but genuinely visible panel capturable. (F21)
+    const { width, height } = get().canvasSize;
+    if (width <= 1 && height <= 1) return false;
     if (get().snapshotRequested) return true;
     set({ snapshotRequested: true });
     return true;

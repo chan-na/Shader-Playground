@@ -19,8 +19,13 @@ beforeEach(() => {
   useCommandPaletteStore.getState().setOpen(false);
   useDockStore.getState().resetLayout();
   // The Snap PNG tests below assert on both of these, and neither store is
-  // reset by the others' helpers.
-  useRendererStore.setState({ ready: false, snapshotRequested: false });
+  // reset by the others' helpers. `canvasSize` starts at a real drawing buffer
+  // so only `ready` decides the F1 cases; the F21 cases floor it themselves.
+  useRendererStore.setState({
+    ready: false,
+    snapshotRequested: false,
+    canvasSize: { width: 800, height: 600 },
+  });
   useToastStore.getState().clear();
 });
 
@@ -172,6 +177,30 @@ describe("AppToolbar — Snap PNG guard (F1)", () => {
     expect(toasts).toHaveLength(1);
     expect(toasts[0]?.kind).toBe("error");
     expect(toasts[0]?.message).toContain("Viewport");
+    // The two refusals must not read the same: this one is "the panel is gone",
+    // and telling the user to expand a rail here would be wrong.
+    expect(toasts[0]?.message).toContain("열어");
+  });
+
+  // F21 — mounted, looping, but hidden behind `display:none`. `ready` is true,
+  // so F1's guard passes; the drawing buffer is floored at 1×1 and the capture
+  // produced a 1×1 PNG. This pins the *call site*: the store can be right about
+  // refusing while the toolbar still drops the refusal or mislabels it.
+  it("with the Viewport collapsed: refuses and says to expand it, not open it", () => {
+    useRendererStore.setState({
+      ready: true,
+      canvasSize: { width: 1, height: 1 },
+    });
+    clickSnapPng();
+
+    expect(useRendererStore.getState().snapshotRequested).toBe(false);
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.kind).toBe("error");
+    expect(toasts[0]?.message).toContain("펼쳐");
+    // F1's wording ("open the Viewport panel") is actively misleading here —
+    // the panel *is* open. Guarding the negative keeps the branch honest.
+    expect(toasts[0]?.message).not.toContain("열어");
   });
 });
 

@@ -173,11 +173,20 @@ export function AppToolbar() {
    * Viewport panel closed there is nothing to serve it, and the old code left
    * the flag armed so reopening the panel downloaded a PNG nobody asked for.
    * Report the refusal instead of dropping it silently. (F1)
+   *
+   * A mounted-but-hidden Viewport (collapsed rail, maximised sibling) is
+   * refused too, since its drawing buffer is clamped to 1×1 (F21). The two
+   * refusals need different instructions, and `ready` is what tells them apart:
+   * the loop is still running in the hidden case. See `requestSnapshot`'s doc —
+   * this branch is the caller half of that contract.
    */
   const screenshot = () => {
-    if (useRendererStore.getState().requestSnapshot()) return;
+    const renderer = useRendererStore.getState();
+    if (renderer.requestSnapshot()) return;
     toast.error(
-      "Viewport가 렌더링 중이 아니어서 스냅샷을 저장하지 못했습니다 — Viewport 패널을 열어 주세요.",
+      renderer.ready
+        ? "Viewport가 화면에 보이지 않아 스냅샷을 저장하지 못했습니다 — 접힌 Viewport 패널을 펼쳐 주세요."
+        : "Viewport가 렌더링 중이 아니어서 스냅샷을 저장하지 못했습니다 — Viewport 패널을 열어 주세요.",
     );
   };
 

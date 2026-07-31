@@ -242,4 +242,75 @@ test.describe("Phase 11 — share URL & HTML export", () => {
     });
     expect(stats.nonZero).toBeGreaterThan(0);
   });
+
+  // F21 — the window F1's `ready` guard deliberately left open. Collapsing a
+  // slot to its rail keeps the panel mounted, so the RAF loop keeps running and
+  // `ready` stays true; only CSS hides it (`.shell-slot--collapsed .panel >
+  // :not(.dock-header) { display: none }`). `clientWidth/Height` then read 0,
+  // `resize()` clamps them to 1x1, and the capture used to read that clamped
+  // buffer — File ▸ Snap PNG downloaded a 1x1 PNG with no warning at all.
+  //
+  // `Viewport/index.tsx` has no unit coverage, so this spec is the only guard
+  // on the wiring; the store-side invariant is pinned in `rendererStore.test`
+  // and the call site in `AppToolbar.test`.
+  test("Snap PNG with the Viewport collapsed into its rail is refused (F21)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await bootApp(page);
+    await setGraph(page, trivialMeshGraph(), {});
+    await expectCanvasRendered(page.getByTestId("viewport-canvas"));
+
+    // Any download from here on is a failure — register before the first click.
+    const downloads: string[] = [];
+    page.on("download", (d) => {
+      downloads.push(d.suggestedFilename());
+    });
+
+    await page
+      .locator(".shell-right-top")
+      .getByRole("button", { name: "Collapse panel" })
+      .click();
+
+    // The distinguishing state: the loop is still alive (so F1's guard passes)
+    // but there is nothing on screen to capture.
+    await expect
+      .poll(
+        () => readSp(page, (sp) => sp.renderer.getState().canvasSize.width),
+        { message: "the collapsed canvas never clamped to its 1px floor" },
+      )
+      .toBe(1);
+    expect(await readSp(page, (sp) => sp.renderer.getState().ready)).toBe(true);
+
+    await page.getByRole("button", { name: "File" }).click();
+    await page.getByRole("menuitem", { name: "Save viewport as PNG" }).click();
+
+    // Refused, reported, and nothing armed for a later frame to serve.
+    await expect(page.getByTestId("toast")).toHaveCount(1);
+    expect(
+      await readSp(page, (sp) => sp.renderer.getState().snapshotRequested),
+    ).toBe(false);
+    await expect(
+      page.waitForEvent("download", { timeout: 5_000 }),
+    ).rejects.toThrow();
+    expect(downloads).toEqual([]);
+
+    // Expanding again restores a real drawing buffer, and Snap PNG works — the
+    // guard must gate on visibility, not latch the panel out of service.
+    await page
+      .locator(".shell-right-top")
+      .getByRole("button", { name: "Expand panel" })
+      .click();
+    await expect
+      .poll(
+        () => readSp(page, (sp) => sp.renderer.getState().canvasSize.width),
+        { message: "the expanded canvas never regained a real width" },
+      )
+      .toBeGreaterThan(1);
+
+    const download = page.waitForEvent("download", { timeout: 15_000 });
+    await page.getByRole("button", { name: "File" }).click();
+    await page.getByRole("menuitem", { name: "Save viewport as PNG" }).click();
+    expect((await download).suggestedFilename()).toMatch(/\.png$/);
+  });
 });

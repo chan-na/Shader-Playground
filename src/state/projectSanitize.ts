@@ -82,6 +82,25 @@ function safeFiniteNumber(v: unknown, fallback = 0): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
+/**
+ * Normalise CRLF / lone CR to LF, using exactly CodeMirror's line-break rule
+ * (`DefaultSplit = /\r\n?|\n/`).
+ *
+ * This is deliberately not byte-preserving: an imported project is normalised
+ * on the way in rather than carried verbatim. The store is otherwise the only
+ * holder of CRLF in the app — CodeMirror normalises every document it loads —
+ * and that mismatch is unrepairable downstream. The store source and the editor
+ * doc can then never compare equal, so the reload effect re-dispatches the
+ * source, CM normalises it into a `docChanged`, the update listener commits the
+ * LF twin, and `updateShaderSource` → `pushHistory` clears `future`. Undoing
+ * back across such an edit destroys the redo the user just earned, every time.
+ * Normalising here means the store and the editor agree from the first frame.
+ * (F22 — also closes the per-stage divergence in F23.)
+ */
+function normalizeLineEndings(v: string): string {
+  return v.replace(/\r\n?/g, "\n");
+}
+
 function safeShaderSource(v: unknown, field: string): string {
   if (typeof v !== "string") {
     throw new Error(`${field} must be a string`);
@@ -91,7 +110,7 @@ function safeShaderSource(v: unknown, field: string): string {
       `${field} exceeds ${SANITIZE_LIMITS.MAX_SHADER_SOURCE_LEN} chars`,
     );
   }
-  return v;
+  return normalizeLineEndings(v);
 }
 
 function sanitizeUniformValues(

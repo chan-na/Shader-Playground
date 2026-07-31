@@ -181,7 +181,13 @@ export interface SpStores {
       };
       /** One-shot PNG snapshot request served by the RAF loop (#3). */
       snapshotRequested: boolean;
-      /** Returns false — and arms nothing — when no render loop is running (F1). */
+      /**
+       * Backing-store size of the drawing buffer, as `resize()` last set it.
+       * Clamps to 1x1 while the Viewport is `display:none` (F21).
+       */
+      canvasSize: { width: number; height: number };
+      /** Returns false — and arms nothing — when there is no loop to serve the
+       *  request (F1) or nothing visible to capture (F21). */
       requestSnapshot: () => boolean;
     };
   };

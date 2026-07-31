@@ -137,6 +137,12 @@ describe("rendererStore", () => {
   describe("snapshot request", () => {
     beforeEach(() => {
       useRendererStore.getState().setReady(true);
+      // A *visible* Viewport: the outer beforeEach leaves `canvasSize` at the
+      // store's 1×1 default, which is also the shape `resize()` produces for a
+      // `display:none` canvas — and which the F21 guard below refuses. Every
+      // case in here is about the request's lifetime, not its visibility, so
+      // give them a real drawing buffer to work against.
+      useRendererStore.getState().setCanvasSize({ width: 800, height: 600 });
     });
 
     it("starts with no pending request and consume returns false", () => {
@@ -223,6 +229,56 @@ describe("rendererStore", () => {
         expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(
           false,
         );
+      });
+    });
+
+    // F21. `ready` says the loop is alive, not that anything is on screen. A
+    // collapsed rail / maximised sibling hides the Viewport with `display:none`
+    // while it stays mounted, so `resize()` floors the drawing buffer at 1×1
+    // and the capture yielded a 1×1 PNG — no error, no warning, just a useless
+    // file. The guard belongs here rather than in the Viewport because that
+    // file has no unit coverage at all.
+    describe("must not capture an invisible canvas (F21)", () => {
+      it("refuses while the drawing buffer is at its 1×1 floor", () => {
+        useRendererStore.getState().setCanvasSize({ width: 1, height: 1 });
+        expect(useRendererStore.getState().ready).toBe(true);
+        expect(useRendererStore.getState().requestSnapshot()).toBe(false);
+        expect(useRendererStore.getState().snapshotRequested).toBe(false);
+      });
+
+      it("a refused request keeps the same state reference", () => {
+        useRendererStore.getState().setCanvasSize({ width: 1, height: 1 });
+        const before = useRendererStore.getState();
+        useRendererStore.getState().requestSnapshot();
+        expect(useRendererStore.getState()).toBe(before);
+      });
+
+      it("nothing stays armed for the frame after the panel is expanded", () => {
+        useRendererStore.getState().setCanvasSize({ width: 1, height: 1 });
+        useRendererStore.getState().requestSnapshot(); // user clicks Snap PNG
+        useRendererStore.getState().setCanvasSize({ width: 800, height: 600 });
+        expect(useRendererStore.getState().snapshotRequested).toBe(false);
+        expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(
+          false,
+        );
+      });
+
+      it("serves the request again once the panel is expanded", () => {
+        useRendererStore.getState().setCanvasSize({ width: 1, height: 1 });
+        expect(useRendererStore.getState().requestSnapshot()).toBe(false);
+        useRendererStore.getState().setCanvasSize({ width: 800, height: 600 });
+        // The guard gates on the current size; it must not latch the panel out
+        // of service once it has refused.
+        expect(useRendererStore.getState().requestSnapshot()).toBe(true);
+        expect(useRendererStore.getState().consumeSnapshotRequest()).toBe(true);
+      });
+
+      it("still captures a thin but genuinely visible panel", () => {
+        // Only the both-axes-floored case is `display:none`. A 1px-wide strip
+        // that is actually rendered still has a real height, and refusing it
+        // would be a false positive.
+        useRendererStore.getState().setCanvasSize({ width: 1, height: 600 });
+        expect(useRendererStore.getState().requestSnapshot()).toBe(true);
       });
     });
   });

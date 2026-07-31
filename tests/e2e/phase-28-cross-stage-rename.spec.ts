@@ -472,14 +472,19 @@ void main() {
   // F3 — CRLF in the paired stage. The reference finder reports absolute
   // document offsets and `rename.ts` slices the OTHER stage's source with them
   // directly (`applyEdits`), but that source comes raw out of graphStore, not
-  // out of CodeMirror: `deserializeProject` passes shader sources through
-  // verbatim, so a project authored on Windows lands in the store with `\r\n`.
-  // The line walk used to drop each line's `\r` while only advancing past the
-  // `\n`, so every offset after line 1 drifted by one character per preceding
-  // line and the rename rewrote the wrong characters — mangled GLSL, committed
-  // to graph history. Unit tests pin the arithmetic and `runRename`; this pins
-  // the production wiring that feeds it (`resolveCrossStageContext` reading the
-  // store, CodeMirror normalising only the document it holds).
+  // out of CodeMirror. The line walk used to drop each line's `\r` while only
+  // advancing past the `\n`, so every offset after line 1 drifted by one
+  // character per preceding line and the rename rewrote the wrong characters —
+  // mangled GLSL, committed to graph history. Unit tests pin the arithmetic and
+  // `runRename`; this pins the production wiring that feeds it
+  // (`resolveCrossStageContext` reading the store, CodeMirror normalising only
+  // the document it holds).
+  //
+  // Originally a project authored on Windows landed in the store with `\r\n`,
+  // because `deserializeProject` passed shader sources through verbatim. F22
+  // normalises them at the import boundary, so this spec now plants the CRLF
+  // through the `__sp` dev hook instead — `updateShaderSource` still accepts
+  // whatever it is given, which is exactly the writer this arithmetic guards.
   test("renaming into a CRLF paired stage rewrites the right offsets", async ({
     page,
   }) => {
@@ -499,8 +504,8 @@ void main() {
       { v: vertCrlf, f: FRAG },
     );
 
-    // The store really is holding CRLF — nothing on the way in normalised it,
-    // and the fragment-only editor never rewrites the vertex stage.
+    // The store really is holding CRLF — `updateShaderSource` does not
+    // normalise, and the fragment-only editor never rewrites the vertex stage.
     expect(
       await readSp(page, (sp) => {
         const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");

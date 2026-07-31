@@ -265,6 +265,91 @@ describe("sanitizeGraphNode — audio", () => {
   });
 });
 
+describe("sanitizeGraphNode — line endings (F22)", () => {
+  // Written without ES2021 `String.replaceAll` — it is not in the lib target.
+  const crlf = (s: string) => s.split("\n").join("\r\n");
+  const VERT = "void main() {\n  gl_Position = vec4(0.0);\n}\n";
+  const FRAG = "out vec4 c;\nvoid main() {\n  c = vec4(1.0);\n}\n";
+
+  it("normalises CRLF in both shader stages", () => {
+    const r = sanitizeGraphNode({
+      id: "s",
+      kind: "shader",
+      vertexSource: crlf(VERT),
+      fragmentSource: crlf(FRAG),
+      uniformValues: {},
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "shader") {
+      expect(r.node.vertexSource).toBe(VERT);
+      expect(r.node.fragmentSource).toBe(FRAG);
+    }
+  });
+
+  it("normalises CRLF in a compute vertexSource", () => {
+    const r = sanitizeGraphNode({
+      id: "c",
+      kind: "compute",
+      vertexSource: crlf(VERT),
+      count: 1,
+      primitive: "POINTS",
+      attributes: [],
+      uniformValues: {},
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "compute") {
+      expect(r.node.vertexSource).toBe(VERT);
+    }
+  });
+
+  it("normalises a lone CR, matching CodeMirror's line-break rule", () => {
+    // CM's DefaultSplit is /\r\n?|\n/, so a bare \r is a line break there too.
+    // Leaving it in the store would reintroduce exactly the F22 mismatch.
+    const r = sanitizeGraphNode({
+      id: "s",
+      kind: "shader",
+      vertexSource: "a\rb\r\nc\nd",
+      fragmentSource: "",
+      uniformValues: {},
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "shader") {
+      expect(r.node.vertexSource).toBe("a\nb\nc\nd");
+    }
+  });
+
+  it("leaves an already-LF source byte-identical", () => {
+    const r = sanitizeGraphNode({
+      id: "s",
+      kind: "shader",
+      vertexSource: VERT,
+      fragmentSource: FRAG,
+      uniformValues: {},
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.node.kind === "shader") {
+      expect(r.node.vertexSource).toBe(VERT);
+      expect(r.node.fragmentSource).toBe(FRAG);
+    }
+  });
+
+  it("measures the length limit against the source as received", () => {
+    // The cap guards the untrusted payload, so it is applied before
+    // normalisation shortens it — a 2x-oversized CRLF blob must not sneak
+    // through on the grounds that its LF form would have fit.
+    const half = Math.ceil(SANITIZE_LIMITS.MAX_SHADER_SOURCE_LEN / 2) + 1;
+    const r = sanitizeGraphNode({
+      id: "s",
+      kind: "shader",
+      vertexSource: "x\r\n".repeat(half),
+      fragmentSource: "",
+      uniformValues: {},
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/vertexSource/);
+  });
+});
+
 describe("sanitizeGraphNode — shader", () => {
   it("throws on oversized fragmentSource", () => {
     const big = "x".repeat(SANITIZE_LIMITS.MAX_SHADER_SOURCE_LEN + 1);

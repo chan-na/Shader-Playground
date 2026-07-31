@@ -406,12 +406,18 @@ void main() {
  *
  * `findReferencesOf`'s offsets are exercised by `references.test.ts`, but the
  * damage happened here: `resolveCrossStageContext` reads `otherStageSource`
- * straight out of `graphStore`, which `deserializeProject` fills verbatim, so
- * it can hold `\r\n` while the edited document — created by CodeMirror, which
- * normalises line endings — cannot. `applyEdits` then slices that raw string
- * with the reported offsets and the result is committed through
- * `applyBothStages`. A one-character-per-line drift therefore wrote mangled
- * GLSL into the store and into graph history.
+ * straight out of `graphStore` while the edited document — created by
+ * CodeMirror, which normalises line endings — is always LF. `applyEdits` then
+ * slices that raw string with the reported offsets and the result is committed
+ * through `applyBothStages`. A one-character-per-line drift therefore wrote
+ * mangled GLSL into the store and into graph history.
+ *
+ * How CRLF reached the store back then: `deserializeProject` passed shader
+ * sources through verbatim. It no longer does — F22 normalises them at the
+ * import boundary, so no production path puts `\r\n` in the store today. These
+ * cases are kept as defence for the writers that still accept it (the `__sp`
+ * dev hook, any future importer that bypasses `sanitizeGraphNode`): the offset
+ * arithmetic must stay correct whether or not anything currently exercises it.
  */
 describe("runRename — CRLF in the other stage (F3)", () => {
   const VERT_CRLF = `#version 300 es
@@ -470,7 +476,8 @@ void main() {
   it("still parses as the same shader when both stages are CRLF", () => {
     // Both sides CRLF in the store; CodeMirror normalises only the doc it holds,
     // so the origin stage arrives LF while the pair stays CRLF. The commit must
-    // not depend on the two agreeing.
+    // not depend on the two agreeing — `runRename` rewrites each side in its own
+    // terms rather than assuming one line-ending convention across the node.
     const fragCrlf = FRAG_LF.replace(/\n/g, "\r\n");
     const view = viewOf(FRAG_LF, FRAG_LF.indexOf("u_amount") + 1);
     const captured: { origin: string | null; other: string | null } = {
@@ -488,8 +495,11 @@ void main() {
 
     expect(runRename(view, () => "u_gain", ctx).applied).toBe(true);
     expect(captured.other).toBe(fragCrlf.replace(/u_amount/g, "u_gain"));
-    // The origin commit follows CodeMirror's document, so it is LF — a known,
-    // accepted asymmetry (the store can end up with per-stage line endings).
+    // The origin commit follows CodeMirror's document, so it is LF. When CRLF
+    // does reach the store through a non-import writer, this rename is one of
+    // the places that leaves the node with per-stage line endings (F23) — the
+    // helper's job is to rewrite correctly, not to reconcile the two. Import is
+    // normalised (F22), so production never gets here with a mixed node.
     expect(captured.origin).toBe(FRAG_LF.replace(/u_amount/g, "u_gain"));
     view.destroy();
   });

@@ -15,8 +15,10 @@ import {
   getNodeAt,
 } from "../../state/dockTree";
 import { useEditorStore } from "../../state/editorStore";
-import { useGraphStore } from "../../state/graphStore";
+import { undoGraph, useGraphStore } from "../../state/graphStore";
+import { useHistoryStore } from "../../state/historyStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { deserializeProject } from "../../state/serialization";
 import { DockLeafContext } from "../dockLeafContext";
 import { getCurrentView } from "./currentView";
 import { CodeEditor } from "./index";
@@ -283,6 +285,85 @@ describe("CodeEditor document switch (#1a)", () => {
     const host = document.querySelector("[data-testid='code-editor']");
     expect(host?.getAttribute("data-active-node")).toBe("shader2");
     expect(collectLint()).toEqual(["shared"]);
+  });
+});
+
+/**
+ * F22 — a project imported with CRLF line endings used to make the graph redo
+ * stack unreachable.
+ *
+ * The store carried CRLF verbatim while CodeMirror normalises every document it
+ * holds to LF, so the two could never compare equal. Undoing back across the
+ * boundary re-loaded the CRLF source into the editor, CM normalised it, the
+ * update listener committed the LF twin, and `updateShaderSource` pushed a
+ * fresh history entry — which clears `future`. The redo the user had just
+ * earned was gone before they could press it.
+ *
+ * These go through the REAL import path (`deserializeProject`), because that is
+ * where the normalisation lives. Planting CRLF with `setState` would bypass the
+ * fix entirely and pin nothing.
+ */
+describe("CodeEditor — imported CRLF source (F22)", () => {
+  const FRAG_CRLF = FRAG.split("\n").join("\r\n");
+
+  /** Load a one-shader project through deserialize + setGraph, as the file
+   *  import / share URL / bootstrap paths all do. */
+  function importProject(fragmentSource: string) {
+    const parsed = deserializeProject({
+      format: "shader-playground",
+      version: 1,
+      exportedAt: "2026-07-31T00:00:00.000Z",
+      graph: {
+        nodes: [
+          {
+            id: "shader1",
+            kind: "shader",
+            vertexSource: VERT,
+            fragmentSource,
+            uniformValues: {},
+          },
+        ],
+        edges: [],
+      },
+      positions: {},
+      parents: {},
+    });
+    act(() => {
+      useGraphStore
+        .getState()
+        .setGraph(parsed.graph, parsed.positions, parsed.parents);
+    });
+    useHistoryStore.setState({ past: [], future: [] });
+  }
+
+  it("normalises the imported source so the store matches the editor doc", () => {
+    importProject(FRAG_CRLF);
+    mount();
+    expect(node("shader1").fragmentSource).toBe(FRAG);
+    expect(view().state.doc.toString()).toBe(FRAG);
+  });
+
+  it("keeps redo reachable after undoing an edit to an imported CRLF shader", async () => {
+    importProject(FRAG_CRLF);
+    mount();
+
+    type("// edited\n");
+    await settle();
+    // One committed edit: `past` holds the pre-edit source, `future` is empty.
+    expect(useHistoryStore.getState().past).toHaveLength(1);
+    const edited = node("shader1").fragmentSource;
+    expect(edited.startsWith("// edited\n")).toBe(true);
+
+    act(() => {
+      undoGraph();
+    });
+    await settle();
+
+    // The undo itself must survive the reload effect: nothing may re-commit the
+    // restored source, so redo stays available and the store stops moving.
+    expect(useHistoryStore.getState().future).toHaveLength(1);
+    expect(node("shader1").fragmentSource).toBe(FRAG);
+    expect(view().state.doc.toString()).toBe(FRAG);
   });
 });
 

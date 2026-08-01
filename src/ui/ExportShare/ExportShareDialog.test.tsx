@@ -194,8 +194,12 @@ describe("ExportShareDialog", () => {
     render(<ExportShareDialog />);
 
     fireEvent.click(screen.getByTestId("es-create-link"));
-    expect(shareUrlModule.encodeShareUrl).toHaveBeenCalledTimes(1);
+    // handleCreateLink now awaits a dynamic `import("../../state/shareUrl")`
+    // before calling encodeShareUrl (learnability T0-3), which adds a
+    // microtask beyond the click — wait for the done panel before asserting
+    // the mock was reached, rather than checking it synchronously.
     expect(await screen.findByTestId("es-share-url")).not.toBeNull();
+    expect(shareUrlModule.encodeShareUrl).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("es-share-url").textContent).toBe(
       "http://x/#share=abc",
     );

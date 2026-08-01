@@ -50,8 +50,26 @@ const ASSETS_DIR = "dist/assets";
 // still left CI red. Raised with explicit user sign-off; the ~2.05 KiB
 // headroom is deliberate slack for gzip variance, since the previous nominal
 // headroom turned out to be measurement error.
+//
+// Learnability T0 (2026-08-01, docs/learnability-plan-2026-08.md): the gate
+// switched from "sum every chunk" to "entry chunk (what the user waits on)
+// plus a loose total safety net". Reason: code-splitting loaders.gl
+// (`objLoader`/`gltfLoader`, used only after a file-picker dialog, plus the
+// `shareUrl` static/dynamic import conflict — see assetActions.ts and
+// ExportShareDialog.tsx) cuts the entry chunk 11% but the old single-number
+// gate summed all chunks, so the shared-code duplication + per-chunk
+// overhead that splitting introduces (+1.18 KiB total) made a strictly
+// faster first load FAIL. The old gate was measuring the wrong thing — users
+// wait on the entry chunk, not the sum of every lazily-fetched chunk.
+// Node 22.23.2 measured (dist/.vite/manifest.json `isEntry` chunk vs all
+// `dist/assets/*.js`, this branch post T0-2/T0-3 split): entry 348.51 KiB,
+// total 396.58 KiB. Adopted entry limit 375 KiB (≈26.5 KiB headroom for
+// T1~T3, the plan's own estimate for their combined UI cost — within the
+// 20~30 KiB band the plan calls for) and total limit 430 KiB (loose safety
+// net so chunk count growing doesn't let the aggregate run away unnoticed).
 const LIMITS_KIB = {
-  js: 396,
+  entry: 375,
+  total: 430,
 };
 
 /** Node major that CI pins via `.nvmrc`; null when unreadable. */
@@ -110,6 +128,41 @@ function listAssets(extension) {
     .map((name) => join(ASSETS_DIR, name));
 }
 
+const MANIFEST_PATH = "dist/.vite/manifest.json";
+
+/**
+ * Entry chunk(s) per `dist/.vite/manifest.json` (`build.manifest: true` in
+ * vite.config.ts). This is what the user's first load actually pays for —
+ * unlike a filename pattern (fragile) or parsing `dist/index.html` (needs
+ * `base`-prefix handling), the manifest's `file` paths are dist-relative and
+ * unaffected by the GITHUB_PAGES `base` swap.
+ */
+function listEntryChunks() {
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+  } catch {
+    console.error(
+      `[bundle-size] ${MANIFEST_PATH} not found/unreadable — vite build.manifest must be on; run npm run build`,
+    );
+    process.exit(2);
+  }
+  const entries = Object.values(manifest)
+    .filter(
+      (e) =>
+        e &&
+        e.isEntry === true &&
+        typeof e.file === "string" &&
+        e.file.endsWith(".js"),
+    )
+    .map((e) => join("dist", e.file));
+  if (entries.length === 0) {
+    console.error(`[bundle-size] no isEntry chunk found in ${MANIFEST_PATH}`);
+    process.exit(2);
+  }
+  return entries;
+}
+
 function measure(paths) {
   return paths.map((path) => {
     const buf = readFileSync(path);
@@ -151,5 +204,7 @@ if (jsFiles.length === 0) {
   process.exit(2);
 }
 
-const ok = checkGroup("JS", jsFiles, LIMITS_KIB.js);
-process.exit(ok ? 0 : 1);
+const entryFiles = listEntryChunks();
+const entryOk = checkGroup("JS (entry chunk)", entryFiles, LIMITS_KIB.entry);
+const totalOk = checkGroup("JS (all chunks)", jsFiles, LIMITS_KIB.total);
+process.exit(entryOk && totalOk ? 0 : 1);

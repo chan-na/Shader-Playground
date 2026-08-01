@@ -480,9 +480,9 @@ uniform vec3 u_baseColor;
 |---|---|---|---|---|
 | — | D-0 번들 예산 방침 결정 | ✅ 완료 | — | 2026-08-01 선택 1 확정 → T0 신설 |
 | — | D-1 Pass Inspector 배치 결정 | ⬜ 미착수 | — | T1 착수 전 |
-| **T0** | **T0-1 게이트를 엔트리 청크 기준으로** | ⬜ 미착수 | — | **T1의 선행 조건** |
-| **T0** | **T0-2 loaders.gl 동적 import** | ⬜ 미착수 | — | 엔트리 −43 KiB 실측 완료 |
-| **T0** | **T0-3 shareUrl import 충돌 해소** | ⬜ 미착수 | — | 기존 버그 |
+| **T0** | **T0-1 게이트를 엔트리 청크 기준으로** | ✅ 완료 | feat/learnability-2026-08 | **T1의 선행 조건** |
+| **T0** | **T0-2 loaders.gl 동적 import** | ✅ 완료 | feat/learnability-2026-08 | 엔트리 −43 KiB 실측 완료 |
+| **T0** | **T0-3 shareUrl import 충돌 해소** | ✅ 완료 | feat/learnability-2026-08 | 기존 버그 |
 | T1 | A-1 풀스크린 대체 표시 | ⬜ 미착수 | — | |
 | T1 | D-1 Pass Inspector | ⬜ 미착수 | — | |
 | T1 | C-1 시스템 유니폼 섹션 | ⬜ 미착수 | — | |

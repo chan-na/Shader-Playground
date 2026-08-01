@@ -14,7 +14,6 @@ import {
 import { useGifRecorderStore } from "../../state/gifRecorder";
 import { useGraphStore } from "../../state/graphStore";
 import { useRecorderStore } from "../../state/recorder";
-import { encodeShareUrl } from "../../state/shareUrl";
 import { toast } from "../../state/toastStore";
 import { SegmentedControl } from "../controls/SegmentedControl";
 import { Slider } from "../controls/Slider";
@@ -592,6 +591,11 @@ function DoneRecordPanel({ info }: { info: RecordDoneInfo }) {
   );
 }
 
+// This component itself is intentionally *not* React.lazy-loaded: App.tsx
+// mounts it statically and keeps it mounted while closed so its GIF-recorder
+// subscription can track AppToolbar's quick-record button (see the
+// displayPhase/auto-stop comments below). Only the shareUrl module (used
+// solely by handleCreateLink, below) is loaded on demand.
 export function ExportShareDialog() {
   const open = useExportShareStore((s) => s.open);
   const target = useExportShareStore((s) => s.target);
@@ -809,6 +813,13 @@ export function ExportShareDialog() {
   const handleCreateLink = async () => {
     const s = useGraphStore.getState();
     try {
+      // Dynamic import kept inside the try: BootstrapGate.tsx already loads
+      // shareUrl dynamically for the initial `#share=` hash check, and a
+      // static import here used to defeat that split (vite reporter warned
+      // on every build — learnability T0-3). A chunk-fetch failure now
+      // surfaces through the same catch → toast.error path as an encode
+      // failure, instead of an unhandled rejection.
+      const { encodeShareUrl } = await import("../../state/shareUrl");
       const url = await encodeShareUrl(
         { nodes: s.nodes, edges: s.edges },
         s.positions,

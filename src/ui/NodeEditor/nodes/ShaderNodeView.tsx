@@ -5,6 +5,7 @@ import { displayNodeName, NODE_META } from "../../../core/nodes/registry";
 import { useDiagnosticsStore } from "../../../state/diagnosticsStore";
 import { NodeThumbnail } from "../NodeThumbnail";
 import { countNodeDiagnostics, ErrorBadge } from "./ErrorBadge";
+import { FullscreenBadge } from "./FullscreenBadge";
 import { GpuTimerChip } from "./GpuTimerChip";
 import { NodeCardHeader } from "./NodeCardHeader";
 import {
@@ -40,11 +41,14 @@ export function ShaderNodeView({ id, data }: NodeProps) {
         nodeId={id}
         {...(errorCount > 0 ? { tone: "error" as const } : {})}
         meta={
-          errorCount > 0 ? (
-            <ErrorBadge nodeId={id} />
-          ) : (
-            <GpuTimerChip nodeId={id} />
-          )
+          <>
+            <FullscreenBadge nodeId={id} />
+            {errorCount > 0 ? (
+              <ErrorBadge nodeId={id} />
+            ) : (
+              <GpuTimerChip nodeId={id} />
+            )}
+          </>
         }
       />
       <div className="node-card__body" style={{ padding: "9px 0" }}>

@@ -128,6 +128,13 @@ export function firstCompileError(
         // fullscreen.vert (not node.vertexSource) whenever the node compiled
         // as a fullscreen pass. Falling back to the node's own source is only
         // for diagnostics recorded before the compiler reported a source.
+        // Since A-1, the Code editor's vertex tab shows this exact same
+        // `compiledVertexSource` value (verbatim, read-only) whenever the
+        // node is fullscreen — see CodeEditor/index.tsx's `isAutoVertex`
+        // source override — so this excerpt and the on-screen document are
+        // now provably the same string, not just "should match in practice".
+        // No behavior change here, just the excerpt source this comment
+        // already pointed at.
         excerpt: buildExcerpt(
           diags.compiledVertexSource ?? node.vertexSource,
           vertexErr.line,

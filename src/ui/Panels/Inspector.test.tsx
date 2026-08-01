@@ -5,15 +5,25 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { GraphNode, ShaderGraphNode } from "../../core/graph/types";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  GraphNode,
+  MeshGraphNode,
+  ShaderGraphNode,
+} from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
+import { useMouseStore } from "../../state/mouseStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { useTimeStore } from "../../state/timeStore";
 import { Inspector } from "./Inspector";
 
 function resetStores() {
   useGraphStore.getState().reset();
   useSelectionStore.getState().select(null);
+  usePassPlanStore.getState().reset();
+  useTimeStore.getState().reset();
+  useMouseStore.getState().reset();
 }
 
 beforeEach(() => {
@@ -300,5 +310,110 @@ describe("Inspector — group delete confirmation is per group (#25)", () => {
     const ids = useGraphStore.getState().nodes.map((n) => n.id);
     expect(ids).not.toContain("g1");
     expect(ids).toContain("g2");
+  });
+});
+
+/** Finds a single `system-uniform-row` by its `data-uniform-name`, throwing
+ *  (rather than a `noUncheckedIndexedAccess`-unsafe `!`) if it's missing. */
+function findSystemUniformRow(name: string): HTMLElement {
+  const row = screen
+    .getAllByTestId("system-uniform-row")
+    .find((r) => r.getAttribute("data-uniform-name") === name);
+  if (!row) throw new Error(`system-uniform-row not found: ${name}`);
+  return row;
+}
+
+// [C-1] The "System uniforms (auto-bound)" section — binding status mirrors
+// `plan.fullscreenByNode` (A-1's publish), never re-derived from the graph.
+describe("Inspector — System uniforms section [C-1]", () => {
+  const viewShaderNode: ShaderGraphNode = {
+    id: "sv1",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "uniform mat4 u_view;",
+    uniformValues: {},
+  };
+
+  const timeShaderNode: ShaderGraphNode = {
+    id: "st1",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "uniform float u_time;",
+    uniformValues: {},
+  };
+
+  // SystemUniformsSection polls u_time/u_mouse on a 500ms interval rather
+  // than subscribing directly (StatusBar.tsx precedent) — fake timers give
+  // deterministic control over that tick instead of a real 500ms wait.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("marks u_view unbound with the fullscreen-pass note when the plan reports this node as fullscreen", () => {
+    useGraphStore.getState().addNode(viewShaderNode);
+    usePassPlanStore.getState().publish([], { sv1: true });
+    useSelectionStore.getState().select("sv1");
+    render(<Inspector embedded />);
+
+    const row = findSystemUniformRow("u_view");
+    expect(row.getAttribute("data-bound")).toBe("false");
+    expect(row.textContent).toContain("not bound (fullscreen pass)");
+  });
+
+  it("marks u_view bound once the plan reports a resolved (non-fullscreen) mesh", () => {
+    useGraphStore.getState().addNode(viewShaderNode);
+    usePassPlanStore.getState().publish([], { sv1: false });
+    useSelectionStore.getState().select("sv1");
+    render(<Inspector embedded />);
+
+    const row = findSystemUniformRow("u_view");
+    expect(row.getAttribute("data-bound")).toBe("true");
+    expect(row.textContent).not.toContain("not bound");
+  });
+
+  it("samples the current u_time value and refreshes it on the next polling tick", () => {
+    useGraphStore.getState().addNode(timeShaderNode);
+    useSelectionStore.getState().select("st1");
+    useTimeStore.getState().setTime(0);
+    render(<Inspector embedded />);
+
+    expect(findSystemUniformRow("u_time").textContent).toContain("0.00s");
+
+    act(() => {
+      useTimeStore.getState().setTime(3.5);
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(findSystemUniformRow("u_time").textContent).toContain("3.50s");
+  });
+});
+
+// [B-1] Mesh Inspector section — the mesh-side counterpart to the existing
+// Compute "Attributes" block.
+describe("Inspector — Mesh section [B-1]", () => {
+  const meshNode: MeshGraphNode = {
+    id: "mesh1",
+    kind: "mesh",
+    primitive: "cube",
+    assetId: null,
+  };
+
+  it("renders the mesh-attributes section with the fixed attribute contract for a primitive mesh", () => {
+    useGraphStore.getState().addNode(meshNode);
+    useSelectionStore.getState().select("mesh1");
+    render(<Inspector embedded />);
+
+    const section = screen.getByTestId("mesh-attributes");
+    expect(section.textContent).toContain("verts");
+    expect(section.textContent).toContain("idx");
+    expect(section.textContent).toContain("TRIANGLES");
+    expect(section.textContent).toContain("a_position");
+    expect(section.textContent).toContain("(vec3)");
+    expect(section.textContent).toContain("a_uv");
+    expect(section.textContent).toContain("(vec2)");
   });
 });

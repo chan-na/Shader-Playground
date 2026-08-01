@@ -62,6 +62,14 @@ describe("StatusBar", () => {
     expect(html).toContain("◨ Diagnostics");
   });
 
+  // T1/D-1: the "▤ Passes" toggle is a sibling of ◨ Diagnostics — same
+  // debugUiStore 3-way exclusion wiring, no dock tree involvement.
+  it("renders the ▤ Passes toggle button", () => {
+    const html = renderToStaticMarkup(<StatusBar />);
+    expect(html).toContain('data-testid="status-passes"');
+    expect(html).toContain("▤ Passes");
+  });
+
   it("renders the left status pill with a stable testid", () => {
     const html = renderToStaticMarkup(<StatusBar />);
     expect(html).toContain('data-testid="status-pill"');
@@ -116,6 +124,32 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     fireEvent.click(screen.getByTestId("status-problems"));
 
     expect(useDebugUiStore.getState().problemsOpen).toBe(true);
+    expect(useDebugUiStore.getState().open).toBe(false);
+  });
+
+  it("clicking status-passes toggles passesOpen and reflects it in aria-pressed", () => {
+    render(<StatusBar />);
+
+    const button = screen.getByTestId("status-passes");
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(button);
+    expect(useDebugUiStore.getState().passesOpen).toBe(true);
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(button);
+    expect(useDebugUiStore.getState().passesOpen).toBe(false);
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("clicking status-passes closes diagnostics (3-way exclusion, T1/D-1)", () => {
+    render(<StatusBar />);
+
+    fireEvent.click(screen.getByTestId("open-diagnostics"));
+    expect(useDebugUiStore.getState().open).toBe(true);
+
+    fireEvent.click(screen.getByTestId("status-passes"));
+    expect(useDebugUiStore.getState().passesOpen).toBe(true);
     expect(useDebugUiStore.getState().open).toBe(false);
   });
 

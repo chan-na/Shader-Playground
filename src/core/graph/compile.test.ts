@@ -4,6 +4,7 @@ import {
   disposeAllExternal,
   externalHandleCount,
 } from "../external/registry";
+import { createFakeGl } from "../gl/fakeGl";
 import { compileGraph, emptyPlan, scaledDimensions } from "./compile";
 import type { Graph } from "./types";
 
@@ -28,6 +29,7 @@ describe("emptyPlan", () => {
     expect(plan.errors).toEqual([]);
     expect(plan.shaderErrors).toEqual({});
     expect(plan.imageTextures).toEqual({});
+    expect(plan.fullscreenByNode).toEqual({});
     expect(plan.hasCompute).toBe(false);
     expect(plan.hasExternal).toBe(false);
     expect(typeof plan.dispose).toBe("function");
@@ -223,6 +225,9 @@ describe("compileGraph fatal-error early return", () => {
     expect(plan.errors.some((e) => e.code === "cycle")).toBe(true);
     expect(plan.width).toBe(100);
     expect(plan.height).toBe(100);
+    // fatal validate short-circuits into `emptyPlan` (spread), so this is
+    // `{}` too — never a stale/half-built record from a torn-down loop.
+    expect(plan.fullscreenByNode).toEqual({});
   });
 
   it("returns emptyPlan + multi_input error when one target handle has > 1 incoming edge", () => {
@@ -310,5 +315,65 @@ describe("compileGraph groups (Phase 29)", () => {
     expect(planWith.passes).toEqual([]);
     expect(planWith.hasExternal).toBe(false);
     expect(planWith.hasCompute).toBe(false);
+  });
+});
+
+describe("compileGraph fullscreenByNode (T1/A-1)", () => {
+  function shaderNode(id: string): Graph["nodes"][number] {
+    return {
+      id,
+      kind: "shader",
+      vertexSource: "//v",
+      fragmentSource: "//f",
+      uniformValues: {},
+    };
+  }
+
+  it("records true for a shader node with no mesh input (fullscreen substitution)", () => {
+    const gl = createFakeGl({ attributes: ["a_position"], uniforms: [] });
+    const graph: Graph = { nodes: [shaderNode("s1")], edges: [] };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    // Sanity: the pass did actually build (superset claim below is otherwise
+    // vacuous — this checks the "normal" success path first).
+    expect(plan.shaderPassByNode.has("s1")).toBe(true);
+    expect(plan.fullscreenByNode.s1).toBe(true);
+    plan.dispose();
+  });
+
+  it("records false when a primitive mesh is connected", () => {
+    const gl = createFakeGl({
+      attributes: ["a_position", "a_normal", "a_uv"],
+      uniforms: [],
+    });
+    const graph: Graph = {
+      nodes: [{ id: "m1", kind: "mesh", primitive: "cube" }, shaderNode("s1")],
+      edges: [
+        {
+          id: "e1",
+          source: "m1",
+          sourceHandle: "mesh",
+          target: "s1",
+          targetHandle: "mesh",
+        },
+      ],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    expect(plan.shaderPassByNode.has("s1")).toBe(true);
+    expect(plan.fullscreenByNode.s1).toBe(false);
+    plan.dispose();
+  });
+
+  it("still records true for a mesh-unconnected node whose fragment fails to compile (superset coverage — the record is not gated on createProgram success)", () => {
+    const gl = createFakeGl({
+      attributes: ["a_position"],
+      uniforms: [],
+      compileFailure: true,
+    });
+    const graph: Graph = { nodes: [shaderNode("s1")], edges: [] };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    // No pass exists — createProgram failed — yet the record is still there.
+    expect(plan.shaderPassByNode.has("s1")).toBe(false);
+    expect(plan.fullscreenByNode.s1).toBe(true);
+    plan.dispose();
   });
 });

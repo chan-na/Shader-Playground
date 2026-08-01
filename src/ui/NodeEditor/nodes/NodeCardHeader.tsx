@@ -202,7 +202,16 @@ export function NodeCardHeader({
       )}
       {meta === undefined ? null : (
         <div
-          style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            // Lets a fragment of multiple meta children (e.g. ShaderNodeView's
+            // FullscreenBadge + ErrorBadge/GpuTimerChip pair, A-1) sit apart
+            // without touching — a no-op for every other caller's single
+            // ReactNode meta.
+            gap: 5,
+          }}
         >
           {meta}
         </div>

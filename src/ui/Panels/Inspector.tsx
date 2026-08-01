@@ -4,6 +4,7 @@ import type {
   ComputeGraphNode,
   GraphNode,
   GroupGraphNode,
+  MeshGraphNode,
   ParamGraphNode,
   ResolutionScale,
   ShaderGraphNode,
@@ -14,7 +15,6 @@ import { RESOLUTION_SCALES } from "../../core/graph/types";
 import {
   inspectorUniforms,
   parseUniforms,
-  SYSTEM_UNIFORM_DESCRIPTIONS,
   samplerUniforms,
 } from "../../core/graph/uniformParser";
 import { displayNodeName, NODE_META } from "../../core/nodes/registry";
@@ -26,7 +26,9 @@ import { TextField } from "../controls/TextField";
 import { AudioInspector } from "./AudioInspector";
 import { GroupInspector } from "./GroupInspector";
 import { InspectorNodeHeader } from "./InspectorNodeHeader";
+import { MeshInspectorSection } from "./MeshInspectorSection";
 import { ParamInspector } from "./ParamInspector";
+import { SystemUniformsSection } from "./SystemUniformsSection";
 import { UniformControl } from "./UniformControl";
 import { UniformHintEditor } from "./UniformHintEditor";
 import { UtilityInspector } from "./UtilityInspector";
@@ -246,6 +248,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
           {(node.kind === "math" ||
             node.kind === "swizzle" ||
             node.kind === "combine") && <UtilityInspector node={node} />}
+
+          {node.kind === "mesh" && (
+            <MeshInspectorSection node={node as MeshGraphNode} />
+          )}
 
           {computeNode && (
             <div className="inspector-section">
@@ -552,54 +558,10 @@ export function Inspector({ embedded = false }: InspectorProps) {
               )}
 
               {systemUniforms.length > 0 && filteredSystem.length > 0 && (
-                <div className="inspector-section">
-                  <div className="inspector-label">System uniforms (auto)</div>
-                  <div
-                    style={{
-                      color: "var(--text-secondary)",
-                      fontSize: 11,
-                      marginTop: 2,
-                      marginBottom: 6,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    렌더러가 자동 주입하므로 그래프 input port에는 노출되지
-                    않습니다.
-                  </div>
-                  {filteredSystem.map((s) => {
-                    const desc = SYSTEM_UNIFORM_DESCRIPTIONS[s.name];
-                    return (
-                      <div
-                        key={s.name}
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text-muted)",
-                          marginBottom: 2,
-                          lineHeight: 1.4,
-                        }}
-                        data-testid="system-uniform-row"
-                        data-uniform-name={s.name}
-                      >
-                        <span style={{ fontFamily: "var(--font-mono)" }}>
-                          {s.name}{" "}
-                          <span style={{ color: "var(--text-disabled)" }}>
-                            · {s.type}
-                          </span>
-                        </span>
-                        {desc && (
-                          <span
-                            style={{
-                              color: "var(--text-secondary)",
-                              marginLeft: 6,
-                            }}
-                          >
-                            — {desc}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <SystemUniformsSection
+                  specs={filteredSystem}
+                  owner={uniformOwner}
+                />
               )}
 
               {noMatches && (

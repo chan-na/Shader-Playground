@@ -479,14 +479,14 @@ uniform vec3 u_baseColor;
 | 티어 | 항목 | 상태 | 브랜치/PR | 비고 |
 |---|---|---|---|---|
 | — | D-0 번들 예산 방침 결정 | ✅ 완료 | — | 2026-08-01 선택 1 확정 → T0 신설 |
-| — | D-1 Pass Inspector 배치 결정 | ⬜ 미착수 | — | T1 착수 전 |
+| — | D-1 Pass Inspector 배치 결정 | ✅ 완료 | — | 잠정 ②(오버레이 3원화) 채택 — design-request v2.3 AA 발행 |
 | **T0** | **T0-1 게이트를 엔트리 청크 기준으로** | ✅ 완료 | feat/learnability-2026-08 | **T1의 선행 조건** |
 | **T0** | **T0-2 loaders.gl 동적 import** | ✅ 완료 | feat/learnability-2026-08 | 엔트리 −43 KiB 실측 완료 |
 | **T0** | **T0-3 shareUrl import 충돌 해소** | ✅ 완료 | feat/learnability-2026-08 | 기존 버그 |
-| T1 | A-1 풀스크린 대체 표시 | ⬜ 미착수 | — | |
-| T1 | D-1 Pass Inspector | ⬜ 미착수 | — | |
-| T1 | C-1 시스템 유니폼 섹션 | ⬜ 미착수 | — | |
-| T1 | B-1 Mesh attribute 노출 | ⬜ 미착수 | — | |
+| T1 | A-1 풀스크린 대체 표시 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 |
+| T1 | D-1 Pass Inspector | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 |
+| T1 | C-1 시스템 유니폼 섹션 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 (유닛 U4) |
+| T1 | B-1 Mesh attribute 노출 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 (유닛 U4) |
 | T2 | E-1 미연결/미사용 경고 | ⬜ 미착수 | — | |
 | T2 | E-4 연결된 슬라이더 표시 | ⬜ 미착수 | — | |
 | T2 | B-2 attribute 소비 체크 | ⬜ 미착수 | — | |

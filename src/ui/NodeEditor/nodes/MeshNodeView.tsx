@@ -1,4 +1,9 @@
 import type { NodeProps } from "@xyflow/react";
+import { useMemo } from "react";
+import {
+  attrTypeLabel,
+  meshContractFor,
+} from "../../../core/assets/meshContract";
 import {
   PRIMITIVE_NAMES,
   type PrimitiveName,
@@ -26,6 +31,15 @@ export function MeshNodeView({ id, data }: NodeProps) {
   const usingAsset = !!asset;
   const label = usingAsset ? asset?.name : node.primitive;
 
+  // [B-1] The mesh port's actual attribute contract — computed from the same
+  // sources the render path reads (asset.data, or makePrimitive for a
+  // built-in), never inferred. Memoized: makePrimitive regenerates full
+  // vertex buffers on every call.
+  const contract = useMemo(() => meshContractFor(node, asset), [node, asset]);
+  const attrSummary = contract.attributes
+    .map((a) => `${a.name} ${attrTypeLabel(a.size)}`)
+    .join(" · ");
+
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 168 }}>
       <NodeCardHeader
@@ -38,11 +52,7 @@ export function MeshNodeView({ id, data }: NodeProps) {
         className="node-card__body"
         style={{ paddingLeft: 14, paddingRight: 22 }}
       >
-        {usingAsset ? (
-          <div className="node-card__meta" style={{ fontSize: 10 }}>
-            {asset?.data.vertexCount.toLocaleString()} verts
-          </div>
-        ) : (
+        {usingAsset ? null : (
           <select
             className="node-card__select nodrag"
             value={node.primitive}
@@ -55,11 +65,24 @@ export function MeshNodeView({ id, data }: NodeProps) {
             ))}
           </select>
         )}
+        <div
+          className="node-card__meta"
+          style={{ fontSize: 10, marginTop: usingAsset ? 0 : 4 }}
+          data-testid="mesh-contract"
+        >
+          <div>{attrSummary}</div>
+          <div>
+            {contract.vertexCount.toLocaleString()} verts ·{" "}
+            {contract.indexCount.toLocaleString()} idx ·{" "}
+            {contract.primitiveLabel}
+          </div>
+        </div>
       </div>
       <PortHandle
         port={{ name: "mesh", type: "mesh" }}
         side="out"
         top={PORT_TOP_PAD}
+        tooltip={`mesh: ${attrSummary} · ${contract.vertexCount.toLocaleString()} verts`}
       />
     </div>
   );

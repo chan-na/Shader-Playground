@@ -138,6 +138,35 @@ describe("PortHandle — drag fanout highlight (M8-U3)", () => {
   });
 });
 
+describe("PortHandle — tooltip [B-1]", () => {
+  it("forwards the tooltip prop as a title attribute on the pin and the label", () => {
+    const { container } = renderInFlow(
+      <PortHandle
+        port={{ name: "mesh", type: "mesh" }}
+        side="out"
+        top={38}
+        tooltip="mesh: a_position vec3 · a_normal vec3 · a_uv vec2 · 24 verts"
+      />,
+    );
+    const handle = container.querySelector(".port-handle--out");
+    expect(handle?.getAttribute("title")).toBe(
+      "mesh: a_position vec3 · a_normal vec3 · a_uv vec2 · 24 verts",
+    );
+    const label = container.querySelector(".node-card__port-label--out");
+    expect(label?.getAttribute("title")).toBe(
+      "mesh: a_position vec3 · a_normal vec3 · a_uv vec2 · 24 verts",
+    );
+  });
+
+  it("omits the title attribute entirely when no tooltip is given", () => {
+    const { container } = renderInFlow(
+      <PortHandle port={{ name: "in1", type: "float" }} side="in" top={40} />,
+    );
+    const handle = container.querySelector(".port-handle--in");
+    expect(handle?.hasAttribute("title")).toBe(false);
+  });
+});
+
 describe("PortHandle — connection snap ring (M8-U4)", () => {
   /**
    * NOTE: the positive case (this port's snap matches -> ring renders) can't

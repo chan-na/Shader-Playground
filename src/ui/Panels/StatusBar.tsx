@@ -81,6 +81,8 @@ export function StatusBar() {
   const diagOpen = useDebugUiStore((s) => s.open);
   const toggleDiag = useDebugUiStore((s) => s.toggleOpen);
   const toggleProblems = useDebugUiStore((s) => s.toggleProblems);
+  const passesOpen = useDebugUiStore((s) => s.passesOpen);
+  const togglePasses = useDebugUiStore((s) => s.togglePasses);
   // R5 (B5-U3): diagnostics is no longer a Side Panel tab — it's a bottom
   // transient overlay (StatusOverlays) toggled purely by debugUiStore.open.
   // The D1-era un-collapse dance (finding the inspector/assets dock leaf and
@@ -176,6 +178,16 @@ export function StatusBar() {
         {problemCount > 0
           ? `⚠ ${problemCount} problem${problemCount === 1 ? "" : "s"}`
           : "no problems"}
+      </button>
+      <button
+        type="button"
+        className="statusbar-diag"
+        onClick={togglePasses}
+        title="Toggle the pass inspector (what actually runs this frame, in order)"
+        data-testid="status-passes"
+        aria-pressed={passesOpen}
+      >
+        ▤ Passes
       </button>
       <button
         type="button"

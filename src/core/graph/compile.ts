@@ -151,6 +151,17 @@ export interface ExecutionPlan {
    * never saw.
    */
   compiledVertexSource: Record<string, string>;
+  /**
+   * Shader node-id → whether that node's mesh input resolved to the
+   * fullscreen-quad substitution (see `compiledVertexSource` above for the
+   * mechanism). Unlike `shaderPassByNode`, which only holds nodes whose
+   * program actually linked, this record is written at the same point as
+   * `compiledVertexSource` — before `createProgram` runs — so it also covers
+   * nodes whose fragment (or vertex) shader failed to compile. UI badges/tabs
+   * that need to stay honest about a broken node's mesh wiring must read this
+   * rather than `shaderPassByNode`.
+   */
+  fullscreenByNode: Record<string, boolean>;
   width: number;
   height: number;
   /**
@@ -188,6 +199,7 @@ export function emptyPlan(width: number, height: number): ExecutionPlan {
     errors: [],
     shaderErrors: {},
     compiledVertexSource: {},
+    fullscreenByNode: {},
     width,
     height,
     hasCompute: false,
@@ -492,6 +504,7 @@ export function compileGraph(
   const errors = validateGraph(graph);
   const shaderErrors: Record<string, ShaderError[]> = {};
   const compiledVertexSource: Record<string, string> = {};
+  const fullscreenByNode: Record<string, boolean> = {};
   const fatal = errors.some(
     (e) =>
       e.code === "cycle" ||
@@ -577,6 +590,7 @@ export function compileGraph(
       vertexSource = fullscreenVert;
     }
     compiledVertexSource[sn.id] = vertexSource;
+    fullscreenByNode[sn.id] = meshIsFullscreen;
 
     const built = createProgram(gl, vertexSource, sn.fragmentSource);
     if (built.errors.length) shaderErrors[sn.id] = built.errors;
@@ -706,6 +720,7 @@ export function compileGraph(
     errors,
     shaderErrors,
     compiledVertexSource,
+    fullscreenByNode,
     width: opts.width,
     height: opts.height,
     hasCompute: passes.some((p) => p.kind === "compute"),

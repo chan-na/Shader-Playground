@@ -1,7 +1,9 @@
+import { cleanup, render, screen } from "@testing-library/react";
 import { type NodeProps, ReactFlowProvider } from "@xyflow/react";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import type { GeometryHandle } from "../../../core/assets/types";
 import type {
   CombineGraphNode,
   ComputeGraphNode,
@@ -13,6 +15,7 @@ import type {
   ShaderGraphNode,
   SwizzleGraphNode,
 } from "../../../core/graph/types";
+import { useAssetStore } from "../../../state/assetStore";
 import { tokens } from "../../../theme";
 import { ComputeNodeView } from "./ComputeNodeView";
 import { ImageNodeView } from "./ImageNodeView";
@@ -70,6 +73,73 @@ describe("MeshNodeView", () => {
     for (const p of ["cube", "sphere", "plane", "torus", "quad"]) {
       expect(html).toContain(`value="${p}"`);
     }
+  });
+
+  // [B-1] The fixed a_position/a_normal/a_uv attribute contract, surfaced on
+  // the card so the `mesh` port stops being an opaque type name.
+  it("shows the built-in primitive's attribute contract + counts", () => {
+    const node: MeshGraphNode = {
+      id: "m1",
+      kind: "mesh",
+      primitive: "cube",
+      assetId: null,
+    };
+    const html = renderInFlow(<MeshNodeView {...mockProps("m1", node)} />);
+    expect(html).toContain('data-testid="mesh-contract"');
+    expect(html).toContain("a_position vec3");
+    expect(html).toContain("a_normal vec3");
+    expect(html).toContain("a_uv vec2");
+    expect(html).toContain("verts");
+    expect(html).toContain("0 idx"); // cube draws via drawArrays, no IBO
+    expect(html).toContain("TRIANGLES");
+  });
+});
+
+// [B-1] Asset-store-dependent branch — needs a live (client) render rather
+// than renderInFlow's renderToStaticMarkup, which (per the NOTE at the top of
+// this file) always sees zustand's frozen *initial* snapshot and would never
+// observe an addMesh() call made before rendering.
+describe("MeshNodeView — asset attribute contract [B-1]", () => {
+  const initialAssetState = useAssetStore.getState();
+
+  afterEach(() => {
+    cleanup();
+    useAssetStore.setState(initialAssetState, true);
+  });
+
+  it("shows the bound asset's own attributes/counts instead of the primitive contract", () => {
+    const asset: GeometryHandle = {
+      id: "a1",
+      name: "imported.obj",
+      data: {
+        attributes: [
+          { name: "a_position", data: new Float32Array(9), size: 3 },
+          { name: "a_normal", data: new Float32Array(9), size: 3 },
+          { name: "a_uv", data: new Float32Array(6), size: 2 },
+        ],
+        vertexCount: 3,
+        indices: new Uint16Array([0, 1, 2]),
+      },
+    };
+    useAssetStore.getState().addMesh(asset);
+    const node: MeshGraphNode = {
+      id: "m1",
+      kind: "mesh",
+      primitive: "cube",
+      assetId: "a1",
+    };
+
+    render(
+      <ReactFlowProvider>
+        <MeshNodeView {...mockProps("m1", node)} />
+      </ReactFlowProvider>,
+    );
+
+    const contract = screen.getByTestId("mesh-contract");
+    expect(contract.textContent).toContain("a_position vec3");
+    expect(contract.textContent).toContain("3 verts");
+    expect(contract.textContent).toContain("3 idx");
+    expect(contract.textContent).toContain("TRIANGLES");
   });
 });
 

@@ -29,6 +29,15 @@ interface PortHandleProps {
    * used by Webcam/Audio node views on their output port while the source is
    * pending/denied permission, since nothing is flowing through it yet. */
   dimmed?: boolean;
+  /**
+   * [B-1] Native `title` tooltip on hover, forwarded to both the pin (Handle
+   * spreads unrecognized props onto its underlying div, `@xyflow/react`'s
+   * `HandleProps` extends `HTMLAttributes<HTMLDivElement>`) and the text
+   * label — used to surface a mesh port's actual attribute contract, or to
+   * flag a compute node's `mesh` output as a TF ping-pong buffer rather than
+   * a static mesh.
+   */
+  tooltip?: string;
 }
 
 /**
@@ -42,7 +51,13 @@ interface PortHandleProps {
  * hidden — every port gets a label so the data type is legible without
  * relying solely on the header color.
  */
-export function PortHandle({ port, side, top, dimmed }: PortHandleProps) {
+export function PortHandle({
+  port,
+  side,
+  top,
+  dimmed,
+  tooltip,
+}: PortHandleProps) {
   const isIn = side === "in";
   const fam = portFamilyHex(port.type);
   const nodeId = useNodeId();
@@ -79,6 +94,7 @@ export function PortHandle({ port, side, top, dimmed }: PortHandleProps) {
         type={isIn ? "target" : "source"}
         position={isIn ? Position.Left : Position.Right}
         className={`handle-${port.type} port-handle port-handle--${side}`}
+        title={tooltip}
         style={{
           top,
           width: PORT_DIAMETER.card,
@@ -127,6 +143,7 @@ export function PortHandle({ port, side, top, dimmed }: PortHandleProps) {
       )}
       <span
         className={`node-card__port-label node-card__port-label--${isIn ? "in" : "out"}`}
+        title={tooltip}
         style={{
           top,
           color: fam,

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   GraphNode,
   MeshGraphNode,
+  ParamGraphNode,
   ShaderGraphNode,
 } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
@@ -415,5 +416,236 @@ describe("Inspector — Mesh section [B-1]", () => {
     expect(section.textContent).toContain("(vec3)");
     expect(section.textContent).toContain("a_uv");
     expect(section.textContent).toContain("(vec2)");
+  });
+});
+
+/** Finds a single `uniform-row` by its `data-uniform-name`. */
+function findUniformRow(name: string): HTMLElement {
+  const row = screen
+    .getAllByTestId("uniform-row")
+    .find((r) => r.getAttribute("data-uniform-name") === name);
+  if (!row) throw new Error(`uniform-row not found: ${name}`);
+  return row;
+}
+
+// [L1/E-4] A uniform is also an input port — when an edge drives it,
+// execute.ts's bindUserUniforms overwrites whatever the Inspector slider
+// would send every frame. The control must disable and explain why.
+describe("Inspector — driven uniforms (L1/E-4)", () => {
+  const drivenShaderNode: ShaderGraphNode = {
+    id: "s3",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "uniform float u_x;\nuniform float u_y;",
+    uniformValues: {},
+  };
+
+  const paramNode: ParamGraphNode = {
+    id: "p1",
+    kind: "param",
+    paramKind: "float",
+    value: 0,
+  };
+
+  it("marks the driven uniform's row, disables its control, and names the source node — the sibling uniform stays untouched", () => {
+    useGraphStore.getState().addNode(drivenShaderNode);
+    useGraphStore.getState().addNode(paramNode);
+    useGraphStore.getState().renameNode("p1", "Speed Param");
+    useGraphStore.getState().addEdge({
+      id: "ed1",
+      source: "p1",
+      sourceHandle: "value",
+      target: "s3",
+      targetHandle: "u_x",
+    });
+    useSelectionStore.getState().select("s3");
+    render(<Inspector embedded />);
+
+    const rowX = findUniformRow("u_x");
+    expect(rowX.getAttribute("data-driven")).toBe("true");
+    expect(rowX.textContent).toContain("driven by Speed Param");
+    const sliderX = rowX.querySelector(
+      "input[type='range']",
+    ) as HTMLInputElement;
+    expect(sliderX.disabled).toBe(true);
+
+    const rowY = findUniformRow("u_y");
+    expect(rowY.getAttribute("data-driven")).toBe("false");
+    expect(rowY.textContent).not.toContain("driven by");
+    const sliderY = rowY.querySelector(
+      "input[type='range']",
+    ) as HTMLInputElement;
+    expect(sliderY.disabled).toBe(false);
+  });
+
+  it("reverts to enabled and drops the note the instant the edge is removed", () => {
+    useGraphStore.getState().addNode(drivenShaderNode);
+    useGraphStore.getState().addNode(paramNode);
+    useGraphStore.getState().addEdge({
+      id: "ed1",
+      source: "p1",
+      sourceHandle: "value",
+      target: "s3",
+      targetHandle: "u_x",
+    });
+    useSelectionStore.getState().select("s3");
+    render(<Inspector embedded />);
+
+    expect(findUniformRow("u_x").getAttribute("data-driven")).toBe("true");
+
+    act(() => {
+      useGraphStore.getState().removeEdge("ed1");
+    });
+
+    expect(findUniformRow("u_x").getAttribute("data-driven")).toBe("false");
+    expect(screen.queryByTestId("uniform-driven-note")).toBeNull();
+    const slider = findUniformRow("u_x").querySelector(
+      "input[type='range']",
+    ) as HTMLInputElement;
+    expect(slider.disabled).toBe(false);
+  });
+
+  // A dead edge (source node gone, e.g. mid-undo) must not collapse to an
+  // empty label the way displayNodeName's blank-name fallback would.
+  it("falls back to the raw edge source id when the driving node no longer exists", () => {
+    useGraphStore.getState().addNode(drivenShaderNode);
+    useGraphStore.setState((s) => ({
+      edges: [
+        ...s.edges,
+        {
+          id: "ed-dead",
+          source: "ghost",
+          sourceHandle: "value",
+          target: "s3",
+          targetHandle: "u_x",
+        },
+      ],
+    }));
+    useSelectionStore.getState().select("s3");
+    render(<Inspector embedded />);
+
+    const row = findUniformRow("u_x");
+    expect(row.getAttribute("data-driven")).toBe("true");
+    expect(row.textContent).toContain("driven by ghost");
+  });
+
+  it("never mutates uniformValues while driven — the store stays untouched", () => {
+    useGraphStore.getState().addNode(drivenShaderNode);
+    useGraphStore.getState().addNode(paramNode);
+    useGraphStore.getState().addEdge({
+      id: "ed1",
+      source: "p1",
+      sourceHandle: "value",
+      target: "s3",
+      targetHandle: "u_x",
+    });
+    useSelectionStore.getState().select("s3");
+    render(<Inspector embedded />);
+
+    const stored = useGraphStore
+      .getState()
+      .nodes.find((n) => n.id === "s3") as ShaderGraphNode;
+    expect(stored.uniformValues).toEqual({});
+  });
+
+  // The hint editor (⚙) edits the source-level annotation, not the live
+  // value — it must stay reachable even while the control is driven.
+  it("keeps the hint-editor gear reachable while the uniform is driven", () => {
+    useGraphStore.getState().addNode(drivenShaderNode);
+    useGraphStore.getState().addNode(paramNode);
+    useGraphStore.getState().addEdge({
+      id: "ed1",
+      source: "p1",
+      sourceHandle: "value",
+      target: "s3",
+      targetHandle: "u_x",
+    });
+    useSelectionStore.getState().select("s3");
+    render(<Inspector embedded />);
+
+    const toggle = findUniformRow("u_x").querySelector(
+      "[data-testid='uniform-edit-toggle']",
+    );
+    expect(toggle).not.toBeNull();
+    fireEvent.click(toggle as Element);
+    expect(screen.getByTestId("uniform-hint-editor")).not.toBeNull();
+  });
+});
+
+// [L1/E-4] Sampler inputs — same (target, targetHandle) lookup, surfaced as
+// connection state instead of a driven/disabled control (samplers have no
+// slider to disable).
+describe("Inspector — Sampler inputs connection state (L1/E-4)", () => {
+  const samplerShaderNode: ShaderGraphNode = {
+    id: "s4",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "uniform sampler2D u_tex;",
+    uniformValues: {},
+  };
+
+  const sourceShaderNode: ShaderGraphNode = {
+    id: "src1",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "",
+    uniformValues: {},
+  };
+
+  it("shows 미연결 for an unconnected sampler input", () => {
+    useGraphStore.getState().addNode(samplerShaderNode);
+    useSelectionStore.getState().select("s4");
+    render(<Inspector embedded />);
+
+    const row = screen.getByTestId("sampler-input-row");
+    expect(row.getAttribute("data-uniform-name")).toBe("u_tex");
+    expect(row.getAttribute("data-connected")).toBe("false");
+    expect(row.textContent).toContain("미연결");
+  });
+
+  it("shows the connected source node's display name", () => {
+    useGraphStore.getState().addNode(samplerShaderNode);
+    useGraphStore.getState().addNode(sourceShaderNode);
+    useGraphStore.getState().renameNode("src1", "Tex Source");
+    useGraphStore.getState().addEdge({
+      id: "et1",
+      source: "src1",
+      sourceHandle: "texture",
+      target: "s4",
+      targetHandle: "u_tex",
+    });
+    useSelectionStore.getState().select("s4");
+    render(<Inspector embedded />);
+
+    const row = screen.getByTestId("sampler-input-row");
+    expect(row.getAttribute("data-connected")).toBe("true");
+    expect(row.textContent).toContain("← Tex Source");
+    expect(row.textContent).not.toContain("미연결");
+  });
+
+  it("reverts to 미연결 when the edge is removed", () => {
+    useGraphStore.getState().addNode(samplerShaderNode);
+    useGraphStore.getState().addNode(sourceShaderNode);
+    useGraphStore.getState().addEdge({
+      id: "et1",
+      source: "src1",
+      sourceHandle: "texture",
+      target: "s4",
+      targetHandle: "u_tex",
+    });
+    useSelectionStore.getState().select("s4");
+    render(<Inspector embedded />);
+
+    expect(
+      screen.getByTestId("sampler-input-row").getAttribute("data-connected"),
+    ).toBe("true");
+
+    act(() => {
+      useGraphStore.getState().removeEdge("et1");
+    });
+
+    const row = screen.getByTestId("sampler-input-row");
+    expect(row.getAttribute("data-connected")).toBe("false");
+    expect(row.textContent).toContain("미연결");
   });
 });

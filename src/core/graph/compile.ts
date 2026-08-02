@@ -62,6 +62,20 @@ interface ParamBinding {
   sourceNodeId: string;
 }
 
+/**
+ * Per-attribute record of whether a mesh's vertex data was actually consumed
+ * by the compiled program (B-2). Mirrors `core/gl/mesh.ts`'s `uploadMesh`
+ * skip condition (`loc === undefined || loc < 0`) so this can never drift
+ * from what the GPU actually bound. Left empty for fullscreen-substituted or
+ * compute-driven passes (see `meshAttributeUse` below) — those aren't a mesh
+ * the user wired in, so a "skipped attribute" warning there would be noise.
+ */
+interface MeshAttributeUse {
+  name: string;
+  size: number;
+  consumed: boolean;
+}
+
 export interface ShaderPass {
   kind: "shader";
   nodeId: string;
@@ -84,6 +98,13 @@ export interface ShaderPass {
   /** FBO dimensions after applying the node's resolutionScale. */
   width: number;
   height: number;
+  /**
+   * Which of the mesh's attributes the linked program actually bound (B-2).
+   * `[]` when the mesh is the fullscreen-quad substitution or compute-driven
+   * — both are automated stand-ins, not a mesh the user connected, so there
+   * is nothing to warn about.
+   */
+  meshAttributeUse: MeshAttributeUse[];
 }
 
 interface ComputeAttributeSlot {
@@ -606,6 +627,7 @@ export function compileGraph(
     let meshComputeVaos:
       | [WebGLVertexArrayObject, WebGLVertexArrayObject]
       | null = null;
+    let meshAttributeUse: MeshAttributeUse[] = [];
     if (meshComputeNodeId) {
       const cp = passByNode.get(meshComputeNodeId) as ComputePass;
       const vaos = buildShaderComputeVaos(gl, built.program, cp);
@@ -634,7 +656,23 @@ export function compileGraph(
         primitive: meshComputeSourcePrim,
       };
     } else {
-      mesh = uploadMesh(gl, meshData, built.program.attributes);
+      // Captured into a local so the closure below still sees the narrowing
+      // from the `!built.program` guard above — TS doesn't carry a property
+      // narrowing (`built.program`) into a nested arrow function.
+      const program = built.program;
+      mesh = uploadMesh(gl, meshData, program.attributes);
+      // Fullscreen substitution is the app's own automatic fallback (A-1),
+      // not a mesh the user wired in — no consumption warning applies there.
+      meshAttributeUse = meshIsFullscreen
+        ? []
+        : meshData.attributes.map((attr) => {
+            const loc = program.attributes[attr.name];
+            return {
+              name: attr.name,
+              size: attr.size,
+              consumed: !(loc === undefined || loc < 0),
+            };
+          });
     }
 
     // Routing inputs: classify each incoming edge as sampler (texture) vs
@@ -680,6 +718,7 @@ export function compileGraph(
       uniformValues: { ...sn.uniformValues },
       width: passWidth,
       height: passHeight,
+      meshAttributeUse,
     };
     passes.push(pass);
     passByNode.set(sn.id, pass);

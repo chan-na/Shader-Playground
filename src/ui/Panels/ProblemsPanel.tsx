@@ -1,9 +1,14 @@
 import { useMemo } from "react";
 import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
+import {
+  type SilentUniformWarning,
+  silentWarningMessage,
+} from "../../core/graph/silentUniforms";
 import { displayNodeName } from "../../core/nodes/registry";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { summarizeProblems } from "./problemsSummary";
@@ -12,6 +17,12 @@ interface Entry {
   nodeId: string;
   stage: "vertex" | "fragment" | "link";
   diag: GLSLDiagnostic;
+}
+
+/** A pass's silent-warning row (E-1, T2), flattened for rendering. */
+interface SilentEntry {
+  nodeId: string;
+  warning: SilentUniformWarning;
 }
 
 type Severity = GLSLDiagnostic["severity"];
@@ -37,6 +48,7 @@ export function ProblemsPanel() {
   const byNode = useDiagnosticsStore((s) => s.byNode);
   const runtimeErrors = useRendererStore((s) => s.stats.errors);
   const nodes = useGraphStore((s) => s.nodes);
+  const passRows = usePassPlanStore((s) => s.rows);
   const select = useSelectionStore((s) => s.select);
   const setStage = useEditorStore((s) => s.setStage);
   const requestJump = useEditorStore((s) => s.requestJump);
@@ -53,15 +65,35 @@ export function ProblemsPanel() {
     return out;
   }, [byNode]);
 
+  // E-1 (T2): flatten every shader pass row's silentWarnings into rows this
+  // panel can render alongside compile diagnostics. Compute rows are never a
+  // source — silent uniform warnings only apply to linked shader programs.
+  const silentEntries: SilentEntry[] = useMemo(() => {
+    const out: SilentEntry[] = [];
+    for (const row of passRows) {
+      if (row.kind !== "shader") continue;
+      for (const w of row.silentWarnings) {
+        out.push({ nodeId: row.nodeId, warning: w });
+      }
+    }
+    return out;
+  }, [passRows]);
+
   // design/Side Panel.dc.html L192-194: severity summary chips, one per
   // severity present (>0 count) above the diagnostic/runtime-error list.
+  // Silent warnings fold into the "warning" bucket alongside any diagnostic
+  // of severity "warning" — they're both warnings from the panel's point of
+  // view, just from different sources.
   const summary = useMemo(
     () =>
       summarizeProblems(
-        entries.map((e) => ({ severity: e.diag.severity })),
+        [
+          ...entries.map((e) => ({ severity: e.diag.severity })),
+          ...silentEntries.map(() => ({ severity: "warning" as const })),
+        ],
         runtimeErrors.length,
       ),
-    [entries, runtimeErrors.length],
+    [entries, silentEntries, runtimeErrors.length],
   );
 
   const nodeLabel = (id: string) => {
@@ -186,6 +218,43 @@ export function ProblemsPanel() {
               </button>
             );
           })}
+        </div>
+      )}
+      {silentEntries.length > 0 && (
+        <div className="inspector-section">
+          <div className="inspector-label">
+            Pipeline warnings ({silentEntries.length})
+          </div>
+          {silentEntries.map((e) => (
+            <button
+              type="button"
+              // A row's declared-uniform names are already deduped
+              // (parseUniforms' `seen` set), so nodeId+uniformName alone is
+              // a stable, collision-free key without falling back to index.
+              key={`${e.nodeId}:${e.warning.uniformName}`}
+              className="problems-card"
+              style={{ borderLeft: `2px solid ${SEVERITY_VAR.warning}` }}
+              onClick={() => select(e.nodeId)}
+              title="Select node"
+              data-testid="silent-warning-row"
+              data-node-id={e.nodeId}
+              data-uniform-name={e.warning.uniformName}
+              data-kind={e.warning.kind}
+            >
+              <span
+                className="problems-card-icon"
+                style={{ color: SEVERITY_VAR.warning }}
+              >
+                {SEVERITY_ICON.warning}
+              </span>
+              <div className="problems-card-body">
+                <div className="problems-card-message">
+                  {silentWarningMessage(e.warning)}
+                </div>
+                <div className="problems-card-loc">{nodeLabel(e.nodeId)}</div>
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </div>

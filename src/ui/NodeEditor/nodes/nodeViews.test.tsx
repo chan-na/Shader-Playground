@@ -16,6 +16,9 @@ import type {
   SwizzleGraphNode,
 } from "../../../core/graph/types";
 import { useAssetStore } from "../../../state/assetStore";
+import { useGraphStore } from "../../../state/graphStore";
+import type { ShaderPassRow } from "../../../state/passPlanStore";
+import { usePassPlanStore } from "../../../state/passPlanStore";
 import { tokens } from "../../../theme";
 import { ComputeNodeView } from "./ComputeNodeView";
 import { ImageNodeView } from "./ImageNodeView";
@@ -140,6 +143,113 @@ describe("MeshNodeView — asset attribute contract [B-1]", () => {
     expect(contract.textContent).toContain("3 verts");
     expect(contract.textContent).toContain("3 idx");
     expect(contract.textContent).toContain("TRIANGLES");
+  });
+});
+
+// [B-2] Same store-dependent-branch reasoning as the asset describe block
+// above: needs a live render so useGraphStore/usePassPlanStore updates are
+// observed.
+describe("MeshNodeView — attribute consumption warning [B-2]", () => {
+  const initialGraph = useGraphStore.getState();
+  const initialPassPlan = usePassPlanStore.getState();
+
+  afterEach(() => {
+    cleanup();
+    useGraphStore.setState(initialGraph, true);
+    usePassPlanStore.setState(initialPassPlan, true);
+  });
+
+  function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {
+    return {
+      kind: "shader",
+      nodeId: "s1",
+      width: 100,
+      height: 100,
+      resolutionScale: 1,
+      meshIsFullscreen: false,
+      meshLabel: "cube",
+      meshComputeNodeId: null,
+      samplers: [],
+      meshAttributeUse: [],
+      silentWarnings: [],
+      ...overrides,
+    };
+  }
+
+  const meshNode: MeshGraphNode = {
+    id: "m1",
+    kind: "mesh",
+    primitive: "cube",
+    assetId: null,
+  };
+  const meshEdge = {
+    id: "e1",
+    source: "m1",
+    sourceHandle: "mesh",
+    target: "s1",
+    targetHandle: "mesh",
+  };
+
+  it("names attributes the connected consumer's program never bound", () => {
+    useGraphStore.setState({ edges: [meshEdge] });
+    usePassPlanStore.getState().publish(
+      [
+        shaderRowFixture({
+          meshAttributeUse: [
+            { name: "a_position", size: 3, consumed: true },
+            { name: "a_normal", size: 3, consumed: false },
+            { name: "a_uv", size: 2, consumed: false },
+          ],
+        }),
+      ],
+      {},
+    );
+
+    render(
+      <ReactFlowProvider>
+        <MeshNodeView {...mockProps("m1", meshNode)} />
+      </ReactFlowProvider>,
+    );
+
+    const warn = screen.getByTestId("mesh-skipped-attrs");
+    expect(warn.textContent).toContain("a_normal");
+    expect(warn.textContent).toContain("a_uv");
+    expect(warn.textContent).not.toContain("a_position");
+  });
+
+  it("renders no warning line when every attribute is consumed", () => {
+    useGraphStore.setState({ edges: [meshEdge] });
+    usePassPlanStore.getState().publish(
+      [
+        shaderRowFixture({
+          meshAttributeUse: [
+            { name: "a_position", size: 3, consumed: true },
+            { name: "a_normal", size: 3, consumed: true },
+            { name: "a_uv", size: 2, consumed: true },
+          ],
+        }),
+      ],
+      {},
+    );
+
+    render(
+      <ReactFlowProvider>
+        <MeshNodeView {...mockProps("m1", meshNode)} />
+      </ReactFlowProvider>,
+    );
+
+    expect(screen.queryByTestId("mesh-skipped-attrs")).toBeNull();
+  });
+
+  it("renders no warning line when there is no connected consumer (unknown, not skipped)", () => {
+    // No edges published — every attribute aggregates to "unknown".
+    render(
+      <ReactFlowProvider>
+        <MeshNodeView {...mockProps("m1", meshNode)} />
+      </ReactFlowProvider>,
+    );
+
+    expect(screen.queryByTestId("mesh-skipped-attrs")).toBeNull();
   });
 });
 

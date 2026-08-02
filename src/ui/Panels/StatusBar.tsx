@@ -5,6 +5,7 @@ import { useDockStore } from "../../state/dockStore";
 import { collectPanelIds } from "../../state/dockTree";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
@@ -75,6 +76,18 @@ export function StatusBar() {
     }
     return n;
   });
+  // E-1 (T2): silent-uniform-warning count across every shader pass row.
+  // A numeric-returning selector, so this stays reference-stable like
+  // compileErrorCount/diagnosticsProblemCount above — passPlanStore only
+  // republishes on recompile (not the RAF hot path), so this doesn't run
+  // afoul of the #42 field-selector discipline either.
+  const silentWarningCount = usePassPlanStore((s) => {
+    let n = 0;
+    for (const r of s.rows) {
+      if (r.kind === "shader") n += r.silentWarnings.length;
+    }
+    return n;
+  });
   const gpuSupported = useGpuTimerStore((s) => s.supported);
   const gpuEnabled = useGpuTimerStore((s) => s.enabled);
   const gpuTotalMs = useGpuTimerStore((s) => s.totalMs);
@@ -107,7 +120,8 @@ export function StatusBar() {
   }, []);
 
   const errorCount = errors.length;
-  const problemCount = diagnosticsProblemCount + errorCount;
+  const problemCount =
+    diagnosticsProblemCount + errorCount + silentWarningCount;
   const showGpu = gpuSupported && gpuEnabled;
 
   const summary = statusSummary({

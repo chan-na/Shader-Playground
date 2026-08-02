@@ -97,4 +97,48 @@ describe("MultiSlider", () => {
     expect(received).toEqual([0.1, 0.2, 0.9]);
     expect(original).toEqual([0.1, 0.2, 0.3]);
   });
+
+  // [L1/E-4] Driven-uniform disable propagates to every axis's Slider and
+  // NumberField.
+  describe("disabled", () => {
+    it("disables every slider and number field for each axis", () => {
+      render(
+        <MultiSlider
+          values={[0.1, 0.2, 0.3]}
+          min={-1}
+          max={1}
+          step={0.01}
+          disabled
+          onChange={() => {}}
+        />,
+      );
+      for (const slider of screen.getAllByRole(
+        "slider",
+      ) as HTMLInputElement[]) {
+        expect(slider.disabled).toBe(true);
+      }
+      for (const field of screen.getAllByRole(
+        "spinbutton",
+      ) as HTMLInputElement[]) {
+        expect(field.disabled).toBe(true);
+      }
+    });
+
+    it("is enabled by default", () => {
+      render(
+        <MultiSlider
+          values={[0.1, 0.2, 0.3]}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={() => {}}
+        />,
+      );
+      for (const slider of screen.getAllByRole(
+        "slider",
+      ) as HTMLInputElement[]) {
+        expect(slider.disabled).toBe(false);
+      }
+    });
+  });
 });

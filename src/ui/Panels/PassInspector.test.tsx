@@ -60,6 +60,8 @@ function shaderRow(
     meshLabel: "fullscreen quad",
     meshComputeNodeId: null,
     samplers: [],
+    meshAttributeUse: [],
+    silentWarnings: [],
     ...overrides,
   };
 }

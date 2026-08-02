@@ -29,6 +29,29 @@ export interface ShaderPassRow {
     sourceNodeId: string;
     unit: number;
   }>;
+  /**
+   * Per-attribute record of whether this pass's linked program actually
+   * bound each of the mesh's attributes (B-2, `docs/learnability-plan-2026-08.md`
+   * T2). Mirrors `ShaderPass.meshAttributeUse` from `core/graph/compile.ts` —
+   * declared inline rather than imported to keep this a leaf store. Empty for
+   * fullscreen-substituted or compute-driven passes.
+   */
+  meshAttributeUse: ReadonlyArray<{
+    name: string;
+    size: number;
+    consumed: boolean;
+  }>;
+  /**
+   * Uniforms this pass declared but that the compiled/linked program or the
+   * graph's wiring silently disagrees with (E-1, T2) — an unconnected
+   * sampler, or a uniform absent from the linked program. Mirrors
+   * `SilentUniformWarning` from `core/graph/silentUniforms.ts`, declared
+   * inline for the same leaf-store reason as `meshAttributeUse` above.
+   */
+  silentWarnings: ReadonlyArray<{
+    uniformName: string;
+    kind: "sampler-unconnected" | "uniform-inactive";
+  }>;
 }
 
 export interface ComputePassRow {

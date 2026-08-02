@@ -9,6 +9,7 @@ export interface MultiSliderProps {
   max: number;
   step: number;
   onChange: (next: number[]) => void;
+  disabled?: boolean;
 }
 
 /**
@@ -33,6 +34,7 @@ export function MultiSlider({
   max,
   step,
   onChange,
+  disabled = false,
 }: MultiSliderProps) {
   return (
     <div>
@@ -53,6 +55,7 @@ export function MultiSlider({
               min={min}
               max={max}
               step={step}
+              disabled={disabled}
               {...(meta !== undefined ? { fillColor: meta.color } : {})}
               onChange={(v) => {
                 const next = values.slice();
@@ -63,6 +66,7 @@ export function MultiSlider({
             <NumberField
               width={48}
               value={component.toFixed(3)}
+              disabled={disabled}
               onChange={(v) => {
                 const next = values.slice();
                 next[i] = v;

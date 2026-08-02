@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import { attrTypeLabel, meshContractFor } from "../../core/assets/meshContract";
+import { aggregateMeshConsumption } from "../../core/graph/meshConsumption";
 import type { MeshGraphNode } from "../../core/graph/types";
 import { useAssetStore } from "../../state/assetStore";
+import { useGraphStore } from "../../state/graphStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 
 /** Same chip visual as the Compute section's count/primitive chips
  *  (Inspector.tsx's pre-extraction "Compute" block) — reused verbatim rather
@@ -30,7 +33,30 @@ export function MeshInspectorSection({ node }: MeshInspectorSectionProps) {
   const asset = useAssetStore((s) =>
     node.assetId ? s.meshes[node.assetId] : undefined,
   );
+  const edges = useGraphStore((s) => s.edges);
+  const passRows = usePassPlanStore((s) => s.rows);
   const contract = useMemo(() => meshContractFor(node, asset), [node, asset]);
+
+  // [B-2] Same aggregation as MeshNodeView's node-card warning line — see
+  // that file's comment for the "any consumer" rationale. Rendered here as a
+  // per-attribute status marker instead of a single warning line, since the
+  // Inspector already lists attributes one per row.
+  const attrStatuses = useMemo(() => {
+    const consumers = new Set(
+      edges
+        .filter((e) => e.source === node.id && e.targetHandle === "mesh")
+        .map((e) => e.target),
+    );
+    const consumerUses: Array<
+      ReadonlyArray<{ name: string; consumed: boolean }>
+    > = [];
+    for (const row of passRows) {
+      if (row.kind === "shader" && consumers.has(row.nodeId)) {
+        consumerUses.push(row.meshAttributeUse);
+      }
+    }
+    return aggregateMeshConsumption(contract.attributes, consumerUses);
+  }, [edges, passRows, node.id, contract]);
 
   return (
     <div className="inspector-section" data-testid="mesh-attributes">
@@ -55,21 +81,35 @@ export function MeshInspectorSection({ node }: MeshInspectorSectionProps) {
         <div className="inspector-label" style={{ fontSize: 11 }}>
           Attributes
         </div>
-        {contract.attributes.map((a) => (
-          <div
-            key={a.name}
-            style={{
-              color: "var(--text-bright-body)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-            }}
-          >
-            {a.name}{" "}
-            <span style={{ color: "var(--text-muted)" }}>
-              ({attrTypeLabel(a.size)})
-            </span>
-          </div>
-        ))}
+        {contract.attributes.map((a) => {
+          const status = attrStatuses[a.name] ?? "unknown";
+          return (
+            <div
+              key={a.name}
+              data-attr-name={a.name}
+              data-attr-status={status}
+              style={{
+                color: "var(--text-bright-body)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+              }}
+            >
+              {a.name}{" "}
+              <span style={{ color: "var(--text-muted)" }}>
+                ({attrTypeLabel(a.size)})
+              </span>
+              {status === "consumed" && (
+                <span style={{ color: "var(--success)" }}> ✓</span>
+              )}
+              {status === "skipped" && (
+                <span style={{ color: "var(--warning)" }}>
+                  {" "}
+                  — 제공되지만 미선언(스킵됨)
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

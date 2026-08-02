@@ -15,8 +15,27 @@ import {
 } from "../../state/diagnosticsStore";
 import { useDockStore } from "../../state/dockStore";
 import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
+import type { ShaderPassRow } from "../../state/passPlanStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { StatusBar } from "./StatusBar";
+
+function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {
+  return {
+    kind: "shader",
+    nodeId: "s1",
+    width: 100,
+    height: 100,
+    resolutionScale: 1,
+    meshIsFullscreen: false,
+    meshLabel: "cube",
+    meshComputeNodeId: null,
+    samplers: [],
+    meshAttributeUse: [],
+    silentWarnings: [],
+    ...overrides,
+  };
+}
 
 // NOTE: zustand v5 + useSyncExternalStore returns the *initial* store snapshot
 // during renderToStaticMarkup, so these tests assert what the bar shows when
@@ -86,6 +105,7 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
   const initialDebugUi = useDebugUiStore.getState();
   const initialDiagnostics = useDiagnosticsStore.getState();
   const initialRenderer = useRendererStore.getState();
+  const initialPassPlan = usePassPlanStore.getState();
 
   beforeEach(() => {
     useDockStore.setState(
@@ -100,6 +120,7 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     useDebugUiStore.setState(initialDebugUi, true);
     useDiagnosticsStore.setState(initialDiagnostics, true);
     useRendererStore.setState(initialRenderer, true);
+    usePassPlanStore.setState(initialPassPlan, true);
   });
 
   it("sums shader diagnostics (all severities) + runtime errors into the status-problems count", () => {
@@ -116,6 +137,27 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
 
     const problems = screen.getByTestId("status-problems");
     expect(problems.textContent).toBe("⚠ 3 problems");
+  });
+
+  // E-1 (T2): silent uniform warnings from passPlanStore rows count toward
+  // the same status-problems total as compile diagnostics/runtime errors.
+  it("sums silentWarnings across shader pass rows into the status-problems count", () => {
+    usePassPlanStore.getState().publish(
+      [
+        shaderRowFixture({
+          silentWarnings: [
+            { uniformName: "u_tex", kind: "sampler-unconnected" },
+            { uniformName: "u_ghost", kind: "uniform-inactive" },
+          ],
+        }),
+      ],
+      {},
+    );
+
+    render(<StatusBar />);
+
+    const problems = screen.getByTestId("status-problems");
+    expect(problems.textContent).toBe("⚠ 2 problems");
   });
 
   it("clicking status-problems opens the problems overlay without opening diagnostics", () => {

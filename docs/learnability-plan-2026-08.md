@@ -375,12 +375,16 @@ UI 선례가 있다.
 
 #### E-1 · 미연결 sampler / 미사용 유니폼 경고
 - ProblemsPanel에 warning 행:
-  `u_tex: sampler 선언됐으나 연결된 엣지 없음 → 검은색 샘플링`
+  `u_tex: sampler 선언됐으나 연결된 엣지 없음 → 검은색 또는 같은 패스의 다른 텍스처(유닛 0) 샘플링 가능`
   `u_foo: 선언됐으나 프로그램에 존재하지 않음(미사용/최적화 제거)`
 - 데이터: `parseUniforms` 결과 ∖ `pass.samplers`/`paramBindings`,
   그리고 `program.uniforms`의 `loc` 유무(`gl/program.ts`).
 - **주의**: GLSL 옵티마이저가 제거한 유니폼과 사용자 오타를 구분할 수 없다.
   문구를 단정적으로 쓰지 말 것.
+- **주의 2 (실측, 2026-08)**: 미연결 sampler가 항상 검은색을 읽는 것도 아니다 —
+  uniform 기본값 0이 텍스처 유닛 0을 가리키므로, 같은 패스에 연결된 sampler가
+  하나라도 있으면 `compile.ts`의 unit 배정(0부터)에 의해 그 첫 텍스처를 그대로
+  읽는다(SwiftShader 재현 완료). sampler-unconnected 문구도 비단정으로 쓸 것.
 - 파일: `src/ui/Panels/ProblemsPanel.tsx`, `src/state/diagnosticsStore.ts`
 
 #### E-4 · 연결된 유니폼의 슬라이더 무력화 표시 (L1)
@@ -487,9 +491,9 @@ uniform vec3 u_baseColor;
 | T1 | D-1 Pass Inspector | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 |
 | T1 | C-1 시스템 유니폼 섹션 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 (유닛 U4) |
 | T1 | B-1 Mesh attribute 노출 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 (유닛 U4) |
-| T2 | E-1 미연결/미사용 경고 | ⬜ 미착수 | — | |
-| T2 | E-4 연결된 슬라이더 표시 | ⬜ 미착수 | — | |
-| T2 | B-2 attribute 소비 체크 | ⬜ 미착수 | — | |
+| T2 | E-1 미연결/미사용 경고 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
+| T2 | E-4 연결된 슬라이더 표시 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
+| T2 | B-2 attribute 소비 체크 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
 | T3 | C-2 `@default` 이관 | ⬜ 미착수 | — | |
 | T3 | E-2 렌더 상태 표시 | ⬜ 미착수 | — | |
 | T3 | E-3 텍스처 파라미터 | ⬜ 미착수 | — | |

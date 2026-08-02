@@ -6,6 +6,8 @@ import {
 } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
+import type { ShaderPassRow } from "../../state/passPlanStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { ProblemsPanel } from "./ProblemsPanel";
@@ -13,13 +15,32 @@ import { ProblemsPanel } from "./ProblemsPanel";
 const initialDiagnostics = useDiagnosticsStore.getState();
 const initialEditor = useEditorStore.getState();
 const initialRenderer = useRendererStore.getState();
+const initialPassPlan = usePassPlanStore.getState();
 
 function resetStores() {
   useDiagnosticsStore.setState(initialDiagnostics, true);
   useEditorStore.setState(initialEditor, true);
   useRendererStore.setState(initialRenderer, true);
+  usePassPlanStore.setState(initialPassPlan, true);
   useGraphStore.getState().reset();
   useSelectionStore.getState().select(null);
+}
+
+function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {
+  return {
+    kind: "shader",
+    nodeId: "s1",
+    width: 100,
+    height: 100,
+    resolutionScale: 1,
+    meshIsFullscreen: false,
+    meshLabel: "cube",
+    meshComputeNodeId: null,
+    samplers: [],
+    meshAttributeUse: [],
+    silentWarnings: [],
+    ...overrides,
+  };
 }
 
 beforeEach(resetStores);
@@ -148,5 +169,59 @@ describe("ProblemsPanel", () => {
 
     const row = screen.getByTestId("problem-row");
     expect(row.textContent).toContain("deleted-node");
+  });
+
+  // E-1 (T2): silent uniform warnings surfaced from passPlanStore rows.
+  describe("Pipeline warnings (E-1)", () => {
+    it("renders a silent-warning-row per warning and folds it into the warning chip", () => {
+      usePassPlanStore.getState().publish(
+        [
+          shaderRowFixture({
+            silentWarnings: [
+              { uniformName: "u_tex", kind: "sampler-unconnected" },
+            ],
+          }),
+        ],
+        {},
+      );
+
+      render(<ProblemsPanel />);
+
+      const row = screen.getByTestId("silent-warning-row");
+      expect(row.getAttribute("data-node-id")).toBe("s1");
+      expect(row.getAttribute("data-uniform-name")).toBe("u_tex");
+      expect(row.getAttribute("data-kind")).toBe("sampler-unconnected");
+      expect(row.textContent).toContain("u_tex");
+      expect(screen.getByText("1 warning")).not.toBeNull();
+    });
+
+    it("clicking a silent-warning-row selects its node", () => {
+      usePassPlanStore.getState().publish(
+        [
+          shaderRowFixture({
+            silentWarnings: [
+              { uniformName: "u_ghost", kind: "uniform-inactive" },
+            ],
+          }),
+        ],
+        {},
+      );
+
+      render(<ProblemsPanel />);
+      fireEvent.click(screen.getByTestId("silent-warning-row"));
+
+      expect(useSelectionStore.getState().selectedNodeId).toBe("s1");
+    });
+
+    it("shows 'No problems' when there are no silent warnings either", () => {
+      usePassPlanStore
+        .getState()
+        .publish([shaderRowFixture({ silentWarnings: [] })], {});
+
+      render(<ProblemsPanel />);
+
+      expect(screen.getByText("No problems")).not.toBeNull();
+      expect(screen.queryByTestId("silent-warning-row")).toBeNull();
+    });
   });
 });

@@ -13,6 +13,8 @@ function shaderRow(nodeId: string): ShaderPassRow {
     meshLabel: "fullscreen quad",
     meshComputeNodeId: null,
     samplers: [],
+    meshAttributeUse: [],
+    silentWarnings: [],
   };
 }
 

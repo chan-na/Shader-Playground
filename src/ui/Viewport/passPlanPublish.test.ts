@@ -9,10 +9,14 @@ import { buildPassRows } from "./passPlanPublish";
 // Attribute set shared by every fake-gl-compiled program in this file: the
 // fixed 3-attribute mesh contract (a_position/a_normal/a_uv, see
 // core/assets/primitives.ts) plus the compute node's ping-pong slot (a_pos).
+// `uniforms: ["u_tex"]` means every fake-compiled program (regardless of its
+// actual source text) reflects exactly one active uniform, `u_tex` — used by
+// the silentWarnings fixtures below to exercise both the "active but
+// unbound" and "declared but not active" branches.
 function makeGl() {
   return createFakeGl({
     attributes: ["a_position", "a_normal", "a_uv", "a_pos"],
-    uniforms: [],
+    uniforms: ["u_tex"],
   });
 }
 
@@ -60,7 +64,15 @@ function buildFixture() {
         id: "s1",
         kind: "shader",
         vertexSource: "//v",
-        fragmentSource: "//f",
+        // Declares two uniforms: u_tex is in the fake gl's active-uniform
+        // list but has no incoming edge here (sampler-unconnected); u_ghost
+        // is declared but never appears in the active list at all
+        // (uniform-inactive).
+        fragmentSource: `#version 300 es
+uniform sampler2D u_tex;
+uniform float u_ghost;
+out vec4 fragColor;
+void main() { fragColor = texture(u_tex, vec2(0.0)); }`,
         uniformValues: {},
       },
       {
@@ -75,7 +87,12 @@ function buildFixture() {
         id: "s3",
         kind: "shader",
         vertexSource: "//v",
-        fragmentSource: "//f",
+        // Same u_tex declaration as s1, but this one gets a sampler edge
+        // (below) — active AND bound, so it should carry no warning.
+        fragmentSource: `#version 300 es
+uniform sampler2D u_tex;
+out vec4 fragColor;
+void main() { fragColor = texture(u_tex, vec2(0.0)); }`,
         uniformValues: {},
       },
       {
@@ -107,6 +124,17 @@ function buildFixture() {
         sourceHandle: "out",
         target: "s4",
         targetHandle: "mesh",
+      },
+      // s1 → s3's u_tex: a non-mesh edge from a "shader"-kind source, so
+      // compile.ts classifies it as a sampler binding (not a paramBinding).
+      // Also verified not to disturb the topological order below — s1
+      // already sorts before s3 without this edge.
+      {
+        id: "e4",
+        source: "s1",
+        sourceHandle: "texture",
+        target: "s3",
+        targetHandle: "u_tex",
       },
     ],
   };
@@ -202,5 +230,58 @@ describe("buildPassRows", () => {
     cp.read = "B";
     expect(row.getRead()).toBe("B");
     plan.dispose();
+  });
+
+  // E-1 (T2): declared-vs-active-vs-bound uniform diffing.
+  describe("silentWarnings", () => {
+    it("flags an active sampler with no incoming edge as sampler-unconnected, and a never-active uniform as uniform-inactive", () => {
+      const { graph, assets, plan } = buildFixture();
+      const rows = buildPassRows(plan, graph, assets);
+      const row = shaderRow(rows, "s1");
+      expect(row.silentWarnings).toEqual([
+        { uniformName: "u_tex", kind: "sampler-unconnected" },
+        { uniformName: "u_ghost", kind: "uniform-inactive" },
+      ]);
+      plan.dispose();
+    });
+
+    it("carries no warning for a sampler that is both active and bound to an edge", () => {
+      const { graph, assets, plan } = buildFixture();
+      const rows = buildPassRows(plan, graph, assets);
+      const row = shaderRow(rows, "s3");
+      expect(row.silentWarnings).toEqual([]);
+      plan.dispose();
+    });
+  });
+
+  // B-2 (T2): mesh-attribute consumption per shader pass.
+  describe("meshAttributeUse", () => {
+    it("marks every attribute consumed for a shader whose program declares all of them", () => {
+      const { graph, assets, plan } = buildFixture();
+      const rows = buildPassRows(plan, graph, assets);
+      const row = shaderRow(rows, "s2");
+      expect(row.meshAttributeUse).toEqual([
+        { name: "a_position", size: 3, consumed: true },
+        { name: "a_normal", size: 3, consumed: true },
+        { name: "a_uv", size: 2, consumed: true },
+      ]);
+      plan.dispose();
+    });
+
+    it("is empty for the fullscreen-substituted pass — not a mesh the user wired in", () => {
+      const { graph, assets, plan } = buildFixture();
+      const rows = buildPassRows(plan, graph, assets);
+      const row = shaderRow(rows, "s1");
+      expect(row.meshAttributeUse).toEqual([]);
+      plan.dispose();
+    });
+
+    it("is empty for a compute-driven pass", () => {
+      const { graph, assets, plan } = buildFixture();
+      const rows = buildPassRows(plan, graph, assets);
+      const row = shaderRow(rows, "s4");
+      expect(row.meshAttributeUse).toEqual([]);
+      plan.dispose();
+    });
   });
 });

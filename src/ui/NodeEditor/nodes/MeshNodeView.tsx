@@ -8,10 +8,12 @@ import {
   PRIMITIVE_NAMES,
   type PrimitiveName,
 } from "../../../core/assets/primitives";
+import { aggregateMeshConsumption } from "../../../core/graph/meshConsumption";
 import type { MeshGraphNode } from "../../../core/graph/types";
 import { displayNodeName } from "../../../core/nodes/registry";
 import { useAssetStore } from "../../../state/assetStore";
 import { useGraphStore } from "../../../state/graphStore";
+import { usePassPlanStore } from "../../../state/passPlanStore";
 import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
@@ -23,6 +25,8 @@ export function MeshNodeView({ id, data }: NodeProps) {
   const asset = useAssetStore((s) =>
     node.assetId ? s.meshes[node.assetId] : undefined,
   );
+  const edges = useGraphStore((s) => s.edges);
+  const passRows = usePassPlanStore((s) => s.rows);
 
   const setPrimitive = (p: PrimitiveName) => {
     setMeshPrimitive(id, p);
@@ -39,6 +43,33 @@ export function MeshNodeView({ id, data }: NodeProps) {
   const attrSummary = contract.attributes
     .map((a) => `${a.name} ${attrTypeLabel(a.size)}`)
     .join(" · ");
+
+  // [B-2] Attributes this mesh provides but that no connected consumer's
+  // linked program actually bound (core/gl/mesh.ts's quiet skip, made
+  // visible). Aggregated across every shader pass wired to this mesh's
+  // output port — "any consumer" semantics, see aggregateMeshConsumption.
+  const skippedAttrNames = useMemo(() => {
+    const consumers = new Set(
+      edges
+        .filter((e) => e.source === id && e.targetHandle === "mesh")
+        .map((e) => e.target),
+    );
+    const consumerUses: Array<
+      ReadonlyArray<{ name: string; consumed: boolean }>
+    > = [];
+    for (const row of passRows) {
+      if (row.kind === "shader" && consumers.has(row.nodeId)) {
+        consumerUses.push(row.meshAttributeUse);
+      }
+    }
+    const statuses = aggregateMeshConsumption(
+      contract.attributes,
+      consumerUses,
+    );
+    return contract.attributes
+      .filter((a) => statuses[a.name] === "skipped")
+      .map((a) => a.name);
+  }, [edges, passRows, id, contract]);
 
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 168 }}>
@@ -76,6 +107,14 @@ export function MeshNodeView({ id, data }: NodeProps) {
             {contract.indexCount.toLocaleString()} idx ·{" "}
             {contract.primitiveLabel}
           </div>
+          {skippedAttrNames.length > 0 && (
+            <div
+              style={{ color: "var(--warning)" }}
+              data-testid="mesh-skipped-attrs"
+            >
+              {skippedAttrNames.join(", ")} — 제공되지만 미선언(스킵됨)
+            </div>
+          )}
         </div>
       </div>
       <PortHandle

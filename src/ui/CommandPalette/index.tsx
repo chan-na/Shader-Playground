@@ -22,15 +22,20 @@ import uvDebugFrag from "../../shaders/templates/uvDebug.frag?raw";
 import { useCommandPaletteStore } from "../../state/commandPaletteStore";
 import {
   CHAIN_DEMO_LAYOUT,
+  CHAIN_DEMO_PARENTS,
   createChainDemoGraph,
   createDemoGraph,
   createParticleDemoGraph,
   createSplitDemoGraph,
   createTorusDemoGraph,
   DEMO_LAYOUT,
+  DEMO_PARENTS,
   PARTICLE_DEMO_LAYOUT,
+  PARTICLE_DEMO_PARENTS,
   SPLIT_DEMO_LAYOUT,
+  SPLIT_DEMO_PARENTS,
   TORUS_DEMO_LAYOUT,
+  TORUS_DEMO_PARENTS,
 } from "../../state/demoGraph";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
@@ -230,7 +235,10 @@ function buildCommands(): Command[] {
         kind: "shader",
         vertexSource: basicVert,
         fragmentSource: starterFrag,
-        uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
+        // C-2: no hardcoded seed values — the initial glow color comes from
+        // starter.frag's `@default` hint, bound by compile.ts's
+        // withExplicitDefaults at compile time.
+        uniformValues: {},
       };
       addNode(node, { x: 100, y: 0 });
       select(id);
@@ -276,7 +284,11 @@ function buildCommands(): Command[] {
           kind: "shader",
           vertexSource: basicVert,
           fragmentSource: tpl.frag,
-          uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
+          // C-2: no hardcoded seed values — most of these templates don't
+          // even declare u_baseColor, so this was seeding a ghost value.
+          // Whatever `@default` hints each template does declare are bound
+          // by compile.ts's withExplicitDefaults at compile time.
+          uniformValues: {},
         };
         addNode(node, { x: 100, y: 0 });
         select(id);
@@ -498,7 +510,7 @@ function buildCommands(): Command[] {
       label: "Load preset: Sphere",
       sub: "3 nodes · sphere + unlit shader",
       keywords: "preset demo sphere",
-      run: () => setGraph(createDemoGraph(), DEMO_LAYOUT),
+      run: () => setGraph(createDemoGraph(), DEMO_LAYOUT, DEMO_PARENTS),
     },
     {
       id: "preset-torus",
@@ -507,7 +519,8 @@ function buildCommands(): Command[] {
       label: "Load preset: Torus UV",
       sub: "3 nodes · torus + UV debug",
       keywords: "preset demo torus uv",
-      run: () => setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT),
+      run: () =>
+        setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT, TORUS_DEMO_PARENTS),
     },
     {
       id: "preset-chain",
@@ -516,7 +529,8 @@ function buildCommands(): Command[] {
       label: "Load preset: Chain (noise → blur → tonemap)",
       sub: "4 nodes · noise → blur → tonemap",
       keywords: "preset demo chain noise blur tonemap",
-      run: () => setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT),
+      run: () =>
+        setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT, CHAIN_DEMO_PARENTS),
     },
     {
       id: "preset-split",
@@ -525,7 +539,8 @@ function buildCommands(): Command[] {
       label: "Load preset: Split viewport (3 outputs)",
       sub: "6 nodes · 3-way split viewport",
       keywords: "preset demo split viewport multi output",
-      run: () => setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT),
+      run: () =>
+        setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT, SPLIT_DEMO_PARENTS),
     },
     {
       id: "preset-particle",
@@ -534,7 +549,12 @@ function buildCommands(): Command[] {
       label: "Load preset: Particle compute (Transform Feedback)",
       sub: "3 nodes · 1024-point compute sim",
       keywords: "preset demo particle compute transform feedback simulation",
-      run: () => setGraph(createParticleDemoGraph(), PARTICLE_DEMO_LAYOUT),
+      run: () =>
+        setGraph(
+          createParticleDemoGraph(),
+          PARTICLE_DEMO_LAYOUT,
+          PARTICLE_DEMO_PARENTS,
+        ),
     },
     {
       id: "graph-clear",
@@ -674,7 +694,10 @@ export function CommandPalette() {
         name,
         vertexSource: basicVert,
         fragmentSource: starterFrag,
-        uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
+        // C-2: no hardcoded seed values — the initial glow color comes from
+        // starter.frag's `@default` hint, bound by compile.ts's
+        // withExplicitDefaults at compile time.
+        uniformValues: {},
       },
       { x: 100, y: 0 },
     );

@@ -137,6 +137,87 @@ describe("buildExportedHtml", () => {
   });
 });
 
+// C-2: the standalone player binds exactly the serialized `uniformValues`
+// (it has no `@default` parser of its own), so the export boundary must
+// materialize GLSL `@default` hints into the embedded project — otherwise a
+// brand-new node (stored map `{}`) exports a GL-zero render while the app
+// shows the seeded glow. Stored values must keep winning, and the app-side
+// graph must not be mutated by exporting.
+describe("buildExportedHtml — @default materialization (C-2)", () => {
+  const defaultsGraph: Graph = {
+    nodes: [
+      {
+        id: "sd",
+        kind: "shader",
+        vertexSource: "void main(){}",
+        fragmentSource:
+          "uniform vec3 u_tint; // @color @default 0.5, 0.7, 1.0\n" +
+          "uniform float u_amt; // @default 3\n" +
+          "void main(){}",
+        uniformValues: { u_amt: 2 },
+      },
+      {
+        id: "cd",
+        kind: "compute",
+        vertexSource:
+          "uniform float u_speed; // @default 5\n" +
+          "in vec3 a_pos;\nout vec3 v_pos;\nvoid main(){ v_pos = a_pos; }",
+        count: 4,
+        primitive: "POINTS",
+        attributes: [
+          { inName: "a_pos", outName: "v_pos", size: 3, seed: "zero" },
+        ],
+        uniformValues: {},
+      },
+      { id: "o1", kind: "output" },
+    ],
+    edges: [],
+  };
+
+  function embeddedGraph(html: string): Graph {
+    const literal = html
+      .split("window.__SP_PROJECT = ")[1]
+      ?.split(";</script>")[0];
+    expect(literal).toBeTruthy();
+    // JSON.parse turns the `<` escapes back into `<`, mirroring what the
+    // player's own script evaluation sees.
+    const project = JSON.parse(literal ?? "") as { graph: Graph };
+    return project.graph;
+  }
+
+  it("seeds a shader node's @default uniforms into the embedded project while stored values win", () => {
+    const graph = embeddedGraph(buildExportedHtml(defaultsGraph, {}));
+    const sd = graph.nodes.find((n) => n.id === "sd");
+    expect(sd?.kind).toBe("shader");
+    if (sd?.kind !== "shader") return;
+    // `@default 0.5, 0.7, 1.0` materialized — the player will bind it.
+    expect(sd.uniformValues.u_tint).toEqual([0.5, 0.7, 1.0]);
+    // The stored value 2 beats the `@default 3` hint (C-2 invariant).
+    expect(sd.uniformValues.u_amt).toBe(2);
+  });
+
+  it("seeds a compute node's vertex-source @default uniforms", () => {
+    const graph = embeddedGraph(buildExportedHtml(defaultsGraph, {}));
+    const cd = graph.nodes.find((n) => n.id === "cd");
+    expect(cd?.kind).toBe("compute");
+    if (cd?.kind !== "compute") return;
+    expect(cd.uniformValues.u_speed).toBe(5);
+  });
+
+  it("does not mutate the app-side graph (materialization is export-only)", () => {
+    buildExportedHtml(defaultsGraph, {});
+    const sd = defaultsGraph.nodes.find((n) => n.id === "sd");
+    const cd = defaultsGraph.nodes.find((n) => n.id === "cd");
+    if (sd?.kind !== "shader" || cd?.kind !== "compute") {
+      throw new Error("fixture nodes missing");
+    }
+    // Autosave/share/JSON export must keep storing user values verbatim —
+    // the seeded copies live only inside the exported HTML.
+    expect(sd.uniformValues).toEqual({ u_amt: 2 });
+    expect(cd.uniformValues).toEqual({});
+  });
+});
+
 /**
  * standalonePlayer.js is a standalone ES5 runtime with no module surface — it
  * cannot be imported and exercised the way the app's twin (`execute.ts`) is.

@@ -508,7 +508,11 @@ export function Viewport() {
 
       // Pull current uniform values into the plan (cheap). Both shader and
       // compute passes carry slider-driven uniformValues that get hot-patched
-      // every frame without recompile.
+      // every frame without recompile. Replacing the whole map is safe for
+      // the C-2 `@default` seeds because they live in the pass's separate
+      // `seededDefaults` field — `bindUserUniforms` composes
+      // `{...seededDefaults, ...uniformValues}` per frame, so this
+      // assignment can no longer clobber a seed before its first draw.
       const graph = useGraphStore.getState();
       // Rebuild the node lookup only when the graph's `nodes` array identity
       // changes (see the cachedNodes declaration). It is a pure function of

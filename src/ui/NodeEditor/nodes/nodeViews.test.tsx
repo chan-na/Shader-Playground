@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import type { GeometryHandle } from "../../../core/assets/types";
+import { IMAGE_TEXTURE_PARAMS } from "../../../core/gl/texture";
 import type {
   CombineGraphNode,
   ComputeGraphNode,
@@ -261,6 +262,15 @@ describe("ImageNodeView", () => {
     expect(html).toContain("No image");
     expect(html).toContain("handle-texture");
     expect(html).toContain(">texture<");
+  });
+
+  // [E-3] Meta line reads IMAGE_TEXTURE_PARAMS, not a hard-coded string —
+  // it must show the actual sampling contract regardless of asset binding.
+  it("shows the wrap/mipmap meta line derived from IMAGE_TEXTURE_PARAMS", () => {
+    const node: ImageGraphNode = { id: "i1", kind: "image", assetId: null };
+    const html = renderInFlow(<ImageNodeView {...mockProps("i1", node)} />);
+    expect(html).toContain(IMAGE_TEXTURE_PARAMS.wrapS);
+    expect(html).toContain("mipmap");
   });
 });
 

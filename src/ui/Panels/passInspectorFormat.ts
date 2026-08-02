@@ -44,3 +44,17 @@ export function computeMeshLabel(
 ): string {
   return `${primitiveLabel} ×${count}, read=${read}`;
 }
+
+/** "blend off · cull off · depth on" — a shader pass's actual GL render
+ * state (E-2). The parameter is a structural type, not
+ * `core/graph/renderState.ts`'s `PassRenderState`, so this module stays free
+ * of a `core/` import — the caller (`PassInspector.tsx`) is what ties the
+ * value to `renderStateFor`, the single function `execute.ts` also calls. */
+export function formatRenderState(s: {
+  blend: boolean;
+  cull: boolean;
+  depthTest: boolean;
+}): string {
+  const onOff = (b: boolean) => (b ? "on" : "off");
+  return `blend ${onOff(s.blend)} · cull ${onOff(s.cull)} · depth ${onOff(s.depthTest)}`;
+}

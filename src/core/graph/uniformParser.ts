@@ -60,6 +60,17 @@ export interface UniformSpec {
   max: number;
   step: number;
   defaultValue: number | number[];
+  /**
+   * True only when an explicit `@default` hint was present in a comment AND
+   * actually merged into `defaultValue` (C-2). Left unset for uniforms that
+   * only got a value from `defaultRangeFor`'s name-based heuristic — binding
+   * those too would be a much bigger behavior change (every unannotated
+   * color-named uniform in an existing project would jump from GL's zero
+   * default to white). `uniformDefaults.ts` reads this flag to decide what a
+   * newly created node's `pass.uniformValues` gets seeded with at compile
+   * time.
+   */
+  hasExplicitDefault?: boolean;
   /** Optional human-readable label overriding the name */
   label?: string;
 }
@@ -416,11 +427,13 @@ function applyHints(spec: UniformSpec, hints: UniformHints): UniformSpec {
           target[i] = hints.defaultValue[i]!;
       }
       out.defaultValue = target;
+      out.hasExplicitDefault = true;
     } else if (
       typeof out.defaultValue === "number" &&
       typeof hints.defaultValue === "number"
     ) {
       out.defaultValue = hints.defaultValue;
+      out.hasExplicitDefault = true;
     }
   }
   return out;

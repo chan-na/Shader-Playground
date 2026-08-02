@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseUniforms } from "../../core/graph/uniformParser";
 import basicVert from "../basic.vert?raw";
 import fullscreenVert from "../fullscreen.vert?raw";
 import starterFrag from "./starter.frag?raw";
@@ -89,5 +90,17 @@ describe("starter.frag default-output recipe [Q1-b]", () => {
     // Stronger than the [C-7] "contains v_uv" checks above: pins the exact
     // set so the vignette recipe can't accidentally grow the varying list.
     expect(declaredVaryings(starterFrag, "in")).toEqual(["v_uv"]);
+  });
+
+  it("declares u_baseColor's initial value as an explicit @default (T3/C-2)", () => {
+    // The uniform-injection code paths (AddNodePill/CommandPalette) create
+    // new Shader nodes with `uniformValues: {}` — this hint, not a hardcoded
+    // value in TS, is what compile.ts's withExplicitDefaults reads to seed
+    // the pass and reproduce the same first-frame glow.
+    const spec = parseUniforms(starterFrag).find(
+      (u) => u.name === "u_baseColor",
+    );
+    expect(spec?.hasExplicitDefault).toBe(true);
+    expect(spec?.defaultValue).toEqual([0.5, 0.7, 1.0]);
   });
 });

@@ -494,11 +494,11 @@ uniform vec3 u_baseColor;
 | T2 | E-1 미연결/미사용 경고 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
 | T2 | E-4 연결된 슬라이더 표시 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
 | T2 | B-2 attribute 소비 체크 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
-| T3 | C-2 `@default` 이관 | ⬜ 미착수 | — | |
-| T3 | E-2 렌더 상태 표시 | ⬜ 미착수 | — | |
-| T3 | E-3 텍스처 파라미터 | ⬜ 미착수 | — | |
-| T3 | F-1 좌표계 카드 | ⬜ 미착수 | — | |
-| T3 | F-2 데모 레슨화 | ⬜ 미착수 | — | |
+| T3 | C-2 `@default` 이관 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U1) |
+| T3 | E-2 렌더 상태 표시 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U2) |
+| T3 | E-3 텍스처 파라미터 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U3) |
+| T3 | F-1 좌표계 카드 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U4) |
+| T3 | F-2 데모 레슨화 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U1) |
 | T4 | A-2 varying 브리지 | ⬜ 미착수 | — | 별도 설계 |
 | T4 | A-3 노드 분리 | ⬜ 보류 | — | A-2 결과 후 판단 |
 

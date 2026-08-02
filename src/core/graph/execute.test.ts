@@ -504,6 +504,122 @@ describe("executePlan — int/ivec uniform dispatch (#11)", () => {
   });
 });
 
+describe("executePlan — render state (E-2)", () => {
+  it("disables BLEND/CULL_FACE on every shader pass; DEPTH_TEST follows meshIsFullscreen", () => {
+    const gl = makeGl();
+    const graph: Graph = {
+      nodes: [
+        { id: "m1", kind: "mesh", primitive: "sphere" },
+        shaderNode("meshPass"),
+        shaderNode("fullscreenPass"),
+        outputNode("o1"),
+        outputNode("o2"),
+      ],
+      edges: [
+        edge("e1", "m1", "meshPass", "mesh"),
+        edge("e2", "meshPass", "o1", "texture"),
+        edge("e3", "fullscreenPass", "o2", "texture"),
+      ],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const meshP = plan.passes.find((p) => p.nodeId === "meshPass");
+    const fsP = plan.passes.find((p) => p.nodeId === "fullscreenPass");
+    if (!meshP || meshP.kind !== "shader") throw new Error("missing meshPass");
+    if (!fsP || fsP.kind !== "shader") {
+      throw new Error("missing fullscreenPass");
+    }
+    expect(meshP.meshIsFullscreen).toBe(false);
+    expect(fsP.meshIsFullscreen).toBe(true);
+
+    const enable = vi.spyOn(gl, "enable");
+    const disable = vi.spyOn(gl, "disable");
+    executePlan(gl, plan, frameCtx(graph), 32, 32);
+
+    // L4: blend/cull are always off — neither is exposed as a node/port yet.
+    // One disable(BLEND)/disable(CULL_FACE) call per shader pass (2 passes).
+    expect(disable.mock.calls.filter((c) => c[0] === gl.BLEND)).toHaveLength(2);
+    expect(
+      disable.mock.calls.filter((c) => c[0] === gl.CULL_FACE),
+    ).toHaveLength(2);
+    expect(enable.mock.calls.some((c) => c[0] === gl.BLEND)).toBe(false);
+    expect(enable.mock.calls.some((c) => c[0] === gl.CULL_FACE)).toBe(false);
+
+    // DEPTH_TEST: on for the mesh-connected pass, off for the fullscreen one.
+    expect(enable.mock.calls.some((c) => c[0] === gl.DEPTH_TEST)).toBe(true);
+    expect(disable.mock.calls.some((c) => c[0] === gl.DEPTH_TEST)).toBe(true);
+
+    plan.dispose();
+  });
+});
+
+// C-2 regression guard: the Viewport hot-patches
+// `pass.uniformValues = node.uniformValues` on every RAF tick, *before* the
+// first executePlan. When compile.ts merged `@default` seeds directly into
+// `pass.uniformValues`, that assignment clobbered them — the seed never
+// reached the GPU and every brand-new node (`uniformValues: {}`) rendered
+// with GL-zero uniforms (near-black glow). Seeds now live in the pass's
+// separate `seededDefaults` field, composed by bindUserUniforms per frame,
+// which is exactly what these tests reproduce and pin.
+describe("executePlan — @default seeds survive the uniform hot-patch (C-2)", () => {
+  function seededGraph(stored: Record<string, number | number[]>): Graph {
+    return {
+      nodes: [
+        {
+          id: "s1",
+          kind: "shader",
+          vertexSource: "//v",
+          fragmentSource: "uniform float u_x; // @default 3\nvoid main(){}",
+          uniformValues: stored,
+        },
+      ],
+      edges: [],
+    };
+  }
+
+  function makeSeedGl(): WebGL2RenderingContext {
+    // `u_x` must be an active uniform or bindUserUniforms never resolves a
+    // location for it and the upload assertions would check nothing.
+    return createFakeGl({ attributes: ["a_position"], uniforms: ["u_x"] });
+  }
+
+  it("uploads the seeded default after a Viewport-style hot-patch replaces uniformValues with the node's empty map", () => {
+    const gl = makeSeedGl();
+    const plan = compileGraph(gl, seededGraph({}), { width: 32, height: 32 });
+    const pass = plan.shaderPassByNode.get("s1");
+    if (!pass) throw new Error("missing shader pass");
+
+    // Mimic ui/Viewport/index.tsx's per-frame hot-patch: a brand-new node's
+    // live stored map ({}) replaces the pass's map wholesale before the
+    // first draw. This exact assignment used to erase the seed for good.
+    pass.uniformValues = {};
+
+    const spy = vi.spyOn(gl, "uniform1f");
+    executePlan(gl, plan, frameCtx(seededGraph({})), 32, 32);
+    // ctx.time is 0, so the only 3-valued float upload can be u_x's seed.
+    expect(spy.mock.calls.some((c) => c[1] === 3)).toBe(true);
+    plan.dispose();
+  });
+
+  it("a hot-patched stored value still wins over the seed (stored > @default > GL zero)", () => {
+    const gl = makeSeedGl();
+    const stored = { u_x: 2 };
+    const plan = compileGraph(gl, seededGraph(stored), {
+      width: 32,
+      height: 32,
+    });
+    const pass = plan.shaderPassByNode.get("s1");
+    if (!pass) throw new Error("missing shader pass");
+
+    pass.uniformValues = stored;
+
+    const spy = vi.spyOn(gl, "uniform1f");
+    executePlan(gl, plan, frameCtx(seededGraph(stored)), 32, 32);
+    expect(spy.mock.calls.some((c) => c[1] === 2)).toBe(true);
+    expect(spy.mock.calls.some((c) => c[1] === 3)).toBe(false);
+    plan.dispose();
+  });
+});
+
 describe("executePlan — dispose", () => {
   it("plan.dispose deletes programs, framebuffers, buffers, and TF objects", () => {
     const gl = makeGl();

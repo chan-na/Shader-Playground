@@ -3,6 +3,7 @@ import {
   computeMeshLabel,
   formatFbo,
   formatGpuMs,
+  formatRenderState,
   formatSampler,
 } from "./passInspectorFormat";
 
@@ -41,6 +42,20 @@ describe("formatGpuMs", () => {
 
   it("renders a measured zero distinctly from 'no sample'", () => {
     expect(formatGpuMs(0)).toBe("0.00");
+  });
+});
+
+describe("formatRenderState", () => {
+  it("formats a mesh-connected pass's state (depth on)", () => {
+    expect(
+      formatRenderState({ blend: false, cull: false, depthTest: true }),
+    ).toBe("blend off · cull off · depth on");
+  });
+
+  it("formats a fullscreen pass's state (depth off)", () => {
+    expect(
+      formatRenderState({ blend: false, cull: false, depthTest: false }),
+    ).toBe("blend off · cull off · depth off");
   });
 });
 

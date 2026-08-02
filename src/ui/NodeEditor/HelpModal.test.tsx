@@ -43,4 +43,26 @@ describe("HelpModalView", () => {
     const html = renderToStaticMarkup(<HelpModalView onClose={vi.fn()} />);
     expect(html).toContain('aria-label="Close help"');
   });
+
+  it("still renders all pre-existing shortcut sections (regression guard)", () => {
+    const html = renderToStaticMarkup(<HelpModalView onClose={vi.fn()} />);
+    expect(html).toContain("Node Graph");
+    expect(html).toContain("View / Pan / Zoom");
+    expect(html).toContain("Global");
+  });
+
+  it("renders a coordinate-system section with all five verified facts", () => {
+    const html = renderToStaticMarkup(<HelpModalView onClose={vi.fn()} />);
+    expect(html).toContain('data-testid="help-coordinates"');
+    // Keyword per fact, matched against the code paths that establish it:
+    // fullscreen.vert, WebGL gl_FragCoord convention, mouseStore/execute.ts
+    // resolution scaling, texture.ts UNPACK_FLIP_Y_WEBGL, asyncReadback.ts
+    // GPU pre-flip.
+    expect(html).toContain("v_uv");
+    expect(html).toContain("gl_FragCoord");
+    expect(html).toContain("u_mouse");
+    expect(html).toContain("UNPACK_FLIP_Y_WEBGL");
+    expect(html).toContain("썸네일");
+    expect(html).toContain("좌하단");
+  });
 });

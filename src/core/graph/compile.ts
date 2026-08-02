@@ -38,6 +38,7 @@ import type {
   VideoGraphNode,
   WebcamGraphNode,
 } from "./types";
+import { withExplicitDefaults } from "./uniformDefaults";
 import {
   topologicalOrder,
   type ValidationError,
@@ -95,6 +96,17 @@ export interface ShaderPass {
   /** Edges that override a uniform's value with a parameter node. */
   paramBindings: ParamBinding[];
   uniformValues: Record<string, number | number[]>;
+  /**
+   * C-2: `@default` seeds parsed from the *compiled* sources at compile time,
+   * kept in their own field rather than merged into `uniformValues`. The
+   * Viewport hot-patches `pass.uniformValues = node.uniformValues` on every
+   * RAF tick — before the first draw included — so a seed merged into
+   * `uniformValues` would be clobbered before it ever reached the GPU (the
+   * original C-2 regression). `bindUserUniforms` composes
+   * `{...seededDefaults, ...uniformValues}` (then param bindings) per frame,
+   * which is what actually enforces **stored value > `@default` > GL zero**.
+   */
+  seededDefaults: Record<string, number | number[]>;
   /** FBO dimensions after applying the node's resolutionScale. */
   width: number;
   height: number;
@@ -134,6 +146,9 @@ export interface ComputePass {
   primitive: number;
   paramBindings: ParamBinding[];
   uniformValues: Record<string, number | number[]>;
+  /** C-2 `@default` seeds — see {@link ShaderPass.seededDefaults} for why
+   * this is a separate field instead of a merge into `uniformValues`. */
+  seededDefaults: Record<string, number | number[]>;
   /** Which side currently holds the freshest captured data (= next input). */
   read: "A" | "B";
 }
@@ -443,7 +458,12 @@ function buildComputePass(
     count: Math.max(1, node.count | 0),
     primitive: glPrimitiveOf(gl, node.primitive),
     paramBindings,
-    uniformValues: { ...node.uniformValues },
+    uniformValues: node.uniformValues,
+    // C-2: seed from the vertex source's `@default` hints. Kept apart from
+    // `uniformValues` so the Viewport's per-frame hot-patch can't clobber the
+    // seeds — see ShaderPass.seededDefaults. Stored values still win: the
+    // effective-map spread order in `bindUserUniforms` guarantees it.
+    seededDefaults: withExplicitDefaults(node.vertexSource, {}),
     read: "A",
   };
   disposers.push(() => {
@@ -715,7 +735,20 @@ export function compileGraph(
       meshComputeVaos,
       samplers,
       paramBindings,
-      uniformValues: { ...sn.uniformValues },
+      uniformValues: sn.uniformValues,
+      // C-2: seed from the compiled-vertex+fragment source's `@default`
+      // hints. `vertexSource` here is already the *compiled* source
+      // (fullscreen.vert substitution already applied above) — matches what
+      // the GL compiler actually saw, same reasoning as
+      // `compiledVertexSource`. Kept apart from `uniformValues` so the
+      // Viewport's per-frame `pass.uniformValues = node.uniformValues`
+      // hot-patch can't clobber the seeds before the first draw (the
+      // original C-2 regression); stored values still win via the
+      // effective-map spread order in `bindUserUniforms`.
+      seededDefaults: withExplicitDefaults(
+        `${vertexSource}\n${sn.fragmentSource}`,
+        {},
+      ),
       width: passWidth,
       height: passHeight,
       meshAttributeUse,

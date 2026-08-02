@@ -1,4 +1,8 @@
 import { useMemo, useState } from "react";
+import {
+  FBO_TEXTURE_PARAMS,
+  IMAGE_TEXTURE_PARAMS,
+} from "../../core/gl/texture";
 import type {
   AudioGraphNode,
   ComputeGraphNode,
@@ -30,6 +34,7 @@ import { InspectorNodeHeader } from "./InspectorNodeHeader";
 import { MeshInspectorSection } from "./MeshInspectorSection";
 import { ParamInspector } from "./ParamInspector";
 import { SystemUniformsSection } from "./SystemUniformsSection";
+import { TextureParamsSection } from "./TextureParamsSection";
 import { UniformControl } from "./UniformControl";
 import { UniformHintEditor } from "./UniformHintEditor";
 import { UtilityInspector } from "./UtilityInspector";
@@ -290,6 +295,22 @@ export function Inspector({ embedded = false }: InspectorProps) {
             <MeshInspectorSection node={node as MeshGraphNode} />
           )}
 
+          {/* [E-3] Image nodes upload through createImageTexture — surface
+              the actual wrap/filter/mipmap/flip parameters it applies
+              (core/gl/texture.ts), not a hand-copied description. The note's
+              parameter nouns are interpolated from the same constant as the
+              structured rows (U3: no hand-copied wrap/filter strings that
+              could contradict the rows if the constant ever changes). */}
+          {node.kind === "image" && (
+            <TextureParamsSection
+              title="Texture sampling"
+              info={IMAGE_TEXTURE_PARAMS}
+              note={`이미지 텍스처는 ${IMAGE_TEXTURE_PARAMS.wrapS} + ${
+                IMAGE_TEXTURE_PARAMS.mipmaps ? "mipmap" : "mipmap 없음"
+              }. 중간 패스(FBO) 텍스처와 파라미터가 달라 같은 GLSL이 다른 결과를 낼 수 있다.`}
+            />
+          )}
+
           {computeNode && (
             <div className="inspector-section">
               <div className="inspector-label">Compute</div>
@@ -380,6 +401,22 @@ export function Inspector({ embedded = false }: InspectorProps) {
                 이 패스의 FBO 해상도 배율 (다운샘플 체인용).
               </div>
             </div>
+          )}
+
+          {/* [E-3] Every shader pass renders into an FBO texture created by
+              createColorTexture — surface its actual parameters (they differ
+              from Image nodes) so "why does the same GLSL look different
+              sampling this vs. an Image node" has an answer in the UI. The
+              note interpolates FBO_TEXTURE_PARAMS rather than hand-copying
+              the values (U3), so it can never contradict the rows above. */}
+          {shaderNode && (
+            <TextureParamsSection
+              title="Output texture (FBO)"
+              info={FBO_TEXTURE_PARAMS}
+              note={`이 노드의 출력을 다른 노드가 샘플링할 때 적용된다: ${FBO_TEXTURE_PARAMS.wrapS}·${
+                FBO_TEXTURE_PARAMS.mipmaps ? "mipmap" : "mipmap 없음"
+              } — Image 노드와 다르다.`}
+            />
           )}
 
           {uniformOwner && (

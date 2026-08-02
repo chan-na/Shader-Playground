@@ -86,6 +86,7 @@ describe("PassInspector", () => {
       screen.getByText("no passes — compile a shader node first"),
     ).not.toBeNull();
     expect(screen.queryAllByTestId("pass-row")).toHaveLength(0);
+    expect(screen.queryAllByTestId("pass-state-note")).toHaveLength(0);
   });
 
   it("renders rows in plan order with correct kind/FBO/mesh/sampler cells", () => {
@@ -136,6 +137,9 @@ describe("PassInspector", () => {
     expect(row0.querySelector('[data-testid="pass-mesh"]')?.textContent).toBe(
       "POINTS ×1024, read=A",
     );
+    expect(row0.querySelector('[data-testid="pass-state"]')?.textContent).toBe(
+      "—",
+    );
 
     expect(row1.textContent).toContain("Noise");
     expect(row1.querySelector('[data-testid="pass-mesh"]')?.textContent).toBe(
@@ -144,6 +148,10 @@ describe("PassInspector", () => {
     expect(row1.querySelector('[data-testid="pass-fbo"]')?.textContent).toBe(
       "1920×1080 (1×)",
     );
+    // noise1: meshIsFullscreen true → depth off.
+    expect(row1.querySelector('[data-testid="pass-state"]')?.textContent).toBe(
+      "blend off · cull off · depth off",
+    );
 
     expect(row2.querySelector('[data-testid="pass-fbo"]')?.textContent).toBe(
       "960×540 (0.5×)",
@@ -151,6 +159,32 @@ describe("PassInspector", () => {
     expect(
       row2.querySelector('[data-testid="pass-samplers"]')?.textContent,
     ).toBe("u_tex ← Noise (unit 0)");
+    // blur1: meshIsFullscreen false → depth on.
+    expect(row2.querySelector('[data-testid="pass-state"]')?.textContent).toBe(
+      "blend off · cull off · depth on",
+    );
+
+    expect(screen.getByTestId("pass-state-note").textContent).toContain(
+      "outColor.a",
+    );
+  });
+
+  it("gives the compute row's State cell an explanatory title, no title on shader rows", () => {
+    useGraphStore.setState({
+      nodes: [computeNode("compute1", "Particles"), shaderNode("s1", "S1")],
+    });
+    usePassPlanStore
+      .getState()
+      .publish([computeRow("compute1"), shaderRow({ nodeId: "s1" })], {});
+
+    render(<PassInspector />);
+    const rows = screen.getAllByTestId("pass-row");
+    const computeState = rows[0]?.querySelector('[data-testid="pass-state"]');
+    const shaderState = rows[1]?.querySelector('[data-testid="pass-state"]');
+    expect(computeState?.getAttribute("title")).toBe(
+      "compute pass: transform feedback only — no fragment stage",
+    );
+    expect(shaderState?.hasAttribute("title")).toBe(false);
   });
 
   it("resolves a shader row's compute-driven mesh via the driving ComputePassRow", () => {

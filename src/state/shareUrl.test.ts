@@ -15,6 +15,10 @@ const graph: Graph = {
       vertexSource: "void main(){}",
       fragmentSource:
         "#version 300 es\nprecision highp float;\nout vec4 c;\nvoid main(){ c = vec4(1); }",
+      // C-2: this fixture doubles as the "stored value beats @default"
+      // backward-compat case — a project saved before C-2 already has
+      // uniformValues, and compile.ts's withExplicitDefaults must let it win
+      // over starter.frag's `@default 0.5, 0.7, 1.0` unconditionally.
       uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
     },
     { id: "output1", kind: "output" },

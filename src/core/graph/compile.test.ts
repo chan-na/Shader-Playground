@@ -377,3 +377,88 @@ describe("compileGraph fullscreenByNode (T1/A-1)", () => {
     plan.dispose();
   });
 });
+
+describe("compileGraph withExplicitDefaults binding (T3/C-2)", () => {
+  // Seeds land in the pass's separate `seededDefaults` field, NOT merged
+  // into `uniformValues`: the Viewport hot-patches
+  // `pass.uniformValues = node.uniformValues` every frame, so a merged-in
+  // seed was clobbered before the first draw ever bound it (the original
+  // C-2 regression — near-black glow on every new node). The stored-wins
+  // ordering is enforced by `bindUserUniforms`'s effective-map spread and is
+  // covered execute-side in execute.test.ts.
+  it("seeds a shader pass's seededDefaults from the fragment source's @default", () => {
+    const gl = createFakeGl({ attributes: [], uniforms: [] });
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "s1",
+          kind: "shader",
+          vertexSource: "//v",
+          fragmentSource: "uniform float u_x; // @default 3\nvoid main(){}",
+          uniformValues: {},
+        },
+      ],
+      edges: [],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const pass = plan.shaderPassByNode.get("s1");
+    expect(pass?.seededDefaults.u_x).toBe(3);
+    expect(pass?.uniformValues).toEqual({});
+    plan.dispose();
+  });
+
+  it("keeps a stored shader uniform value in uniformValues alongside the seed (stored wins at bind time)", () => {
+    const gl = createFakeGl({ attributes: [], uniforms: [] });
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "s1",
+          kind: "shader",
+          vertexSource: "//v",
+          fragmentSource: "uniform float u_x; // @default 3\nvoid main(){}",
+          uniformValues: { u_x: 2 },
+        },
+      ],
+      edges: [],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const pass = plan.shaderPassByNode.get("s1");
+    // Seeds are computed from source alone; the stored value stays in
+    // uniformValues and out-spreads the seed in bindUserUniforms.
+    expect(pass?.seededDefaults.u_x).toBe(3);
+    expect(pass?.uniformValues.u_x).toBe(2);
+    plan.dispose();
+  });
+
+  it("seeds a compute pass's seededDefaults from the vertex source's @default", () => {
+    const gl = createFakeGl({ attributes: ["a_position"], uniforms: [] });
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "c1",
+          kind: "compute",
+          vertexSource:
+            "uniform float u_y; // @default 5\nin vec3 a_position;\nout vec3 v_position;\nvoid main(){ v_position = a_position; }",
+          count: 4,
+          primitive: "POINTS",
+          attributes: [
+            {
+              inName: "a_position",
+              outName: "v_position",
+              size: 3,
+              seed: "zero",
+            },
+          ],
+          uniformValues: {},
+        },
+      ],
+      edges: [],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const pass = plan.passByNode.get("c1");
+    expect(pass?.kind).toBe("compute");
+    expect(pass?.seededDefaults.u_y).toBe(5);
+    expect(pass?.uniformValues).toEqual({});
+    plan.dispose();
+  });
+});

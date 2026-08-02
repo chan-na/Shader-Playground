@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   GraphNode,
+  ImageGraphNode,
   MeshGraphNode,
   ParamGraphNode,
   ShaderGraphNode,
@@ -569,6 +570,49 @@ describe("Inspector — driven uniforms (L1/E-4)", () => {
     expect(toggle).not.toBeNull();
     fireEvent.click(toggle as Element);
     expect(screen.getByTestId("uniform-hint-editor")).not.toBeNull();
+  });
+});
+
+// [E-3] Texture parameters — derived from core/gl/texture.ts's
+// FBO_TEXTURE_PARAMS / IMAGE_TEXTURE_PARAMS constants, not hand-copied
+// strings, so the two sections can never silently disagree with the GL layer.
+describe("Inspector — Texture parameters [E-3]", () => {
+  const imageNode: ImageGraphNode = {
+    id: "img1",
+    kind: "image",
+    assetId: null,
+  };
+
+  it("shows the Image node's REPEAT/mipmap sampling parameters", () => {
+    useGraphStore.getState().addNode(imageNode);
+    useSelectionStore.getState().select("img1");
+    render(<Inspector embedded />);
+
+    const section = screen.getByTestId("texture-params");
+    expect(section.textContent).toContain("REPEAT");
+    expect(section.textContent).toContain("LINEAR_MIPMAP_LINEAR");
+    expect(section.textContent).toContain("mipmaps: yes");
+    expect(section.textContent).toContain("같은 GLSL이 다른 결과");
+  });
+
+  it("shows the Shader node's FBO output texture parameters (CLAMP_TO_EDGE, no mipmap)", () => {
+    useGraphStore.getState().addNode(shaderNode);
+    useSelectionStore.getState().select("s1");
+    render(<Inspector embedded />);
+
+    const section = screen.getByTestId("texture-params");
+    expect(section.textContent).toContain("Output texture (FBO)");
+    expect(section.textContent).toContain("CLAMP_TO_EDGE");
+    expect(section.textContent).toContain("mipmaps: no");
+    expect(section.textContent).toContain("Image 노드와 다르다");
+  });
+
+  it("does not show a texture-params section for a plain output node", () => {
+    useGraphStore.getState().addNode(otherNode);
+    useSelectionStore.getState().select("o1");
+    render(<Inspector embedded />);
+
+    expect(screen.queryByTestId("texture-params")).toBeNull();
   });
 });
 

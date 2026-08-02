@@ -1,5 +1,6 @@
 import type { NodeProps } from "@xyflow/react";
 import { useEffect, useRef } from "react";
+import { IMAGE_TEXTURE_PARAMS } from "../../../core/gl/texture";
 import type { ImageGraphNode } from "../../../core/graph/types";
 import { displayNodeName } from "../../../core/nodes/registry";
 import { useAssetStore } from "../../../state/assetStore";
@@ -61,6 +62,13 @@ export function ImageNodeView({ id, data }: NodeProps) {
         )}
         <div className="node-card__meta">
           {asset ? `${asset.width}×${asset.height}` : id}
+        </div>
+        {/* [E-3] Drift-proof meta line: reads the same constant the
+            Inspector's texture-params section and createImageTexture itself
+            derive from (core/gl/texture.ts), never a copied string. */}
+        <div className="node-card__meta">
+          {IMAGE_TEXTURE_PARAMS.wrapS} ·{" "}
+          {IMAGE_TEXTURE_PARAMS.mipmaps ? "mipmap" : "no mip"}
         </div>
       </div>
       <PortHandle

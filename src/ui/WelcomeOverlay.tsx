@@ -1,17 +1,22 @@
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
+import type { ParentsMap } from "../core/graph/parents";
 import type { Graph, GraphNode, GraphNodeKind } from "../core/graph/types";
 import { importFiles } from "../state/assetActions";
 import { useCommandPaletteStore } from "../state/commandPaletteStore";
 import {
   CHAIN_DEMO_LAYOUT,
+  CHAIN_DEMO_PARENTS,
   createChainDemoGraph,
   createDemoGraph,
   createParticleDemoGraph,
   createTorusDemoGraph,
   DEMO_LAYOUT,
+  DEMO_PARENTS,
   PARTICLE_DEMO_LAYOUT,
+  PARTICLE_DEMO_PARENTS,
   TORUS_DEMO_LAYOUT,
+  TORUS_DEMO_PARENTS,
 } from "../state/demoGraph";
 import { useGraphStore } from "../state/graphStore";
 import type { NodePosition } from "../state/types";
@@ -57,19 +62,31 @@ interface Starter {
   tags: StarterTag[];
   factory: () => Graph;
   layout: Record<string, NodePosition>;
+  parents: ParentsMap;
 }
 
 /** Distinct node kinds present in a graph, in first-seen order — drives the
- * card's tag row (dot color = that kind's category, tokens.nodeCategory). */
+ * card's tag row (dot color = that kind's category, tokens.nodeCategory).
+ * `group` is excluded — F-2's lesson groups are purely-visual editor
+ * scaffolding, not part of the functional graph shape this chip/tag row
+ * describes (a group's own category isn't even meaningful here). */
 function uniqueTags(nodes: GraphNode[]): StarterTag[] {
   const seen = new Set<GraphNodeKind>();
   const tags: StarterTag[] = [];
   for (const n of nodes) {
+    if (n.kind === "group") continue;
     if (seen.has(n.kind)) continue;
     seen.add(n.kind);
     tags.push({ kind: n.kind, category: NODE_CATEGORY_OF[n.kind] });
   }
   return tags;
+}
+
+/** Functional (non-group) node count — what the "N nodes" chip and card copy
+ * describe. F-2's lesson groups are editor-only scaffolding and must not
+ * inflate this number (the copy below literally says "three nodes"). */
+function functionalNodeCount(nodes: GraphNode[]): number {
+  return nodes.filter((n) => n.kind !== "group").length;
 }
 
 // Node counts/tags are derived once from the real demo factories at module
@@ -84,40 +101,44 @@ const SPHERE_STARTER: Starter = {
   key: "sphere",
   title: "Sphere",
   desc: "A shaded sphere mesh piped straight to Output — the smallest possible graph, three nodes end to end.",
-  nodeCount: sphereGraph.nodes.length,
+  nodeCount: functionalNodeCount(sphereGraph.nodes),
   tags: uniqueTags(sphereGraph.nodes),
   factory: createDemoGraph,
   layout: DEMO_LAYOUT,
+  parents: DEMO_PARENTS,
 };
 
 const TORUS_STARTER: Starter = {
   key: "torus",
   title: "Torus UV",
   desc: "Same three-node shape as Sphere, wired to a UV-debug shader instead — see exactly how coordinates wrap a mesh.",
-  nodeCount: torusGraph.nodes.length,
+  nodeCount: functionalNodeCount(torusGraph.nodes),
   tags: uniqueTags(torusGraph.nodes),
   factory: createTorusDemoGraph,
   layout: TORUS_DEMO_LAYOUT,
+  parents: TORUS_DEMO_PARENTS,
 };
 
 const CHAIN_STARTER: Starter = {
   key: "chain",
   title: "Chain",
   desc: "Noise feeds blur feeds tonemap — a three-stage post-process pipeline chained before the Output.",
-  nodeCount: chainGraph.nodes.length,
+  nodeCount: functionalNodeCount(chainGraph.nodes),
   tags: uniqueTags(chainGraph.nodes),
   factory: createChainDemoGraph,
   layout: CHAIN_DEMO_LAYOUT,
+  parents: CHAIN_DEMO_PARENTS,
 };
 
 const PARTICLE_STARTER: Starter = {
   key: "particle",
   title: "Particle field",
   desc: "A 1024-point compute pass drives a point-sprite shader — GPU simulation feeding the Output directly.",
-  nodeCount: particleGraph.nodes.length,
+  nodeCount: functionalNodeCount(particleGraph.nodes),
   tags: uniqueTags(particleGraph.nodes),
   factory: createParticleDemoGraph,
   layout: PARTICLE_DEMO_LAYOUT,
+  parents: PARTICLE_DEMO_PARENTS,
 };
 
 const STARTERS: Starter[] = [
@@ -139,7 +160,9 @@ const THUMB_CLASS: Record<Starter["key"], string> = {
 };
 
 function createStarterGraph(starter: Starter): void {
-  useGraphStore.getState().setGraph(starter.factory(), starter.layout);
+  useGraphStore
+    .getState()
+    .setGraph(starter.factory(), starter.layout, starter.parents);
 }
 
 /** AppToolbar.tsx onFilesChosen's accept string, reused verbatim. */

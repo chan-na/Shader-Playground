@@ -1,4 +1,5 @@
 import type { Graph } from "../core/graph/types";
+import { withExplicitDefaults } from "../core/graph/uniformDefaults";
 import { serializeProject } from "../state/serialization";
 import type { NodePosition } from "../state/types";
 import { tokens } from "../theme";
@@ -15,7 +16,40 @@ export function buildExportedHtml(
   positions: Record<string, NodePosition>,
   opts?: { title?: string; width?: number; height?: number },
 ): string {
-  const project = serializeProject(graph, positions);
+  // C-2: the standalone player has no `@default` parser — it binds exactly
+  // the serialized `uniformValues` (standalonePlayer.js). Materialize each
+  // shader/compute node's effective values at this export boundary so a
+  // node whose defaults come from GLSL `@default` hints (stored map `{}`)
+  // renders the same in the exported file as in the app. Export-only:
+  // regular project serialization (autosave / share URL / JSON export)
+  // keeps storing user values verbatim, preserving the "stored value >
+  // `@default` > GL zero" invariant. Seeding from the *raw* node sources is
+  // a safe superset of compile.ts's compiled-source seeding: the app's
+  // fullscreen.vert substitution declares no uniforms, and any extra seeded
+  // name that isn't active in the player's linked program is skipped at
+  // bind time.
+  const materialized: Graph = {
+    nodes: graph.nodes.map((n) => {
+      if (n.kind === "shader") {
+        return {
+          ...n,
+          uniformValues: withExplicitDefaults(
+            `${n.vertexSource}\n${n.fragmentSource}`,
+            n.uniformValues,
+          ),
+        };
+      }
+      if (n.kind === "compute") {
+        return {
+          ...n,
+          uniformValues: withExplicitDefaults(n.vertexSource, n.uniformValues),
+        };
+      }
+      return n;
+    }),
+    edges: graph.edges,
+  };
+  const project = serializeProject(materialized, positions);
   const title = opts?.title ?? "Shader Playground export";
   const w = opts?.width ?? 800;
   const h = opts?.height ?? 600;

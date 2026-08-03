@@ -449,7 +449,7 @@ describe("CodeEditor F2 rename target (#10)", () => {
  */
 describe("CodeEditor — A-1 auto-vertex readOnly", () => {
   it("shows fullscreen.vert verbatim + blocks editing when the node is plan-marked fullscreen", async () => {
-    usePassPlanStore.getState().publish([], { shader1: true });
+    usePassPlanStore.getState().publish([], { shader1: true }, {});
     mount();
     await act(async () => {
       useEditorStore.getState().setStage("vertex");
@@ -472,7 +472,7 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
   });
 
   it("returns to the user's vertexSource + editable once the node stops being plan-marked fullscreen (no reselection)", async () => {
-    usePassPlanStore.getState().publish([], { shader1: true });
+    usePassPlanStore.getState().publish([], { shader1: true }, {});
     mount();
     await act(async () => {
       useEditorStore.getState().setStage("vertex");
@@ -484,7 +484,7 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
     // no selection change. The dedicated `[isAutoVertex]` effect is the only
     // thing that can catch this.
     await act(async () => {
-      usePassPlanStore.getState().publish([], { shader1: false });
+      usePassPlanStore.getState().publish([], { shader1: false }, {});
     });
 
     expect(view().state.doc.toString()).toBe(VERT);
@@ -503,7 +503,7 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
   });
 
   it("shows the neutral auto-vertex note while the substituted doc is on screen", async () => {
-    usePassPlanStore.getState().publish([], { shader1: true });
+    usePassPlanStore.getState().publish([], { shader1: true }, {});
     mount();
     await act(async () => {
       useEditorStore.getState().setStage("vertex");
@@ -522,7 +522,7 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
     // a fact about the vertex *document* — it must already be honest here,
     // while everything stage-scoped (source override, readOnly, note) still
     // applies to the visible fragment document only.
-    usePassPlanStore.getState().publish([], { shader1: true });
+    usePassPlanStore.getState().publish([], { shader1: true }, {});
     mount();
     const vertexTab = screen.getByTestId("stage-tab-vertex");
     expect(vertexTab.getAttribute("data-active")).toBe("false");
@@ -544,7 +544,7 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
 
     // Mesh disconnects: the auto flip swaps fullscreen.vert into the doc.
     await act(async () => {
-      usePassPlanStore.getState().publish([], { shader1: true });
+      usePassPlanStore.getState().publish([], { shader1: true }, {});
     });
     expect(view().state.doc.toString()).toBe(fullscreenVert);
 
@@ -556,7 +556,7 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
 
     // Mesh reconnects: the user's source returns, editable again.
     await act(async () => {
-      usePassPlanStore.getState().publish([], { shader1: false });
+      usePassPlanStore.getState().publish([], { shader1: false }, {});
     });
     expect(view().state.doc.toString()).toBe(VERT);
     expect(view().state.readOnly).toBe(false);
@@ -580,7 +580,9 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
     useGraphStore.setState({
       nodes: [shaderNode("shader1"), shaderNode("shader2")],
     });
-    usePassPlanStore.getState().publish([], { shader1: true, shader2: true });
+    usePassPlanStore
+      .getState()
+      .publish([], { shader1: true, shader2: true }, {});
     mount();
     await act(async () => {
       useEditorStore.getState().setStage("vertex");

@@ -152,6 +152,7 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
         }),
       ],
       {},
+      {},
     );
 
     render(<StatusBar />);

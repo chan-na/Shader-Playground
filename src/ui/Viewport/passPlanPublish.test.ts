@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { makePrimitive } from "../../core/assets/primitives";
 import { createFakeGl } from "../../core/gl/fakeGl";
-import { compileGraph } from "../../core/graph/compile";
+import { compileGraph, emptyPlan } from "../../core/graph/compile";
 import type { Graph } from "../../core/graph/types";
+import basicVert from "../../shaders/basic.vert?raw";
 import type { ComputePassRow, ShaderPassRow } from "../../state/passPlanStore";
-import { buildPassRows } from "./passPlanPublish";
+import { buildPassRows, buildVaryingContracts } from "./passPlanPublish";
 
 // Attribute set shared by every fake-gl-compiled program in this file: the
 // fixed 3-attribute mesh contract (a_position/a_normal/a_uv, see
@@ -283,5 +284,118 @@ describe("buildPassRows", () => {
       expect(row.meshAttributeUse).toEqual([]);
       plan.dispose();
     });
+  });
+});
+
+// A-2 (T4): vertex↔fragment varying contract, keyed off the *compiled*
+// vertex source rather than the node's own `vertexSource`.
+describe("buildVaryingContracts", () => {
+  // Both shader nodes declare the same fragment: `basic.vert`'s v_normal,
+  // statically used. The point of this fixture is that both nodes share
+  // `node.vertexSource === basicVert`, so the only thing that can explain a
+  // difference in the two nodes' contracts is which vertex source the
+  // *compiler* actually saw (fullscreen.vert vs basic.vert) — not what the
+  // node itself declares.
+  const fragUsingVNormal = `#version 300 es
+precision highp float;
+in vec3 v_normal;
+out vec4 fragColor;
+void main() { fragColor = vec4(v_normal, 1.0); }
+`;
+
+  function buildVaryingFixture() {
+    const graph: Graph = {
+      nodes: [
+        { id: "mCube", kind: "mesh", primitive: "cube" },
+        {
+          id: "sFull",
+          kind: "shader",
+          // basic.vert provides v_normal/v_uv/v_world, but sFull has no mesh
+          // edge below, so compile.ts substitutes fullscreen.vert (v_uv
+          // only) — node.vertexSource is never handed to the compiler.
+          vertexSource: basicVert,
+          fragmentSource: fragUsingVNormal,
+          uniformValues: {},
+        },
+        {
+          id: "sMesh",
+          kind: "shader",
+          // Same vertexSource as sFull, but wired to a mesh below, so this
+          // one really is compiled against basic.vert.
+          vertexSource: basicVert,
+          fragmentSource: fragUsingVNormal,
+          uniformValues: {},
+        },
+      ],
+      edges: [
+        {
+          id: "e1",
+          source: "mCube",
+          sourceHandle: "mesh",
+          target: "sMesh",
+          targetHandle: "mesh",
+        },
+      ],
+    };
+    const assets = { meshes: {}, images: {} };
+    const gl = makeGl();
+    const plan = compileGraph(gl, graph, { width: 64, height: 64, assets });
+    return { graph, plan };
+  }
+
+  it("uses the compiled vertex source, not the node's own vertexSource, for a fullscreen-substituted node", () => {
+    const { graph, plan } = buildVaryingFixture();
+    // Proves the fixture actually hit the fullscreen-substitution branch:
+    // if this were false, a "missing-out" result below would be meaningless.
+    expect(plan.fullscreenByNode.sFull).toBe(true);
+
+    const contracts = buildVaryingContracts(plan, graph);
+    const c = contracts.sFull;
+    expect(c).toBeDefined();
+    const names = c?.rows.map((r) => r.name).sort();
+    // v_uv comes from fullscreen.vert (the compiled source); v_normal/v_world
+    // — which basic.vert (the node's own, uncompiled vertexSource) would
+    // have provided — are absent from the vertex side entirely.
+    expect(names).toContain("v_uv");
+    const vNormal = c?.rows.find((r) => r.name === "v_normal");
+    expect(vNormal?.vertexType).toBeNull();
+    expect(vNormal?.status).toBe("missing-out");
+    expect(vNormal?.fragmentUsed).toBe(true);
+    plan.dispose();
+  });
+
+  it("links v_normal for a mesh-connected node, where basic.vert really is the compiled source", () => {
+    const { graph, plan } = buildVaryingFixture();
+    expect(plan.fullscreenByNode.sMesh).toBe(false);
+
+    const contracts = buildVaryingContracts(plan, graph);
+    const c = contracts.sMesh;
+    const vNormal = c?.rows.find((r) => r.name === "v_normal");
+    expect(vNormal?.vertexType).toBe("vec3");
+    expect(vNormal?.status).toBe("linked");
+    plan.dispose();
+  });
+
+  it("omits nodes absent from plan.compiledVertexSource (never reached the compiler)", () => {
+    const { graph } = buildVaryingFixture();
+    // emptyPlan is what a fatal validate (e.g. a cycle) yields — every
+    // shader node in the graph is present, but none reached compile.ts's
+    // per-node loop, so compiledVertexSource is `{}`.
+    const contracts = buildVaryingContracts(emptyPlan(64, 64), graph);
+    expect(contracts).toEqual({});
+  });
+
+  it("ignores non-shader nodes even if compiledVertexSource somehow held an entry for one", () => {
+    const { graph, plan } = buildVaryingFixture();
+    const withMeshEntry = {
+      ...plan,
+      compiledVertexSource: {
+        ...plan.compiledVertexSource,
+        mCube: basicVert,
+      },
+    };
+    const contracts = buildVaryingContracts(withMeshEntry, graph);
+    expect(contracts.mCube).toBeUndefined();
+    plan.dispose();
   });
 });

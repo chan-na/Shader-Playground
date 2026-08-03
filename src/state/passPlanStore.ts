@@ -73,10 +73,39 @@ export interface ComputePassRow {
 
 export type PassRow = ShaderPassRow | ComputePassRow;
 
+/**
+ * Per-varying row of a shader node's vertex↔fragment contract (A-2, T4).
+ * Mirrors `VaryingRow` from `core/glsl/varyingContract.ts` — declared inline
+ * rather than imported, for the same leaf-store reason as `meshAttributeUse`/
+ * `silentWarnings` above.
+ */
+export interface NodeVaryingRow {
+  name: string;
+  vertexType: string | null;
+  fragmentType: string | null;
+  fragmentUsed: boolean;
+  fragmentLine?: number;
+  status: "linked" | "unused" | "missing-out" | "type-mismatch";
+}
+
+/**
+ * Mirrors `VaryingContract` from `core/glsl/varyingContract.ts`, declared
+ * inline for the same leaf-store reason as `NodeVaryingRow` above.
+ */
+export interface NodeVaryings {
+  rows: ReadonlyArray<NodeVaryingRow>;
+  confident: boolean;
+}
+
 export interface PassPlanState {
   rows: PassRow[];
   fullscreenByNode: Record<string, boolean>;
-  publish: (rows: PassRow[], fullscreenByNode: Record<string, boolean>) => void;
+  varyingsByNode: Record<string, NodeVaryings>;
+  publish: (
+    rows: PassRow[],
+    fullscreenByNode: Record<string, boolean>,
+    varyingsByNode: Record<string, NodeVaryings>,
+  ) => void;
   /**
    * Drop rows/records for nodes no longer in the graph. Mirrors
    * `diagnosticsStore.retainOnly`'s identity-preservation: when nothing is
@@ -90,7 +119,9 @@ export interface PassPlanState {
 export const usePassPlanStore = create<PassPlanState>((set) => ({
   rows: [],
   fullscreenByNode: {},
-  publish: (rows, fullscreenByNode) => set({ rows, fullscreenByNode }),
+  varyingsByNode: {},
+  publish: (rows, fullscreenByNode, varyingsByNode) =>
+    set({ rows, fullscreenByNode, varyingsByNode }),
   retainOnly: (nodeIds) =>
     set((s) => {
       const keep = new Set(nodeIds);
@@ -106,11 +137,18 @@ export const usePassPlanStore = create<PassPlanState>((set) => ({
         if (keep.has(id)) fullscreenByNode[id] = v;
         else recordChanged = true;
       }
-      if (!rowsChanged && !recordChanged) return s;
+      let varyingsChanged = false;
+      const varyingsByNode: Record<string, NodeVaryings> = {};
+      for (const [id, v] of Object.entries(s.varyingsByNode)) {
+        if (keep.has(id)) varyingsByNode[id] = v;
+        else varyingsChanged = true;
+      }
+      if (!rowsChanged && !recordChanged && !varyingsChanged) return s;
       return {
         rows: rowsChanged ? rows : s.rows,
         fullscreenByNode: recordChanged ? fullscreenByNode : s.fullscreenByNode,
+        varyingsByNode: varyingsChanged ? varyingsByNode : s.varyingsByNode,
       };
     }),
-  reset: () => set({ rows: [], fullscreenByNode: {} }),
+  reset: () => set({ rows: [], fullscreenByNode: {}, varyingsByNode: {} }),
 }));

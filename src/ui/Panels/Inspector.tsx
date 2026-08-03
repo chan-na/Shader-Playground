@@ -39,6 +39,7 @@ import { UniformControl } from "./UniformControl";
 import { UniformHintEditor } from "./UniformHintEditor";
 import { UtilityInspector } from "./UtilityInspector";
 import { filterUniforms } from "./uniformFilter";
+import { VaryingBridgeSection } from "./VaryingBridgeSection";
 import { VideoInspector } from "./VideoInspector";
 import { ViewportControls } from "./ViewportControls";
 import { WebcamInspector } from "./WebcamInspector";
@@ -682,6 +683,15 @@ export function Inspector({ embedded = false }: InspectorProps) {
                   owner={uniformOwner}
                 />
               )}
+
+              {/* [A-2, T4] A varying is not a uniform, so `uniformQuery`
+                  (which only filters the uniform/sampler/system rows above)
+                  must never hide this section — it's rendered outside every
+                  `filtered*`/`noMatches` branch, and unconditionally on
+                  `shaderNode` so it shows even when the node declares zero
+                  uniforms. Gated on `shaderNode` rather than `uniformOwner`:
+                  a compute node has no fragment stage to bridge to. */}
+              {shaderNode && <VaryingBridgeSection nodeId={shaderNode.id} />}
 
               {noMatches && (
                 <div

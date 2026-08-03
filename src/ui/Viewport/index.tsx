@@ -42,7 +42,7 @@ import { DockPanelHeader } from "../DockPanelHeader";
 import { CompileErrorOverlay } from "./CompileErrorOverlay";
 import { EmptyState } from "./EmptyState";
 import { PaneOverlay } from "./PaneOverlay";
-import { buildPassRows } from "./passPlanPublish";
+import { buildPassRows, buildVaryingContracts } from "./passPlanPublish";
 import { TransportBar } from "./TransportBar";
 
 /** Output 노드 개수 → Viewport 헤더 메타 배지 텍스트("1 · single" 등, App
@@ -240,20 +240,23 @@ export function Viewport() {
         // undone / replaced) so ProblemsPanel rows and badge counts don't keep
         // reporting phantom problems (M10).
         diagStore.retainOnly(shaderNodeIds);
-        // Publish the Pass Inspector's plan-summary rows (T1/D-1). A fatal
-        // validate (cycle etc.) yields `emptyPlan`, which is a transient
-        // state — publishing it here would blank the badges/Pass Inspector
-        // to a false "0 passes" while the user is mid-drag on a cycle-causing
-        // edit. Keep the last real plan's rows/fullscreenByNode in that case;
-        // `retainOnly` below still runs unconditionally so nodes actually
-        // deleted from the graph (including from an all-nodes-removed graph,
-        // which can itself produce `errors`) are pruned immediately.
+        // Publish the Pass Inspector's plan-summary rows (T1/D-1) and each
+        // shader node's varying contract (A-2/T4). A fatal validate (cycle
+        // etc.) yields `emptyPlan`, which is a transient state — publishing
+        // it here would blank the badges/Pass Inspector to a false "0
+        // passes" (and drop every varying contract) while the user is
+        // mid-drag on a cycle-causing edit. Keep the last real plan's
+        // rows/fullscreenByNode/varyingsByNode in that case; `retainOnly`
+        // below still runs unconditionally so nodes actually deleted from
+        // the graph (including from an all-nodes-removed graph, which can
+        // itself produce `errors`) are pruned immediately.
         const passStore = usePassPlanStore.getState();
         const fatal = plan.passes.length === 0 && plan.errors.length > 0;
         if (!fatal) {
           passStore.publish(
             buildPassRows(plan, g, assets),
             plan.fullscreenByNode,
+            buildVaryingContracts(plan, g),
           );
         }
         passStore.retainOnly(g.nodes.map((n) => n.id));

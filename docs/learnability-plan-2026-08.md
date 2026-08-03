@@ -499,7 +499,7 @@ uniform vec3 u_baseColor;
 | T3 | E-3 텍스처 파라미터 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U3) |
 | T3 | F-1 좌표계 카드 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U4) |
 | T3 | F-2 데모 레슨화 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U1) |
-| T4 | A-2 varying 브리지 | ⬜ 미착수 | — | 별도 설계 |
+| T4 | A-2 varying 브리지 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 39 |
 | T4 | A-3 노드 분리 | ⬜ 보류 | — | A-2 결과 후 판단 |
 
 **상태 표기**: ⬜ 미착수 / 🟨 진행중 / ✅ 완료 / ⏸ 보류 / ❌ 취소

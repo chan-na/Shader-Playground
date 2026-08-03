@@ -204,6 +204,7 @@ describe("MeshNodeView — attribute consumption warning [B-2]", () => {
         }),
       ],
       {},
+      {},
     );
 
     render(
@@ -230,6 +231,7 @@ describe("MeshNodeView — attribute consumption warning [B-2]", () => {
           ],
         }),
       ],
+      {},
       {},
     );
 

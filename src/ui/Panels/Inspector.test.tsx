@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ComputeGraphNode,
   GraphNode,
   ImageGraphNode,
   MeshGraphNode,
@@ -15,6 +16,7 @@ import type {
 } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 import { useMouseStore } from "../../state/mouseStore";
+import type { NodeVaryingRow, NodeVaryings } from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { useTimeStore } from "../../state/timeStore";
@@ -357,7 +359,7 @@ describe("Inspector — System uniforms section [C-1]", () => {
 
   it("marks u_view unbound with the fullscreen-pass note when the plan reports this node as fullscreen", () => {
     useGraphStore.getState().addNode(viewShaderNode);
-    usePassPlanStore.getState().publish([], { sv1: true });
+    usePassPlanStore.getState().publish([], { sv1: true }, {});
     useSelectionStore.getState().select("sv1");
     render(<Inspector embedded />);
 
@@ -368,7 +370,7 @@ describe("Inspector — System uniforms section [C-1]", () => {
 
   it("marks u_view bound once the plan reports a resolved (non-fullscreen) mesh", () => {
     useGraphStore.getState().addNode(viewShaderNode);
-    usePassPlanStore.getState().publish([], { sv1: false });
+    usePassPlanStore.getState().publish([], { sv1: false }, {});
     useSelectionStore.getState().select("sv1");
     render(<Inspector embedded />);
 
@@ -417,6 +419,105 @@ describe("Inspector — Mesh section [B-1]", () => {
     expect(section.textContent).toContain("(vec3)");
     expect(section.textContent).toContain("a_uv");
     expect(section.textContent).toContain("(vec2)");
+  });
+});
+
+// [A-2, T4] Varying bridge section — the vertex↔fragment contract, sourced
+// from passPlanStore.varyingsByNode (never re-parsed here).
+describe("Inspector — Varying bridge section [A-2]", () => {
+  const bridgeShaderNode: ShaderGraphNode = {
+    id: "vb1",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "uniform float u_a;",
+    uniformValues: {},
+  };
+
+  const meshNode: MeshGraphNode = {
+    id: "vbmesh1",
+    kind: "mesh",
+    primitive: "cube",
+    assetId: null,
+  };
+
+  const computeNode: ComputeGraphNode = {
+    id: "vbcompute1",
+    kind: "compute",
+    vertexSource: "",
+    count: 1024,
+    primitive: "POINTS",
+    attributes: [],
+    uniformValues: {},
+  };
+
+  function seedContract(nodeId: string, rows: NodeVaryingRow[]) {
+    const contract: NodeVaryings = { rows, confident: true };
+    usePassPlanStore.getState().publish([], {}, { [nodeId]: contract });
+  }
+
+  it("shows the bridge section for a selected shader node once a contract is published", () => {
+    useGraphStore.getState().addNode(bridgeShaderNode);
+    seedContract("vb1", [
+      {
+        name: "v_uv",
+        vertexType: "vec2",
+        fragmentType: "vec2",
+        fragmentUsed: true,
+        status: "linked",
+      },
+    ]);
+    useSelectionStore.getState().select("vb1");
+    render(<Inspector embedded />);
+
+    expect(screen.getByTestId("varying-bridge")).not.toBeNull();
+    expect(screen.getByTestId("varying-row")).not.toBeNull();
+  });
+
+  it("stays visible while an unrelated uniform search query is active", () => {
+    useGraphStore.getState().addNode(bridgeShaderNode);
+    seedContract("vb1", [
+      {
+        name: "v_uv",
+        vertexType: "vec2",
+        fragmentType: "vec2",
+        fragmentUsed: true,
+        status: "linked",
+      },
+    ]);
+    useSelectionStore.getState().select("vb1");
+    render(<Inspector embedded />);
+
+    fireEvent.change(screen.getByTestId("uniform-search"), {
+      target: { value: "nonexistent" },
+    });
+
+    expect(screen.getByTestId("uniform-search-empty")).not.toBeNull();
+    expect(screen.getByTestId("varying-bridge")).not.toBeNull();
+  });
+
+  it("is absent for a mesh node", () => {
+    useGraphStore.getState().addNode(meshNode);
+    useSelectionStore.getState().select("vbmesh1");
+    render(<Inspector embedded />);
+
+    expect(screen.queryByTestId("varying-bridge")).toBeNull();
+  });
+
+  it("is absent for a compute node even when a contract exists under its id", () => {
+    useGraphStore.getState().addNode(computeNode);
+    seedContract("vbcompute1", [
+      {
+        name: "v_pos",
+        vertexType: "vec3",
+        fragmentType: "vec3",
+        fragmentUsed: true,
+        status: "linked",
+      },
+    ]);
+    useSelectionStore.getState().select("vbcompute1");
+    render(<Inspector embedded />);
+
+    expect(screen.queryByTestId("varying-bridge")).toBeNull();
   });
 });
 

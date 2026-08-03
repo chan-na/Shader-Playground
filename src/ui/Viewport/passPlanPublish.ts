@@ -1,4 +1,5 @@
 import { glPrimitiveLabel } from "../../core/gl/primitiveLabel";
+import { computeVaryingContract } from "../../core/glsl/varyingContract";
 import type { ExecutionPlan } from "../../core/graph/compile";
 import { computeSilentUniformWarnings } from "../../core/graph/silentUniforms";
 import type {
@@ -7,7 +8,7 @@ import type {
   ShaderGraphNode,
 } from "../../core/graph/types";
 import { parseUniforms } from "../../core/graph/uniformParser";
-import type { PassRow } from "../../state/passPlanStore";
+import type { NodeVaryings, PassRow } from "../../state/passPlanStore";
 
 /** Minimal view of the asset catalog this module needs (just mesh names). */
 export interface PassPlanAssets {
@@ -57,7 +58,10 @@ function meshLabelFor(
  * state here would add avoidable GC pressure on top of that. `silentWarnings`
  * is the one field genuinely computed here (E-1, T2): it's a `parseUniforms`
  * pass plus a small set diff, cheap enough at recompile frequency (not a RAF
- * hot path — see `Viewport/index.tsx`'s `recompile`).
+ * hot path — see `Viewport/index.tsx`'s `recompile`). `buildVaryingContracts`
+ * below is the same story for A-2 (T4): one `computeVaryingContract` call per
+ * shader node, i.e. two `buildSymbolTable` passes — also recompile-frequency,
+ * not RAF.
  */
 export function buildPassRows(
   plan: ExecutionPlan,
@@ -121,4 +125,48 @@ export function buildPassRows(
     });
   }
   return rows;
+}
+
+/**
+ * Vertex↔fragment varying contract per shader node (A-2, T4), for the Pass
+ * Inspector to surface via `passPlanStore.varyingsByNode`.
+ *
+ * Reads `plan.compiledVertexSource[node.id]` — the vertex source actually
+ * handed to the GL compiler — rather than `node.vertexSource`, for the exact
+ * reason `buildPassRows`'s `silentWarnings` above does the same (see its
+ * comment, and `compile.ts`'s doc on `compiledVertexSource`): a fullscreen-
+ * substituted node's varying contract comes from `fullscreen.vert` (which
+ * only provides `v_uv`), not from the user's `basic.vert` (which also
+ * provides `v_normal`/`v_world`). Asserting against the user source would
+ * report those as "provided" when the compiler never saw them — exactly the
+ * false reassurance this module exists to remove. `fragmentSource` is read
+ * straight off the node because `compile.ts`'s `createProgram` call passes
+ * the fragment source through unmodified (there is no fragment-side
+ * substitution to account for).
+ *
+ * A node absent from `compiledVertexSource` never reached the compiler at
+ * all (e.g. every shader node when `plan` is `emptyPlan` after a fatal
+ * validate) and is skipped — showing a contract for a node the compiler
+ * never touched would itself be a fabricated bridge.
+ *
+ * `compiledVertexSource`/`fullscreenByNode` are written *before*
+ * `createProgram` runs (`compile.ts`), so a node whose fragment failed to
+ * compile or whose program failed to link still gets a contract computed
+ * here — which is exactly the case a `missing-out`/`type-mismatch` warning is
+ * most useful for (a real varying mismatch is a common cause of a link
+ * failure).
+ */
+export function buildVaryingContracts(
+  plan: ExecutionPlan,
+  graph: Graph,
+): Record<string, NodeVaryings> {
+  const out: Record<string, NodeVaryings> = {};
+  for (const node of graph.nodes) {
+    if (node.kind !== "shader") continue;
+    const vert = plan.compiledVertexSource[node.id];
+    if (vert === undefined) continue;
+    const fragmentSource = (node as ShaderGraphNode).fragmentSource;
+    out[node.id] = computeVaryingContract(vert, fragmentSource);
+  }
+  return out;
 }

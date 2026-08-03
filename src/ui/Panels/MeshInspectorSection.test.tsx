@@ -68,6 +68,7 @@ describe("MeshInspectorSection — attribute status markers [B-2]", () => {
         }),
       ],
       {},
+      {},
     );
 
     render(<MeshInspectorSection node={meshNode} />);

@@ -6,7 +6,11 @@ import {
 } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
-import type { ShaderPassRow } from "../../state/passPlanStore";
+import type {
+  NodeVaryingRow,
+  NodeVaryings,
+  ShaderPassRow,
+} from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
@@ -41,6 +45,24 @@ function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {
     silentWarnings: [],
     ...overrides,
   };
+}
+
+function varyingRowFixture(overrides: Partial<NodeVaryingRow>): NodeVaryingRow {
+  return {
+    name: "v_foo",
+    vertexType: null,
+    fragmentType: "vec3",
+    fragmentUsed: true,
+    status: "missing-out",
+    ...overrides,
+  };
+}
+
+function varyingsFixture(
+  rows: NodeVaryingRow[],
+  confident = true,
+): NodeVaryings {
+  return { rows, confident };
 }
 
 beforeEach(resetStores);
@@ -183,6 +205,7 @@ describe("ProblemsPanel", () => {
           }),
         ],
         {},
+        {},
       );
 
       render(<ProblemsPanel />);
@@ -205,6 +228,7 @@ describe("ProblemsPanel", () => {
           }),
         ],
         {},
+        {},
       );
 
       render(<ProblemsPanel />);
@@ -216,12 +240,109 @@ describe("ProblemsPanel", () => {
     it("shows 'No problems' when there are no silent warnings either", () => {
       usePassPlanStore
         .getState()
-        .publish([shaderRowFixture({ silentWarnings: [] })], {});
+        .publish([shaderRowFixture({ silentWarnings: [] })], {}, {});
 
       render(<ProblemsPanel />);
 
       expect(screen.getByText("No problems")).not.toBeNull();
       expect(screen.queryByTestId("silent-warning-row")).toBeNull();
+    });
+  });
+
+  // A-2 (T4): varying-bridge warnings surfaced from passPlanStore.varyingsByNode.
+  describe("Pipeline warnings (A-2 varying bridge)", () => {
+    it("renders a varying-warning-row per confident warning and folds it into the warning chip", () => {
+      usePassPlanStore.getState().publish(
+        [],
+        {},
+        {
+          s1: varyingsFixture([
+            varyingRowFixture({ name: "v_foo", fragmentLine: 4 }),
+          ]),
+        },
+      );
+
+      render(<ProblemsPanel />);
+
+      const row = screen.getByTestId("varying-warning-row");
+      expect(row.getAttribute("data-node-id")).toBe("s1");
+      expect(row.getAttribute("data-varying-name")).toBe("v_foo");
+      expect(row.textContent).toContain("v_foo");
+      expect(screen.getByText("1 warning")).not.toBeNull();
+    });
+
+    it("clicking a varying-warning-row selects the node, switches to the fragment stage, and jumps to fragmentLine", () => {
+      usePassPlanStore.getState().publish(
+        [],
+        {},
+        {
+          s1: varyingsFixture([
+            varyingRowFixture({ name: "v_foo", fragmentLine: 4 }),
+          ]),
+        },
+      );
+
+      render(<ProblemsPanel />);
+      fireEvent.click(screen.getByTestId("varying-warning-row"));
+
+      expect(useSelectionStore.getState().selectedNodeId).toBe("s1");
+      expect(useEditorStore.getState().activeStage).toBe("fragment");
+      expect(useEditorStore.getState().jumpRequest).toMatchObject({
+        nodeId: "s1",
+        stage: "fragment",
+        line: 4,
+      });
+    });
+
+    it("clicking a varying-warning-row without a fragmentLine still selects+switches but requests no jump", () => {
+      usePassPlanStore
+        .getState()
+        .publish(
+          [],
+          {},
+          { s1: varyingsFixture([varyingRowFixture({ name: "v_bar" })]) },
+        );
+
+      render(<ProblemsPanel />);
+      fireEvent.click(screen.getByTestId("varying-warning-row"));
+
+      expect(useSelectionStore.getState().selectedNodeId).toBe("s1");
+      expect(useEditorStore.getState().activeStage).toBe("fragment");
+      expect(useEditorStore.getState().jumpRequest).toBeNull();
+    });
+
+    it("renders no row (and no false 'OK') when the contract isn't confident", () => {
+      usePassPlanStore.getState().publish(
+        [],
+        {},
+        {
+          s1: varyingsFixture([varyingRowFixture({ name: "v_branch" })], false),
+        },
+      );
+
+      render(<ProblemsPanel />);
+
+      expect(screen.queryByTestId("varying-warning-row")).toBeNull();
+      expect(screen.getByText("No problems")).not.toBeNull();
+    });
+
+    it("sums silentEntries and varyingEntries into a single Pipeline warnings count", () => {
+      usePassPlanStore.getState().publish(
+        [
+          shaderRowFixture({
+            silentWarnings: [
+              { uniformName: "u_tex", kind: "sampler-unconnected" },
+            ],
+          }),
+        ],
+        {},
+        { s1: varyingsFixture([varyingRowFixture({ name: "v_foo" })]) },
+      );
+
+      render(<ProblemsPanel />);
+
+      expect(screen.getByText("Pipeline warnings (2)")).not.toBeNull();
+      expect(screen.getByText("2 warnings")).not.toBeNull();
     });
   });
 });

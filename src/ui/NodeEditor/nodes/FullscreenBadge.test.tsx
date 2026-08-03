@@ -15,13 +15,13 @@ describe("FullscreenBadge", () => {
   });
 
   it("renders nothing when the node's fullscreenByNode entry is false", () => {
-    usePassPlanStore.getState().publish([], { s1: false });
+    usePassPlanStore.getState().publish([], { s1: false }, {});
     render(<FullscreenBadge nodeId="s1" />);
     expect(screen.queryByTestId("node-fullscreen-s1")).toBeNull();
   });
 
   it("renders the FULLSCREEN pill once the node is marked fullscreen", () => {
-    usePassPlanStore.getState().publish([], { s1: true });
+    usePassPlanStore.getState().publish([], { s1: true }, {});
     render(<FullscreenBadge nodeId="s1" />);
     const badge = screen.getByTestId("node-fullscreen-s1");
     expect(badge.textContent).toBe("FULLSCREEN");
@@ -35,7 +35,7 @@ describe("FullscreenBadge", () => {
   });
 
   it("only renders the badge for the node it was given, not other nodes", () => {
-    usePassPlanStore.getState().publish([], { s1: false, s2: true });
+    usePassPlanStore.getState().publish([], { s1: false, s2: true }, {});
     render(<FullscreenBadge nodeId="s1" />);
     expect(screen.queryByTestId("node-fullscreen-s1")).toBeNull();
   });

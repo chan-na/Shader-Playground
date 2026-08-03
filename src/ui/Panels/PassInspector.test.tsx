@@ -112,6 +112,7 @@ describe("PassInspector", () => {
         }),
       ],
       {},
+      {},
     );
 
     render(<PassInspector />);
@@ -175,7 +176,7 @@ describe("PassInspector", () => {
     });
     usePassPlanStore
       .getState()
-      .publish([computeRow("compute1"), shaderRow({ nodeId: "s1" })], {});
+      .publish([computeRow("compute1"), shaderRow({ nodeId: "s1" })], {}, {});
 
     render(<PassInspector />);
     const rows = screen.getAllByTestId("pass-row");
@@ -205,6 +206,7 @@ describe("PassInspector", () => {
         }),
       ],
       {},
+      {},
     );
 
     render(<PassInspector />);
@@ -226,6 +228,7 @@ describe("PassInspector", () => {
         }),
       ],
       {},
+      {},
     );
 
     render(<PassInspector />);
@@ -239,7 +242,7 @@ describe("PassInspector", () => {
     useGraphStore.setState({ nodes: [] });
     usePassPlanStore
       .getState()
-      .publish([shaderRow({ nodeId: "deleted1" })], {});
+      .publish([shaderRow({ nodeId: "deleted1" })], {}, {});
 
     render(<PassInspector />);
     expect(screen.getByTestId("pass-row").textContent).toContain("deleted1");
@@ -247,7 +250,9 @@ describe("PassInspector", () => {
 
   it('renders "—" in the GPU ms column when the timer extension is unsupported', () => {
     useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
-    usePassPlanStore.getState().publish([shaderRow({ nodeId: "noise1" })], {});
+    usePassPlanStore
+      .getState()
+      .publish([shaderRow({ nodeId: "noise1" })], {}, {});
     useGpuTimerStore.setState({
       supported: false,
       enabled: true,
@@ -260,7 +265,9 @@ describe("PassInspector", () => {
 
   it('renders "—" in the GPU ms column when the timer is disabled', () => {
     useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
-    usePassPlanStore.getState().publish([shaderRow({ nodeId: "noise1" })], {});
+    usePassPlanStore
+      .getState()
+      .publish([shaderRow({ nodeId: "noise1" })], {}, {});
     useGpuTimerStore.setState({
       supported: true,
       enabled: false,
@@ -273,7 +280,9 @@ describe("PassInspector", () => {
 
   it("renders the formatted GPU ms when supported and enabled", () => {
     useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
-    usePassPlanStore.getState().publish([shaderRow({ nodeId: "noise1" })], {});
+    usePassPlanStore
+      .getState()
+      .publish([shaderRow({ nodeId: "noise1" })], {}, {});
     useGpuTimerStore.setState({
       supported: true,
       enabled: true,
@@ -289,7 +298,7 @@ describe("PassInspector", () => {
     useGraphStore.setState({ nodes: [computeNode("compute1", "Particles")] });
     let read: "A" | "B" = "A";
     const rows = [computeRow("compute1", () => read)];
-    usePassPlanStore.getState().publish(rows, {});
+    usePassPlanStore.getState().publish(rows, {}, {});
 
     render(<PassInspector />);
     expect(screen.getByTestId("pass-mesh").textContent).toBe(

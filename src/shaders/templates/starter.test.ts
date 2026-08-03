@@ -103,4 +103,15 @@ describe("starter.frag default-output recipe [Q1-b]", () => {
     expect(spec?.hasExplicitDefault).toBe(true);
     expect(spec?.defaultValue).toEqual([0.5, 0.7, 1.0]);
   });
+
+  it("declares unlit.frag's u_baseColor @default too (T3/C-2 regression)", () => {
+    // `Add Shader: Unlit` runs the same generic template path that used to
+    // hardcode `uniformValues: { u_baseColor: [0.5, 0.7, 1.0] }` for every
+    // template. C-2 removed that seed in favour of GLSL hints, so a template
+    // that declares u_baseColor without a hint falls through to GL zero and
+    // the new node renders near-black — which is deletion, not migration.
+    const spec = parseUniforms(unlitFrag).find((u) => u.name === "u_baseColor");
+    expect(spec?.hasExplicitDefault).toBe(true);
+    expect(spec?.defaultValue).toEqual([0.5, 0.7, 1.0]);
+  });
 });

@@ -632,3 +632,55 @@ uniform float u_after;
     expect(names).toContain("u_after");
   });
 });
+
+describe("line-wrapped parameter lists (T4/M4-1 regression)", () => {
+  // A parameter list wrapped across lines leaves brace depth at 0, so before
+  // the paren-depth guard the continuation line reached the *global*
+  // storage-declaration branch: `n` was recorded as a phantom varying and the
+  // tail walker took the next declarator's first identifier token — the `in`
+  // keyword itself — as a second phantom symbol. A symbol literally named
+  // "in" then leaked into semantic highlighting, hover and rename.
+  const wrapped = `#version 300 es
+precision highp float;
+
+vec3 shade(
+  in vec3 n, in vec3 l,
+  in float k
+) {
+  return n * l * k;
+}
+
+out vec4 outColor;
+void main() { outColor = vec4(shade(vec3(1.0), vec3(0.0), 1.0), 1.0); }
+`;
+
+  it("does not invent a global symbol named after the `in` qualifier", () => {
+    const names = buildSymbolTable(wrapped).symbols.map((s) => s.name);
+    expect(names).not.toContain("in");
+  });
+
+  it("does not hoist wrapped parameters to global scope", () => {
+    const globals = buildSymbolTable(wrapped)
+      .symbols.filter((s) => s.scope === null)
+      .map((s) => s.name);
+    expect(globals).not.toContain("n");
+    expect(globals).not.toContain("l");
+    expect(globals).not.toContain("k");
+    // The real global on the other side of the wrapped header still lands.
+    expect(globals).toContain("outColor");
+  });
+
+  it("still harvests genuine comma multi-declarations", () => {
+    // The paren guard must not regress the shape RE_STORAGE_DECL was relaxed
+    // for in the first place.
+    const src = `#version 300 es
+out vec2 v_uv, v_st;
+void main() {}
+`;
+    const globals = buildSymbolTable(src)
+      .symbols.filter((s) => s.scope === null)
+      .map((s) => s.name);
+    expect(globals).toContain("v_uv");
+    expect(globals).toContain("v_st");
+  });
+});

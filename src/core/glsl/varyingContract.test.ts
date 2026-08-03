@@ -357,3 +357,56 @@ describe("varyingWarningMessage", () => {
     expect(msg).toContain("수 있습니다");
   });
 });
+
+describe("qualifier / array-size disagreement (T4/M4-2 regression)", () => {
+  // GLSL ES 3.0 rejects both of these at link time, but the type token alone
+  // compares equal — so the row used to render a confident `linked` ✓ beside
+  // a program that does not link. Confidence is now withdrawn instead.
+  const vertOf = (decl: string) => `#version 300 es
+in vec3 a_position;
+${decl}
+void main() { gl_Position = vec4(a_position, 1.0); }
+`;
+  const fragOf = (decl: string) => `#version 300 es
+precision highp float;
+${decl}
+out vec4 outColor;
+void main() { outColor = vec4(float(v_id), 0.0, 0.0, 1.0); }
+`;
+
+  it("withdraws confidence when the interpolation qualifier differs", () => {
+    const c = computeVaryingContract(
+      vertOf("flat out int v_id;"),
+      fragOf("in int v_id;"),
+    );
+    expect(c.confident).toBe(false);
+  });
+
+  it("withdraws confidence when the array size differs", () => {
+    const c = computeVaryingContract(
+      vertOf("out float v_id[2];"),
+      fragOf("in float v_id[3];"),
+    );
+    expect(c.confident).toBe(false);
+  });
+
+  it("keeps confidence when both stages agree on `flat`", () => {
+    const c = computeVaryingContract(
+      vertOf("flat out int v_id;"),
+      fragOf("flat in int v_id;"),
+    );
+    expect(c.confident).toBe(true);
+    expect(c.rows.find((r) => r.name === "v_id")?.status).toBe("linked");
+  });
+
+  it("treats an omitted `smooth` as agreeing with an explicit one", () => {
+    // `smooth` is the default; writing it on one side only is not a mismatch
+    // and must not cost the shader its ✓.
+    const c = computeVaryingContract(
+      vertOf("smooth out float v_id;"),
+      fragOf("in float v_id;"),
+    );
+    expect(c.confident).toBe(true);
+    expect(c.rows.find((r) => r.name === "v_id")?.status).toBe("linked");
+  });
+});

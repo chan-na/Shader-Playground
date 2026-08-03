@@ -454,6 +454,16 @@ function parseSymbolTable(source: string): SymbolTable {
   // When > 0 inside a struct body — we don't index struct members yet but we
   // must not treat them as locals.
   let structDepth = 0;
+  // When > 0 we are inside an unclosed `(` — in practice a function header
+  // whose parameter list is wrapped across lines. Brace depth alone cannot
+  // see this (a wrapped header has no `{` yet), so continuation lines like
+  // `  in vec3 n, in vec3 l,` would otherwise reach the storage-declaration
+  // branch below and be harvested as *globals*: `n` as a phantom varying and
+  // — because the tail walker takes the first identifier token of the next
+  // declarator — the qualifier `in` itself as a phantom symbol named "in".
+  // That pollutes semantic highlighting, makes hover report a global, and
+  // lets rename rewrite every `in` keyword in the file.
+  let parenDepth = 0;
 
   for (let i = 0; i < lines.length; i++) {
     // Already comment-masked: comment runs are spaces, so every index within
@@ -464,7 +474,7 @@ function parseSymbolTable(source: string): SymbolTable {
     // Handle declarations BEFORE updating depth so a function header on this
     // line is recorded at the outer scope, and locals inside the function
     // body (which start the line AFTER `{`) land at depth >= 1.
-    if (depth === 0 && structDepth === 0) {
+    if (depth === 0 && structDepth === 0 && parenDepth === 0) {
       // Storage-qualifier (uniform/in/out/attribute/varying/const).
       const sm = RE_STORAGE_DECL.exec(code);
       if (sm) {
@@ -659,7 +669,9 @@ function parseSymbolTable(source: string): SymbolTable {
     // Count braces in this (comment-stripped) line. Increment depth for `{`,
     // decrement for `}` — once we leave the function body (`depth` returns to
     // 0 with `currentFn` set) clear `currentFn` so subsequent declarations
-    // are global again.
+    // are global again. Parens are tracked alongside so a parameter list
+    // wrapped across lines suppresses the global-declaration branch above
+    // until it closes.
     for (const ch of code) {
       if (ch === "{") {
         depth += 1;
@@ -669,6 +681,10 @@ function parseSymbolTable(source: string): SymbolTable {
           if (currentFn) currentFn = null;
           if (structDepth > 0) structDepth = Math.max(0, structDepth - 1);
         }
+      } else if (ch === "(") {
+        parenDepth += 1;
+      } else if (ch === ")") {
+        if (parenDepth > 0) parenDepth -= 1;
       }
     }
   }

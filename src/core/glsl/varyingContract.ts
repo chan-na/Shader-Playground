@@ -109,17 +109,21 @@ const RE_WRAPPED_STORAGE_DECL =
   /^[ \t]*(?:(?:flat|smooth|noperspective|centroid|invariant)[ \t]+)*(?:in|out|varying)[ \t]+[^;{}\r\n]*$/m;
 
 /**
- * Intentional non-detection, on purpose (silence, not a false "OK"):
- *  - Array-size mismatches (`out vec3 v[2];` vs `in vec3 v[3];`) — this
- *    module only compares the type token, not any trailing `[N]`.
- *  - Interpolation-qualifier mismatches (`flat out int v;` vs
- *    `smooth in int v;`, which GLSL ES *does* reject at link time) — the
- *    qualifier is consumed and discarded by `RE_STORAGE_DECL`, so it never
- *    reaches this module.
- * Both are rare in hand-written playground shaders, and under-reporting a
- * real problem is the safe direction for a "confident" contract: silence
- * here does not fabricate false reassurance the way a wrong "linked" verdict
- * would, and `confident` already covers the higher-likelihood hazards above.
+ * Formerly this list also excused array-size mismatches (`out vec3 v[2];` vs
+ * `in vec3 v[3];`) and interpolation-qualifier mismatches (`flat out int v;`
+ * vs `smooth in int v;`) on the grounds that failing to detect them is mere
+ * silence. That reasoning was wrong, and it failed this list's own admission
+ * criterion below: both shapes link-fail on ANGLE/SwiftShader, yet the type
+ * token alone compares equal — so the row rendered a confident `linked` ✓
+ * next to a program that does not link. That is fabricated reassurance, the
+ * exact failure this gate exists to prevent, not silence.
+ *
+ * They are now handled by {@link hasSignatureDisagreement}, which compares
+ * the qualifier and array suffix that `RE_STORAGE_DECL` discards. A
+ * disagreement withdraws confidence for the whole contract rather than
+ * inventing a new row status: the ✓ and the warnings both go quiet, which is
+ * the honest verdict for a shape we can detect but not precisely attribute.
+ * Shaders whose stages agree (the common `flat` case) keep full confidence.
  *
  * Admission criterion for this list: a shape may stay non-detected ONLY if
  * its failure mode is silence — a real mismatch we fail to flag. A *legal*
@@ -142,6 +146,54 @@ function hasConfidenceHazard(maskedSource: string): boolean {
 /** Escape a GLSL identifier for use inside a `RegExp` literal. */
 function escapeRegExp(name: string): string {
   return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The parts of `name`'s storage declaration that `RE_STORAGE_DECL` throws
+ * away but the linker still enforces: the interpolation qualifier and the
+ * array suffix, as a comparable string like `"flat|[2]"`. `null` when the
+ * declaration isn't found in this source.
+ *
+ * `smooth` is dropped during normalisation because it *is* the default — a
+ * stage that writes it and one that omits it agree, and reporting them as a
+ * disagreement would withdraw confidence from correct shaders.
+ */
+function declarationSignature(
+  name: string,
+  maskedSource: string,
+): string | null {
+  const re = new RegExp(
+    `^[ \\t]*((?:(?:flat|smooth|noperspective|centroid|invariant)[ \\t]+)*)` +
+      `(?:in|out|varying)[ \\t]+(?:(?:highp|mediump|lowp)[ \\t]+)?\\w+[ \\t]+` +
+      `${escapeRegExp(name)}[ \\t]*(\\[[^\\]]*\\])?`,
+    "m",
+  );
+  const m = re.exec(maskedSource);
+  if (!m) return null;
+  const qualifiers = (m[1] ?? "")
+    .split(/[ \t]+/)
+    .filter((q) => q.length > 0 && q !== "smooth")
+    .sort()
+    .join(" ");
+  return `${qualifiers}|${m[2] ?? ""}`;
+}
+
+/**
+ * True when a varying declared on both stages carries a different
+ * interpolation qualifier or array size in each — a real link failure that
+ * type-token comparison alone reads as `linked`.
+ */
+function hasSignatureDisagreement(
+  sharedNames: readonly string[],
+  maskedVertexSource: string,
+  maskedFragmentSource: string,
+): boolean {
+  for (const name of sharedNames) {
+    const v = declarationSignature(name, maskedVertexSource);
+    const f = declarationSignature(name, maskedFragmentSource);
+    if (v !== null && f !== null && v !== f) return true;
+  }
+  return false;
 }
 
 /**
@@ -257,9 +309,19 @@ export function computeVaryingContract(
     rows.push(buildRow(f.name, null, f, maskedFragmentSource));
   }
 
+  const maskedVertexSource = maskComments(vertexSource);
+  const sharedNames = vertexCandidates
+    .filter((v) => fragmentByName.has(v.name))
+    .map((v) => v.name);
+
   const confident =
-    !hasConfidenceHazard(maskComments(vertexSource)) &&
-    !hasConfidenceHazard(maskedFragmentSource);
+    !hasConfidenceHazard(maskedVertexSource) &&
+    !hasConfidenceHazard(maskedFragmentSource) &&
+    !hasSignatureDisagreement(
+      sharedNames,
+      maskedVertexSource,
+      maskedFragmentSource,
+    );
 
   return { rows, confident };
 }

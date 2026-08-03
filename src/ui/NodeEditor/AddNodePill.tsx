@@ -98,7 +98,10 @@ export function AddNodePill() {
       kind: "shader",
       vertexSource: basicVert,
       fragmentSource: starterFrag,
-      uniformValues: { u_baseColor: [0.5, 0.7, 1.0] },
+      // C-2: no hardcoded seed values — the initial glow color comes from
+      // starter.frag's `@default` hint, bound by compile.ts's
+      // withExplicitDefaults at compile time.
+      uniformValues: {},
     };
     useGraphStore.getState().addNode(node, { x: 100, y: 0 });
     useSelectionStore.getState().select(id);

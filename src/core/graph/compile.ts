@@ -38,6 +38,7 @@ import type {
   VideoGraphNode,
   WebcamGraphNode,
 } from "./types";
+import { withExplicitDefaults } from "./uniformDefaults";
 import {
   topologicalOrder,
   type ValidationError,
@@ -62,6 +63,20 @@ interface ParamBinding {
   sourceNodeId: string;
 }
 
+/**
+ * Per-attribute record of whether a mesh's vertex data was actually consumed
+ * by the compiled program (B-2). Mirrors `core/gl/mesh.ts`'s `uploadMesh`
+ * skip condition (`loc === undefined || loc < 0`) so this can never drift
+ * from what the GPU actually bound. Left empty for fullscreen-substituted or
+ * compute-driven passes (see `meshAttributeUse` below) — those aren't a mesh
+ * the user wired in, so a "skipped attribute" warning there would be noise.
+ */
+interface MeshAttributeUse {
+  name: string;
+  size: number;
+  consumed: boolean;
+}
+
 export interface ShaderPass {
   kind: "shader";
   nodeId: string;
@@ -81,9 +96,27 @@ export interface ShaderPass {
   /** Edges that override a uniform's value with a parameter node. */
   paramBindings: ParamBinding[];
   uniformValues: Record<string, number | number[]>;
+  /**
+   * C-2: `@default` seeds parsed from the *compiled* sources at compile time,
+   * kept in their own field rather than merged into `uniformValues`. The
+   * Viewport hot-patches `pass.uniformValues = node.uniformValues` on every
+   * RAF tick — before the first draw included — so a seed merged into
+   * `uniformValues` would be clobbered before it ever reached the GPU (the
+   * original C-2 regression). `bindUserUniforms` composes
+   * `{...seededDefaults, ...uniformValues}` (then param bindings) per frame,
+   * which is what actually enforces **stored value > `@default` > GL zero**.
+   */
+  seededDefaults: Record<string, number | number[]>;
   /** FBO dimensions after applying the node's resolutionScale. */
   width: number;
   height: number;
+  /**
+   * Which of the mesh's attributes the linked program actually bound (B-2).
+   * `[]` when the mesh is the fullscreen-quad substitution or compute-driven
+   * — both are automated stand-ins, not a mesh the user connected, so there
+   * is nothing to warn about.
+   */
+  meshAttributeUse: MeshAttributeUse[];
 }
 
 interface ComputeAttributeSlot {
@@ -113,6 +146,9 @@ export interface ComputePass {
   primitive: number;
   paramBindings: ParamBinding[];
   uniformValues: Record<string, number | number[]>;
+  /** C-2 `@default` seeds — see {@link ShaderPass.seededDefaults} for why
+   * this is a separate field instead of a merge into `uniformValues`. */
+  seededDefaults: Record<string, number | number[]>;
   /** Which side currently holds the freshest captured data (= next input). */
   read: "A" | "B";
 }
@@ -151,6 +187,17 @@ export interface ExecutionPlan {
    * never saw.
    */
   compiledVertexSource: Record<string, string>;
+  /**
+   * Shader node-id → whether that node's mesh input resolved to the
+   * fullscreen-quad substitution (see `compiledVertexSource` above for the
+   * mechanism). Unlike `shaderPassByNode`, which only holds nodes whose
+   * program actually linked, this record is written at the same point as
+   * `compiledVertexSource` — before `createProgram` runs — so it also covers
+   * nodes whose fragment (or vertex) shader failed to compile. UI badges/tabs
+   * that need to stay honest about a broken node's mesh wiring must read this
+   * rather than `shaderPassByNode`.
+   */
+  fullscreenByNode: Record<string, boolean>;
   width: number;
   height: number;
   /**
@@ -188,6 +235,7 @@ export function emptyPlan(width: number, height: number): ExecutionPlan {
     errors: [],
     shaderErrors: {},
     compiledVertexSource: {},
+    fullscreenByNode: {},
     width,
     height,
     hasCompute: false,
@@ -410,7 +458,12 @@ function buildComputePass(
     count: Math.max(1, node.count | 0),
     primitive: glPrimitiveOf(gl, node.primitive),
     paramBindings,
-    uniformValues: { ...node.uniformValues },
+    uniformValues: node.uniformValues,
+    // C-2: seed from the vertex source's `@default` hints. Kept apart from
+    // `uniformValues` so the Viewport's per-frame hot-patch can't clobber the
+    // seeds — see ShaderPass.seededDefaults. Stored values still win: the
+    // effective-map spread order in `bindUserUniforms` guarantees it.
+    seededDefaults: withExplicitDefaults(node.vertexSource, {}),
     read: "A",
   };
   disposers.push(() => {
@@ -492,6 +545,7 @@ export function compileGraph(
   const errors = validateGraph(graph);
   const shaderErrors: Record<string, ShaderError[]> = {};
   const compiledVertexSource: Record<string, string> = {};
+  const fullscreenByNode: Record<string, boolean> = {};
   const fatal = errors.some(
     (e) =>
       e.code === "cycle" ||
@@ -577,6 +631,7 @@ export function compileGraph(
       vertexSource = fullscreenVert;
     }
     compiledVertexSource[sn.id] = vertexSource;
+    fullscreenByNode[sn.id] = meshIsFullscreen;
 
     const built = createProgram(gl, vertexSource, sn.fragmentSource);
     if (built.errors.length) shaderErrors[sn.id] = built.errors;
@@ -592,6 +647,7 @@ export function compileGraph(
     let meshComputeVaos:
       | [WebGLVertexArrayObject, WebGLVertexArrayObject]
       | null = null;
+    let meshAttributeUse: MeshAttributeUse[] = [];
     if (meshComputeNodeId) {
       const cp = passByNode.get(meshComputeNodeId) as ComputePass;
       const vaos = buildShaderComputeVaos(gl, built.program, cp);
@@ -620,7 +676,23 @@ export function compileGraph(
         primitive: meshComputeSourcePrim,
       };
     } else {
-      mesh = uploadMesh(gl, meshData, built.program.attributes);
+      // Captured into a local so the closure below still sees the narrowing
+      // from the `!built.program` guard above — TS doesn't carry a property
+      // narrowing (`built.program`) into a nested arrow function.
+      const program = built.program;
+      mesh = uploadMesh(gl, meshData, program.attributes);
+      // Fullscreen substitution is the app's own automatic fallback (A-1),
+      // not a mesh the user wired in — no consumption warning applies there.
+      meshAttributeUse = meshIsFullscreen
+        ? []
+        : meshData.attributes.map((attr) => {
+            const loc = program.attributes[attr.name];
+            return {
+              name: attr.name,
+              size: attr.size,
+              consumed: !(loc === undefined || loc < 0),
+            };
+          });
     }
 
     // Routing inputs: classify each incoming edge as sampler (texture) vs
@@ -663,9 +735,23 @@ export function compileGraph(
       meshComputeVaos,
       samplers,
       paramBindings,
-      uniformValues: { ...sn.uniformValues },
+      uniformValues: sn.uniformValues,
+      // C-2: seed from the compiled-vertex+fragment source's `@default`
+      // hints. `vertexSource` here is already the *compiled* source
+      // (fullscreen.vert substitution already applied above) — matches what
+      // the GL compiler actually saw, same reasoning as
+      // `compiledVertexSource`. Kept apart from `uniformValues` so the
+      // Viewport's per-frame `pass.uniformValues = node.uniformValues`
+      // hot-patch can't clobber the seeds before the first draw (the
+      // original C-2 regression); stored values still win via the
+      // effective-map spread order in `bindUserUniforms`.
+      seededDefaults: withExplicitDefaults(
+        `${vertexSource}\n${sn.fragmentSource}`,
+        {},
+      ),
       width: passWidth,
       height: passHeight,
+      meshAttributeUse,
     };
     passes.push(pass);
     passByNode.set(sn.id, pass);
@@ -706,6 +792,7 @@ export function compileGraph(
     errors,
     shaderErrors,
     compiledVertexSource,
+    fullscreenByNode,
     width: opts.width,
     height: opts.height,
     hasCompute: passes.some((p) => p.kind === "compute"),

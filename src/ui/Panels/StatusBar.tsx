@@ -5,6 +5,7 @@ import { useDockStore } from "../../state/dockStore";
 import { collectPanelIds } from "../../state/dockTree";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
@@ -75,12 +76,26 @@ export function StatusBar() {
     }
     return n;
   });
+  // E-1 (T2): silent-uniform-warning count across every shader pass row.
+  // A numeric-returning selector, so this stays reference-stable like
+  // compileErrorCount/diagnosticsProblemCount above — passPlanStore only
+  // republishes on recompile (not the RAF hot path), so this doesn't run
+  // afoul of the #42 field-selector discipline either.
+  const silentWarningCount = usePassPlanStore((s) => {
+    let n = 0;
+    for (const r of s.rows) {
+      if (r.kind === "shader") n += r.silentWarnings.length;
+    }
+    return n;
+  });
   const gpuSupported = useGpuTimerStore((s) => s.supported);
   const gpuEnabled = useGpuTimerStore((s) => s.enabled);
   const gpuTotalMs = useGpuTimerStore((s) => s.totalMs);
   const diagOpen = useDebugUiStore((s) => s.open);
   const toggleDiag = useDebugUiStore((s) => s.toggleOpen);
   const toggleProblems = useDebugUiStore((s) => s.toggleProblems);
+  const passesOpen = useDebugUiStore((s) => s.passesOpen);
+  const togglePasses = useDebugUiStore((s) => s.togglePasses);
   // R5 (B5-U3): diagnostics is no longer a Side Panel tab — it's a bottom
   // transient overlay (StatusOverlays) toggled purely by debugUiStore.open.
   // The D1-era un-collapse dance (finding the inspector/assets dock leaf and
@@ -105,7 +120,8 @@ export function StatusBar() {
   }, []);
 
   const errorCount = errors.length;
-  const problemCount = diagnosticsProblemCount + errorCount;
+  const problemCount =
+    diagnosticsProblemCount + errorCount + silentWarningCount;
   const showGpu = gpuSupported && gpuEnabled;
 
   const summary = statusSummary({
@@ -176,6 +192,16 @@ export function StatusBar() {
         {problemCount > 0
           ? `⚠ ${problemCount} problem${problemCount === 1 ? "" : "s"}`
           : "no problems"}
+      </button>
+      <button
+        type="button"
+        className="statusbar-diag"
+        onClick={togglePasses}
+        title="Toggle the pass inspector (what actually runs this frame, in order)"
+        data-testid="status-passes"
+        aria-pressed={passesOpen}
+      >
+        ▤ Passes
       </button>
       <button
         type="button"

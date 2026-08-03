@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { hydrateGraphAssets } from "../state/assetActions";
 import { clearSession, loadSession, startAutoSave } from "../state/autoSave";
 import { useBootstrapStore } from "../state/bootstrapStore";
-import { createDemoGraph, DEMO_LAYOUT } from "../state/demoGraph";
+import { createDemoGraph, DEMO_LAYOUT, DEMO_PARENTS } from "../state/demoGraph";
 import { useGraphStore } from "../state/graphStore";
 import { useHistoryStore } from "../state/historyStore";
 import {
@@ -57,7 +57,9 @@ export function BootstrapGate() {
         useBootstrapStore.getState().setPhase("prompt");
         return;
       }
-      useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+      useGraphStore
+        .getState()
+        .setGraph(createDemoGraph(), DEMO_LAYOUT, DEMO_PARENTS);
       useHistoryStore.getState().clear();
       startAutoSave();
       useBootstrapStore.getState().setPhase("done");
@@ -93,7 +95,9 @@ export function BootstrapGate() {
         "session restore failed, falling back to demo",
         normalizeError(e),
       );
-      useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+      useGraphStore
+        .getState()
+        .setGraph(createDemoGraph(), DEMO_LAYOUT, DEMO_PARENTS);
       useHistoryStore.getState().clear();
       void clearSession();
     }
@@ -103,7 +107,9 @@ export function BootstrapGate() {
 
   const discard = () => {
     void clearSession();
-    useGraphStore.getState().setGraph(createDemoGraph(), DEMO_LAYOUT);
+    useGraphStore
+      .getState()
+      .setGraph(createDemoGraph(), DEMO_LAYOUT, DEMO_PARENTS);
     useHistoryStore.getState().clear();
     startAutoSave();
     useBootstrapStore.getState().setPhase("done");

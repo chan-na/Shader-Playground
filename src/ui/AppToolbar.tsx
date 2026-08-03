@@ -4,13 +4,17 @@ import { hydrateGraphAssets, importFiles } from "../state/assetActions";
 import { useCommandPaletteStore } from "../state/commandPaletteStore";
 import {
   CHAIN_DEMO_LAYOUT,
+  CHAIN_DEMO_PARENTS,
   createChainDemoGraph,
   createDemoGraph,
   createSplitDemoGraph,
   createTorusDemoGraph,
   DEMO_LAYOUT,
+  DEMO_PARENTS,
   SPLIT_DEMO_LAYOUT,
+  SPLIT_DEMO_PARENTS,
   TORUS_DEMO_LAYOUT,
+  TORUS_DEMO_PARENTS,
 } from "../state/demoGraph";
 import { useDockStore } from "../state/dockStore";
 import { collectPanelIds, DOCK_PANEL_IDS } from "../state/dockTree";
@@ -396,7 +400,7 @@ export function AppToolbar() {
               role="menuitem"
               className="tb-menu-item"
               onClick={() => {
-                setGraph(createDemoGraph(), DEMO_LAYOUT);
+                setGraph(createDemoGraph(), DEMO_LAYOUT, DEMO_PARENTS);
                 close();
               }}
             >
@@ -407,7 +411,11 @@ export function AppToolbar() {
               role="menuitem"
               className="tb-menu-item"
               onClick={() => {
-                setGraph(createTorusDemoGraph(), TORUS_DEMO_LAYOUT);
+                setGraph(
+                  createTorusDemoGraph(),
+                  TORUS_DEMO_LAYOUT,
+                  TORUS_DEMO_PARENTS,
+                );
                 close();
               }}
             >
@@ -418,7 +426,11 @@ export function AppToolbar() {
               role="menuitem"
               className="tb-menu-item"
               onClick={() => {
-                setGraph(createChainDemoGraph(), CHAIN_DEMO_LAYOUT);
+                setGraph(
+                  createChainDemoGraph(),
+                  CHAIN_DEMO_LAYOUT,
+                  CHAIN_DEMO_PARENTS,
+                );
                 close();
               }}
             >
@@ -429,7 +441,11 @@ export function AppToolbar() {
               role="menuitem"
               className="tb-menu-item"
               onClick={() => {
-                setGraph(createSplitDemoGraph(), SPLIT_DEMO_LAYOUT);
+                setGraph(
+                  createSplitDemoGraph(),
+                  SPLIT_DEMO_LAYOUT,
+                  SPLIT_DEMO_PARENTS,
+                );
                 close();
               }}
             >

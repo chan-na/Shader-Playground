@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createFakeGl } from "./fakeGl";
 import {
   createColorTexture,
   createImageTexture,
   disposeTexture,
+  FBO_TEXTURE_PARAMS,
+  IMAGE_TEXTURE_PARAMS,
 } from "./texture";
 
 describe("createColorTexture", () => {
@@ -52,5 +54,95 @@ describe("disposeTexture", () => {
     const gl = createFakeGl();
     const tex = createColorTexture(gl, 16, 16);
     expect(() => disposeTexture(gl, tex)).not.toThrow();
+  });
+});
+
+// [E-3] No-drift contract: the GL calls below must derive from
+// FBO_TEXTURE_PARAMS / IMAGE_TEXTURE_PARAMS, not independent literals — this
+// pins the exact enum values applied so the constants the Inspector reads can
+// never silently diverge from what the GL layer actually does.
+describe("createColorTexture — applies FBO_TEXTURE_PARAMS verbatim [E-3]", () => {
+  it("sets LINEAR filters + CLAMP_TO_EDGE wrap and never touches mipmap/flip", () => {
+    const gl = createFakeGl();
+    const texParameteri = vi.spyOn(gl, "texParameteri");
+    const generateMipmap = vi.spyOn(gl, "generateMipmap");
+    const pixelStorei = vi.spyOn(gl, "pixelStorei");
+
+    createColorTexture(gl, 8, 8);
+
+    expect(texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MIN_FILTER,
+      gl.LINEAR,
+    );
+    expect(texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MAG_FILTER,
+      gl.LINEAR,
+    );
+    expect(texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_S,
+      gl.CLAMP_TO_EDGE,
+    );
+    expect(texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_T,
+      gl.CLAMP_TO_EDGE,
+    );
+    expect(generateMipmap).not.toHaveBeenCalled();
+    expect(pixelStorei).not.toHaveBeenCalled();
+
+    // Sanity: the constant itself says what the calls above assert.
+    expect(FBO_TEXTURE_PARAMS.mipmaps).toBe(false);
+    expect(FBO_TEXTURE_PARAMS.flipY).toBe(false);
+  });
+});
+
+describe("createImageTexture — applies IMAGE_TEXTURE_PARAMS verbatim [E-3]", () => {
+  it("sets LINEAR_MIPMAP_LINEAR/LINEAR filters, REPEAT wrap, generates mipmaps, and flips Y on upload only", () => {
+    const gl = createFakeGl();
+    const texParameteri = vi.spyOn(gl, "texParameteri");
+    const generateMipmap = vi.spyOn(gl, "generateMipmap");
+    const pixelStorei = vi.spyOn(gl, "pixelStorei");
+    const fakeBitmap = { width: 4, height: 4 } as unknown as ImageBitmap;
+
+    createImageTexture(gl, fakeBitmap);
+
+    expect(texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MIN_FILTER,
+      gl.LINEAR_MIPMAP_LINEAR,
+    );
+    expect(texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MAG_FILTER,
+      gl.LINEAR,
+    );
+    expect(texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_S,
+      gl.REPEAT,
+    );
+    expect(texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_T,
+      gl.REPEAT,
+    );
+    expect(generateMipmap).toHaveBeenCalledWith(gl.TEXTURE_2D);
+    // Flip is toggled on before upload and back off after, never left on.
+    expect(pixelStorei).toHaveBeenNthCalledWith(
+      1,
+      gl.UNPACK_FLIP_Y_WEBGL,
+      true,
+    );
+    expect(pixelStorei).toHaveBeenNthCalledWith(
+      2,
+      gl.UNPACK_FLIP_Y_WEBGL,
+      false,
+    );
+
+    expect(IMAGE_TEXTURE_PARAMS.mipmaps).toBe(true);
+    expect(IMAGE_TEXTURE_PARAMS.flipY).toBe(true);
   });
 });

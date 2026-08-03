@@ -1,6 +1,11 @@
 import { setDiagnostics } from "@codemirror/lint";
 import type { Extension } from "@codemirror/state";
-import { EditorSelection, EditorState } from "@codemirror/state";
+import {
+  Compartment,
+  EditorSelection,
+  EditorState,
+  Transaction,
+} from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -8,10 +13,17 @@ import { glslValidator } from "../../core/glsl/glslValidator";
 import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { displayNodeName } from "../../core/nodes/registry";
+// The exact raw string compile.ts:1 imports and hands to `createProgram`
+// whenever a shader node's mesh input doesn't resolve (A-1). Importing the
+// same `?raw` module here — not a copy — is what lets the vertex tab claim
+// "보이는 것 = 도는 것": this is byte-identical to the compiled source, not a
+// hand-maintained echo of it.
+import fullscreenVert from "../../shaders/fullscreen.vert?raw";
 import type { NodeDiagnostics } from "../../state/diagnosticsStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
 import { debounce } from "../../utils/debounce";
@@ -87,6 +99,24 @@ const BREADCRUMB_KIND_STYLE: CSSProperties = {
   color: tokens.text.muted,
 };
 
+/** Height budget for `AUTO_VERTEX_NOTE_STYLE` below — the editor container's
+ * height is reduced by exactly this much (via `calc()`) so the note sits
+ * above the document without overlapping it (`.panel-body` isn't a flex
+ * container, so this can't be a `flex: 1` sibling without an index.css
+ * change — see A-1's design-noninvasive note). */
+const AUTO_VERTEX_NOTE_HEIGHT = 22;
+const AUTO_VERTEX_NOTE_STYLE: CSSProperties = {
+  height: AUTO_VERTEX_NOTE_HEIGHT,
+  boxSizing: "border-box",
+  display: "flex",
+  alignItems: "center",
+  padding: "0 10px",
+  fontSize: 11,
+  color: "var(--text-muted)",
+  background: "var(--surface-card)",
+  borderBottom: "1px solid var(--border-default)",
+};
+
 function NodeBreadcrumb({
   name,
   kind,
@@ -151,6 +181,12 @@ export function CodeEditor() {
   // The exact extension array the mounted EditorState was built from. Every
   // `setState` MUST reuse this identical array — see the reload effect (#1a).
   const extRef = useRef<Extension[] | null>(null);
+  // The readOnly Compartment living inside `extRef`'s array (A-1). Mutated
+  // via `.reconfigure` rather than replaced, from two places: the dedicated
+  // `[isAutoVertex]` effect (same document, flag flips) and the reload
+  // effect's compensating dispatch (document switch, since `setState` resets
+  // every compartment back to its mount-time value).
+  const roRef = useRef<Compartment | null>(null);
   // Mount-time debounced live validator, so the reload effect can kick it for a
   // swapped-in document (a `setState` produces no ViewUpdate, so the update
   // listener that normally drives it never runs).
@@ -182,11 +218,41 @@ export function CodeEditor() {
   );
   const isCompute = node?.kind === "compute";
 
+  // A-1: this node's mesh input didn't resolve, so the compiler substituted
+  // fullscreen.vert for its vertex stage (passPlanStore.fullscreenByNode is
+  // the ExecutionPlan's per-node record — see compile.ts's `fullscreenByNode`
+  // doc comment). Primitive selector: reads one boolean out of the record
+  // rather than subscribing to the whole map.
+  const isFullscreenPass = usePassPlanStore((s) =>
+    effectiveId ? s.fullscreenByNode[effectiveId] === true : false,
+  );
+  // Stage-INDEPENDENT half: "is this node's vertex *document* the
+  // auto-substituted fullscreen.vert?" — drives the StageTabs label and its
+  // `data-auto` E2E anchor. The tab strip is visible no matter which stage
+  // is active, and `editorStore.activeStage` defaults to "fragment", so
+  // gating the label on `stage === "vertex"` made the most common state
+  // lie: the node card shows FULLSCREEN while the vertex tab still
+  // advertises a `vertex.glsl` document that isn't the one running — the
+  // exact misinformation A-1 exists to remove.
+  const isAutoVertexDoc =
+    !isMulti && node?.kind === "shader" && isFullscreenPass;
+  // Stage-SCOPED half: the document currently ON SCREEN is that auto vertex
+  // doc — drives the source override, the readOnly compartment, and the
+  // in-editor note, all of which describe the visible document only.
+  const isAutoVertex = isAutoVertexDoc && stage === "vertex";
+  // Mirrored into a ref (diagsRef pattern, below) so the reload effect's
+  // compensating dispatch can read the current flag without widening that
+  // effect's own dependency array to include it.
+  const isAutoVertexRef = useRef(isAutoVertex);
+  isAutoVertexRef.current = isAutoVertex;
+
   const source = node
     ? isCompute
       ? (node as ComputeGraphNode).vertexSource
       : stage === "vertex"
-        ? (node as ShaderGraphNode).vertexSource
+        ? isAutoVertex
+          ? fullscreenVert
+          : (node as ShaderGraphNode).vertexSource
         : (node as ShaderGraphNode).fragmentSource
     : "";
 
@@ -256,6 +322,16 @@ export function CodeEditor() {
       if (cur.kind !== "shader") return;
       const sn = cur as ShaderGraphNode;
       if (st === "vertex") {
+        // A-1 guard: never let the fullscreen.vert substitution land in the
+        // store as this node's real vertexSource. Real typing can't reach
+        // here in the first place — CodeMirror's readOnly facet rejects the
+        // DOM input before a transaction is even produced — but the reload
+        // effect's own doc-swap dispatch (mesh connects/disconnects while
+        // this node's vertex tab is open, same (id, stage) so no
+        // node/stage switch) also raises `docChanged`, and that swap's text
+        // is deliberately NOT the stored source while auto. Reading the
+        // live plan here (not a stale ref) catches that path too.
+        if (usePassPlanStore.getState().fullscreenByNode[id] === true) return;
         if (sn.vertexSource === value) return;
         lastCommittedRef.current = value;
         useGraphStore
@@ -305,12 +381,23 @@ export function CodeEditor() {
       }
     });
 
+    // Mount-time-only Compartment (A-1): always created with `false` here —
+    // whatever `isAutoVertex` actually is for the node/stage that ends up
+    // loaded gets applied by the `[isAutoVertex]` effect right after mount,
+    // same as any other post-mount derived state.
+    const ro = new Compartment();
+    roRef.current = ro;
+
     // ⚠ ONE array, reused by the initial state and by every `setState` in the
     // reload effect. Rebuilding it there as `glslExtensions()` alone would drop
     // `updateListener` from the swapped-in state, and from that moment on every
     // keystroke would stop reaching the store — a silent data-loss regression
     // that typecheck / lint / knip cannot see (#1a).
-    const extensions: Extension[] = [...glslExtensions(), updateListener];
+    const extensions: Extension[] = [
+      ...glslExtensions(),
+      updateListener,
+      ro.of(EditorState.readOnly.of(false)),
+    ];
     extRef.current = extensions;
     liveValidateRef.current = liveValidate;
 
@@ -326,6 +413,7 @@ export function CodeEditor() {
       commitRef.current = null;
       liveValidateRef.current = null;
       extRef.current = null;
+      roRef.current = null;
       setCurrentView(null);
       view.destroy();
       viewRef.current = null;
@@ -405,22 +493,43 @@ export function CodeEditor() {
     if (switching && extensions) {
       view.setState(EditorState.create({ doc: source, extensions }));
       // Two compensating dispatches, because `setState` is not a transaction:
-      // (1) reinstall + repopulate lint for the incoming document. Relying on
-      //     the `[diags, stage, liveDiags]` effect to re-fire is not sound —
-      //     switching between two nodes whose diagnosticsStore entry is the
-      //     same reference (both absent, or literally the same object), on the
-      //     same stage, changes none of its deps, and the `setLiveDiags` above
-      //     deliberately preserves identity when it is already empty. The lint
-      //     field itself did not survive `setState` (it is installed through
-      //     `StateEffect.appendConfig`, so it is not in `extRef`), so without
-      //     this dispatch the incoming document would carry no underlines at
-      //     all. Pinned by "re-applies diagnostics when the switch changes no
-      //     effect dependency" in `index.test.tsx`.
+      // (1) reinstall + repopulate lint for the incoming document, AND (A-1)
+      //     reconfigure the readOnly compartment for the incoming node/stage
+      //     — merged into one `view.dispatch(specA, specB)` call (CM6 merges
+      //     multiple TransactionSpecs passed to one `dispatch`/`update` call
+      //     into a single transaction; their `effects` concatenate).
+      //     Relying on the `[diags, stage, liveDiags]` effect to re-fire is
+      //     not sound — switching between two nodes whose diagnosticsStore
+      //     entry is the same reference (both absent, or literally the same
+      //     object), on the same stage, changes none of its deps, and the
+      //     `setLiveDiags` above deliberately preserves identity when it is
+      //     already empty. The lint field itself did not survive `setState`
+      //     (it is installed through `StateEffect.appendConfig`, so it is
+      //     not in `extRef`), so without this dispatch the incoming document
+      //     would carry no underlines at all. Pinned by "re-applies
+      //     diagnostics when the switch changes no effect dependency" in
+      //     `index.test.tsx`.
+      //     The readOnly half is equally necessary here rather than left to
+      //     the dedicated `[isAutoVertex]` effect below: `setState` always
+      //     resets `ro` back to its mount-time value (`false`, see the mount
+      //     effect), and when switching from one auto-vertex node to another
+      //     `isAutoVertex` is `true` both before and after — the dedicated
+      //     effect's dependency doesn't change, so it never re-fires. This
+      //     dispatch is the only thing that puts `ro` back to `true` for the
+      //     incoming document. Pinned by "keeps readOnly across an auto→auto
+      //     node switch" in `index.test.tsx`.
       view.dispatch(
         setDiagnostics(
           view.state,
           toCMDiagnostics(view, mergeDiagnostics(diagsRef.current, stage, [])),
         ),
+        {
+          effects: roRef.current
+            ? roRef.current.reconfigure(
+                EditorState.readOnly.of(isAutoVertexRef.current),
+              )
+            : [],
+        },
       );
       // (2) kick the live validator by hand: `setState` produces no ViewUpdate,
       //     so `updateListener` (which normally drives it on every doc change,
@@ -436,10 +545,41 @@ export function CodeEditor() {
     // otherwise collapse the cursor to offset 0. On a real document switch we
     // always reload (cursor reset there is expected). (M11)
     if (!switching && source === view.state.doc.toString()) return;
+    // Non-switching full replace: the text comes from OUTSIDE the editor —
+    // either a store external change (graph undo/redo, import/reset) or the
+    // A-1 auto flip swapping fullscreen.vert in/out while this node's vertex
+    // tab stays open. Kept OUT of CM's undo history (`addToHistory(false)`):
+    // recording it would let a focused Cmd+Z pop the replacement back — e.g.
+    // after a user-speed mesh disconnect→reconnect (>500ms apart, so CM's
+    // newGroupDelay never merges the two swaps) the latest history event is
+    // the fullscreen.vert→user-source replacement, so one undo would turn
+    // the now-editable document back into fullscreen.vert, and the 50ms
+    // commit would pass the A-1 guard (the plan already says "not
+    // fullscreen") and write fullscreen.vert into the store as the node's
+    // real vertexSource — the same resurrect-then-commit data loss the
+    // `setState` switch path (#1a) exists to prevent.
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: source },
+      annotations: Transaction.addToHistory.of(false),
     });
   }, [effectiveId, stage, source]);
+
+  // A-1: reconfigure the readOnly compartment when `isAutoVertex` flips
+  // *without* a node/stage switch — e.g. connecting/disconnecting this same
+  // node's mesh input while its vertex tab is open. The reload effect above
+  // only reconfigures `ro` on its `switching` branch (a real document
+  // replace); this is the only path for the "same document, flag flips"
+  // case. Guarded with null checks rather than `!` — both refs are only
+  // ever set together in the mount effect, so in practice neither is null
+  // once mounted, but this reads the refs directly rather than assuming that.
+  useEffect(() => {
+    const view = viewRef.current;
+    const ro = roRef.current;
+    if (!view || !ro) return;
+    view.dispatch({
+      effects: ro.reconfigure(EditorState.readOnly.of(isAutoVertex)),
+    });
+  }, [isAutoVertex]);
 
   // Scroll/select to a requested line (from ProblemsPanel) once the editor
   // doc matches the requested node/stage.
@@ -499,6 +639,7 @@ export function CodeEditor() {
           onChange={setStage}
           vertexHasError={vertexHasError}
           fragmentHasError={fragmentHasError}
+          vertexAuto={isAutoVertexDoc}
         />
         {!isMulti && effectiveId && node && (
           <div className="code-stage-strip-meta">
@@ -509,6 +650,19 @@ export function CodeEditor() {
         <AutoOpenToggle />
       </div>
       <div className="panel-body">
+        {isAutoVertex && (
+          /* Wording is deliberately cause-NEUTRAL: the substitution fires
+             not only when the mesh edge is absent, but also when the edge
+             exists and its source fails to resolve — mesh asset not loaded,
+             or the driving compute pass failed to build (compile.ts's
+             meshIsFullscreen). "mesh 미연결" here would tell a learner
+             debugging a broken compute shader to go check an edge that is
+             visibly connected. */
+          <div data-testid="vertex-auto-note" style={AUTO_VERTEX_NOTE_STYLE}>
+            mesh 입력이 해석되지 않아 fullscreen.vert가 대신 실행됩니다 (읽기
+            전용)
+          </div>
+        )}
         <div
           ref={containerRef}
           data-testid="code-editor"
@@ -516,7 +670,9 @@ export function CodeEditor() {
           data-active-stage={stage}
           style={{
             width: "100%",
-            height: "100%",
+            height: isAutoVertex
+              ? `calc(100% - ${AUTO_VERTEX_NOTE_HEIGHT}px)`
+              : "100%",
             display: node && !isMulti ? "block" : "none",
           }}
         />

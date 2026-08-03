@@ -13,6 +13,7 @@ export interface NumberFieldProps {
   dataTestId?: string;
   ariaLabel?: string;
   id?: string;
+  disabled?: boolean;
 }
 
 /** Native numeric input skinned per design/Side Panel.dc.html L257.
@@ -47,6 +48,7 @@ export function NumberField({
   dataTestId,
   ariaLabel,
   id,
+  disabled = false,
 }: NumberFieldProps) {
   const external = typeof value === "number" ? String(value) : value;
   const [draft, setDraft] = useState(external);
@@ -75,6 +77,7 @@ export function NumberField({
       style={width !== undefined ? { width } : undefined}
       aria-label={ariaLabel}
       data-testid={dataTestId}
+      disabled={disabled}
       onChange={(e) => {
         const raw = e.target.value;
         setDraft(raw);

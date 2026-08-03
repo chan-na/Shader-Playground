@@ -58,4 +58,31 @@ describe("ColorField", () => {
     expect(input.tagName).toBe("INPUT");
     expect(input.getAttribute("type")).toBe("color");
   });
+
+  // [L1/E-4] Driven-uniform disable.
+  describe("disabled", () => {
+    it("marks the color input disabled and dims the wrapper", () => {
+      const { container } = render(
+        <ColorField rgb={[1, 0, 0]} onChange={() => {}} disabled />,
+      );
+      const input = container.querySelector(
+        "input[type='color']",
+      ) as HTMLInputElement;
+      expect(input.disabled).toBe(true);
+      const wrapper = container.querySelector(".ctl-color") as HTMLElement;
+      expect(wrapper.style.opacity).toBe("0.5");
+    });
+
+    it("is enabled and undimmed by default", () => {
+      const { container } = render(
+        <ColorField rgb={[1, 0, 0]} onChange={() => {}} />,
+      );
+      const input = container.querySelector(
+        "input[type='color']",
+      ) as HTMLInputElement;
+      expect(input.disabled).toBe(false);
+      const wrapper = container.querySelector(".ctl-color") as HTMLElement;
+      expect(wrapper.style.opacity).toBe("");
+    });
+  });
 });

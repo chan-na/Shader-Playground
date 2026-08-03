@@ -323,6 +323,37 @@ describe("parseUniforms with hints", () => {
   });
 });
 
+describe("hasExplicitDefault (T3/C-2)", () => {
+  it("is true for a scalar @default", () => {
+    const src = `uniform float u_x; // @default 3`;
+    const x = parseUniforms(src).find((u) => u.name === "u_x")!;
+    expect(x.hasExplicitDefault).toBe(true);
+    expect(x.defaultValue).toBe(3);
+  });
+
+  it("is true for a vector @default", () => {
+    const src = `uniform vec3 u_tint; // @default 0.5,0.7,1.0`;
+    const x = parseUniforms(src).find((u) => u.name === "u_tint")!;
+    expect(x.hasExplicitDefault).toBe(true);
+    expect(x.defaultValue).toEqual([0.5, 0.7, 1.0]);
+  });
+
+  it("is unset for a color-named uniform with no @default hint (heuristic-only default)", () => {
+    // u_baseColor's [1,1,1] here comes from defaultRangeFor's name-based
+    // heuristic, not an explicit hint — withExplicitDefaults must not bind
+    // this (C-2's explicit-only decision).
+    const src = `uniform vec3 u_baseColor;`;
+    const x = parseUniforms(src).find((u) => u.name === "u_baseColor")!;
+    expect(x.hasExplicitDefault).toBeUndefined();
+  });
+
+  it("is unset when no hint comment is present at all", () => {
+    const src = `uniform float u_amount;`;
+    const x = parseUniforms(src).find((u) => u.name === "u_amount")!;
+    expect(x.hasExplicitDefault).toBeUndefined();
+  });
+});
+
 describe("parseHintComment @color", () => {
   it("parses @color", () => {
     const h = parseHintComment("// @color");

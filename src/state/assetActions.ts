@@ -13,9 +13,7 @@ import {
   loadCachedMesh,
   loadCachedVideo,
 } from "../core/assets/cache";
-import { loadGltfFromFile } from "../core/assets/gltfLoader";
 import { loadImageFromFile } from "../core/assets/imageLoader";
-import { loadObjFromFile } from "../core/assets/objLoader";
 import { loadVideoFromFile } from "../core/assets/videoLoader";
 import type { GraphNode } from "../core/graph/types";
 import { nextId } from "../utils/id";
@@ -102,7 +100,13 @@ async function importFile(
   const graphStore = useGraphStore.getState();
   const selection = useSelectionStore.getState();
 
+  // T0-2(learnability 2026-08): loaders.gl(~43 KiB gzip)을 엔트리 청크에서 제거하기
+  // 위한 동적 import. gltfLoader가 objLoader의 toGeometryHandle을 import하므로
+  // 둘 다 동적이어야 엔트리에서 완전히 빠진다. 청크 fetch 실패(오프라인/배포 중
+  // 캐시 불일치)는 이 await가 reject → 유일한 호출자 importFiles의 try/catch가
+  // 기존 `자산 임포트 실패 (${file.name})` toast.error로 표면화한다.
   if (kind === "obj") {
+    const { loadObjFromFile } = await import("../core/assets/objLoader");
     const handle = await loadObjFromFile(file);
     assetStore.addMesh(handle);
     void cacheMesh(handle).catch((e) =>
@@ -121,6 +125,7 @@ async function importFile(
   }
 
   if (kind === "gltf") {
+    const { loadGltfFromFile } = await import("../core/assets/gltfLoader");
     const handle = await loadGltfFromFile(file);
     assetStore.addMesh(handle);
     void cacheMesh(handle).catch((e) =>

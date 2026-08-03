@@ -6,6 +6,7 @@ export interface ColorFieldProps {
   onChange: (next: number[]) => void;
   dataTestId?: string;
   id?: string;
+  disabled?: boolean;
 }
 
 /** Swatch + hex chip pair (design/Side Panel.dc.html L92, L264). The
@@ -16,11 +17,20 @@ export interface ColorFieldProps {
  * `onChange` preserves UniformControl's original color semantic: only
  * channels [0..2] are replaced (an alpha/4th component, if present, is
  * carried through unchanged). */
-export function ColorField({ rgb, onChange, dataTestId, id }: ColorFieldProps) {
+export function ColorField({
+  rgb,
+  onChange,
+  dataTestId,
+  id,
+  disabled = false,
+}: ColorFieldProps) {
   const hex = rgbToHex(rgb);
 
   return (
-    <div className="ctl-color">
+    // [L1/E-4] No new CSS class for the disabled dim — inline opacity only,
+    // applied here rather than in controls.css so it stays scoped to the
+    // driven-uniform case (design 무침습 사다리 3단).
+    <div className="ctl-color" style={disabled ? { opacity: 0.5 } : undefined}>
       <span className="ctl-color-swatch" style={{ background: hex }}>
         <input
           id={id}
@@ -29,6 +39,7 @@ export function ColorField({ rgb, onChange, dataTestId, id }: ColorFieldProps) {
           value={hex}
           aria-label="color"
           data-testid={dataTestId}
+          disabled={disabled}
           onChange={(e) => {
             const [r, g, b] = hexToRgb(e.target.value);
             const next = rgb.slice();

@@ -31,6 +31,61 @@ out vec4 outColor;
     for (const s of t.symbols) expect(s.scope).toBeNull();
   });
 
+  it("captures storage declarations prefixed with an interpolation qualifier (flat/centroid)", () => {
+    const src = `flat out int v_id;
+centroid in vec2 v;
+`;
+    const t = buildSymbolTable(src);
+    const byName = new Map(t.symbols.map((s) => [s.name, s]));
+    const vId = byName.get("v_id");
+    expect(vId?.kind).toBe("out");
+    expect(vId?.type).toBe("int");
+    expect(vId?.line).toBe(1);
+    // Column is 1-based and must point at "v_id", not be shifted by "flat ".
+    expect(vId?.column).toBe(src.split("\n")[0]!.indexOf("v_id") + 1);
+
+    const v = byName.get("v");
+    expect(v?.kind).toBe("in");
+    expect(v?.type).toBe("vec2");
+    expect(v?.line).toBe(2);
+    expect(v?.column).toBe(src.split("\n")[1]!.indexOf(" v;") + 2);
+  });
+
+  it("harvests every declarator of a global comma multi-declaration", () => {
+    const src = `out vec2 v_uv, v_st;
+uniform mat4 u_view, u_proj;
+`;
+    const t = buildSymbolTable(src);
+    const byName = new Map(t.symbols.map((s) => [s.name, s]));
+    expect(byName.get("v_uv")?.kind).toBe("out");
+    expect(byName.get("v_st")?.kind).toBe("out");
+    expect(byName.get("v_st")?.type).toBe("vec2");
+    // Column points at the declarator itself, not the comma or the space.
+    expect(byName.get("v_st")?.column).toBe(
+      src.split("\n")[0]!.indexOf("v_st") + 1,
+    );
+    expect(byName.get("u_view")?.kind).toBe("uniform");
+    expect(byName.get("u_proj")?.kind).toBe("uniform");
+    expect(byName.get("u_proj")?.type).toBe("mat4");
+    for (const s of t.symbols) expect(s.scope).toBeNull();
+  });
+
+  it("does not harvest call-initializer args of a global const as phantom globals", () => {
+    // `[^,;]+` stops at the first comma, which for a call initializer sits
+    // *inside* the parens — the bracketDepth guard must refuse the walk, so
+    // `a`/`b` here are recognized as call args, not extra const declarators.
+    const src = `const vec3 K = mix(vec3(0.0), vec3(1.0), 0.5);
+const float x = 0.0, y = 1.0;
+`;
+    const t = buildSymbolTable(src);
+    const consts = t.symbols.filter((s) => s.kind === "const");
+    expect(consts.map((c) => `${c.name}:${c.type}`)).toEqual([
+      "K:vec3",
+      "x:float",
+      "y:float",
+    ]);
+  });
+
   it("captures function declarations with parameters in the same scope", () => {
     const src = `float hash(vec2 p) {
   return fract(p.x * p.y);
@@ -575,5 +630,57 @@ uniform float u_after;
     const names = buildSymbolTable(src).symbols.map((s) => s.name);
     expect(names).toContain("u_kept");
     expect(names).toContain("u_after");
+  });
+});
+
+describe("line-wrapped parameter lists (T4/M4-1 regression)", () => {
+  // A parameter list wrapped across lines leaves brace depth at 0, so before
+  // the paren-depth guard the continuation line reached the *global*
+  // storage-declaration branch: `n` was recorded as a phantom varying and the
+  // tail walker took the next declarator's first identifier token — the `in`
+  // keyword itself — as a second phantom symbol. A symbol literally named
+  // "in" then leaked into semantic highlighting, hover and rename.
+  const wrapped = `#version 300 es
+precision highp float;
+
+vec3 shade(
+  in vec3 n, in vec3 l,
+  in float k
+) {
+  return n * l * k;
+}
+
+out vec4 outColor;
+void main() { outColor = vec4(shade(vec3(1.0), vec3(0.0), 1.0), 1.0); }
+`;
+
+  it("does not invent a global symbol named after the `in` qualifier", () => {
+    const names = buildSymbolTable(wrapped).symbols.map((s) => s.name);
+    expect(names).not.toContain("in");
+  });
+
+  it("does not hoist wrapped parameters to global scope", () => {
+    const globals = buildSymbolTable(wrapped)
+      .symbols.filter((s) => s.scope === null)
+      .map((s) => s.name);
+    expect(globals).not.toContain("n");
+    expect(globals).not.toContain("l");
+    expect(globals).not.toContain("k");
+    // The real global on the other side of the wrapped header still lands.
+    expect(globals).toContain("outColor");
+  });
+
+  it("still harvests genuine comma multi-declarations", () => {
+    // The paren guard must not regress the shape RE_STORAGE_DECL was relaxed
+    // for in the first place.
+    const src = `#version 300 es
+out vec2 v_uv, v_st;
+void main() {}
+`;
+    const globals = buildSymbolTable(src)
+      .symbols.filter((s) => s.scope === null)
+      .map((s) => s.name);
+    expect(globals).toContain("v_uv");
+    expect(globals).toContain("v_st");
   });
 });

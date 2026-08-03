@@ -89,6 +89,7 @@ export function ComputeNodeView({ id, data }: NodeProps) {
         port={{ name: "mesh", type: "mesh" }}
         side="out"
         top={PORT_TOP_PAD}
+        tooltip="mesh (TF ping-pong buffer) — compute out 어트리뷰트가 실체. 정적 메시가 아니라 매 프레임 갱신되는 버퍼입니다"
       />
     </div>
   );

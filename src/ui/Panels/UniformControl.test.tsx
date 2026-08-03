@@ -184,6 +184,101 @@ describe("UniformControl", () => {
     });
   });
 
+  // [L1/E-4] `drivenBy` means an edge is overwriting whatever this control
+  // would send (execute.ts's bindUserUniforms/bindSamplers) every frame — the
+  // control disables and a note names the driving node.
+  describe("drivenBy", () => {
+    it("disables the slider + number input and shows the driven note", () => {
+      render(
+        <UniformControl
+          spec={makeSpec({ control: "slider" })}
+          value={0.5}
+          onChange={() => {}}
+          drivenBy="Tint Param"
+        />,
+      );
+      expect((screen.getByRole("slider") as HTMLInputElement).disabled).toBe(
+        true,
+      );
+      expect(
+        (screen.getByRole("spinbutton") as HTMLInputElement).disabled,
+      ).toBe(true);
+      expect(screen.getByTestId("uniform-driven-note").textContent).toContain(
+        "driven by Tint Param",
+      );
+    });
+
+    it("disables every axis of a multi control and shows the driven note", () => {
+      render(
+        <UniformControl
+          spec={makeSpec({
+            control: "multi",
+            type: "vec3",
+            defaultValue: [0, 0, 0],
+          })}
+          value={[0.1, 0.2, 0.3]}
+          onChange={() => {}}
+          drivenBy="Tint Param"
+        />,
+      );
+      for (const slider of screen.getAllByRole(
+        "slider",
+      ) as HTMLInputElement[]) {
+        expect(slider.disabled).toBe(true);
+      }
+      expect(screen.getByTestId("uniform-driven-note")).not.toBeNull();
+    });
+
+    it("disables the color input and shows the driven note", () => {
+      const { container } = render(
+        <UniformControl
+          spec={makeSpec({
+            control: "color",
+            type: "vec3",
+            defaultValue: [0, 0, 0],
+          })}
+          value={[1, 0, 0]}
+          onChange={() => {}}
+          drivenBy="Tint Param"
+        />,
+      );
+      const input = container.querySelector(
+        "input[type='color']",
+      ) as HTMLInputElement;
+      expect(input.disabled).toBe(true);
+      expect(screen.getByTestId("uniform-driven-note")).not.toBeNull();
+    });
+
+    it("disables the toggle and shows the driven note", () => {
+      render(
+        <UniformControl
+          spec={makeSpec({ control: "bool", defaultValue: 0 })}
+          value={0}
+          onChange={() => {}}
+          drivenBy="Tint Param"
+        />,
+      );
+      expect((screen.getByRole("switch") as HTMLButtonElement).disabled).toBe(
+        true,
+      );
+      expect(screen.getByTestId("uniform-driven-note")).not.toBeNull();
+    });
+
+    it("renders no note and an enabled control when drivenBy is omitted", () => {
+      render(
+        <UniformControl
+          spec={makeSpec({ control: "slider" })}
+          value={0.5}
+          onChange={() => {}}
+        />,
+      );
+      expect((screen.getByRole("slider") as HTMLInputElement).disabled).toBe(
+        false,
+      );
+      expect(screen.queryByTestId("uniform-driven-note")).toBeNull();
+    });
+  });
+
   describe("sampler / matrix", () => {
     it("renders nothing for sampler", () => {
       const { container } = render(

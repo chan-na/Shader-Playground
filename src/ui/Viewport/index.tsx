@@ -31,6 +31,7 @@ import { useGifRecorderStore } from "../../state/gifRecorder";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { snapshotGraph, useGraphStore } from "../../state/graphStore";
 import { mouseVec4, useMouseStore } from "../../state/mouseStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { thumbnailScheduler } from "../../state/thumbnailScheduler";
 import { useTimeStore } from "../../state/timeStore";
@@ -41,6 +42,7 @@ import { DockPanelHeader } from "../DockPanelHeader";
 import { CompileErrorOverlay } from "./CompileErrorOverlay";
 import { EmptyState } from "./EmptyState";
 import { PaneOverlay } from "./PaneOverlay";
+import { buildPassRows, buildVaryingContracts } from "./passPlanPublish";
 import { TransportBar } from "./TransportBar";
 
 /** Output 노드 개수 → Viewport 헤더 메타 배지 텍스트("1 · single" 등, App
@@ -238,6 +240,26 @@ export function Viewport() {
         // undone / replaced) so ProblemsPanel rows and badge counts don't keep
         // reporting phantom problems (M10).
         diagStore.retainOnly(shaderNodeIds);
+        // Publish the Pass Inspector's plan-summary rows (T1/D-1) and each
+        // shader node's varying contract (A-2/T4). A fatal validate (cycle
+        // etc.) yields `emptyPlan`, which is a transient state — publishing
+        // it here would blank the badges/Pass Inspector to a false "0
+        // passes" (and drop every varying contract) while the user is
+        // mid-drag on a cycle-causing edit. Keep the last real plan's
+        // rows/fullscreenByNode/varyingsByNode in that case; `retainOnly`
+        // below still runs unconditionally so nodes actually deleted from
+        // the graph (including from an all-nodes-removed graph, which can
+        // itself produce `errors`) are pruned immediately.
+        const passStore = usePassPlanStore.getState();
+        const fatal = plan.passes.length === 0 && plan.errors.length > 0;
+        if (!fatal) {
+          passStore.publish(
+            buildPassRows(plan, g, assets),
+            plan.fullscreenByNode,
+            buildVaryingContracts(plan, g),
+          );
+        }
+        passStore.retainOnly(g.nodes.map((n) => n.id));
         // Publish the drawable Output panes for this plan so DOM overlays can
         // read composite cell membership without recomputing it themselves.
         // Must mirror the `drawable` filter in execute.ts's composite step
@@ -264,6 +286,10 @@ export function Viewport() {
         plan = emptyPlan(w, h);
         pushError(String(e));
         useRendererStore.getState().setPanes([]);
+        // Same "keep last real plan's rows" reasoning as the try branch above
+        // — only prune nodes that actually left the graph, never wipe the
+        // Pass Inspector's summary because of a transient compile throw.
+        usePassPlanStore.getState().retainOnly(g.nodes.map((n) => n.id));
       }
     };
 
@@ -485,7 +511,11 @@ export function Viewport() {
 
       // Pull current uniform values into the plan (cheap). Both shader and
       // compute passes carry slider-driven uniformValues that get hot-patched
-      // every frame without recompile.
+      // every frame without recompile. Replacing the whole map is safe for
+      // the C-2 `@default` seeds because they live in the pass's separate
+      // `seededDefaults` field — `bindUserUniforms` composes
+      // `{...seededDefaults, ...uniformValues}` per frame, so this
+      // assignment can no longer clobber a seed before its first draw.
       const graph = useGraphStore.getState();
       // Rebuild the node lookup only when the graph's `nodes` array identity
       // changes (see the cachedNodes declaration). It is a pure function of

@@ -1,18 +1,28 @@
 import { describe, expect, it } from "vitest";
-import type { ShaderGraphNode } from "../core/graph/types";
+import type { ParentsMap } from "../core/graph/parents";
+import type {
+  Graph,
+  GraphNodeKind,
+  ShaderGraphNode,
+} from "../core/graph/types";
 import { topologicalOrder, validateGraph } from "../core/graph/validate";
 import { NODE_META } from "../core/nodes/registry";
 import {
   CHAIN_DEMO_LAYOUT,
+  CHAIN_DEMO_PARENTS,
   createChainDemoGraph,
   createDemoGraph,
   createParticleDemoGraph,
   createSplitDemoGraph,
   createTorusDemoGraph,
   DEMO_LAYOUT,
+  DEMO_PARENTS,
   PARTICLE_DEMO_LAYOUT,
+  PARTICLE_DEMO_PARENTS,
   SPLIT_DEMO_LAYOUT,
+  SPLIT_DEMO_PARENTS,
   TORUS_DEMO_LAYOUT,
+  TORUS_DEMO_PARENTS,
 } from "./demoGraph";
 
 describe("createDemoGraph (single shader)", () => {
@@ -127,6 +137,112 @@ describe("createParticleDemoGraph (compute → render → output)", () => {
   it("has a layout entry for every node", () => {
     for (const n of graph.nodes) {
       expect(PARTICLE_DEMO_LAYOUT[n.id]).toBeDefined();
+    }
+  });
+});
+
+/** Count of each functional (non-group) node kind, order-independent. */
+function kindCounts(graph: Graph): Partial<Record<GraphNodeKind, number>> {
+  const out: Partial<Record<GraphNodeKind, number>> = {};
+  for (const n of graph.nodes) {
+    if (n.kind === "group") continue;
+    out[n.kind] = (out[n.kind] ?? 0) + 1;
+  }
+  return out;
+}
+
+// F-2 (T3): every demo now carries lesson Group nodes + a parents map.
+// Parametrized across all 5 factories so the same invariants (group-before-
+// children ordering, parents pointing at real groups, unchanged functional
+// node composition, non-empty labels) are pinned once instead of five times.
+const DEMOS: Array<{
+  name: string;
+  factory: () => Graph;
+  parents: ParentsMap;
+  expectedKinds: Partial<Record<GraphNodeKind, number>>;
+}> = [
+  {
+    name: "sphere",
+    factory: createDemoGraph,
+    parents: DEMO_PARENTS,
+    expectedKinds: { mesh: 1, shader: 1, output: 1 },
+  },
+  {
+    name: "torus",
+    factory: createTorusDemoGraph,
+    parents: TORUS_DEMO_PARENTS,
+    expectedKinds: { mesh: 1, shader: 1, output: 1 },
+  },
+  {
+    name: "chain",
+    factory: createChainDemoGraph,
+    parents: CHAIN_DEMO_PARENTS,
+    expectedKinds: { shader: 3, output: 1 },
+  },
+  {
+    name: "split",
+    factory: createSplitDemoGraph,
+    parents: SPLIT_DEMO_PARENTS,
+    expectedKinds: { shader: 3, output: 3 },
+  },
+  {
+    name: "particle",
+    factory: createParticleDemoGraph,
+    parents: PARTICLE_DEMO_PARENTS,
+    expectedKinds: { compute: 1, shader: 1, output: 1 },
+  },
+];
+
+describe.each(DEMOS)("learnability lesson groups (T3/F-2) — $name", ({
+  factory,
+  parents,
+  expectedKinds,
+}) => {
+  const graph = factory();
+  const groupIds = new Set(
+    graph.nodes.filter((n) => n.kind === "group").map((n) => n.id),
+  );
+
+  it("still passes validation with groups present", () => {
+    expect(validateGraph(graph)).toEqual([]);
+  });
+
+  it("has at least one lesson group", () => {
+    expect(groupIds.size).toBeGreaterThan(0);
+  });
+
+  it("every group precedes its children in the nodes array (RF nesting requirement)", () => {
+    const indexOf = new Map(graph.nodes.map((n, i) => [n.id, i]));
+    for (const [childId, groupId] of Object.entries(parents)) {
+      const groupIdx = indexOf.get(groupId);
+      const childIdx = indexOf.get(childId);
+      expect(groupIdx).toBeDefined();
+      expect(childIdx).toBeDefined();
+      expect(groupIdx as number).toBeLessThan(childIdx as number);
+    }
+  });
+
+  it("every parents value references a real group node in this graph", () => {
+    for (const groupId of Object.values(parents)) {
+      expect(groupIds.has(groupId)).toBe(true);
+    }
+  });
+
+  it("every parents key references a real node in this graph", () => {
+    const nodeIds = new Set(graph.nodes.map((n) => n.id));
+    for (const childId of Object.keys(parents)) {
+      expect(nodeIds.has(childId)).toBe(true);
+    }
+  });
+
+  it("functional (non-group) node kind composition is unchanged", () => {
+    expect(kindCounts(graph)).toEqual(expectedKinds);
+  });
+
+  it("every group has a non-empty label", () => {
+    for (const n of graph.nodes) {
+      if (n.kind !== "group") continue;
+      expect(n.label.trim().length).toBeGreaterThan(0);
     }
   });
 });

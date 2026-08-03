@@ -21,7 +21,7 @@ precision highp float;
 in vec2 v_uv;
 
 uniform float u_time;
-uniform vec3 u_baseColor;
+uniform vec3 u_baseColor; // @color @default 0.5, 0.7, 1.0
 
 out vec4 outColor;
 

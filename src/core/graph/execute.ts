@@ -16,6 +16,7 @@ import type { CompiledProgram } from "../gl/program";
 import { setUniform } from "../gl/uniforms";
 import { resolveValueFor, type Value } from "../nodes/utility";
 import type { ComputePass, ExecutionPlan, ShaderPass } from "./compile";
+import { applyRenderState, renderStateFor } from "./renderState";
 import type { Graph } from "./types";
 import {
   snapshotUniformValue,
@@ -191,8 +192,14 @@ function bindUserUniforms(
   ctx: FrameContext,
   resolveCache: Map<string, Value>,
 ) {
-  // Build an effective uniform map: explicit values overridden by param edges.
+  // Build an effective uniform map. The spread order encodes the C-2
+  // invariant **stored value > GLSL `@default` > GL zero** (param edges then
+  // override both, below): `seededDefaults` is a separate pass field
+  // precisely because the Viewport hot-patches
+  // `pass.uniformValues = node.uniformValues` every frame — a seed merged
+  // into `uniformValues` at compile time never survived to the first draw.
   const effective: Record<string, UniformValue> = {
+    ...pass.seededDefaults,
     ...pass.uniformValues,
   };
   if (ctx.graph && pass.paramBindings.length) {
@@ -343,13 +350,19 @@ export function executePlan(
     gl.viewport(0, 0, pass.width, pass.height);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    if (pass.meshIsFullscreen) {
-      gl.disable(gl.DEPTH_TEST);
-      gl.disable(gl.CULL_FACE);
-    } else {
-      gl.enable(gl.DEPTH_TEST);
-      gl.disable(gl.CULL_FACE);
-    }
+    // Render state (blend/cull/depth) is centralized in renderState.ts (E-2)
+    // so this loop and the Pass Inspector's `State` column read the same
+    // function instead of the UI hand-copying this branch as a string. A
+    // BLEND-disabling call now runs explicitly every pass — no behavior
+    // change (blending has never been turned on anywhere in this codebase),
+    // just an explicit state write in place of relying on the WebGL default.
+    // Note blend-off does NOT mean `outColor.a` is discarded: the alpha is
+    // written into this pass's FBO (downstream samplers read it back), and
+    // the composite below carries it to the default framebuffer, where the
+    // canvas context (`alpha:true` default, premultipliedAlpha:false — see
+    // core/gl/context.ts) hands it to the browser's page compositor. See
+    // renderState.ts's module doc for the measured behavior.
+    applyRenderState(gl, renderStateFor(pass.meshIsFullscreen));
     gl.useProgram(pass.program.program);
     bindSystemUniforms(gl, pass, ctx);
     bindUserUniforms(gl, pass, ctx, resolveCache);

@@ -1,7 +1,10 @@
+import { cleanup, render, screen } from "@testing-library/react";
 import { type NodeProps, ReactFlowProvider } from "@xyflow/react";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import type { GeometryHandle } from "../../../core/assets/types";
+import { IMAGE_TEXTURE_PARAMS } from "../../../core/gl/texture";
 import type {
   CombineGraphNode,
   ComputeGraphNode,
@@ -13,6 +16,10 @@ import type {
   ShaderGraphNode,
   SwizzleGraphNode,
 } from "../../../core/graph/types";
+import { useAssetStore } from "../../../state/assetStore";
+import { useGraphStore } from "../../../state/graphStore";
+import type { ShaderPassRow } from "../../../state/passPlanStore";
+import { usePassPlanStore } from "../../../state/passPlanStore";
 import { tokens } from "../../../theme";
 import { ComputeNodeView } from "./ComputeNodeView";
 import { ImageNodeView } from "./ImageNodeView";
@@ -71,6 +78,182 @@ describe("MeshNodeView", () => {
       expect(html).toContain(`value="${p}"`);
     }
   });
+
+  // [B-1] The fixed a_position/a_normal/a_uv attribute contract, surfaced on
+  // the card so the `mesh` port stops being an opaque type name.
+  it("shows the built-in primitive's attribute contract + counts", () => {
+    const node: MeshGraphNode = {
+      id: "m1",
+      kind: "mesh",
+      primitive: "cube",
+      assetId: null,
+    };
+    const html = renderInFlow(<MeshNodeView {...mockProps("m1", node)} />);
+    expect(html).toContain('data-testid="mesh-contract"');
+    expect(html).toContain("a_position vec3");
+    expect(html).toContain("a_normal vec3");
+    expect(html).toContain("a_uv vec2");
+    expect(html).toContain("verts");
+    expect(html).toContain("0 idx"); // cube draws via drawArrays, no IBO
+    expect(html).toContain("TRIANGLES");
+  });
+});
+
+// [B-1] Asset-store-dependent branch — needs a live (client) render rather
+// than renderInFlow's renderToStaticMarkup, which (per the NOTE at the top of
+// this file) always sees zustand's frozen *initial* snapshot and would never
+// observe an addMesh() call made before rendering.
+describe("MeshNodeView — asset attribute contract [B-1]", () => {
+  const initialAssetState = useAssetStore.getState();
+
+  afterEach(() => {
+    cleanup();
+    useAssetStore.setState(initialAssetState, true);
+  });
+
+  it("shows the bound asset's own attributes/counts instead of the primitive contract", () => {
+    const asset: GeometryHandle = {
+      id: "a1",
+      name: "imported.obj",
+      data: {
+        attributes: [
+          { name: "a_position", data: new Float32Array(9), size: 3 },
+          { name: "a_normal", data: new Float32Array(9), size: 3 },
+          { name: "a_uv", data: new Float32Array(6), size: 2 },
+        ],
+        vertexCount: 3,
+        indices: new Uint16Array([0, 1, 2]),
+      },
+    };
+    useAssetStore.getState().addMesh(asset);
+    const node: MeshGraphNode = {
+      id: "m1",
+      kind: "mesh",
+      primitive: "cube",
+      assetId: "a1",
+    };
+
+    render(
+      <ReactFlowProvider>
+        <MeshNodeView {...mockProps("m1", node)} />
+      </ReactFlowProvider>,
+    );
+
+    const contract = screen.getByTestId("mesh-contract");
+    expect(contract.textContent).toContain("a_position vec3");
+    expect(contract.textContent).toContain("3 verts");
+    expect(contract.textContent).toContain("3 idx");
+    expect(contract.textContent).toContain("TRIANGLES");
+  });
+});
+
+// [B-2] Same store-dependent-branch reasoning as the asset describe block
+// above: needs a live render so useGraphStore/usePassPlanStore updates are
+// observed.
+describe("MeshNodeView — attribute consumption warning [B-2]", () => {
+  const initialGraph = useGraphStore.getState();
+  const initialPassPlan = usePassPlanStore.getState();
+
+  afterEach(() => {
+    cleanup();
+    useGraphStore.setState(initialGraph, true);
+    usePassPlanStore.setState(initialPassPlan, true);
+  });
+
+  function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {
+    return {
+      kind: "shader",
+      nodeId: "s1",
+      width: 100,
+      height: 100,
+      resolutionScale: 1,
+      meshIsFullscreen: false,
+      meshLabel: "cube",
+      meshComputeNodeId: null,
+      samplers: [],
+      meshAttributeUse: [],
+      silentWarnings: [],
+      ...overrides,
+    };
+  }
+
+  const meshNode: MeshGraphNode = {
+    id: "m1",
+    kind: "mesh",
+    primitive: "cube",
+    assetId: null,
+  };
+  const meshEdge = {
+    id: "e1",
+    source: "m1",
+    sourceHandle: "mesh",
+    target: "s1",
+    targetHandle: "mesh",
+  };
+
+  it("names attributes the connected consumer's program never bound", () => {
+    useGraphStore.setState({ edges: [meshEdge] });
+    usePassPlanStore.getState().publish(
+      [
+        shaderRowFixture({
+          meshAttributeUse: [
+            { name: "a_position", size: 3, consumed: true },
+            { name: "a_normal", size: 3, consumed: false },
+            { name: "a_uv", size: 2, consumed: false },
+          ],
+        }),
+      ],
+      {},
+      {},
+    );
+
+    render(
+      <ReactFlowProvider>
+        <MeshNodeView {...mockProps("m1", meshNode)} />
+      </ReactFlowProvider>,
+    );
+
+    const warn = screen.getByTestId("mesh-skipped-attrs");
+    expect(warn.textContent).toContain("a_normal");
+    expect(warn.textContent).toContain("a_uv");
+    expect(warn.textContent).not.toContain("a_position");
+  });
+
+  it("renders no warning line when every attribute is consumed", () => {
+    useGraphStore.setState({ edges: [meshEdge] });
+    usePassPlanStore.getState().publish(
+      [
+        shaderRowFixture({
+          meshAttributeUse: [
+            { name: "a_position", size: 3, consumed: true },
+            { name: "a_normal", size: 3, consumed: true },
+            { name: "a_uv", size: 2, consumed: true },
+          ],
+        }),
+      ],
+      {},
+      {},
+    );
+
+    render(
+      <ReactFlowProvider>
+        <MeshNodeView {...mockProps("m1", meshNode)} />
+      </ReactFlowProvider>,
+    );
+
+    expect(screen.queryByTestId("mesh-skipped-attrs")).toBeNull();
+  });
+
+  it("renders no warning line when there is no connected consumer (unknown, not skipped)", () => {
+    // No edges published — every attribute aggregates to "unknown".
+    render(
+      <ReactFlowProvider>
+        <MeshNodeView {...mockProps("m1", meshNode)} />
+      </ReactFlowProvider>,
+    );
+
+    expect(screen.queryByTestId("mesh-skipped-attrs")).toBeNull();
+  });
 });
 
 describe("ImageNodeView", () => {
@@ -81,6 +264,15 @@ describe("ImageNodeView", () => {
     expect(html).toContain("No image");
     expect(html).toContain("handle-texture");
     expect(html).toContain(">texture<");
+  });
+
+  // [E-3] Meta line reads IMAGE_TEXTURE_PARAMS, not a hard-coded string —
+  // it must show the actual sampling contract regardless of asset binding.
+  it("shows the wrap/mipmap meta line derived from IMAGE_TEXTURE_PARAMS", () => {
+    const node: ImageGraphNode = { id: "i1", kind: "image", assetId: null };
+    const html = renderInFlow(<ImageNodeView {...mockProps("i1", node)} />);
+    expect(html).toContain(IMAGE_TEXTURE_PARAMS.wrapS);
+    expect(html).toContain("mipmap");
   });
 });
 

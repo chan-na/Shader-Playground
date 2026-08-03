@@ -83,6 +83,22 @@ describe("NumberField", () => {
     render(<NumberField value="0" width={48} onChange={() => {}} />);
     expect(spin().style.width).toBe("48px");
   });
+
+  // [L1/E-4] Driven-uniform disable. The real protection is the native
+  // `disabled` attribute — browsers refuse user keystrokes/drags on a
+  // disabled input — so that's what this asserts; `fireEvent.change` bypasses
+  // real user interaction entirely (it sets `.value` and dispatches
+  // programmatically), so it fires regardless of `disabled` in jsdom and
+  // isn't a meaningful signal here.
+  it("marks the input disabled when the disabled prop is set", () => {
+    render(<NumberField value="1.000" disabled onChange={() => {}} />);
+    expect(spin().disabled).toBe(true);
+  });
+
+  it("is enabled by default", () => {
+    render(<NumberField value="1.000" onChange={() => {}} />);
+    expect(spin().disabled).toBe(false);
+  });
 });
 
 // [#14] `<input type="number">` runs the HTML value-sanitization algorithm:

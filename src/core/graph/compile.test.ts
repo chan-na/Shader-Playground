@@ -4,6 +4,7 @@ import {
   disposeAllExternal,
   externalHandleCount,
 } from "../external/registry";
+import { createFakeGl } from "../gl/fakeGl";
 import { compileGraph, emptyPlan, scaledDimensions } from "./compile";
 import type { Graph } from "./types";
 
@@ -28,6 +29,7 @@ describe("emptyPlan", () => {
     expect(plan.errors).toEqual([]);
     expect(plan.shaderErrors).toEqual({});
     expect(plan.imageTextures).toEqual({});
+    expect(plan.fullscreenByNode).toEqual({});
     expect(plan.hasCompute).toBe(false);
     expect(plan.hasExternal).toBe(false);
     expect(typeof plan.dispose).toBe("function");
@@ -223,6 +225,9 @@ describe("compileGraph fatal-error early return", () => {
     expect(plan.errors.some((e) => e.code === "cycle")).toBe(true);
     expect(plan.width).toBe(100);
     expect(plan.height).toBe(100);
+    // fatal validate short-circuits into `emptyPlan` (spread), so this is
+    // `{}` too — never a stale/half-built record from a torn-down loop.
+    expect(plan.fullscreenByNode).toEqual({});
   });
 
   it("returns emptyPlan + multi_input error when one target handle has > 1 incoming edge", () => {
@@ -310,5 +315,150 @@ describe("compileGraph groups (Phase 29)", () => {
     expect(planWith.passes).toEqual([]);
     expect(planWith.hasExternal).toBe(false);
     expect(planWith.hasCompute).toBe(false);
+  });
+});
+
+describe("compileGraph fullscreenByNode (T1/A-1)", () => {
+  function shaderNode(id: string): Graph["nodes"][number] {
+    return {
+      id,
+      kind: "shader",
+      vertexSource: "//v",
+      fragmentSource: "//f",
+      uniformValues: {},
+    };
+  }
+
+  it("records true for a shader node with no mesh input (fullscreen substitution)", () => {
+    const gl = createFakeGl({ attributes: ["a_position"], uniforms: [] });
+    const graph: Graph = { nodes: [shaderNode("s1")], edges: [] };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    // Sanity: the pass did actually build (superset claim below is otherwise
+    // vacuous — this checks the "normal" success path first).
+    expect(plan.shaderPassByNode.has("s1")).toBe(true);
+    expect(plan.fullscreenByNode.s1).toBe(true);
+    plan.dispose();
+  });
+
+  it("records false when a primitive mesh is connected", () => {
+    const gl = createFakeGl({
+      attributes: ["a_position", "a_normal", "a_uv"],
+      uniforms: [],
+    });
+    const graph: Graph = {
+      nodes: [{ id: "m1", kind: "mesh", primitive: "cube" }, shaderNode("s1")],
+      edges: [
+        {
+          id: "e1",
+          source: "m1",
+          sourceHandle: "mesh",
+          target: "s1",
+          targetHandle: "mesh",
+        },
+      ],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    expect(plan.shaderPassByNode.has("s1")).toBe(true);
+    expect(plan.fullscreenByNode.s1).toBe(false);
+    plan.dispose();
+  });
+
+  it("still records true for a mesh-unconnected node whose fragment fails to compile (superset coverage — the record is not gated on createProgram success)", () => {
+    const gl = createFakeGl({
+      attributes: ["a_position"],
+      uniforms: [],
+      compileFailure: true,
+    });
+    const graph: Graph = { nodes: [shaderNode("s1")], edges: [] };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    // No pass exists — createProgram failed — yet the record is still there.
+    expect(plan.shaderPassByNode.has("s1")).toBe(false);
+    expect(plan.fullscreenByNode.s1).toBe(true);
+    plan.dispose();
+  });
+});
+
+describe("compileGraph withExplicitDefaults binding (T3/C-2)", () => {
+  // Seeds land in the pass's separate `seededDefaults` field, NOT merged
+  // into `uniformValues`: the Viewport hot-patches
+  // `pass.uniformValues = node.uniformValues` every frame, so a merged-in
+  // seed was clobbered before the first draw ever bound it (the original
+  // C-2 regression — near-black glow on every new node). The stored-wins
+  // ordering is enforced by `bindUserUniforms`'s effective-map spread and is
+  // covered execute-side in execute.test.ts.
+  it("seeds a shader pass's seededDefaults from the fragment source's @default", () => {
+    const gl = createFakeGl({ attributes: [], uniforms: [] });
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "s1",
+          kind: "shader",
+          vertexSource: "//v",
+          fragmentSource: "uniform float u_x; // @default 3\nvoid main(){}",
+          uniformValues: {},
+        },
+      ],
+      edges: [],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const pass = plan.shaderPassByNode.get("s1");
+    expect(pass?.seededDefaults.u_x).toBe(3);
+    expect(pass?.uniformValues).toEqual({});
+    plan.dispose();
+  });
+
+  it("keeps a stored shader uniform value in uniformValues alongside the seed (stored wins at bind time)", () => {
+    const gl = createFakeGl({ attributes: [], uniforms: [] });
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "s1",
+          kind: "shader",
+          vertexSource: "//v",
+          fragmentSource: "uniform float u_x; // @default 3\nvoid main(){}",
+          uniformValues: { u_x: 2 },
+        },
+      ],
+      edges: [],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const pass = plan.shaderPassByNode.get("s1");
+    // Seeds are computed from source alone; the stored value stays in
+    // uniformValues and out-spreads the seed in bindUserUniforms.
+    expect(pass?.seededDefaults.u_x).toBe(3);
+    expect(pass?.uniformValues.u_x).toBe(2);
+    plan.dispose();
+  });
+
+  it("seeds a compute pass's seededDefaults from the vertex source's @default", () => {
+    const gl = createFakeGl({ attributes: ["a_position"], uniforms: [] });
+    const graph: Graph = {
+      nodes: [
+        {
+          id: "c1",
+          kind: "compute",
+          vertexSource:
+            "uniform float u_y; // @default 5\nin vec3 a_position;\nout vec3 v_position;\nvoid main(){ v_position = a_position; }",
+          count: 4,
+          primitive: "POINTS",
+          attributes: [
+            {
+              inName: "a_position",
+              outName: "v_position",
+              size: 3,
+              seed: "zero",
+            },
+          ],
+          uniformValues: {},
+        },
+      ],
+      edges: [],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const pass = plan.passByNode.get("c1");
+    expect(pass?.kind).toBe("compute");
+    expect(pass?.seededDefaults.u_y).toBe(5);
+    expect(pass?.uniformValues).toEqual({});
+    plan.dispose();
   });
 });

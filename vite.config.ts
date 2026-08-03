@@ -5,6 +5,7 @@ import { minifyStandalonePlayerPlugin } from "./src/build/minifyStandalonePlayer
 
 export default defineConfig({
   base: process.env.GITHUB_PAGES ? "/Shader-Playground/" : "/",
+  build: { manifest: true },
   plugins: [minifyStandalonePlayerPlugin(), react(), cspMetaPlugin()],
   server: {
     open: false,

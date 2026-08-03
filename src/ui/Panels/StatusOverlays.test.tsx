@@ -62,6 +62,36 @@ describe("StatusOverlays", () => {
     );
   });
 
+  // T1/D-1: passesOpen is the third mutually-exclusive slot (see
+  // debugUiStore.ts's 3-way exclusion / design-request v2.3 AA1 note).
+  it("shows the passes overlay with the Pass Inspector when passesOpen", () => {
+    render(<StatusOverlays />);
+
+    act(() => {
+      useDebugUiStore.getState().setPassesOpen(true);
+    });
+
+    expect(screen.getByTestId("passes-overlay")).not.toBeNull();
+    expect(screen.getByTestId("passes-overlay").textContent).toContain(
+      "▤ Passes",
+    );
+    // Empty-state text from PassInspector (no rows published in this test).
+    expect(screen.getByTestId("passes-overlay").textContent).toContain(
+      "no passes — compile a shader node first",
+    );
+  });
+
+  it("never renders the metric strip in the passes overlay", () => {
+    render(<StatusOverlays />);
+
+    act(() => {
+      useDebugUiStore.getState().setPassesOpen(true);
+    });
+
+    expect(screen.getByTestId("passes-overlay")).not.toBeNull();
+    expect(screen.queryByTestId("diagnostics-metric-strip")).toBeNull();
+  });
+
   it("shows the panel skeleton instead of the diagnostics panel while bootstrap isn't done", () => {
     useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
     render(<StatusOverlays />);

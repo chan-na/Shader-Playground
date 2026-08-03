@@ -63,6 +63,41 @@ const GROUPS: ShortcutGroup[] = [
   },
 ];
 
+// Coordinate-system facts, verified against the code paths that establish
+// each convention (see the file:line references in the sibling comments —
+// keep this list in sync if those paths change; do not add unverified
+// claims). Reuses `ShortcutRow`: `keys` holds the term, `desc` the
+// explanation, so the existing help-modal__* markup renders it unchanged.
+const COORDINATE_NOTES: ShortcutRow[] = [
+  {
+    // src/shaders/fullscreen.vert
+    keys: "v_uv",
+    desc: "(0,0)=좌하단 · (1,1)=우상단. fullscreen.vert가 v_uv = a_position*0.5+0.5 로 만든다 (NDC (-1,-1)=좌하단)",
+  },
+  {
+    keys: "gl_FragCoord",
+    desc: "픽셀 단위·좌하단 원점(WebGL 규약). u_resolution으로 나누면 v_uv와 같은 공간",
+  },
+  {
+    // src/state/mouseStore.ts (header comment) + src/core/graph/execute.ts:148-159
+    keys: "u_mouse",
+    desc: "vec4 — xy=현재 위치, zw=마지막 클릭. 픽셀 단위·좌하단 원점(Shadertoy iMouse 관례). resolutionScale<1 패스에서는 패스 크기에 맞게 자동 스케일된다",
+  },
+  {
+    // src/core/gl/texture.ts:51-55
+    keys: "Image 업로드",
+    desc: "UNPACK_FLIP_Y_WEBGL로 뒤집어 올린다 — 이미지 맨 윗줄이 v_uv.y=1. 그래서 texture(u_img, v_uv)가 화면과 같은 방향",
+  },
+  {
+    // src/core/thumbnail/asyncReadback.ts:54-56, 102
+    keys: "노드 썸네일",
+    desc: "readback 전에 GPU에서 Y를 미리 뒤집어 브라우저 ImageData(상단 원점) 순서로 만든다 — 뷰포트와 썸네일이 같은 방향인 이유",
+  },
+];
+
+const COORDINATE_INTRO =
+  "이 앱의 모든 셰이더 좌표는 좌하단 원점으로 정렬돼 있다 — 각 경로가 그걸 어떻게 맞추는지:";
+
 interface HelpModalViewProps {
   onClose: () => void;
 }
@@ -105,6 +140,21 @@ export function HelpModalView({ onClose }: HelpModalViewProps) {
               </ul>
             </section>
           ))}
+          <section
+            className="help-modal__section"
+            data-testid="help-coordinates"
+          >
+            <h3 className="help-modal__section-title">Coordinate Spaces</h3>
+            <p className="help-modal__desc">{COORDINATE_INTRO}</p>
+            <ul className="help-modal__list">
+              {COORDINATE_NOTES.map((r) => (
+                <li key={r.keys} className="help-modal__row">
+                  <kbd className="help-modal__keys">{r.keys}</kbd>
+                  <span className="help-modal__desc">{r.desc}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
         <div className="cmdk-hint">
           <span>Esc · 바깥 클릭 → 닫기</span>

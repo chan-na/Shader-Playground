@@ -81,4 +81,64 @@ describe("StageTabs", () => {
     fireEvent.click(screen.getByTestId("stage-tab-vertex"));
     expect(onChange).toHaveBeenCalledWith("vertex");
   });
+
+  it("defaults to the vertex.glsl label and data-auto=false when vertexAuto is omitted", () => {
+    render(
+      <StageTabs
+        active="vertex"
+        onChange={() => {}}
+        vertexHasError={false}
+        fragmentHasError={false}
+      />,
+    );
+    expect(screen.getByText("vertex.glsl")).not.toBeNull();
+    expect(
+      screen.getByTestId("stage-tab-vertex").getAttribute("data-auto"),
+    ).toBe("false");
+  });
+
+  it("swaps the vertex tab to 'fullscreen.vert (auto)' + data-auto=true when vertexAuto is true (A-1)", () => {
+    render(
+      <StageTabs
+        active="vertex"
+        onChange={() => {}}
+        vertexHasError={false}
+        fragmentHasError={false}
+        vertexAuto={true}
+      />,
+    );
+    expect(screen.queryByText("vertex.glsl")).toBeNull();
+    expect(screen.getByText("fullscreen.vert (auto)")).not.toBeNull();
+    expect(
+      screen.getByTestId("stage-tab-vertex").getAttribute("data-auto"),
+    ).toBe("true");
+    // The fragment tab is untouched by vertexAuto — no data-auto attribute
+    // at all (not even "false"), and its label is unchanged.
+    expect(
+      screen.getByTestId("stage-tab-fragment").hasAttribute("data-auto"),
+    ).toBe(false);
+    expect(screen.getByText("fragment.glsl")).not.toBeNull();
+  });
+
+  it("keeps the auto label while the FRAGMENT tab is active — the label states doc truth, not stage truth", () => {
+    // vertexAuto describes the vertex *document* (is it the substituted
+    // fullscreen.vert?), which is true regardless of which tab the user is
+    // looking at. editorStore's default stage is "fragment", so this is the
+    // state a fullscreen node is first seen in — the label must already be
+    // honest there, without a vertex-tab click.
+    render(
+      <StageTabs
+        active="fragment"
+        onChange={() => {}}
+        vertexHasError={false}
+        fragmentHasError={false}
+        vertexAuto={true}
+      />,
+    );
+    const vertexTab = screen.getByTestId("stage-tab-vertex");
+    expect(vertexTab.getAttribute("data-active")).toBe("false");
+    expect(vertexTab.getAttribute("data-auto")).toBe("true");
+    expect(screen.queryByText("vertex.glsl")).toBeNull();
+    expect(screen.getByText("fullscreen.vert (auto)")).not.toBeNull();
+  });
 });

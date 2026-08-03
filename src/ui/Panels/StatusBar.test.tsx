@@ -15,8 +15,27 @@ import {
 } from "../../state/diagnosticsStore";
 import { useDockStore } from "../../state/dockStore";
 import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
+import type { ShaderPassRow } from "../../state/passPlanStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { StatusBar } from "./StatusBar";
+
+function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {
+  return {
+    kind: "shader",
+    nodeId: "s1",
+    width: 100,
+    height: 100,
+    resolutionScale: 1,
+    meshIsFullscreen: false,
+    meshLabel: "cube",
+    meshComputeNodeId: null,
+    samplers: [],
+    meshAttributeUse: [],
+    silentWarnings: [],
+    ...overrides,
+  };
+}
 
 // NOTE: zustand v5 + useSyncExternalStore returns the *initial* store snapshot
 // during renderToStaticMarkup, so these tests assert what the bar shows when
@@ -62,6 +81,14 @@ describe("StatusBar", () => {
     expect(html).toContain("◨ Diagnostics");
   });
 
+  // T1/D-1: the "▤ Passes" toggle is a sibling of ◨ Diagnostics — same
+  // debugUiStore 3-way exclusion wiring, no dock tree involvement.
+  it("renders the ▤ Passes toggle button", () => {
+    const html = renderToStaticMarkup(<StatusBar />);
+    expect(html).toContain('data-testid="status-passes"');
+    expect(html).toContain("▤ Passes");
+  });
+
   it("renders the left status pill with a stable testid", () => {
     const html = renderToStaticMarkup(<StatusBar />);
     expect(html).toContain('data-testid="status-pill"');
@@ -78,6 +105,7 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
   const initialDebugUi = useDebugUiStore.getState();
   const initialDiagnostics = useDiagnosticsStore.getState();
   const initialRenderer = useRendererStore.getState();
+  const initialPassPlan = usePassPlanStore.getState();
 
   beforeEach(() => {
     useDockStore.setState(
@@ -92,6 +120,7 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     useDebugUiStore.setState(initialDebugUi, true);
     useDiagnosticsStore.setState(initialDiagnostics, true);
     useRendererStore.setState(initialRenderer, true);
+    usePassPlanStore.setState(initialPassPlan, true);
   });
 
   it("sums shader diagnostics (all severities) + runtime errors into the status-problems count", () => {
@@ -110,12 +139,60 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     expect(problems.textContent).toBe("⚠ 3 problems");
   });
 
+  // E-1 (T2): silent uniform warnings from passPlanStore rows count toward
+  // the same status-problems total as compile diagnostics/runtime errors.
+  it("sums silentWarnings across shader pass rows into the status-problems count", () => {
+    usePassPlanStore.getState().publish(
+      [
+        shaderRowFixture({
+          silentWarnings: [
+            { uniformName: "u_tex", kind: "sampler-unconnected" },
+            { uniformName: "u_ghost", kind: "uniform-inactive" },
+          ],
+        }),
+      ],
+      {},
+      {},
+    );
+
+    render(<StatusBar />);
+
+    const problems = screen.getByTestId("status-problems");
+    expect(problems.textContent).toBe("⚠ 2 problems");
+  });
+
   it("clicking status-problems opens the problems overlay without opening diagnostics", () => {
     render(<StatusBar />);
 
     fireEvent.click(screen.getByTestId("status-problems"));
 
     expect(useDebugUiStore.getState().problemsOpen).toBe(true);
+    expect(useDebugUiStore.getState().open).toBe(false);
+  });
+
+  it("clicking status-passes toggles passesOpen and reflects it in aria-pressed", () => {
+    render(<StatusBar />);
+
+    const button = screen.getByTestId("status-passes");
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(button);
+    expect(useDebugUiStore.getState().passesOpen).toBe(true);
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(button);
+    expect(useDebugUiStore.getState().passesOpen).toBe(false);
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("clicking status-passes closes diagnostics (3-way exclusion, T1/D-1)", () => {
+    render(<StatusBar />);
+
+    fireEvent.click(screen.getByTestId("open-diagnostics"));
+    expect(useDebugUiStore.getState().open).toBe(true);
+
+    fireEvent.click(screen.getByTestId("status-passes"));
+    expect(useDebugUiStore.getState().passesOpen).toBe(true);
     expect(useDebugUiStore.getState().open).toBe(false);
   });
 

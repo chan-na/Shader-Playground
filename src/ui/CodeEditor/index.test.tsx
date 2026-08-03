@@ -1,10 +1,11 @@
-import { undo } from "@codemirror/commands";
+import { insertNewlineAndIndent, undo } from "@codemirror/commands";
 import { forEachDiagnostic } from "@codemirror/lint";
 import { EditorSelection } from "@codemirror/state";
 import { runScopeHandlers } from "@codemirror/view";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ShaderGraphNode } from "../../core/graph/types";
+import fullscreenVert from "../../shaders/fullscreen.vert?raw";
 import type { NodeDiagnostics } from "../../state/diagnosticsStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useDockStore } from "../../state/dockStore";
@@ -17,6 +18,7 @@ import {
 import { useEditorStore } from "../../state/editorStore";
 import { undoGraph, useGraphStore } from "../../state/graphStore";
 import { useHistoryStore } from "../../state/historyStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { deserializeProject } from "../../state/serialization";
 import { DockLeafContext } from "../dockLeafContext";
@@ -146,6 +148,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  usePassPlanStore.getState().reset();
 });
 
 describe("CodeEditor mount", () => {
@@ -435,6 +438,169 @@ describe("CodeEditor F2 rename target (#10)", () => {
 
     expect(node("shader1").vertexSource).toBe(renamed(VERT_U));
     expect(node("shader1").fragmentSource).toBe(renamed(FRAG_U));
+  });
+});
+
+/**
+ * A-1 — the vertex tab shows fullscreen.vert verbatim and is read-only for
+ * any node `passPlanStore.fullscreenByNode` marks fullscreen (the mesh
+ * input didn't resolve, so the compiler substituted it), and reverts the
+ * instant that record says otherwise — no reselection required.
+ */
+describe("CodeEditor — A-1 auto-vertex readOnly", () => {
+  it("shows fullscreen.vert verbatim + blocks editing when the node is plan-marked fullscreen", async () => {
+    usePassPlanStore.getState().publish([], { shader1: true }, {});
+    mount();
+    await act(async () => {
+      useEditorStore.getState().setStage("vertex");
+    });
+    expect(view().state.doc.toString()).toBe(fullscreenVert);
+    expect(view().state.readOnly).toBe(true);
+
+    // Not just the flag: the actual keymap-bound editing command (Enter)
+    // must no-op, which is what makes typing genuinely ineffective.
+    const before = view().state.doc.toString();
+    let applied = true;
+    act(() => {
+      applied = insertNewlineAndIndent(view());
+    });
+    expect(applied).toBe(false);
+    expect(view().state.doc.toString()).toBe(before);
+
+    // And the store's real vertexSource must be untouched throughout.
+    expect(node("shader1").vertexSource).toBe(VERT);
+  });
+
+  it("returns to the user's vertexSource + editable once the node stops being plan-marked fullscreen (no reselection)", async () => {
+    usePassPlanStore.getState().publish([], { shader1: true }, {});
+    mount();
+    await act(async () => {
+      useEditorStore.getState().setStage("vertex");
+    });
+    expect(view().state.doc.toString()).toBe(fullscreenVert);
+    expect(view().state.readOnly).toBe(true);
+
+    // Mesh connects (recompile flips this record) — same node, same stage,
+    // no selection change. The dedicated `[isAutoVertex]` effect is the only
+    // thing that can catch this.
+    await act(async () => {
+      usePassPlanStore.getState().publish([], { shader1: false }, {});
+    });
+
+    expect(view().state.doc.toString()).toBe(VERT);
+    expect(view().state.readOnly).toBe(false);
+
+    let applied = false;
+    act(() => {
+      applied = insertNewlineAndIndent(view());
+    });
+    expect(applied).toBe(true);
+    await settle();
+    // The fullscreen.vert text the tab showed a moment ago must never have
+    // reached the store as this node's "real" vertexSource (A-1 commit
+    // guard) — only the just-typed edit did.
+    expect(node("shader1").vertexSource.includes(fullscreenVert)).toBe(false);
+  });
+
+  it("shows the neutral auto-vertex note while the substituted doc is on screen", async () => {
+    usePassPlanStore.getState().publish([], { shader1: true }, {});
+    mount();
+    await act(async () => {
+      useEditorStore.getState().setStage("vertex");
+    });
+    // Cause-neutral wording: the substitution also fires when a mesh edge
+    // exists but doesn't resolve (asset unloaded / compute pass failed), so
+    // the note must not claim the input is missing ("미연결").
+    expect(screen.getByTestId("vertex-auto-note").textContent).toBe(
+      "mesh 입력이 해석되지 않아 fullscreen.vert가 대신 실행됩니다 (읽기 전용)",
+    );
+  });
+
+  it("advertises the auto vertex doc on the tab while the FRAGMENT stage is active", async () => {
+    // editorStore defaults to "fragment" (see beforeEach), which is exactly
+    // the state a fullscreen node is first selected in. The tab label states
+    // a fact about the vertex *document* — it must already be honest here,
+    // while everything stage-scoped (source override, readOnly, note) still
+    // applies to the visible fragment document only.
+    usePassPlanStore.getState().publish([], { shader1: true }, {});
+    mount();
+    const vertexTab = screen.getByTestId("stage-tab-vertex");
+    expect(vertexTab.getAttribute("data-active")).toBe("false");
+    expect(vertexTab.getAttribute("data-auto")).toBe("true");
+    expect(vertexTab.textContent).toBe("fullscreen.vert (auto)");
+    // Stage-scoped behavior untouched: the on-screen doc is the user's
+    // fragment source, editable, with no auto-vertex note.
+    expect(view().state.doc.toString()).toBe(FRAG);
+    expect(view().state.readOnly).toBe(false);
+    expect(screen.queryByTestId("vertex-auto-note")).toBeNull();
+  });
+
+  it("editor undo cannot resurrect fullscreen.vert after a disconnect→reconnect round-trip", async () => {
+    mount();
+    await act(async () => {
+      useEditorStore.getState().setStage("vertex");
+    });
+    expect(view().state.doc.toString()).toBe(VERT);
+
+    // Mesh disconnects: the auto flip swaps fullscreen.vert into the doc.
+    await act(async () => {
+      usePassPlanStore.getState().publish([], { shader1: true }, {});
+    });
+    expect(view().state.doc.toString()).toBe(fullscreenVert);
+
+    // Sit out CM's history newGroupDelay (500ms): at user speed the two
+    // swap transactions are NOT adjacent-grouped, so if they were recorded
+    // in history at all, undo would pop only the second one — turning the
+    // doc into fullscreen.vert instead of harmlessly reverting both.
+    await settle(600);
+
+    // Mesh reconnects: the user's source returns, editable again.
+    await act(async () => {
+      usePassPlanStore.getState().publish([], { shader1: false }, {});
+    });
+    expect(view().state.doc.toString()).toBe(VERT);
+    expect(view().state.readOnly).toBe(false);
+
+    // Cmd+Z: both swaps were dispatched with addToHistory(false), so there
+    // is nothing to undo. Without that annotation this pops the
+    // fullscreen.vert→VERT replacement, and the 50ms commit then passes the
+    // A-1 guard (the plan already says "not fullscreen") and writes
+    // fullscreen.vert into the store as shader1's real vertexSource.
+    let applied = true;
+    act(() => {
+      applied = undo(view());
+    });
+    await settle();
+    expect(applied).toBe(false);
+    expect(view().state.doc.toString()).toBe(VERT);
+    expect(node("shader1").vertexSource).toBe(VERT);
+  });
+
+  it("keeps readOnly across a switch between two fullscreen-marked nodes (compensating-dispatch regression guard)", async () => {
+    useGraphStore.setState({
+      nodes: [shaderNode("shader1"), shaderNode("shader2")],
+    });
+    usePassPlanStore
+      .getState()
+      .publish([], { shader1: true, shader2: true }, {});
+    mount();
+    await act(async () => {
+      useEditorStore.getState().setStage("vertex");
+    });
+    expect(view().state.readOnly).toBe(true);
+    expect(view().state.doc.toString()).toBe(fullscreenVert);
+
+    // isAutoVertex is `true` both before and after this switch, so the
+    // dedicated `[isAutoVertex]` effect's dependency never changes and it
+    // never re-fires. Only the reload effect's own compensating dispatch —
+    // which `setState` otherwise leaves undone, since `setState` resets the
+    // `ro` compartment back to its mount-time `false` — can restore
+    // readOnly for node B's document.
+    await act(async () => {
+      useSelectionStore.getState().select("shader2");
+    });
+    expect(view().state.doc.toString()).toBe(fullscreenVert);
+    expect(view().state.readOnly).toBe(true);
   });
 });
 

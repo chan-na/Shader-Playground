@@ -76,8 +76,26 @@ const STORAGE_QUALIFIERS: Record<string, GlslSymbolKind> = {
 
 const IDENT_TOKEN = /[A-Za-z_][\w]*/;
 
+// Leading interpolation qualifiers (`flat out int v_id;`, `centroid in vec2
+// v;`) are consumed by a non-capturing group so capture-group indices — and
+// the column arithmetic below that keys off `sm[2]`/`sm[3]` — stay unchanged.
+// Without this, `computeVaryingContract` (varyingContract.ts) would miss a
+// `flat`/`centroid`-qualified varying's declaration on one stage and report a
+// false "not provided" warning even though both stages agree.
+//
+// Like RE_LOCAL_DECL below, the first declarator ends at the first `,` or `;`
+// (capture 4) so comma multi-declarations (`out vec2 v_uv, v_st;` — legal
+// GLSL) leave a `, v_st;` tail for parseSymbolTable's declarator walk to
+// harvest. The previous single-declarator form (`…;` only) rejected such
+// lines wholesale, dropping EVERY declared name from the table — which made
+// `computeVaryingContract` emit a *confident* false "vertex가 제공하지 않음"
+// warning while the real program linked fine, the exact over-reporting its
+// confidence gate exists to prevent. A global initializer (`const` only)
+// also stops at the first comma, so the call site's bracketDepth() guard is
+// what distinguishes a real declarator comma from a comma inside a call
+// initializer (`const vec3 K = mix(a, b, t);`).
 const RE_STORAGE_DECL =
-  /^\s*(uniform|in|out|attribute|varying|const)\s+(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+([A-Za-z_][\w]*)\s*(?:\[\d+\])?\s*(?:=\s*[^;]+)?;/;
+  /^\s*(?:(?:flat|smooth|noperspective|centroid|invariant)\s+)*(uniform|in|out|attribute|varying|const)\s+(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+([A-Za-z_][\w]*)\s*(?:\[\d+\])?\s*(?:=\s*[^,;]+)?\s*([,;])/;
 // Local variable declaration inside a function body. Allows a precision
 // qualifier and an optional initializer expression but stops at the first
 // `,` or `;` so multi-decl shorthand (`float x = 0.0, y = 1.0;`) leaves the
@@ -436,6 +454,16 @@ function parseSymbolTable(source: string): SymbolTable {
   // When > 0 inside a struct body — we don't index struct members yet but we
   // must not treat them as locals.
   let structDepth = 0;
+  // When > 0 we are inside an unclosed `(` — in practice a function header
+  // whose parameter list is wrapped across lines. Brace depth alone cannot
+  // see this (a wrapped header has no `{` yet), so continuation lines like
+  // `  in vec3 n, in vec3 l,` would otherwise reach the storage-declaration
+  // branch below and be harvested as *globals*: `n` as a phantom varying and
+  // — because the tail walker takes the first identifier token of the next
+  // declarator — the qualifier `in` itself as a phantom symbol named "in".
+  // That pollutes semantic highlighting, makes hover report a global, and
+  // lets rename rewrite every `in` keyword in the file.
+  let parenDepth = 0;
 
   for (let i = 0; i < lines.length; i++) {
     // Already comment-masked: comment runs are spaces, so every index within
@@ -446,7 +474,7 @@ function parseSymbolTable(source: string): SymbolTable {
     // Handle declarations BEFORE updating depth so a function header on this
     // line is recorded at the outer scope, and locals inside the function
     // body (which start the line AFTER `{`) land at depth >= 1.
-    if (depth === 0 && structDepth === 0) {
+    if (depth === 0 && structDepth === 0 && parenDepth === 0) {
       // Storage-qualifier (uniform/in/out/attribute/varying/const).
       const sm = RE_STORAGE_DECL.exec(code);
       if (sm) {
@@ -462,6 +490,30 @@ function parseSymbolTable(source: string): SymbolTable {
           column: col,
           scope: null,
         });
+        // Comma multi-declaration (`out vec2 v_uv, v_st;`): same walk as the
+        // local-decl harvester below, including the bracketDepth guard so a
+        // comma inside a `const` initializer's call arguments is not
+        // harvested as a phantom global. `sm[0]` starts at offset 0 (the
+        // regex is `^`-anchored), so the tail begins at its length.
+        if (sm[4] === "," && bracketDepth(sm[0]) === 0) {
+          const tail = code.slice(sm[0].length);
+          let cursor = sm[0].length;
+          for (const declarator of splitTopLevelDeclarators(tail)) {
+            const m2 = IDENT_TOKEN.exec(declarator);
+            if (!m2) continue;
+            const idx = code.indexOf(m2[0], cursor);
+            if (idx < 0) continue;
+            symbols.push({
+              name: m2[0],
+              type,
+              kind,
+              line: lineNo,
+              column: idx + 1,
+              scope: null,
+            });
+            cursor = idx + m2[0].length;
+          }
+        }
         // fall through — counting braces below is still cheap and harmless.
       } else {
         const stm = RE_STRUCT.exec(code);
@@ -617,7 +669,9 @@ function parseSymbolTable(source: string): SymbolTable {
     // Count braces in this (comment-stripped) line. Increment depth for `{`,
     // decrement for `}` — once we leave the function body (`depth` returns to
     // 0 with `currentFn` set) clear `currentFn` so subsequent declarations
-    // are global again.
+    // are global again. Parens are tracked alongside so a parameter list
+    // wrapped across lines suppresses the global-declaration branch above
+    // until it closes.
     for (const ch of code) {
       if (ch === "{") {
         depth += 1;
@@ -627,6 +681,10 @@ function parseSymbolTable(source: string): SymbolTable {
           if (currentFn) currentFn = null;
           if (structDepth > 0) structDepth = Math.max(0, structDepth - 1);
         }
+      } else if (ch === "(") {
+        parenDepth += 1;
+      } else if (ch === ")") {
+        if (parenDepth > 0) parenDepth -= 1;
       }
     }
   }

@@ -345,7 +345,12 @@ function buildCommands(): Command[] {
               seed: "zero",
             },
           ],
-          uniformValues: { u_dt: 0.016, u_strength: 0.6 },
+          // C-2: `particle.vert` already annotates both of these
+          // (`@default 0.016` / `@default 0.6`), so `withExplicitDefaults`
+          // reproduces the exact same values from the source. Keeping the map
+          // here left this one creation path still seeding values with no
+          // visible origin — the very thing C-2 removed from the other four.
+          uniformValues: {},
         };
         addNode(node, { x: -200, y: 80 });
         select(id);

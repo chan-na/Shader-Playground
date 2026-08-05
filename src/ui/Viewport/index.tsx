@@ -16,6 +16,7 @@ import {
 import { parseShaderInfoLog } from "../../core/graph/diagnostics";
 import { executePlan, resetComposite } from "../../core/graph/execute";
 import type { GraphNode } from "../../core/graph/types";
+import { isFatalValidation } from "../../core/graph/validate";
 import { AsyncThumbnailReadback } from "../../core/thumbnail/asyncReadback";
 import {
   DEFAULT_EXPORT_BASE,
@@ -250,8 +251,15 @@ export function Viewport() {
         // below still runs unconditionally so nodes actually deleted from
         // the graph (including from an all-nodes-removed graph, which can
         // itself produce `errors`) are pruned immediately.
+        //
+        // Asks `validate.ts` the same question `compileGraph` asked rather
+        // than inferring it from the plan's shape: a `missing_node`-only
+        // graph that legitimately compiles to zero passes (delete the Output
+        // node while a dangling edge remains) is NOT fatal, but the former
+        // `passes.length === 0 && errors.length > 0` heuristic called it
+        // fatal and froze every plan-derived surface on the stale plan.
         const passStore = usePassPlanStore.getState();
-        const fatal = plan.passes.length === 0 && plan.errors.length > 0;
+        const fatal = isFatalValidation(plan.errors);
         if (!fatal) {
           passStore.publish(
             buildPassRows(plan, g, assets),
@@ -674,6 +682,14 @@ export function Viewport() {
       plan.dispose();
       setReady(false);
       useRendererStore.getState().setPanes([]);
+      // The plan the rows describe is gone, and `retainOnly` can't remove
+      // them — it prunes by node id, and the nodes are all still in the
+      // graph. Without this the Pass Inspector keeps listing passes for a
+      // disposed plan (and the FULLSCREEN badges / varying contracts stay
+      // frozen) for as long as the Viewport is unmounted. The remount's
+      // `recompile()` republishes immediately, so this only ever shows as
+      // an honest empty state.
+      usePassPlanStore.getState().reset();
     };
     // glRetryTick is a deliberate dep (see the log.debug call above): bumping
     // it via retryGlContext() tears down and re-runs this whole effect,

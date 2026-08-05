@@ -25,8 +25,20 @@ function riskGlyphAndNote(
   if (!row.fragmentUsed) {
     return { glyph: null, note: "(선언만 있고 미사용 — 링크는 통과)" };
   }
-  return { glyph: null, note: "(전처리기/인터페이스 블록 — 판정 보류)" };
+  return { glyph: null, note: HOLD_NOTE };
 }
+
+/**
+ * Shared "we can't tell" note. Deliberately does NOT name a cause: confidence
+ * is withdrawn by five distinct hazards in `varyingContract.ts` (preprocessor
+ * branch, interface block, line-wrapped storage declaration, an inter-stage
+ * qualifier/array-size disagreement, an unterminated block comment), and the
+ * earlier copy named only the first two — so a shader held for a qualifier
+ * mismatch was told the reason was a preprocessor branch it doesn't contain.
+ * Attributing the hold precisely would mean plumbing a reason code through
+ * `passPlanStore`; until then, saying less is the honest option.
+ */
+const HOLD_NOTE = "(파서가 확신할 수 없는 선언 형태 — 판정 보류)";
 
 /** [A-2, T4] Same caption-style block SystemUniformsSection uses for its
  *  explanatory note (11px, `var(--text-secondary)`, no card/border). */
@@ -83,7 +95,7 @@ export function VaryingBridgeSection({ nodeId }: VaryingBridgeSectionProps) {
       <div style={CAPTION_STYLE}>
         vertex의 out과 fragment의 in을 잇는 스테이지 간 계약입니다.
         {isFullscreen && " vertex 계약 출처: fullscreen.vert (auto)"}
-        {!contract.confident && " (전처리기/인터페이스 블록 — 판정 보류)"}
+        {!contract.confident && ` ${HOLD_NOTE}`}
       </div>
       {contract.rows.map((row) => {
         let glyph: string | null = null;
@@ -95,8 +107,15 @@ export function VaryingBridgeSection({ nodeId }: VaryingBridgeSectionProps) {
           // Positive assertion only under confidence — see the component doc.
           if (contract.confident) glyph = "✓";
         } else if (row.status === "unused") {
-          nameMuted = true;
-          note = "(미사용 — fragment가 받지 않음)";
+          // "fragment가 받지 않음" is as much a positive assertion as the ✓
+          // above, and it fails in the same way: an unterminated `/*` in the
+          // fragment source erases every `in` declaration below it, turning
+          // the vertex outputs that *are* consumed into `unused` rows. Held
+          // under the same gate rather than stated confidently.
+          if (contract.confident) {
+            nameMuted = true;
+            note = "(미사용 — fragment가 받지 않음)";
+          }
         } else {
           const warnMessage =
             row.status === "missing-out"

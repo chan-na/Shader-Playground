@@ -471,7 +471,7 @@ uniform vec3 u_baseColor;
 | **D-1** | **Pass Inspector의 배치** — ① 6번째 도킹 패널(디자인 라운드 필요) ② `StatusOverlays` 트랜지언트 오버레이(디자인 정본 무영향) ③ Inspector 내부 섹션 | T1 | **②**. `debugUiStore`/`DiagnosticsPanel` 선례가 있고 정본을 안 건드린다 |
 | **D-2** | A-1에서 fullscreen 시 vertex 탭을 **읽기 전용 컴파일 소스**로 바꿀지, **사용자 소스 + 경고 배너**로 둘지 | T1 | 읽기 전용 컴파일 소스. "보이는 것 = 도는 것"이 이 계획의 요지 |
 | **D-3** | E2E 스펙 신규 추가 범위 — 티어마다 새 Phase 스펙을 붙일지, T1~T3 묶어 하나로 | T1 | 티어마다. 회귀 추적이 쉽다 |
-| **D-4** | E-3에서 Image 노드 wrap/filter를 **조작 가능**하게 만들지(= 노드 스키마 확장, 직렬화 영향) 아니면 표시만 할지 | T3 | 조작 가능. 학습 가치가 가장 큰 항목이지만 범위가 커진다 |
+| **D-4** | E-3에서 Image 노드 wrap/filter를 **조작 가능**하게 만들지(= 노드 스키마 확장, 직렬화 영향) 아니면 표시만 할지 | T3 | 조작 가능. 학습 가치가 가장 큰 항목이지만 범위가 커진다 — ⚠ **미결 유지**: T3 구현은 이 권장의 **반대**인 표시 전용을 택했다(`temp/learnability-followup.md` §1 T3). 승인이 아니라 잠정 처리이므로 이 행은 닫히지 않았다 |
 | **D-5** | A-3(노드 분리)까지 갈지 | T4 | A-2 결과를 보고 판단 |
 
 ---
@@ -496,11 +496,12 @@ uniform vec3 u_baseColor;
 | T2 | B-2 attribute 소비 체크 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
 | T3 | C-2 `@default` 이관 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U1) |
 | T3 | E-2 렌더 상태 표시 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U2) |
-| T3 | E-3 텍스처 파라미터 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U3) |
+| T3 | E-3 텍스처 파라미터 | ✅ 완료 (표시 전용) | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U3). ⚠ D-4 권장("조작 가능")과 **반대** 방향 — D-4는 미결로 남아 있다 |
 | T3 | F-1 좌표계 카드 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U4) |
 | T3 | F-2 데모 레슨화 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U1) |
 | T4 | A-2 varying 브리지 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 39 |
-| T4 | A-3 노드 분리 | ⬜ 보류 | — | A-2 결과 후 판단 |
+| T4 | A-3 노드 분리 | ⬜ 보류 | — | A-2 결과 후 판단 — `temp/learnability-followup.md` §5·§6-4 참조(A-3 대신 **파서를 정규식→토크나이저/AST로** 올리는 쪽을 권고) |
+| — | 머지 후 코드리뷰 라운드 | ✅ 완료 | review/learnability-2026-08 | 확정 28건 → 중복 제외 23건 수정. 상세는 `temp/learnability-followup.md` §6 |
 
 **상태 표기**: ⬜ 미착수 / 🟨 진행중 / ✅ 완료 / ⏸ 보류 / ❌ 취소
 

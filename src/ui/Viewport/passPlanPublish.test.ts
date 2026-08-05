@@ -195,6 +195,26 @@ describe("buildPassRows", () => {
     plan.dispose();
   });
 
+  it("labels an asset-mesh shader whose handle is absent with the primitive fallback", () => {
+    const { graph } = buildFixture();
+    // Import still in flight, or the asset dropped from a restored session:
+    // with assetA missing from the catalog, compile.ts's meshDataFor falls
+    // through to makePrimitive(mn.primitive), so the pass genuinely draws
+    // mAsset's cube. Naming the asset here would report the node's intent,
+    // not the draw.
+    const emptyAssets = { meshes: {}, images: {} };
+    const plan = compileGraph(makeGl(), graph, {
+      width: 64,
+      height: 64,
+      assets: emptyAssets,
+    });
+    const rows = buildPassRows(plan, graph, emptyAssets);
+    const row = shaderRow(rows, "s3");
+    expect(row.meshIsFullscreen).toBe(false);
+    expect(row.meshLabel).toBe("cube (asset not loaded)");
+    plan.dispose();
+  });
+
   it("leaves the mesh label empty for a compute-driven shader", () => {
     const { graph, assets, plan } = buildFixture();
     const rows = buildPassRows(plan, graph, assets);

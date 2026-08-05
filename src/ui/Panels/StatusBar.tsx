@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confidentVaryingWarnings } from "../../core/glsl/varyingContract";
 import { useDebugUiStore } from "../../state/debugUiStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useDockStore } from "../../state/dockStore";
@@ -88,6 +89,20 @@ export function StatusBar() {
     }
     return n;
   });
+  // A-2 (T4): varying-bridge warnings land in the same ProblemsPanel section
+  // as the E-1 rows above and are counted the same way there
+  // (`silentEntries.length + varyingEntries.length`), so leaving them out
+  // here let the bar read "no problems" while the panel showed a warning
+  // row. Same reference-stable numeric-selector shape as the count above;
+  // `confidentVaryingWarnings` is the same filter ProblemsPanel applies, so
+  // the two totals cannot drift.
+  const varyingWarningCount = usePassPlanStore((s) => {
+    let n = 0;
+    for (const contract of Object.values(s.varyingsByNode)) {
+      n += confidentVaryingWarnings(contract).length;
+    }
+    return n;
+  });
   const gpuSupported = useGpuTimerStore((s) => s.supported);
   const gpuEnabled = useGpuTimerStore((s) => s.enabled);
   const gpuTotalMs = useGpuTimerStore((s) => s.totalMs);
@@ -121,7 +136,10 @@ export function StatusBar() {
 
   const errorCount = errors.length;
   const problemCount =
-    diagnosticsProblemCount + errorCount + silentWarningCount;
+    diagnosticsProblemCount +
+    errorCount +
+    silentWarningCount +
+    varyingWarningCount;
   const showGpu = gpuSupported && gpuEnabled;
 
   const summary = statusSummary({

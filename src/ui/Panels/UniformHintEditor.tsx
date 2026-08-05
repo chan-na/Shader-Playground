@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { UniformHints, UniformSpec } from "../../core/graph/uniformParser";
 import "../controls/controls.css";
 
@@ -31,11 +31,21 @@ export function UniformHintEditor({
   const [max, setMax] = useState(String(spec.max));
   const [step, setStep] = useState(String(spec.step));
   const [label, setLabel] = useState(spec.label ?? "");
-  const [def, setDef] = useState(
-    Array.isArray(spec.defaultValue)
-      ? spec.defaultValue.join(", ")
-      : String(spec.defaultValue),
-  );
+  const seededDef = Array.isArray(spec.defaultValue)
+    ? spec.defaultValue.join(", ")
+    : String(spec.defaultValue);
+  const [def, setDef] = useState(seededDef);
+  // What the Default field was pre-filled with on mount. `spec.defaultValue`
+  // is not necessarily authored: for a uniform with no `@default` annotation
+  // it's `defaultRangeFor`'s *name-based heuristic* (`u_*color*` → white, …).
+  // Since C-2 the annotation is no longer decoration — `withExplicitDefaults`
+  // seeds only `hasExplicitDefault` uniforms, and `bindUserUniforms` uploads
+  // that seed every frame. So writing the field back out unconditionally
+  // turned a heuristic guess into a *bound* value: adjusting only the slider's
+  // min/max on an unannotated `u_tintColor` silently moved it from GL zero
+  // (black) to white. Only emit `@default` when the user actually touched it,
+  // or when the uniform already had one to preserve.
+  const seededDefRef = useRef(seededDef);
 
   const apply = () => {
     const hints: UniformHints = {};
@@ -49,15 +59,21 @@ export function UniformHintEditor({
     const labelTrim = label.trim();
     if (labelTrim) hints.label = labelTrim;
 
-    if (isVec) {
-      const parts = def
-        .split(/[ ,]+/)
-        .map((s) => parseFloat(s))
-        .filter((n) => !Number.isNaN(n));
-      if (parts.length) hints.defaultValue = parts;
-    } else {
-      const dn = parseFloat(def);
-      if (!Number.isNaN(dn)) hints.defaultValue = dn;
+    // `writeUniformHints` re-emits the whole managed annotation block, so
+    // omitting `defaultValue` deletes an existing `@default` — hence the
+    // `hasExplicitDefault` half of the guard, which keeps an already-annotated
+    // uniform's value even when the field wasn't touched.
+    if (def !== seededDefRef.current || spec.hasExplicitDefault) {
+      if (isVec) {
+        const parts = def
+          .split(/[ ,]+/)
+          .map((s) => parseFloat(s))
+          .filter((n) => !Number.isNaN(n));
+        if (parts.length) hints.defaultValue = parts;
+      } else {
+        const dn = parseFloat(def);
+        if (!Number.isNaN(dn)) hints.defaultValue = dn;
+      }
     }
 
     // Preserve an explicit vector control so re-parsing the source doesn't let

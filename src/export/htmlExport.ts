@@ -14,7 +14,21 @@ import standalonePlayer from "./standalonePlayer.js?raw";
 export function buildExportedHtml(
   graph: Graph,
   positions: Record<string, NodePosition>,
-  opts?: { title?: string; width?: number; height?: number },
+  opts?: {
+    title?: string;
+    width?: number;
+    height?: number;
+    /**
+     * Group membership (`graphStore.parents`). Omitting it does not just lose
+     * the grouping: since F-2 (T3) every demo wraps its nodes in lesson
+     * groups, and `positions` for a grouped node are *group-relative*
+     * (`GroupGraphNode` semantics). An export carrying those coordinates with
+     * an empty parents map re-imports as a graph whose nodes are laid out
+     * relative to groups that no longer exist — every lesson node stacked at
+     * the origin.
+     */
+    parents?: Record<string, string>;
+  },
 ): string {
   // C-2: the standalone player has no `@default` parser — it binds exactly
   // the serialized `uniformValues` (standalonePlayer.js). Materialize each
@@ -23,18 +37,34 @@ export function buildExportedHtml(
   // renders the same in the exported file as in the app. Export-only:
   // regular project serialization (autosave / share URL / JSON export)
   // keeps storing user values verbatim, preserving the "stored value >
-  // `@default` > GL zero" invariant. Seeding from the *raw* node sources is
-  // a safe superset of compile.ts's compiled-source seeding: the app's
-  // fullscreen.vert substitution declares no uniforms, and any extra seeded
-  // name that isn't active in the player's linked program is skipped at
-  // bind time.
+  // `@default` > GL zero" invariant.
+  //
+  // The vertex half is seeded from the source the *player* will actually
+  // compile, not from `n.vertexSource`. The player substitutes FULLSCREEN_VERT
+  // whenever a shader node has no resolvable mesh edge (standalonePlayer.js's
+  // `meshIsFullscreen` branch), exactly as `compile.ts` does. Seeding from the
+  // raw source in that case writes a value for a uniform that neither runtime
+  // ever binds — inert while the file is played, but not inert on the round
+  // trip: re-importing the exported HTML's embedded project promotes it to a
+  // *stored* value, so a uniform whose default the user never chose would win
+  // over the GLSL `@default` the moment they attach a mesh. `""` is the exact
+  // stand-in — `fullscreen.vert` declares no uniforms of its own.
+  const seedVertexSource = (nodeId: string, raw: string): string =>
+    graph.edges.some(
+      (e) =>
+        e.target === nodeId &&
+        e.targetHandle === "mesh" &&
+        graph.nodes.some((m) => m.id === e.source && m.kind === "mesh"),
+    )
+      ? raw
+      : "";
   const materialized: Graph = {
     nodes: graph.nodes.map((n) => {
       if (n.kind === "shader") {
         return {
           ...n,
           uniformValues: withExplicitDefaults(
-            `${n.vertexSource}\n${n.fragmentSource}`,
+            `${seedVertexSource(n.id, n.vertexSource)}\n${n.fragmentSource}`,
             n.uniformValues,
           ),
         };
@@ -49,7 +79,7 @@ export function buildExportedHtml(
     }),
     edges: graph.edges,
   };
-  const project = serializeProject(materialized, positions);
+  const project = serializeProject(materialized, positions, opts?.parents);
   const title = opts?.title ?? "Shader Playground export";
   const w = opts?.width ?? 800;
   const h = opts?.height ?? 600;
@@ -118,8 +148,12 @@ export function downloadExportedHtml(
   graph: Graph,
   positions: Record<string, NodePosition>,
   baseName = DEFAULT_EXPORT_BASE,
+  parents?: Record<string, string>,
 ): string {
-  const html = buildExportedHtml(graph, positions, { title: baseName });
+  const html = buildExportedHtml(graph, positions, {
+    title: baseName,
+    ...(parents !== undefined && { parents }),
+  });
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const finalName = exportFileName(baseName, "html");

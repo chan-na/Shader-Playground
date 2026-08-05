@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GraphNode, MeshGraphNode } from "../core/graph/types";
+import { CHAIN_DEMO_PARENTS } from "../state/demoGraph";
 import { useGraphStore } from "../state/graphStore";
 import { useHistoryStore } from "../state/historyStore";
 import { WelcomeOverlay } from "./WelcomeOverlay";
@@ -76,6 +77,35 @@ describe("WelcomeOverlay", () => {
     expect(nodes.some((n) => n.id === "compute1" && n.kind === "compute")).toBe(
       true,
     );
+  });
+
+  it("Create also installs the demo's lesson-group parents map (F-2)", () => {
+    render(<WelcomeOverlay />);
+    fireEvent.click(screen.getByTestId("welcome-card-chain"));
+    fireEvent.click(screen.getByTestId("welcome-create-button"));
+
+    // Guard against a vacuous assertion: the map has to be non-empty for the
+    // comparison below to distinguish "forwarded" from "defaulted to {}".
+    expect(Object.keys(CHAIN_DEMO_PARENTS).length).toBeGreaterThan(0);
+    // Without it the demo's group boxes stay empty and every child — whose
+    // layout coordinates are group-relative — collapses onto the origin.
+    expect(useGraphStore.getState().parents).toEqual(CHAIN_DEMO_PARENTS);
+  });
+
+  it("the node-count chip counts functional nodes only, not F-2's lesson groups", () => {
+    render(<WelcomeOverlay />);
+    const chipOf = (key: string): string =>
+      screen
+        .getByTestId(`welcome-card-${key}`)
+        .querySelector(".welcome-card-chip")?.textContent ?? "";
+
+    // Sphere/Torus wrap 3 functional nodes in 3 groups, Chain 4 in 3,
+    // Particle 3 in 2 — a raw nodes.length would read 6/6/7/5 and contradict
+    // the Sphere card's own copy ("three nodes end to end").
+    expect(chipOf("sphere")).toBe("3 nodes");
+    expect(chipOf("torus")).toBe("3 nodes");
+    expect(chipOf("chain")).toBe("4 nodes");
+    expect(chipOf("particle")).toBe("3 nodes");
   });
 
   it('"Start blank" dismisses the overlay for the GraphEmptyState onboarding, graph stays empty', () => {

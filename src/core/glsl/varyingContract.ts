@@ -143,6 +143,24 @@ function hasConfidenceHazard(maskedSource: string): boolean {
   );
 }
 
+/**
+ * The one hazard that cannot be detected *after* masking: `maskComments`
+ * blanks an unterminated `/*` all the way to EOF (`stripComments.ts`'s
+ * `end < 0` branch), which is right for the editor affordances it was built
+ * for — they just go quiet for a keystroke — but here it erases every
+ * declaration below the typo and leaves a perfectly clean-looking source
+ * behind, so none of the three masked-source hazards above can fire. The
+ * contract then reports the vanished stage's varyings as confident
+ * `missing-out` warnings (or, in the mirror direction, turns the other
+ * stage's outputs into confident `unused` rows). Detected on the *raw*
+ * source instead. Over-firing on a `/*` that sits inside a `//` comment
+ * costs nothing but extra silence, which this module prefers to fabrication.
+ */
+function hasUnterminatedBlockComment(raw: string): boolean {
+  const open = raw.lastIndexOf("/*");
+  return open >= 0 && raw.indexOf("*/", open + 2) < 0;
+}
+
 /** Escape a GLSL identifier for use inside a `RegExp` literal. */
 function escapeRegExp(name: string): string {
   return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -157,6 +175,12 @@ function escapeRegExp(name: string): string {
  * `smooth` is dropped during normalisation because it *is* the default — a
  * stage that writes it and one that omits it agree, and reporting them as a
  * disagreement would withdraw confidence from correct shaders.
+ *
+ * The `\b` after the name is load-bearing. Without it, looking up `v_uv` in a
+ * source that also declares `v_uv2` matches whichever line comes *first*, so a
+ * `flat out float v_uv2;` declared above `out vec2 v_uv;` made both stages
+ * report `v_uv`'s signature as `v_uv2`'s — identical on both sides, so a real
+ * qualifier/array disagreement on `v_uv` compared equal and the ✓ came back.
  */
 function declarationSignature(
   name: string,
@@ -165,7 +189,7 @@ function declarationSignature(
   const re = new RegExp(
     `^[ \\t]*((?:(?:flat|smooth|noperspective|centroid|invariant)[ \\t]+)*)` +
       `(?:in|out|varying)[ \\t]+(?:(?:highp|mediump|lowp)[ \\t]+)?\\w+[ \\t]+` +
-      `${escapeRegExp(name)}[ \\t]*(\\[[^\\]]*\\])?`,
+      `${escapeRegExp(name)}\\b[ \\t]*(\\[[^\\]]*\\])?`,
     "m",
   );
   const m = re.exec(maskedSource);
@@ -315,6 +339,8 @@ export function computeVaryingContract(
     .map((v) => v.name);
 
   const confident =
+    !hasUnterminatedBlockComment(vertexSource) &&
+    !hasUnterminatedBlockComment(fragmentSource) &&
     !hasConfidenceHazard(maskedVertexSource) &&
     !hasConfidenceHazard(maskedFragmentSource) &&
     !hasSignatureDisagreement(

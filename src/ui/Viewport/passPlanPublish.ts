@@ -29,6 +29,15 @@ function meshSourceNode(graph: Graph, shaderNodeId: string) {
  *  - "" — compute-driven; the caller renders the driving ComputeNode's own
  *    row instead of a mesh label here.
  *  - the built-in primitive name, or the loaded asset's display name.
+ *
+ * The asset branch mirrors `compile.ts`'s `meshDataFor` fallback rather than
+ * the node's *intent*: an `assetId` whose handle isn't in the catalog (import
+ * still in flight, asset dropped from a restored session) falls through to
+ * `makePrimitive(mn.primitive)` there, so the pass genuinely draws the
+ * primitive. Naming the asset anyway put the Pass Inspector — the one surface
+ * whose whole premise is "what actually runs this frame" — at odds with both
+ * the node card (`meshContractFor` reports `source: "primitive"` in exactly
+ * this state) and the draw call itself.
  */
 function meshLabelFor(
   graph: Graph,
@@ -42,7 +51,11 @@ function meshLabelFor(
   const source = meshSourceNode(graph, nodeId);
   if (!source || source.kind !== "mesh") return "";
   const mn = source as MeshGraphNode;
-  if (mn.assetId) return assets.meshes[mn.assetId]?.name ?? "asset";
+  if (mn.assetId) {
+    const handle = assets.meshes[mn.assetId];
+    if (handle) return handle.name;
+    return `${mn.primitive} (asset not loaded)`;
+  }
   return mn.primitive;
 }
 

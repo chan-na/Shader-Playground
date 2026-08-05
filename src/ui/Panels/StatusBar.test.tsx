@@ -161,6 +161,151 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     expect(problems.textContent).toBe("⚠ 2 problems");
   });
 
+  // A-2 (T4): varying-bridge warnings land in the same ProblemsPanel section
+  // as the E-1 rows above, so the bar has to count them the way the panel
+  // does — otherwise the bar reads "no problems" over a visible warning row.
+  it("sums confident varying-bridge warnings into the status-problems count", () => {
+    usePassPlanStore.getState().publish(
+      [],
+      {},
+      {
+        s1: {
+          rows: [
+            {
+              name: "v_uv",
+              vertexType: null,
+              fragmentType: "vec2",
+              fragmentUsed: true,
+              status: "missing-out",
+            },
+          ],
+          confident: true,
+        },
+      },
+    );
+
+    render(<StatusBar />);
+
+    const problems = screen.getByTestId("status-problems");
+    expect(problems.textContent).toBe("⚠ 1 problem");
+  });
+
+  // `confidentVaryingWarnings` drops every row of a non-confident contract, so
+  // ProblemsPanel shows nothing for s2 — a bar count the panel can't account
+  // for is the same drift, just in the opposite direction.
+  it("excludes a non-confident contract's varying warnings from the count", () => {
+    usePassPlanStore.getState().publish(
+      [],
+      {},
+      {
+        s1: {
+          rows: [
+            {
+              name: "v_uv",
+              vertexType: null,
+              fragmentType: "vec2",
+              fragmentUsed: true,
+              status: "missing-out",
+            },
+          ],
+          confident: true,
+        },
+        s2: {
+          rows: [
+            {
+              name: "v_branch",
+              vertexType: null,
+              fragmentType: "vec3",
+              fragmentUsed: true,
+              status: "missing-out",
+            },
+            {
+              name: "v_wrapped",
+              vertexType: "vec2",
+              fragmentType: "vec4",
+              fragmentUsed: true,
+              status: "type-mismatch",
+            },
+          ],
+          confident: false,
+        },
+      },
+    );
+
+    render(<StatusBar />);
+
+    const problems = screen.getByTestId("status-problems");
+    expect(problems.textContent).toBe("⚠ 1 problem");
+  });
+
+  // A declared-but-unused `in` links fine, so ProblemsPanel skips it — only
+  // the statically-used row of this contract is a problem.
+  it("excludes a statically-unused missing-out row from the count", () => {
+    usePassPlanStore.getState().publish(
+      [],
+      {},
+      {
+        s1: {
+          rows: [
+            {
+              name: "v_uv",
+              vertexType: null,
+              fragmentType: "vec2",
+              fragmentUsed: true,
+              status: "missing-out",
+            },
+            {
+              name: "v_ghost",
+              vertexType: null,
+              fragmentType: "vec2",
+              fragmentUsed: false,
+              status: "missing-out",
+            },
+          ],
+          confident: true,
+        },
+      },
+    );
+
+    render(<StatusBar />);
+
+    const problems = screen.getByTestId("status-problems");
+    expect(problems.textContent).toBe("⚠ 1 problem");
+  });
+
+  it("sums silentWarnings and varying-bridge warnings into one total", () => {
+    usePassPlanStore.getState().publish(
+      [
+        shaderRowFixture({
+          silentWarnings: [
+            { uniformName: "u_tex", kind: "sampler-unconnected" },
+            { uniformName: "u_ghost", kind: "uniform-inactive" },
+          ],
+        }),
+      ],
+      {},
+      {
+        s1: {
+          rows: [
+            {
+              name: "v_uv",
+              vertexType: "vec2",
+              fragmentType: "vec3",
+              fragmentUsed: true,
+              status: "type-mismatch",
+            },
+          ],
+          confident: true,
+        },
+      },
+    );
+
+    render(<StatusBar />);
+
+    const problems = screen.getByTestId("status-problems");
+    expect(problems.textContent).toBe("⚠ 3 problems");
+  });
+
   it("clicking status-problems opens the problems overlay without opening diagnostics", () => {
     render(<StatusBar />);
 

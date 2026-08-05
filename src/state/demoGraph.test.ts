@@ -155,41 +155,67 @@ function kindCounts(graph: Graph): Partial<Record<GraphNodeKind, number>> {
 // Parametrized across all 5 factories so the same invariants (group-before-
 // children ordering, parents pointing at real groups, unchanged functional
 // node composition, non-empty labels) are pinned once instead of five times.
+// `groupLabels` is the step copy itself — the whole payload of the feature,
+// so it is asserted verbatim rather than merely "non-empty".
 const DEMOS: Array<{
   name: string;
   factory: () => Graph;
   parents: ParentsMap;
   expectedKinds: Partial<Record<GraphNodeKind, number>>;
+  groupLabels: string[];
 }> = [
   {
     name: "sphere",
     factory: createDemoGraph,
     parents: DEMO_PARENTS,
     expectedKinds: { mesh: 1, shader: 1, output: 1 },
+    groupLabels: [
+      "1 · Mesh — 정점 데이터 (a_position·a_normal·a_uv)",
+      "2 · Shader — vertex+fragment가 메시를 그린다",
+      "3 · Output — 최종 텍스처를 캔버스로",
+    ],
   },
   {
     name: "torus",
     factory: createTorusDemoGraph,
     parents: TORUS_DEMO_PARENTS,
     expectedKinds: { mesh: 1, shader: 1, output: 1 },
+    groupLabels: [
+      "1 · Mesh — torus 정점 데이터, a_uv가 표면을 감싼다",
+      "2 · Shader — UV Debug: v_uv를 그대로 색으로 출력",
+      "3 · Output — 최종 텍스처를 캔버스로",
+    ],
   },
   {
     name: "chain",
     factory: createChainDemoGraph,
     parents: CHAIN_DEMO_PARENTS,
     expectedKinds: { shader: 3, output: 1 },
+    groupLabels: [
+      "1 · Generate — mesh 없음 → fullscreen quad",
+      "2 · Filter — 이전 패스 FBO를 u_tex로 샘플",
+      "3 · Display",
+    ],
   },
   {
     name: "split",
     factory: createSplitDemoGraph,
     parents: SPLIT_DEMO_PARENTS,
     expectedKinds: { shader: 3, output: 3 },
+    groupLabels: [
+      "파이프라인 — noise → blur → tonemap",
+      "각 단계를 Output으로 분기 — 화면 3분할",
+    ],
   },
   {
     name: "particle",
     factory: createParticleDemoGraph,
     parents: PARTICLE_DEMO_PARENTS,
     expectedKinds: { compute: 1, shader: 1, output: 1 },
+    groupLabels: [
+      "1 · Compute — transform feedback ping-pong (A/B)",
+      "2 · Render — 파티클 버퍼를 POINTS로",
+    ],
   },
 ];
 
@@ -197,6 +223,7 @@ describe.each(DEMOS)("learnability lesson groups (T3/F-2) — $name", ({
   factory,
   parents,
   expectedKinds,
+  groupLabels,
 }) => {
   const graph = factory();
   const groupIds = new Set(
@@ -244,5 +271,17 @@ describe.each(DEMOS)("learnability lesson groups (T3/F-2) — $name", ({
       if (n.kind !== "group") continue;
       expect(n.label.trim().length).toBeGreaterThan(0);
     }
+  });
+
+  it("carries the exact step copy on its groups, in group order", () => {
+    // The labels *are* the lesson — "non-empty" above leaves the entire
+    // payload free to drift (renumbering, a dropped step, an English
+    // rewrite), so pin the strings themselves.
+    const labels: string[] = [];
+    for (const n of graph.nodes) {
+      if (n.kind !== "group") continue;
+      labels.push(n.label);
+    }
+    expect(labels).toEqual(groupLabels);
   });
 });

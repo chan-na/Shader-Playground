@@ -105,6 +105,14 @@ const BREADCRUMB_KIND_STYLE: CSSProperties = {
  * container, so this can't be a `flex: 1` sibling without an index.css
  * change — see A-1's design-noninvasive note). */
 const AUTO_VERTEX_NOTE_HEIGHT = 22;
+/** The text is ~44 CJK-ish characters, so in a narrow Code panel it wrapped
+ *  to a second line that the fixed 22px height then clipped — the note about
+ *  why the editor is read-only was itself half-unreadable, and the `calc()`
+ *  budget silently stopped matching the rendered height. Pinned to one line
+ *  with an ellipsis; the full sentence stays reachable via the native title
+ *  (same affordance `FullscreenBadge` uses for its tooltip). */
+const AUTO_VERTEX_NOTE_TEXT =
+  "mesh 입력이 해석되지 않아 fullscreen.vert가 대신 실행됩니다 (읽기 전용)";
 const AUTO_VERTEX_NOTE_STYLE: CSSProperties = {
   height: AUTO_VERTEX_NOTE_HEIGHT,
   boxSizing: "border-box",
@@ -115,6 +123,9 @@ const AUTO_VERTEX_NOTE_STYLE: CSSProperties = {
   color: "var(--text-muted)",
   background: "var(--surface-card)",
   borderBottom: "1px solid var(--border-default)",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
 };
 
 function NodeBreadcrumb({
@@ -658,9 +669,12 @@ export function CodeEditor() {
              meshIsFullscreen). "mesh 미연결" here would tell a learner
              debugging a broken compute shader to go check an edge that is
              visibly connected. */
-          <div data-testid="vertex-auto-note" style={AUTO_VERTEX_NOTE_STYLE}>
-            mesh 입력이 해석되지 않아 fullscreen.vert가 대신 실행됩니다 (읽기
-            전용)
+          <div
+            data-testid="vertex-auto-note"
+            style={AUTO_VERTEX_NOTE_STYLE}
+            title={AUTO_VERTEX_NOTE_TEXT}
+          >
+            {AUTO_VERTEX_NOTE_TEXT}
           </div>
         )}
         <div

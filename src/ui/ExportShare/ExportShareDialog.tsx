@@ -775,6 +775,7 @@ export function ExportShareDialog() {
     const html = buildExportedHtml(
       { nodes: s.nodes, edges: s.edges },
       s.positions,
+      { parents: s.parents },
     );
     // `rev` genuinely drives this recompute (see comment above) — touch it
     // directly so it reads as a real dependency, not just a list entry.
@@ -804,6 +805,7 @@ export function ExportShareDialog() {
       { nodes: s.nodes, edges: s.edges },
       s.positions,
       fileName,
+      s.parents,
     );
     setHtmlDoneName(savedName);
     toast.success(`Exported ${savedName} · ${sizeKB} KB`);

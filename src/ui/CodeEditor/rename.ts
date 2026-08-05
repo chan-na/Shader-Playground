@@ -329,6 +329,17 @@ export function glslRename() {
     {
       key: "F2",
       run: (view) => {
+        // A-1 guard, mirroring `CodeEditor/index.tsx`'s commit-path guard.
+        // While the vertex tab shows the auto-substituted `fullscreen.vert`,
+        // the visible document is NOT this node's `vertexSource` — so a
+        // rename computed from it would write a renamed `fullscreen.vert`
+        // over the user's real source through `applyBothStages`, destroying
+        // it. `EditorState.readOnly` does not stop this on its own:
+        // CodeMirror consults that facet in its DOM input handlers, not in
+        // `dispatch`, and `applyBothStages` writes to `graphStore` directly
+        // without going through the view at all. Both halves of the damage
+        // are therefore blocked here rather than downstream.
+        if (view.state.readOnly) return false;
         const ctx = resolveCrossStageContext();
         return runRename(view, undefined, ctx).applied;
       },

@@ -94,8 +94,15 @@ const IDENT_TOKEN = /[A-Za-z_][\w]*/;
 // also stops at the first comma, so the call site's bracketDepth() guard is
 // what distinguishes a real declarator comma from a comma inside a call
 // initializer (`const vec3 K = mix(a, b, t);`).
+//
+// The array suffix accepts any bracket content, not just a decimal literal:
+// `out vec2 v_uv[MAX_LIGHTS];` and `[N]` are legal GLSL (a constant
+// expression is allowed), and a decimal-only suffix rejected those lines
+// wholesale — the same over-reporting failure the declarator walk above was
+// added to fix, since the name then vanished from one stage's table and came
+// back as a confident "vertex가 제공하지 않음" warning.
 const RE_STORAGE_DECL =
-  /^\s*(?:(?:flat|smooth|noperspective|centroid|invariant)\s+)*(uniform|in|out|attribute|varying|const)\s+(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+([A-Za-z_][\w]*)\s*(?:\[\d+\])?\s*(?:=\s*[^,;]+)?\s*([,;])/;
+  /^\s*(?:(?:flat|smooth|noperspective|centroid|invariant)\s+)*(uniform|in|out|attribute|varying|const)\s+(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+([A-Za-z_][\w]*)\s*(?:\[[^\]\r\n]*\])?\s*(?:=\s*[^,;]+)?\s*([,;])/;
 // Local variable declaration inside a function body. Allows a precision
 // qualifier and an optional initializer expression but stops at the first
 // `,` or `;` so multi-decl shorthand (`float x = 0.0, y = 1.0;`) leaves the

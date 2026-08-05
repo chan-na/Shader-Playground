@@ -482,113 +482,156 @@ function parseSymbolTable(source: string): SymbolTable {
     // line is recorded at the outer scope, and locals inside the function
     // body (which start the line AFTER `{`) land at depth >= 1.
     if (depth === 0 && structDepth === 0 && parenDepth === 0) {
-      // Storage-qualifier (uniform/in/out/attribute/varying/const).
-      const sm = RE_STORAGE_DECL.exec(code);
-      if (sm) {
-        const kind = STORAGE_QUALIFIERS[sm[1]!]!;
-        const type = sm[2]!;
-        const name = sm[3]!;
-        const col = code.indexOf(name, code.indexOf(type) + type.length) + 1;
-        symbols.push({
-          name,
-          type,
-          kind,
-          line: lineNo,
-          column: col,
-          scope: null,
-        });
-        // Comma multi-declaration (`out vec2 v_uv, v_st;`): same walk as the
-        // local-decl harvester below, including the bracketDepth guard so a
-        // comma inside a `const` initializer's call arguments is not
-        // harvested as a phantom global. `sm[0]` starts at offset 0 (the
-        // regex is `^`-anchored), so the tail begins at its length.
-        if (sm[4] === "," && bracketDepth(sm[0]) === 0) {
-          const tail = code.slice(sm[0].length);
-          let cursor = sm[0].length;
-          for (const declarator of splitTopLevelDeclarators(tail)) {
-            const m2 = IDENT_TOKEN.exec(declarator);
-            if (!m2) continue;
-            const idx = code.indexOf(m2[0], cursor);
-            if (idx < 0) continue;
-            symbols.push({
-              name: m2[0],
-              type,
-              kind,
-              line: lineNo,
-              column: idx + 1,
-              scope: null,
-            });
-            cursor = idx + m2[0].length;
-          }
-        }
-        // fall through — counting braces below is still cheap and harmless.
-      } else {
-        const stm = RE_STRUCT.exec(code);
-        if (stm) {
-          const name = stm[1]!;
-          const col = code.indexOf(name, code.indexOf("struct") + 6) + 1;
+      // Storage-qualifier declarations (uniform/in/out/attribute/varying/
+      // const), scanned REPEATEDLY across the line rather than once. A line
+      // may carry more than one `;`-terminated declaration — `out vec2 v_uv;
+      // out vec3 v_n;`, or one trailing a single-line `struct L { vec3 c; };`
+      // / `precision highp float;` — and stopping at the first used to drop
+      // every later name from the table. `computeVaryingContract` then
+      // reported the fragment's input as a *confident* "vertex가 제공하지
+      // 않음" warning for a program that links fine (mirror direction: a
+      // consumed varying rendered as a confident "unused" row). Restarts are
+      // only attempted where the line's brackets are balanced (`lineDepth`),
+      // so a member inside `struct L { … }` or a body opened on this line can
+      // never be harvested as a global.
+      let scanFrom = 0;
+      let lineDepth = 0;
+      let firstAttempt = true;
+      while (scanFrom < code.length) {
+        const seg = code.slice(scanFrom);
+        const sm = lineDepth === 0 ? RE_STORAGE_DECL.exec(seg) : null;
+        let advance: number;
+        if (sm) {
+          const kind = STORAGE_QUALIFIERS[sm[1]!]!;
+          const type = sm[2]!;
+          const name = sm[3]!;
+          const col =
+            scanFrom + seg.indexOf(name, seg.indexOf(type) + type.length) + 1;
           symbols.push({
             name,
-            type: "struct",
-            kind: "struct",
+            type,
+            kind,
             line: lineNo,
             column: col,
             scope: null,
           });
-          structDepth += 1;
-          // Count remaining braces on this line below.
-        } else {
-          const fm = RE_FUNCTION_HEADER.exec(code);
-          if (
-            fm &&
-            !NOT_A_FUNCTION.has(fm[1]!) &&
-            !NOT_A_FUNCTION.has(fm[2]!)
-          ) {
-            const returnType = fm[1]!;
-            const name = fm[2]!;
-            const paramsRaw = fm[3]!;
-            const params = parseFunctionParameters(paramsRaw);
-            const col =
-              code.indexOf(name, code.indexOf(returnType) + returnType.length) +
-              1;
-            symbols.push({
-              name,
-              type: returnType,
-              kind: "function",
-              line: lineNo,
-              column: col,
-              scope: null,
-              parameters: formatParameters(params),
-            });
-            // Parameters belong inside the function body; they are recorded
-            // on the header's line at their own column. Two anchors keep that
-            // column honest (L32): a running cursor so parameter N is searched
-            // after parameter N-1's name, and each parameter's own type token
-            // so the search starts *after* the type. Without them a bare
-            // `indexOf(name, afterParen)` matches inside an earlier token —
-            // `void f(mat3 m)` would report the `m` of `mat3`, and
-            // `void f(vec3 v, float f)` the `f` of `float`. Falls back to the
-            // function name's column when a parameter can't be located.
-            let searchFrom = code.indexOf("(") + 1;
-            for (const p of params) {
-              const typeIdx = code.indexOf(p.type, searchFrom);
-              const anchor =
-                typeIdx >= 0 ? typeIdx + p.type.length : searchFrom;
-              const pCol = code.indexOf(p.name, anchor);
-              if (pCol >= 0) searchFrom = pCol + p.name.length;
+          // Comma multi-declaration (`out vec2 v_uv, v_st;`): same walk as the
+          // local-decl harvester below, including the bracketDepth guard so a
+          // comma inside a `const` initializer's call arguments is not
+          // harvested as a phantom global. `sm[0]` starts at offset 0 of the
+          // segment (the regex is `^`-anchored), so the tail begins at its
+          // length and every column is offset by `scanFrom`.
+          if (sm[4] === "," && bracketDepth(sm[0]) === 0) {
+            const tail = seg.slice(sm[0].length);
+            let cursor = sm[0].length;
+            for (const declarator of splitTopLevelDeclarators(tail)) {
+              const m2 = IDENT_TOKEN.exec(declarator);
+              if (!m2) continue;
+              const idx = seg.indexOf(m2[0], cursor);
+              if (idx < 0) continue;
               symbols.push({
-                name: p.name,
-                type: p.type,
-                kind: "parameter",
+                name: m2[0],
+                type,
+                kind,
                 line: lineNo,
-                column: pCol >= 0 ? pCol + 1 : col,
-                scope: name,
+                column: scanFrom + idx + 1,
+                scope: null,
               });
+              cursor = idx + m2[0].length;
             }
-            // Enter the function body. Braces on this line are counted below.
-            currentFn = name;
           }
+          if (sm[4] === ";") {
+            advance = sm[0].length;
+          } else {
+            // A `,` terminator means the declarator list (or a call
+            // initializer) runs on; resume after the declaration's `;`.
+            const semi = seg.indexOf(";", sm[0].length);
+            advance = semi < 0 ? seg.length : semi + 1;
+          }
+          // fall through — counting braces below is still cheap and harmless.
+        } else {
+          if (firstAttempt) {
+            // Struct / function heads are only recognised at the start of a
+            // line, exactly as before — `firstAttempt` is true only while
+            // `scanFrom` is 0.
+            const stm = RE_STRUCT.exec(code);
+            if (stm) {
+              const name = stm[1]!;
+              const col = code.indexOf(name, code.indexOf("struct") + 6) + 1;
+              symbols.push({
+                name,
+                type: "struct",
+                kind: "struct",
+                line: lineNo,
+                column: col,
+                scope: null,
+              });
+              structDepth += 1;
+              // Count remaining braces on this line below.
+            } else {
+              const fm = RE_FUNCTION_HEADER.exec(code);
+              if (
+                fm &&
+                !NOT_A_FUNCTION.has(fm[1]!) &&
+                !NOT_A_FUNCTION.has(fm[2]!)
+              ) {
+                const returnType = fm[1]!;
+                const name = fm[2]!;
+                const paramsRaw = fm[3]!;
+                const params = parseFunctionParameters(paramsRaw);
+                const col =
+                  code.indexOf(
+                    name,
+                    code.indexOf(returnType) + returnType.length,
+                  ) + 1;
+                symbols.push({
+                  name,
+                  type: returnType,
+                  kind: "function",
+                  line: lineNo,
+                  column: col,
+                  scope: null,
+                  parameters: formatParameters(params),
+                });
+                // Parameters belong inside the function body; they are
+                // recorded on the header's line at their own column. Two
+                // anchors keep that column honest (L32): a running cursor so
+                // parameter N is searched after parameter N-1's name, and each
+                // parameter's own type token so the search starts *after* the
+                // type. Without them a bare `indexOf(name, afterParen)`
+                // matches inside an earlier token — `void f(mat3 m)` would
+                // report the `m` of `mat3`, and `void f(vec3 v, float f)` the
+                // `f` of `float`. Falls back to the function name's column
+                // when a parameter can't be located.
+                let searchFrom = code.indexOf("(") + 1;
+                for (const p of params) {
+                  const typeIdx = code.indexOf(p.type, searchFrom);
+                  const anchor =
+                    typeIdx >= 0 ? typeIdx + p.type.length : searchFrom;
+                  const pCol = code.indexOf(p.name, anchor);
+                  if (pCol >= 0) searchFrom = pCol + p.name.length;
+                  symbols.push({
+                    name: p.name,
+                    type: p.type,
+                    kind: "parameter",
+                    line: lineNo,
+                    column: pCol >= 0 ? pCol + 1 : col,
+                    scope: name,
+                  });
+                }
+                // Enter the function body. Braces on this line are counted
+                // below.
+                currentFn = name;
+              }
+            }
+          }
+          const semi = seg.indexOf(";");
+          if (semi < 0) break;
+          advance = semi + 1;
         }
+        firstAttempt = false;
+        lineDepth += bracketDepth(seg.slice(0, advance));
+        scanFrom += advance;
       }
     } else if (depth >= 1 && currentFn && structDepth === 0) {
       // Local variable declaration inside a function body. The first capture

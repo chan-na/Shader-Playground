@@ -685,11 +685,17 @@ export function Viewport() {
       // The plan the rows describe is gone, and `retainOnly` can't remove
       // them — it prunes by node id, and the nodes are all still in the
       // graph. Without this the Pass Inspector keeps listing passes for a
-      // disposed plan (and the FULLSCREEN badges / varying contracts stay
-      // frozen) for as long as the Viewport is unmounted. The remount's
-      // `recompile()` republishes immediately, so this only ever shows as
-      // an honest empty state.
-      usePassPlanStore.getState().reset();
+      // disposed plan for as long as the Viewport is unmounted.
+      //
+      // Only the *published* flag drops, not the payload. This cleanup also
+      // runs for `closePanel("viewport")`, which has no remount behind it, so
+      // an earlier full `reset()` here left the graph-derived facts erased
+      // for as long as the panel stayed closed: the StatusBar answered "no
+      // problems" for a graph whose warnings were still true, and every A-1
+      // surface read the missing `fullscreenByNode` entry as a positive "not
+      // a fullscreen pass" — badge gone, vertex tab silently editable again.
+      // Those facts belong to the graph, not to this component's lifetime.
+      usePassPlanStore.getState().markUnpublished();
     };
     // glRetryTick is a deliberate dep (see the log.debug call above): bumping
     // it via retryGlContext() tears down and re-runs this whole effect,

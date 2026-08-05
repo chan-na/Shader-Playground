@@ -48,8 +48,9 @@ export interface VaryingContract {
   rows: VaryingRow[];
   /**
    * False when either stage contains a shape this module cannot see through
-   * (preprocessor branch, interface block, line-wrapped storage declaration —
-   * see {@link hasConfidenceHazard}). A verdict hold in *both* directions:
+   * (preprocessor branch, interface block, line-wrapped storage declaration,
+   * a `#define` carrying a storage qualifier — see
+   * {@link hasConfidenceHazard}). A verdict hold in *both* directions:
    * `confidentVaryingWarnings` refuses to surface *any* warning when this is
    * false, because the declaration set the diff was computed from may not be
    * the one that actually compiles — and `VaryingBridgeSection` equally
@@ -109,6 +110,24 @@ const RE_WRAPPED_STORAGE_DECL =
   /^[ \t]*(?:(?:flat|smooth|noperspective|centroid|invariant)[ \t]+)*(?:in|out|varying)[ \t]+[^;{}\r\n]*$/m;
 
 /**
+ * A `#define` whose *body* carries a storage or interpolation qualifier
+ * (`#define VOUT out` + `VOUT vec2 v_uv;`, or the function-like `#define
+ * VARYING(t, n) out t n;`). `symbolTable.ts` matches literal qualifiers only
+ * and does not expand macros, so a varying declared through one is invisible
+ * to it on that stage and comes back as a confident `missing-out` warning —
+ * or, in the fragment direction, as a confident "unused" row — for a program
+ * that links fine.
+ *
+ * Only the macro *body* is inspected: treating every `#define` as a hazard
+ * would silence the feature for the ubiquitous `#define PI 3.14159`. The
+ * qualifiers are matched as whole lowercase words, so `#define MAX_STEPS 64`,
+ * `#define SATURATE(x) clamp(x, 0.0, 1.0)` and `#define OUTLINE_WIDTH 0.1`
+ * all stay clear of it.
+ */
+const RE_MACRO_QUALIFIER =
+  /^[ \t]*#[ \t]*define[ \t]+\w+[^\r\n]*\b(?:in|out|varying|flat|smooth|noperspective|centroid|invariant)\b/m;
+
+/**
  * Formerly this list also excused array-size mismatches (`out vec3 v[2];` vs
  * `in vec3 v[3];`) and interpolation-qualifier mismatches (`flat out int v;`
  * vs `smooth in int v;`) on the grounds that failing to detect them is mere
@@ -139,7 +158,8 @@ function hasConfidenceHazard(maskedSource: string): boolean {
   return (
     RE_PREPROCESSOR_BRANCH.test(maskedSource) ||
     RE_INTERFACE_BLOCK.test(maskedSource) ||
-    RE_WRAPPED_STORAGE_DECL.test(maskedSource)
+    RE_WRAPPED_STORAGE_DECL.test(maskedSource) ||
+    RE_MACRO_QUALIFIER.test(maskedSource)
   );
 }
 
@@ -167,6 +187,21 @@ function escapeRegExp(name: string): string {
 }
 
 /**
+ * The *head* of a varying-capable storage declaration: its interpolation
+ * qualifiers (capture 1), the storage keyword, an optional precision and the
+ * type token — everything before the declarator list. `(?:^|[;}])` rather
+ * than `^` alone because `symbolTable.ts` harvests declarations that share a
+ * line with an earlier one (`out vec2 v_uv; out vec3 v_n;`) or trail a
+ * single-line `struct L { vec3 c; };`, so a lookup anchored to line starts
+ * would find no declaration for those names and skip their comparison.
+ */
+const RE_VARYING_DECL_HEAD =
+  /(?:^|[;}])[ \t]*((?:(?:flat|smooth|noperspective|centroid|invariant)[ \t]+)*)(?:in|out|varying)[ \t]+(?:(?:highp|mediump|lowp)[ \t]+)?\w+[ \t]+/gm;
+
+/** One entry of a declarator list: the declared name and its array suffix. */
+const RE_DECLARATOR = /^([A-Za-z_]\w*)[ \t]*(\[[^\]]*\])?/;
+
+/**
  * The parts of `name`'s storage declaration that `RE_STORAGE_DECL` throws
  * away but the linker still enforces: the interpolation qualifier and the
  * array suffix, as a comparable string like `"flat|[2]"`. `null` when the
@@ -176,38 +211,56 @@ function escapeRegExp(name: string): string {
  * stage that writes it and one that omits it agree, and reporting them as a
  * disagreement would withdraw confidence from correct shaders.
  *
- * The `\b` after the name is load-bearing. Without it, looking up `v_uv` in a
- * source that also declares `v_uv2` matches whichever line comes *first*, so a
- * `flat out float v_uv2;` declared above `out vec2 v_uv;` made both stages
- * report `v_uv`'s signature as `v_uv2`'s — identical on both sides, so a real
- * qualifier/array disagreement on `v_uv` compared equal and the ✓ came back.
+ * Walks the whole declarator list of every declaration rather than reading
+ * the first name after the type token. That earlier shape could not see past
+ * the first declarator of a comma multi-declaration (`flat out float v_a,
+ * v_b;`) — a shape `symbolTable.ts` explicitly supports — so `v_b` always
+ * came back `null` and its comparison was skipped in silence, leaving a
+ * `linked` ✓ beside a stage pair whose interpolation qualifiers (or array
+ * sizes) genuinely disagree. Comparing declarator names for *equality* also
+ * subsumes the `\b` anchor that used to keep a lookup of `v_uv` from
+ * matching a `v_uv2` declared above it.
  */
 function declarationSignature(
   name: string,
   maskedSource: string,
 ): string | null {
-  const re = new RegExp(
-    `^[ \\t]*((?:(?:flat|smooth|noperspective|centroid|invariant)[ \\t]+)*)` +
-      `(?:in|out|varying)[ \\t]+(?:(?:highp|mediump|lowp)[ \\t]+)?\\w+[ \\t]+` +
-      `${escapeRegExp(name)}\\b[ \\t]*(\\[[^\\]]*\\])?`,
-    "m",
-  );
-  const m = re.exec(maskedSource);
-  if (!m) return null;
-  const qualifiers = (m[1] ?? "")
-    .split(/[ \t]+/)
-    .filter((q) => q.length > 0 && q !== "smooth")
-    .sort()
-    .join(" ");
-  return `${qualifiers}|${m[2] ?? ""}`;
+  RE_VARYING_DECL_HEAD.lastIndex = 0;
+  let head = RE_VARYING_DECL_HEAD.exec(maskedSource);
+  while (head !== null) {
+    const from = head.index + head[0].length;
+    const semi = maskedSource.indexOf(";", from);
+    const list = maskedSource.slice(from, semi < 0 ? undefined : semi);
+    for (const declarator of list.split(",")) {
+      const d = RE_DECLARATOR.exec(declarator.trim());
+      if (d && d[1] === name) {
+        const qualifiers = (head[1] ?? "")
+          .split(/[ \t]+/)
+          .filter((q) => q.length > 0 && q !== "smooth")
+          .sort()
+          .join(" ");
+        return `${qualifiers}|${d[2] ?? ""}`;
+      }
+    }
+    head = RE_VARYING_DECL_HEAD.exec(maskedSource);
+  }
+  return null;
 }
 
 /**
- * True when a varying declared on both stages carries a different
- * interpolation qualifier or array size in each — a real link failure that
- * type-token comparison alone reads as `linked`.
+ * True when a varying declared on both stages cannot be *shown* to carry the
+ * same interpolation qualifier and array size: either the two signatures
+ * differ — a real link failure that type-token comparison alone reads as
+ * `linked` — or one of them could not be located at all.
+ *
+ * The `null` case is deliberately counted as a disagreement. Skipping it was
+ * how the comma multi-declaration hole above stayed invisible, and a name the
+ * symbol table found but this module cannot locate in the source means the
+ * two parsers disagree about what is declared — not a shape whose ✓ we can
+ * vouch for. Withdrawing confidence there is silence, which this module ranks
+ * strictly above fabricated reassurance (see {@link hasConfidenceHazard}).
  */
-function hasSignatureDisagreement(
+function hasSignatureUncertainty(
   sharedNames: readonly string[],
   maskedVertexSource: string,
   maskedFragmentSource: string,
@@ -215,7 +268,7 @@ function hasSignatureDisagreement(
   for (const name of sharedNames) {
     const v = declarationSignature(name, maskedVertexSource);
     const f = declarationSignature(name, maskedFragmentSource);
-    if (v !== null && f !== null && v !== f) return true;
+    if (v === null || f === null || v !== f) return true;
   }
   return false;
 }
@@ -343,7 +396,7 @@ export function computeVaryingContract(
     !hasUnterminatedBlockComment(fragmentSource) &&
     !hasConfidenceHazard(maskedVertexSource) &&
     !hasConfidenceHazard(maskedFragmentSource) &&
-    !hasSignatureDisagreement(
+    !hasSignatureUncertainty(
       sharedNames,
       maskedVertexSource,
       maskedFragmentSource,

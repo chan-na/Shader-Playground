@@ -18,13 +18,22 @@ export function formatFbo(
 }
 
 /** "u_tex ← noise1 (unit 0)" — which texture unit a sampler uniform is bound
- * to and which upstream node feeds it. */
+ * to and which upstream node feeds it.
+ *
+ * `bound: false` renders "u_tex ← image1 (미바인딩)" instead: the edge exists,
+ * but the source hands `execute.ts` no texture, so `bindSamplers` skips the
+ * unit entirely and the sampler keeps its link-time default. The unit number
+ * is dropped rather than kept, because the plan's unit is precisely the one
+ * that never gets assigned — printing it would be the same false binding
+ * claim in smaller type. */
 export function formatSampler(
   uniformName: string,
   sourceLabel: string,
   unit: number,
+  bound = true,
 ): string {
-  return `${uniformName} ← ${sourceLabel} (unit ${unit})`;
+  const state = bound ? `unit ${unit}` : "미바인딩";
+  return `${uniformName} ← ${sourceLabel} (${state})`;
 }
 
 /** GPU timer column. `undefined` means no sample has landed yet for this

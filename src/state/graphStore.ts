@@ -496,13 +496,20 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     if (!node) return;
     if (node.kind === "shader") {
       const sn = node as ShaderGraphNode;
-      const frag = writeUniformHints(sn.fragmentSource, name, hints);
-      if (frag !== null) {
-        get().updateShaderSource(id, { fragmentSource: frag });
+      // Vertex first — it must match the declaration the READERS pick. Every
+      // spec producer parses `${vertexSource}\n${fragmentSource}` with
+      // first-wins dedup (uniformParser: `if (seen.has(name)) continue`), so
+      // for a uniform declared in both stages the vertex declaration is the
+      // one the Inspector shows. Writing fragment first would overwrite the
+      // author's annotations on a declaration nobody reads, while the edit
+      // itself stayed invisible.
+      const vert = writeUniformHints(sn.vertexSource, name, hints);
+      if (vert !== null) {
+        get().updateShaderSource(id, { vertexSource: vert });
         return;
       }
-      const vert = writeUniformHints(sn.vertexSource, name, hints);
-      if (vert !== null) get().updateShaderSource(id, { vertexSource: vert });
+      const frag = writeUniformHints(sn.fragmentSource, name, hints);
+      if (frag !== null) get().updateShaderSource(id, { fragmentSource: frag });
       return;
     }
     if (node.kind === "compute") {

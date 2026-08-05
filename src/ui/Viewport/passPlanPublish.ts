@@ -60,6 +60,58 @@ function meshLabelFor(
 }
 
 /**
+ * Source-node kinds that hand `bindSamplers` a texture even when the plan
+ * itself carries none for them:
+ *  - shader/compute — a source that failed to compile has no entry in
+ *    `shaderPassByNode`, but `execute.ts` binds its opaque-black placeholder
+ *    (`ensureBlankTexture`) rather than skipping the unit.
+ *  - webcam/video/audio — external sources live outside the plan (they
+ *    survive recompiles) and their texture appears/disappears per frame, so
+ *    no compile-time verdict is possible. Treated as resolved: claiming
+ *    "unbound" for the frame or two before the first upload would be a false
+ *    alarm on every working webcam graph.
+ */
+const SELF_TEXTURING_KINDS: ReadonlySet<string> = new Set([
+  "shader",
+  "compute",
+  "webcam",
+  "video",
+  "audio",
+]);
+
+/**
+ * Sampler uniform names whose edge exists but whose source produces no
+ * texture at all — an ImageNode with no `assetId`, or one whose asset never
+ * made it into `plan.imageTextures` (catalog miss on a restored session,
+ * bitmap not decoded, `createImageTexture` threw). `execute.ts`'s
+ * `bindSamplers` `continue`s over exactly these, so no `uniform1i` and no
+ * `bindTexture` happens for them and the sampler keeps its link-time default
+ * of unit 0.
+ *
+ * This is the samplers-column counterpart to `meshLabelFor`'s
+ * "(asset not loaded)" fallback above: the Pass Inspector's whole premise is
+ * "what actually runs this frame", so an edge alone must not be reported as a
+ * binding. Mirrors the `bindSamplers` lookup order exactly (pass → plan image
+ * → external), which is why an absent source node counts as unresolved —
+ * `execute.ts` skips that unit too.
+ */
+function emptySourceSamplers(
+  plan: ExecutionPlan,
+  graph: Graph,
+  samplers: ReadonlyArray<{ uniformName: string; sourceNodeId: string }>,
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of samplers) {
+    if (plan.shaderPassByNode.has(s.sourceNodeId)) continue;
+    if (plan.imageTextures[s.sourceNodeId] !== undefined) continue;
+    const src = graph.nodes.find((n) => n.id === s.sourceNodeId);
+    if (src && SELF_TEXTURING_KINDS.has(src.kind)) continue;
+    out.add(s.uniformName);
+  }
+  return out;
+}
+
+/**
  * Turn a compiled `ExecutionPlan` into the shallow row summary the Pass
  * Inspector (leaf `passPlanStore`) displays. Preserves `plan.passes` order,
  * which is the same topological order `executePlan` draws in.
@@ -115,6 +167,7 @@ export function buildPassRows(
             ...pass.samplers.map((s) => s.uniformName),
             ...pass.paramBindings.map((p) => p.uniformName),
           ]),
+          emptySourceSamplers(plan, graph, pass.samplers),
         )
       : [];
     rows.push({

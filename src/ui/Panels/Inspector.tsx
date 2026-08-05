@@ -23,7 +23,9 @@ import {
   samplerUniforms,
 } from "../../core/graph/uniformParser";
 import { displayNodeName, NODE_META } from "../../core/nodes/registry";
+import fullscreenVert from "../../shaders/fullscreen.vert?raw";
 import { useGraphStore } from "../../state/graphStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
 import { SelectField } from "../controls/SelectField";
@@ -187,17 +189,50 @@ export function Inspector({ embedded = false }: InspectorProps) {
   const computeNode =
     node?.kind === "compute" ? (node as ComputeGraphNode) : null;
 
+  // [#30] A-1's fullscreen substitution, as already published by the compiler.
+  // Read here (not re-derived from the graph) for the same reason
+  // SystemUniformsSection reads it: the substitution rule lives in compile.ts.
+  const isFullscreen = usePassPlanStore(
+    (s) => shaderNode !== null && s.fullscreenByNode[shaderNode.id] === true,
+  );
+
   const specs = useMemo(() => {
-    if (shaderNode)
-      return parseUniforms(
-        `${shaderNode.vertexSource}\n${shaderNode.fragmentSource}`,
+    if (shaderNode) {
+      // [#30] Spec the source the compiler actually saw *first*. When no mesh
+      // resolves, compile.ts replaces this node's vertex source with
+      // fullscreen.vert (`if (meshIsFullscreen) vertexSource = fullscreenVert`)
+      // and seeds `@default`s from that same pair — but `parseUniforms` keeps
+      // the *first* declaration of a name, so parsing the stored vertex source
+      // let a bare `uniform vec3 u_x;` in it shadow the fragment's annotated
+      // `// @color @default …`: the Inspector showed a heuristic default while
+      // the GPU got the explicit one.
+      if (!isFullscreen)
+        return parseUniforms(
+          `${shaderNode.vertexSource}\n${shaderNode.fragmentSource}`,
+        );
+      const compiled = parseUniforms(
+        `${fullscreenVert}\n${shaderNode.fragmentSource}`,
       );
+      // Uniforms only the stored vertex source declares still get a row: they
+      // are exactly what the substitution took away, and [C-1]'s "not bound
+      // (fullscreen pass)" note on `u_view`/`u_proj`/`u_model`/`u_camera` is
+      // the place that says so. Dropping them would delete the explanation
+      // along with the row. They come after the compiled ones, and never
+      // override a name the compiled program really declares.
+      const compiledNames = new Set(compiled.map((u) => u.name));
+      return compiled.concat(
+        parseUniforms(shaderNode.vertexSource).filter(
+          (u) => !compiledNames.has(u.name),
+        ),
+      );
+    }
     if (computeNode) return parseUniforms(computeNode.vertexSource);
     return [];
   }, [
     shaderNode?.vertexSource,
     shaderNode?.fragmentSource,
     shaderNode,
+    isFullscreen,
     computeNode?.vertexSource,
     computeNode,
   ]);

@@ -81,12 +81,38 @@ afterEach(() => {
 
 describe("PassInspector", () => {
   it("shows the empty state when there are no passes", () => {
+    // A *published* plan with no passes — the graph compiled and produced
+    // nothing. Distinct from "no renderer at all" below, which is why this
+    // now publishes rather than relying on the store's initial state.
+    usePassPlanStore.getState().publish([], {}, {});
     render(<PassInspector />);
     expect(
       screen.getByText("no passes — compile a shader node first"),
     ).not.toBeNull();
     expect(screen.queryAllByTestId("pass-row")).toHaveLength(0);
     expect(screen.queryAllByTestId("pass-state-note")).toHaveLength(0);
+  });
+
+  it("says the renderer is not running rather than claiming zero passes", () => {
+    // Viewport unmounted (panel closed): the rows survive for the surfaces
+    // that describe the *graph*, but this table describes *this frame*, so it
+    // must not list a disposed plan's passes — nor imply the graph has none.
+    useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
+    usePassPlanStore
+      .getState()
+      .publish([shaderRow({ nodeId: "noise1" })], {}, {});
+    usePassPlanStore.getState().markUnpublished();
+    render(<PassInspector />);
+
+    expect(
+      screen.getByText(
+        "renderer not running — open the Viewport panel to see this frame's passes",
+      ),
+    ).not.toBeNull();
+    expect(screen.queryAllByTestId("pass-row")).toHaveLength(0);
+    // The payload itself is untouched — this is a rendering decision, not a
+    // store reset (see passPlanStore.markUnpublished).
+    expect(usePassPlanStore.getState().rows).toHaveLength(1);
   });
 
   it("renders rows in plan order with correct kind/FBO/mesh/sampler cells", () => {
@@ -167,6 +193,41 @@ describe("PassInspector", () => {
 
     expect(screen.getByTestId("pass-state-note").textContent).toContain(
       "outColor.a",
+    );
+  });
+
+  // [12]: the Samplers column is the one surface whose premise is "what
+  // actually runs this frame" — an edge whose source has no texture must not
+  // read as a unit binding `execute.ts` never performs.
+  it("marks a sampler whose source produced no texture as 미바인딩, leaving sibling samplers alone", () => {
+    useGraphStore.setState({
+      nodes: [shaderNode("blur1", "Blur"), shaderNode("noise1", "Noise")],
+    });
+    usePassPlanStore.getState().publish(
+      [
+        shaderRow({
+          nodeId: "blur1",
+          samplers: [
+            { uniformName: "u_tex", sourceNodeId: "img1", unit: 0 },
+            { uniformName: "u_prev", sourceNodeId: "noise1", unit: 1 },
+          ],
+          silentWarnings: [
+            { uniformName: "u_tex", kind: "sampler-source-empty" },
+          ],
+        }),
+      ],
+      {},
+      {},
+    );
+
+    render(<PassInspector />);
+
+    const cell = screen
+      .getByTestId("pass-row")
+      .querySelector('[data-testid="pass-samplers"]');
+    // img1 is not in the graph store, so nodeLabel falls back to the raw id.
+    expect(cell?.textContent).toBe(
+      "u_tex ← img1 (미바인딩), u_prev ← Noise (unit 1)",
     );
   });
 

@@ -44,13 +44,16 @@ export interface ShaderPassRow {
   /**
    * Uniforms this pass declared but that the compiled/linked program or the
    * graph's wiring silently disagrees with (E-1, T2) — an unconnected
-   * sampler, or a uniform absent from the linked program. Mirrors
-   * `SilentUniformWarning` from `core/graph/silentUniforms.ts`, declared
-   * inline for the same leaf-store reason as `meshAttributeUse` above.
+   * sampler, a connected sampler whose source has no texture at all
+   * (`sampler-source-empty`, which `PassInspector` also reads to keep the
+   * Samplers column from claiming a unit `execute.ts` never assigns), or a
+   * uniform absent from the linked program. Mirrors `SilentUniformWarning`
+   * from `core/graph/silentUniforms.ts`, declared inline for the same
+   * leaf-store reason as `meshAttributeUse` above.
    */
   silentWarnings: ReadonlyArray<{
     uniformName: string;
-    kind: "sampler-unconnected" | "uniform-inactive";
+    kind: "sampler-unconnected" | "sampler-source-empty" | "uniform-inactive";
   }>;
 }
 
@@ -101,6 +104,21 @@ export interface PassPlanState {
   rows: PassRow[];
   fullscreenByNode: Record<string, boolean>;
   varyingsByNode: Record<string, NodeVaryings>;
+  /**
+   * Whether a live renderer stands behind this snapshot. False before the
+   * first publish and again once the Viewport unmounts (`markUnpublished`).
+   *
+   * The distinction exists because this store carries two different kinds of
+   * truth. `rows` answer "what runs *this frame*", so they must not be shown
+   * once the plan behind them is disposed. `fullscreenByNode` /
+   * `varyingsByNode` / each row's `silentWarnings` answer "what is this graph
+   * *like*" — A-1's substitution, the varying contract, an unconnected
+   * sampler — and those facts do not stop being true because a panel closed.
+   * Erasing them was how closing the Viewport made the StatusBar claim "no
+   * problems" and flipped every A-1 surface to its opposite (badge gone,
+   * vertex tab editable again).
+   */
+  published: boolean;
   publish: (
     rows: PassRow[],
     fullscreenByNode: Record<string, boolean>,
@@ -113,6 +131,12 @@ export interface PassPlanState {
    * don't re-render on every recompile.
    */
   retainOnly: (nodeIds: string[]) => void;
+  /**
+   * The renderer went away (Viewport unmounted, plan disposed) without the
+   * graph changing. Only `published` flips — see its doc for why the payload
+   * stays.
+   */
+  markUnpublished: () => void;
   reset: () => void;
 }
 
@@ -120,8 +144,9 @@ export const usePassPlanStore = create<PassPlanState>((set) => ({
   rows: [],
   fullscreenByNode: {},
   varyingsByNode: {},
+  published: false,
   publish: (rows, fullscreenByNode, varyingsByNode) =>
-    set({ rows, fullscreenByNode, varyingsByNode }),
+    set({ rows, fullscreenByNode, varyingsByNode, published: true }),
   retainOnly: (nodeIds) =>
     set((s) => {
       const keep = new Set(nodeIds);
@@ -150,5 +175,12 @@ export const usePassPlanStore = create<PassPlanState>((set) => ({
         varyingsByNode: varyingsChanged ? varyingsByNode : s.varyingsByNode,
       };
     }),
-  reset: () => set({ rows: [], fullscreenByNode: {}, varyingsByNode: {} }),
+  markUnpublished: () => set({ published: false }),
+  reset: () =>
+    set({
+      rows: [],
+      fullscreenByNode: {},
+      varyingsByNode: {},
+      published: false,
+    }),
 }));

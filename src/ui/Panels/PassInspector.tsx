@@ -63,6 +63,12 @@ const READ_POLL_INTERVAL_MS = 250;
  */
 export function PassInspector() {
   const rows = usePassPlanStore((s) => s.rows);
+  // This table is the one surface whose whole premise is "what runs *this*
+  // frame", so it is also the one that must not show a disposed plan's rows.
+  // The rest of the store's payload survives an unmount on purpose (see
+  // `passPlanStore.published`); this component is where that distinction is
+  // paid for.
+  const published = usePassPlanStore((s) => s.published);
   const nodes = useGraphStore((s) => s.nodes);
   const gpuByNode = useGpuTimerStore((s) => s.byNode);
   const gpuSupported = useGpuTimerStore((s) => s.supported);
@@ -110,11 +116,28 @@ export function PassInspector() {
     return row.meshLabel;
   };
 
+  // A sampler edge is not a binding: `execute.ts`'s `bindSamplers` skips the
+  // unit outright when the source has no texture (image with no asset, asset
+  // that never loaded), so the plan's unit number is never assigned. The set
+  // of such uniforms is read back off `row.silentWarnings` rather than carried
+  // as a second row field — `passPlanPublish` already computes it there for
+  // E-1, and one derivation means this column and the Problems panel cannot
+  // drift apart.
   const samplersCell = (row: PassRow): string => {
     if (row.kind === "compute" || row.samplers.length === 0) return "—";
+    const empty = new Set(
+      row.silentWarnings
+        .filter((w) => w.kind === "sampler-source-empty")
+        .map((w) => w.uniformName),
+    );
     return row.samplers
       .map((s) =>
-        formatSampler(s.uniformName, nodeLabel(s.sourceNodeId), s.unit),
+        formatSampler(
+          s.uniformName,
+          nodeLabel(s.sourceNodeId),
+          s.unit,
+          !empty.has(s.uniformName),
+        ),
       )
       .join(", ");
   };
@@ -134,15 +157,18 @@ export function PassInspector() {
     <div
       style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "6px 12px" }}
     >
-      {rows.length === 0 ? (
+      {!published || rows.length === 0 ? (
         <div
+          data-testid="pass-inspector-empty"
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: 11,
             color: "var(--text-muted)",
           }}
         >
-          no passes — compile a shader node first
+          {published
+            ? "no passes — compile a shader node first"
+            : "renderer not running — open the Viewport panel to see this frame's passes"}
         </div>
       ) : (
         <table

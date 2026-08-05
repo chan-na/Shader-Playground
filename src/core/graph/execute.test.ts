@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+// Test-only reach across layers (core ← ui): systemUniformStatus.ts is a leaf
+// module with no imports of its own, and the dependency graph dpdm walks is
+// rooted at src/main.tsx, so this adds no cycle to the app.
+import { systemUniformBinding } from "../../ui/Panels/systemUniformStatus";
 import { defaultCameraState } from "../camera/orbitCamera";
 import { disposeAllExternal } from "../external/registry";
 import { createFakeGl } from "../gl/fakeGl";
+import type { CompiledProgram } from "../gl/program";
 import { compileGraph } from "./compile";
 import { executePlan, type FrameContext, resetComposite } from "./execute";
 import type {
@@ -548,6 +553,134 @@ describe("executePlan — render state (E-2)", () => {
     expect(enable.mock.calls.some((c) => c[0] === gl.DEPTH_TEST)).toBe(true);
     expect(disable.mock.calls.some((c) => c[0] === gl.DEPTH_TEST)).toBe(true);
 
+    plan.dispose();
+  });
+});
+
+// C-1 cross-check. `ui/Panels/systemUniformStatus.ts` re-declares this file's
+// binding rules (VIEW_DEPENDENT / COMPUTE_BOUND) so the Inspector can tell the
+// user which system uniforms *this* frame's draw actually sets. Nothing joined
+// the two copies: every other test here activates only u_time/u_resolution/
+// u_src/u_mouse, so `setTypedUniform` returns early for the view-dependent
+// names and both directions of drift (dropping the `!meshIsFullscreen` gate,
+// or binding a new uniform in `bindComputeSystemUniforms`) stayed green while
+// the Inspector went on asserting the old rule. This runs one real frame with
+// all eight system uniforms active and compares what reached the GPU against
+// what the table predicts, per pass kind.
+describe("executePlan — system uniforms match the Inspector table (C-1)", () => {
+  const SYSTEM_UNIFORM_NAMES = [
+    "u_time",
+    "u_resolution",
+    "u_view",
+    "u_proj",
+    "u_model",
+    "u_camera",
+    "u_mouse",
+    "u_frame",
+  ] as const;
+
+  // Every entry point `setUniform`/`setTypedUniform` can reach; all of them
+  // take the location as argument 0. Spying the whole set (not just the ones
+  // today's shapes happen to use) is what makes an *added* compute binding
+  // observable no matter which upload shape it picks.
+  const UPLOAD_METHODS = [
+    "uniform1f",
+    "uniform2f",
+    "uniform3f",
+    "uniform4f",
+    "uniform1i",
+    "uniform2i",
+    "uniform3i",
+    "uniform4i",
+    "uniform1fv",
+    "uniform2fv",
+    "uniform3fv",
+    "uniform4fv",
+    "uniformMatrix3fv",
+    "uniformMatrix4fv",
+  ] as const;
+
+  /** One frame of a mesh shader + fullscreen shader + compute pass plan. */
+  function runFrame() {
+    const gl = createFakeGl({
+      attributes: ["a_position", "a_pos"],
+      uniforms: [...SYSTEM_UNIFORM_NAMES],
+    });
+    const graph: Graph = {
+      nodes: [
+        { id: "m1", kind: "mesh", primitive: "sphere" },
+        shaderNode("meshPass"),
+        shaderNode("fsPass"),
+        computeNode("c1"),
+        outputNode("o1"),
+        outputNode("o2"),
+      ],
+      edges: [
+        edge("e1", "m1", "meshPass", "mesh"),
+        edge("e2", "meshPass", "o1", "texture"),
+        edge("e3", "fsPass", "o2", "texture"),
+      ],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const spies = UPLOAD_METHODS.map((m) => vi.spyOn(gl, m));
+    executePlan(gl, plan, frameCtx(graph), 32, 32);
+    // Locations are distinct objects per program, so a set of them identifies
+    // "this pass uploaded this uniform" without cross-talk between passes.
+    const uploaded = new Set<WebGLUniformLocation>();
+    for (const spy of spies) {
+      for (const call of spy.mock.calls) {
+        const loc = call[0];
+        if (loc) uploaded.add(loc);
+      }
+    }
+    return { plan, uploaded };
+  }
+
+  function expectMatchesTable(
+    program: CompiledProgram,
+    uploaded: Set<WebGLUniformLocation>,
+    ownerKind: "shader" | "compute",
+    isFullscreen: boolean,
+  ) {
+    for (const name of SYSTEM_UNIFORM_NAMES) {
+      const loc = program.uniforms[name];
+      // Guard, not a courtesy: an unresolved location makes every "not bound"
+      // row pass vacuously — exactly the blind spot this test exists to close.
+      if (!loc) throw new Error(`${name} location was not resolved`);
+      // `hasPass: true` — every case below located its pass in the plan, which
+      // is precisely the condition that argument reports.
+      expect({ name, bound: uploaded.has(loc) }).toEqual({
+        name,
+        bound: systemUniformBinding(name, ownerKind, isFullscreen, true).bound,
+      });
+    }
+  }
+
+  it("a mesh-connected shader pass binds all eight", () => {
+    const { plan, uploaded } = runFrame();
+    const p = plan.shaderPassByNode.get("meshPass");
+    if (!p) throw new Error("missing meshPass");
+    // The Inspector reads this same flag (via passPlanStore.fullscreenByNode),
+    // so pinning it here ties the table's input to the renderer's, too.
+    expect(p.meshIsFullscreen).toBe(false);
+    expectMatchesTable(p.program, uploaded, "shader", false);
+    plan.dispose();
+  });
+
+  it("a fullscreen shader pass skips u_view/u_proj/u_model/u_camera", () => {
+    const { plan, uploaded } = runFrame();
+    const p = plan.shaderPassByNode.get("fsPass");
+    if (!p) throw new Error("missing fsPass");
+    expect(p.meshIsFullscreen).toBe(true);
+    expectMatchesTable(p.program, uploaded, "shader", true);
+    plan.dispose();
+  });
+
+  it("a compute pass binds u_time/u_frame and nothing else", () => {
+    const { plan, uploaded } = runFrame();
+    const p = plan.passes.find((q) => q.nodeId === "c1");
+    if (!p || p.kind !== "compute") throw new Error("missing compute pass");
+    expectMatchesTable(p.program, uploaded, "compute", false);
     plan.dispose();
   });
 });

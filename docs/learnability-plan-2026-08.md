@@ -78,7 +78,7 @@
 | **L1** | 유니폼이 슬라이더이자 포트인데, 엣지가 연결되면 슬라이더가 **조용히 무력화**. 슬라이더는 여전히 활성이고 값도 움직이는데 화면만 안 변함 | `registry.ts:104`(포트 노출), `execute.ts` `bindUserUniforms`(paramBindings가 덮어씀). `Inspector.tsx`/`UniformControl.tsx`에 connected 체크 **0건** |
 | **L2** | 중간 텍스처와 이미지 텍스처의 파라미터가 다름 → 같은 GLSL이 다른 결과 | `texture.ts:29-32` (`CLAMP_TO_EDGE`+`LINEAR`, 밉맵 없음) vs `texture.ts:63-64` (`REPEAT`+`LINEAR_MIPMAP_LINEAR`) |
 | **L3** | Y축 규약이 경로마다 다르게 맞춰져 있음 — 실제로는 정렬돼 있으나 **명시가 없어** 추론 불가 | `fullscreen.vert`(좌하단), `texture.ts:53`(`UNPACK_FLIP_Y`), 썸네일 readback의 프래그먼트 Y-flip, `gl_FragCoord`/`u_mouse` 좌하단 |
-| **L4** | **알파/블렌딩이 아예 존재하지 않음**. `gl.enable(gl.BLEND)` 호출 0건. `CULL_FACE` 항상 disable. depth test는 fullscreen 여부로 자동 on/off | `execute.ts:344-351` |
+| **L4** | **블렌딩이 아예 존재하지 않음**. `gl.enable(gl.BLEND)` 호출 0건. `CULL_FACE` 항상 disable. depth test는 fullscreen 여부로 자동 on/off. ⚠ 2026-08 실측으로 정정: **알파 자체는 무시되지 않는다** — 패스 안 블렌딩만 없고 `outColor.a`는 FBO에 기록되어 다운스트림 샘플링에 쓰이며 캔버스 합성(`alpha:true` + `premultipliedAlpha:false`)에도 반영된다 | `execute.ts:344-351`, `core/gl/context.ts:4-8` |
 | **L5** | **실행 파이프라인을 보여주는 뷰가 없음** ← 프로젝트 목표와 정면 충돌. 위상 순서·패스 수·FBO 해상도·텍스처 유닛 배정·ping-pong read 측이 전부 `ExecutionPlan` 안에만 있음 | `compile.ts` `ExecutionPlan`, StatusBar는 fps/draws/GPU 합계뿐 |
 | **L6** | 미연결·미사용 유니폼이 조용함 → "검은 화면, 원인 불명" | `gl/uniforms.ts:20`(`loc === null` → return), `execute.ts` `bindSamplers` 미발견 시 스킵. Architecture.md §2.2·§3.2가 명시 |
 | **L7** | Output 분할 레이아웃이 암묵적. 3개일 때 "상단 2칸 + 하단 전폭 1칸"은 추측 불가 | `validate.ts:3`(`MAX_OUTPUTS=4`), `graph/splitLayout.ts`. 툴팁 한 줄이 전부 |
@@ -425,8 +425,12 @@ uniform vec3 u_baseColor;
 
 #### E-2 · 렌더 상태 표시 (L4)
 - Pass Inspector 행에 `blend off · cull off · depth on|off` 표시.
-- **최소한 알파가 무시된다는 사실을 어딘가에 명시.** 현재는 `outColor.a`를 써도
-  아무 일도 안 일어나고 설명이 없다.
+- **알파의 실제 동작을 정확히 명시.** ⚠ 초판의 "알파는 무시된다"는 구현 중 실측으로
+  **반증됐다**: 패스 안에서는 블렌딩이 없지만(`gl.enable(gl.BLEND)` 미호출)
+  `outColor.a`는 FBO에 기록되어 다운스트림 샘플링에 쓰이고, 최종 캔버스 합성
+  (`alpha:true` + `premultipliedAlpha:false`)을 거쳐 페이지 배경과 합성된다 —
+  `outColor.a = 0.0`이면 뷰포트가 페이지 배경으로 뚫린다. 구현은 이 정정된
+  사실을 Pass Inspector 각주에 반영했다(SPEC Phase 38).
 - 선택: 블렌딩을 실제로 노출할지는 별도 논의(포트/노드 옵션 추가 = 범위 확대).
 
 #### E-3 · 텍스처 파라미터 표시/조작 (L2)
@@ -501,16 +505,34 @@ uniform vec3 u_baseColor;
 | T3 | F-2 데모 레슨화 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U1) |
 | T4 | A-2 varying 브리지 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 39 |
 | T4 | A-3 노드 분리 | ⬜ 보류 | — | A-2 결과 후 판단 — `temp/learnability-followup.md` §5·§6-4 참조(A-3 대신 **파서를 정규식→토크나이저/AST로** 올리는 쪽을 권고) |
-| — | 머지 후 코드리뷰 라운드 | ✅ 완료 | review/learnability-2026-08 | 확정 28건 → 중복 제외 23건 수정. 상세는 `temp/learnability-followup.md` §6 |
+| — | 머지 후 코드리뷰 라운드 | ✅ 완료 | review/learnability-2026-08 | 확정 28건 → 중복 제외 23건 수정. 상세는 `temp/learnability-followup.md` §6 (로컬 전용, 아래 6-2 참고) |
+| — | 2차 코드리뷰 라운드(머지 전량 재검토) | ✅ 완료 | review/learnability-2026-08-round2 | 10차원 병렬 + 적대적 검증으로 제기 37건 → **확정 32건**. 코드 수정 + 문서 정정. 상세는 `temp/learnability-followup.md` §7 |
 
 **상태 표기**: ⬜ 미착수 / 🟨 진행중 / ✅ 완료 / ⏸ 보류 / ❌ 취소
+
+### 6-1. 번들 예산 현황
+
+> 이 표는 **커밋되는 문서에 남기는 사본**이다. 상세 이력은 `temp/learnability-followup.md`에 있으나 그 파일은 `.gitignore`(`temp/`) 대상이라 clone한 트리에는 없다 — 예산이 D-0a 조건을 벗어났다는 사실이 로컬 한 대에만 남지 않도록 여기에 요약한다.
+
+| 시점 | entry gzip | total gzip | 여유(entry/total) |
+|---|---|---|---|
+| T0 완료(M0) | 348.51 KiB | 396.58 KiB | 26.49 / 33.42 |
+| PR #80 머지(`b0b4e74`) | 357.54 KiB | 405.61 KiB | 17.46 / 24.39 |
+| PR #81(1차 리뷰) 후 | 357.87 KiB | 405.95 KiB | 17.13 / 24.05 |
+| 2차 리뷰 라운드 후 | **358.96 KiB** | **407.04 KiB** | **16.04 / 22.96** |
+
+전 구간 한도(entry 375 / total 430) 내로 **게이트는 green**이다. 다만 entry 여유가 D-0a가 요구한 **20~30 KiB 밴드를 M3 이후 계속 밑돌고 있다**(현재 16.04). 한도 상향은 사용자 승인 사항이며, 다음 라운드 착수 전 재검토가 필요하다. 측정은 CI와 같은 Node 22(`.nvmrc`)로 해야 한다 — Node ≥ 24는 zlib-ng라 ~1.8 KiB 더 작게 나온다.
+
+### 6-2. 미추적 문서 참조 주의
+
+이 계획서는 몇 곳에서 `temp/learnability-followup.md`(잠정 결정·보류 항목 기록, ~30 KB)를 근거로 지목한다. `temp/`는 `.gitignore:27`에 있어 **저장소에 커밋되지 않는다** — 다른 머신이나 새 clone에서는 그 참조가 죽은 링크다. 이 라운드의 결정 근거를 영구 보존하려면 해당 문서를 `docs/`로 승격해 커밋해야 하며, 그 여부는 사용자 판단 사항으로 열려 있다(§6-1 표는 최소한의 방어선으로 여기에 복제해 둔 것이다).
 
 ---
 
 ## 7. 참고
 
 - `Architecture.md` — §2.2(포트 동적 생성) · §3.1(컴파일 절차) · §3.2(sampler vs param) · §4.4(시스템 유니폼)
-- `SPEC.md` — Phase별 명세 (최신 Phase 35)
+- `SPEC.md` — Phase별 명세 (이 라운드가 Phase 36~39 추가, 최신 Phase 39)
 - `CLAUDE.md` — 품질 게이트 규약, 게이트 우회 금지 목록
 - `design/CHANGELOG.md` — UI 정본 v2.0/v2.1/v2.2
 - `scripts/check-bundle-size.mjs` — 번들 천장의 역사와 측정 주의사항

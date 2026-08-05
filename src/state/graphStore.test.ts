@@ -1054,7 +1054,7 @@ void main(){}`,
       expect(useGraphStore.getState().rev).toBe(before + 1);
     });
 
-    it("falls back to the vertex source when not in the fragment", () => {
+    it("writes into the vertex source when the fragment lacks it", () => {
       const s = useGraphStore.getState();
       s.addNode({
         id: "s1",
@@ -1089,6 +1089,32 @@ void main(){}`,
       expect((node as ComputeGraphNode).vertexSource).toContain(
         "uniform float u_speed; // @range 0..3 @step 0.1",
       );
+    });
+
+    it("edits the declaration the parser adopts when both stages have it", () => {
+      // Spec producers parse `${vertexSource}\n${fragmentSource}` with
+      // first-wins dedup, so the VERTEX declaration is what the Inspector
+      // shows. Writing the fragment one instead used to destroy the author's
+      // annotations there while leaving the UI unchanged.
+      const s = useGraphStore.getState();
+      const frag = `uniform float u_amp; // @range 0..5 @step 0.1 @default 3 @label "Amp"`;
+      s.addNode({
+        id: "s1",
+        kind: "shader",
+        vertexSource: "uniform float u_amp;\nvoid main(){}",
+        fragmentSource: `${frag}\nvoid main(){}`,
+        uniformValues: {},
+      } satisfies ShaderGraphNode);
+      s.setUniformHints("s1", "u_amp", { min: -2, max: 2, label: "Amplitude" });
+
+      const node = useGraphStore
+        .getState()
+        .nodes.find((n) => n.id === "s1") as ShaderGraphNode;
+      expect(node.vertexSource).toContain(
+        'uniform float u_amp; // @range -2..2 @label "Amplitude"',
+      );
+      // The fragment's authored comment survives byte-for-byte.
+      expect(node.fragmentSource).toContain(frag);
     });
 
     it("is a no-op for an unknown id", () => {

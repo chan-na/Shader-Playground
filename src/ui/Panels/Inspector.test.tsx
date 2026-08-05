@@ -17,6 +17,7 @@ import type {
 import { useGraphStore } from "../../state/graphStore";
 import { useMouseStore } from "../../state/mouseStore";
 import type {
+  ComputePassRow,
   NodeVaryingRow,
   NodeVaryings,
   ShaderPassRow,
@@ -341,6 +342,40 @@ function systemUniformValue(name: string): string {
   return span.textContent ?? "";
 }
 
+/** Fills in every field `ShaderPassRow` requires; the overrides carry the
+ *  pass size under test. Same factory shape as PassInspector.test.tsx.
+ *  [#10] Module-scoped because the binding-state block below needs it too:
+ *  "this node has a pass at all" is now part of the binding verdict. */
+function shaderPassRow(
+  overrides: Partial<ShaderPassRow> & { nodeId: string },
+): ShaderPassRow {
+  return {
+    kind: "shader",
+    width: 800,
+    height: 600,
+    resolutionScale: 1,
+    meshIsFullscreen: true,
+    meshLabel: "fullscreen quad",
+    meshComputeNodeId: null,
+    samplers: [],
+    meshAttributeUse: [],
+    silentWarnings: [],
+    ...overrides,
+  };
+}
+
+/** Minimal `ComputePassRow` — only `nodeId`/`kind` matter to the Inspector's
+ *  "does this node execute at all" check. */
+function computePassRow(nodeId: string): ComputePassRow {
+  return {
+    kind: "compute",
+    nodeId,
+    count: 1024,
+    primitiveLabel: "POINTS",
+    getRead: () => "A",
+  };
+}
+
 // [C-1] The "System uniforms (auto-bound)" section — binding status mirrors
 // `plan.fullscreenByNode` (A-1's publish), never re-derived from the graph.
 describe("Inspector — System uniforms section [C-1]", () => {
@@ -373,7 +408,9 @@ describe("Inspector — System uniforms section [C-1]", () => {
 
   it("marks u_view unbound with the fullscreen-pass note when the plan reports this node as fullscreen", () => {
     useGraphStore.getState().addNode(viewShaderNode);
-    usePassPlanStore.getState().publish([], { sv1: true }, {});
+    usePassPlanStore
+      .getState()
+      .publish([shaderPassRow({ nodeId: "sv1" })], { sv1: true }, {});
     useSelectionStore.getState().select("sv1");
     render(<Inspector embedded />);
 
@@ -384,7 +421,13 @@ describe("Inspector — System uniforms section [C-1]", () => {
 
   it("marks u_view bound once the plan reports a resolved (non-fullscreen) mesh", () => {
     useGraphStore.getState().addNode(viewShaderNode);
-    usePassPlanStore.getState().publish([], { sv1: false }, {});
+    usePassPlanStore
+      .getState()
+      .publish(
+        [shaderPassRow({ nodeId: "sv1", meshIsFullscreen: false })],
+        { sv1: false },
+        {},
+      );
     useSelectionStore.getState().select("sv1");
     render(<Inspector embedded />);
 
@@ -395,6 +438,9 @@ describe("Inspector — System uniforms section [C-1]", () => {
 
   it("samples the current u_time value and refreshes it on the next polling tick", () => {
     useGraphStore.getState().addNode(timeShaderNode);
+    usePassPlanStore
+      .getState()
+      .publish([shaderPassRow({ nodeId: "st1" })], { st1: true }, {});
     useSelectionStore.getState().select("st1");
     useTimeStore.getState().setTime(0);
     render(<Inspector embedded />);
@@ -407,6 +453,52 @@ describe("Inspector — System uniforms section [C-1]", () => {
     });
 
     expect(findSystemUniformRow("u_time").textContent).toContain("3.50s");
+  });
+
+  // [#10] A shader error is not fatal validation: compile.ts drops the failed
+  // node's pass and the plan is republished without it, while
+  // `fullscreenByNode` keeps the node's entry. Nothing of this node runs, so
+  // every row has to say so — a live u_time under a compile-error overlay
+  // reads as "the shader is receiving time, only the picture is missing".
+  it("marks every row unbound, with no live value, when the plan has no pass for the node", () => {
+    useGraphStore.getState().addNode(timeShaderNode);
+    usePassPlanStore.getState().publish([], { st1: false }, {});
+    useSelectionStore.getState().select("st1");
+    useTimeStore.getState().setTime(12.34);
+    render(<Inspector embedded />);
+
+    const row = findSystemUniformRow("u_time");
+    expect(row.getAttribute("data-bound")).toBe("false");
+    expect(row.textContent).toContain("not bound (no pass for this node)");
+    expect(systemUniformValue("u_time")).toBe("—");
+
+    // …and it stays "—" across the polling tick that used to keep it moving.
+    act(() => {
+      useTimeStore.getState().setTime(15.5);
+      vi.advanceTimersByTime(500);
+    });
+    expect(systemUniformValue("u_time")).toBe("—");
+    expect(findSystemUniformRow("u_time").textContent).not.toContain("15.50s");
+  });
+
+  // Both reasons are true when a fullscreen-substituted program fails to
+  // link. u_view keeps naming the substitution (the actionable one, and what
+  // phase-36's C-1 spec asserts); the rest fall back to the generic note.
+  it("keeps the fullscreen note on u_view when the pass is also missing", () => {
+    useGraphStore.getState().addNode({
+      ...viewShaderNode,
+      fragmentSource: "uniform mat4 u_view;\nuniform float u_time;",
+    });
+    usePassPlanStore.getState().publish([], { sv1: true }, {});
+    useSelectionStore.getState().select("sv1");
+    render(<Inspector embedded />);
+
+    expect(findSystemUniformRow("u_view").textContent).toContain(
+      "not bound (fullscreen pass)",
+    );
+    expect(findSystemUniformRow("u_time").textContent).toContain(
+      "not bound (no pass for this node)",
+    );
   });
 });
 
@@ -444,26 +536,6 @@ describe("Inspector — System uniform values [C-1]", () => {
     attributes: [],
     uniformValues: {},
   };
-
-  /** Fills in every field `ShaderPassRow` requires; the overrides carry the
-   *  pass size under test. Same factory shape as PassInspector.test.tsx. */
-  function shaderPassRow(
-    overrides: Partial<ShaderPassRow> & { nodeId: string },
-  ): ShaderPassRow {
-    return {
-      kind: "shader",
-      width: 800,
-      height: 600,
-      resolutionScale: 1,
-      meshIsFullscreen: true,
-      meshLabel: "fullscreen quad",
-      meshComputeNodeId: null,
-      samplers: [],
-      meshAttributeUse: [],
-      silentWarnings: [],
-      ...overrides,
-    };
-  }
 
   // Same 500ms sampling interval as the [C-1] block above.
   beforeEach(() => {
@@ -531,6 +603,9 @@ describe("Inspector — System uniform values [C-1]", () => {
 
   it("withholds the value of a row it marks unbound, keeping the bound row's own value", () => {
     useGraphStore.getState().addNode(mouseComputeNode);
+    // [#10] The compute pass has to actually be in the plan for u_time to be
+    // bound at all — otherwise the row correctly says "no pass for this node".
+    usePassPlanStore.getState().publish([computePassRow("cm1")], {}, {});
     useTimeStore.getState().setTime(1.25);
     useMouseStore.getState().setPosition(800, 600);
     useSelectionStore.getState().select("cm1");
@@ -947,5 +1022,90 @@ describe("Inspector — Sampler inputs connection state (L1/E-4)", () => {
     const row = screen.getByTestId("sampler-input-row");
     expect(row.getAttribute("data-connected")).toBe("false");
     expect(row.textContent).toContain("미연결");
+  });
+});
+
+// [#30] Under fullscreen substitution the compiler never sees this node's
+// stored vertex source — `compile.ts` replaces it with `fullscreen.vert`
+// before `createProgram`, and seeds defaults from that same pair. The
+// Inspector has to parse what was compiled, or it describes a program that
+// does not exist.
+describe("Inspector — uniform specs follow the compiled vertex source [#30]", () => {
+  /** `parseUniforms` keeps the FIRST declaration of a name, so the bare
+   *  vertex declaration shadows the fragment's annotated one whenever the
+   *  stored vertex source is parsed. */
+  const shadowingNode: ShaderGraphNode = {
+    id: "fs1",
+    kind: "shader",
+    vertexSource: "uniform float u_k;\nuniform float u_vertexOnly;",
+    fragmentSource: "uniform float u_k; // @range 0 10 @default 7",
+    uniformValues: {},
+  };
+
+  /** The `input[type=number]` beside a uniform's slider, showing the value
+   *  the control would send (`value ?? spec.defaultValue`). */
+  function uniformNumberValue(name: string): string {
+    const input = findUniformRow(name).querySelector("input[type=number]");
+    if (!(input instanceof HTMLInputElement))
+      throw new Error(`uniform-row has no number input: ${name}`);
+    return input.value;
+  }
+
+  it("shows the fragment's @default for a uniform the vertex source shadows, once the plan reports fullscreen", () => {
+    useGraphStore.getState().addNode(shadowingNode);
+    usePassPlanStore.getState().publish([], { fs1: true }, {});
+    useSelectionStore.getState().select("fs1");
+    render(<Inspector embedded />);
+
+    // compile.ts seeds `fullscreen.vert + fragmentSource`, i.e. 7 — the old
+    // spec showed the unannotated vertex declaration's heuristic 0 instead.
+    expect(uniformNumberValue("u_k")).toBe("7.000");
+  });
+
+  // The substituted program does not declare a vertex-only uniform — but its
+  // row is where [C-1] explains that ("not bound (fullscreen pass)" for the
+  // view matrices), so the row stays and only loses its shadowing power.
+  it("still lists vertex-only uniforms, after the compiled ones", () => {
+    useGraphStore.getState().addNode(shadowingNode);
+    usePassPlanStore.getState().publish([], { fs1: true }, {});
+    useSelectionStore.getState().select("fs1");
+    render(<Inspector embedded />);
+
+    expect(
+      screen
+        .getAllByTestId("uniform-row")
+        .map((r) => r.getAttribute("data-uniform-name")),
+    ).toEqual(["u_k", "u_vertexOnly"]);
+  });
+
+  // Guards phase-36's C-1 spec: the default demo's vertex source declares the
+  // view matrices, and disconnecting the mesh must leave the `u_view` row in
+  // place (now reading "not bound (fullscreen pass)"), not delete it.
+  it("keeps the system-uniform row for a matrix only the vertex source declares", () => {
+    useGraphStore.getState().addNode({
+      ...shadowingNode,
+      vertexSource: "uniform mat4 u_view;",
+    });
+    usePassPlanStore
+      .getState()
+      .publish([shaderPassRow({ nodeId: "fs1" })], { fs1: true }, {});
+    useSelectionStore.getState().select("fs1");
+    render(<Inspector embedded />);
+
+    const row = findSystemUniformRow("u_view");
+    expect(row.getAttribute("data-bound")).toBe("false");
+    expect(row.textContent).toContain("not bound (fullscreen pass)");
+  });
+
+  it("keeps parsing the node's own vertex source while a mesh resolves", () => {
+    useGraphStore.getState().addNode(shadowingNode);
+    usePassPlanStore.getState().publish([], { fs1: false }, {});
+    useSelectionStore.getState().select("fs1");
+    render(<Inspector embedded />);
+
+    // Not fullscreen: the vertex declaration is real, so it wins exactly as
+    // the compiler's own `vertexSource + fragmentSource` parse does.
+    expect(uniformNumberValue("u_k")).toBe("0.000");
+    expect(screen.getAllByTestId("uniform-row")).toHaveLength(2);
   });
 });

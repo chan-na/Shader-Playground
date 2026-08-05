@@ -539,6 +539,65 @@ uniform sampler2D u_tex;
   });
 });
 
+describe("scientific-notation round-trip", () => {
+  // `fmtNum` is `String(n)`, which emits an exponent below 1e-6 and at/above
+  // 1e21. The readers used to accept plain decimals only, so a value the GUI
+  // had just written came back as something else.
+  it("re-reads a sub-1e-6 @step as the value that was written", () => {
+    const out = writeUniformHints("uniform float u_bias;", "u_bias", {
+      min: 0,
+      max: 0.001,
+      step: 1e-7,
+    })!;
+    expect(out).toBe("uniform float u_bias; // @range 0..0.001 @step 1e-7");
+    const spec = parseUniforms(out)[0]!;
+    // Used to be step 1, which pinned the [0, 0.001] slider to a single value.
+    expect(spec.step).toBe(1e-7);
+    expect(spec.min).toBe(0);
+    expect(spec.max).toBe(0.001);
+  });
+
+  it("keeps exponent bounds instead of silently rewriting them", () => {
+    // min side used to drop the whole @range (min fell back to heuristic -1);
+    // max side used to parse as 1, i.e. 10^7 times what the author asked for.
+    expect(parseHintComment("// @range 1e-7..1")).toEqual({
+      min: 1e-7,
+      max: 1,
+    });
+    expect(parseHintComment("// @range 0..1e-7")).toEqual({
+      min: 0,
+      max: 1e-7,
+    });
+    expect(parseHintComment("// @min 2.5E-8 @max 1e+21")).toEqual({
+      min: 2.5e-8,
+      max: 1e21,
+    });
+    expect(parseHintComment("// @step .5")).toEqual({ step: 0.5 });
+  });
+
+  it("strips exponent annotations instead of demoting them to free-text", () => {
+    // Each re-Apply used to leave an `e-7` fragment behind, growing the
+    // comment without bound.
+    const once = serializeHintComment("//", { defaultValue: 1e-7 });
+    expect(once).toBe("// @default 1e-7");
+    expect(serializeHintComment(once, { defaultValue: 1e-7 })).toBe(once);
+    expect(serializeHintComment("// note @range 1e-7..1 @step 1e-7", {})).toBe(
+      "// note",
+    );
+  });
+
+  it("reads plain-decimal annotations exactly as before (compat)", () => {
+    const src = `uniform float u_amp; // @range -3..5 @step 0.1 @default 3 @label "Amp"`;
+    const u = parseUniforms(src)[0]!;
+    expect(u.min).toBe(-3);
+    expect(u.max).toBe(5);
+    expect(u.step).toBe(0.1);
+    expect(u.defaultValue).toBe(3);
+    expect(u.label).toBe("Amp");
+    expect(u.hasExplicitDefault).toBe(true);
+  });
+});
+
 describe("writeUniformHints — block-comment awareness (L33)", () => {
   it("rewrites the live declaration, not a commented-out twin", () => {
     const src = `/*

@@ -73,8 +73,12 @@ function valueFor(
       // this row in a different coordinate space from the `u_resolution` row
       // directly below it, which has always been pass-space — at 0.5× on an
       // 800×600 canvas the shader saw (400, 300) while this read "800, 600".
-      const mx = shaderRow ? shaderRow.width / Math.max(1, canvas.width) : 1;
-      const my = shaderRow ? shaderRow.height / Math.max(1, canvas.height) : 1;
+      // [#10] With no row there is no pass space to rescale into, so this says
+      // "—" exactly like `u_resolution` below rather than silently falling
+      // back to a 1× (canvas-space) reading.
+      if (!shaderRow) return "—";
+      const mx = shaderRow.width / Math.max(1, canvas.width);
+      const my = shaderRow.height / Math.max(1, canvas.height);
       return `${Math.round(sample.mouseX * mx)}, ${Math.round(sample.mouseY * my)}`;
     }
     case "u_resolution":
@@ -110,6 +114,19 @@ export function SystemUniformsSection({
       (r): r is ShaderPassRow => r.kind === "shader" && r.nodeId === owner.id,
     ),
   );
+  // [#10] Does the published plan actually execute a pass for this node? A
+  // shader/compute node whose program fails to build is dropped from `rows`
+  // (compile.ts `continue`s before `passes.push`) while `fullscreenByNode`
+  // keeps its entry, and a shader error is not fatal validation — so the plan
+  // is republished with this one node missing and nothing of it ever runs.
+  // `published` is part of the question: rows outlive the renderer by design
+  // (see `passPlanStore.published`), and a `u_time` reading that keeps ticking
+  // while nothing is being uploaded is the same lie in a different costume.
+  const hasPass = usePassPlanStore(
+    (s) =>
+      s.published &&
+      s.rows.some((r) => r.kind === owner.kind && r.nodeId === owner.id),
+  );
   // Changes only on canvas resize (`setCanvasSize` keeps the previous object
   // when the dimensions are unchanged), so subscribing is reference-stable.
   const canvasSize = useRendererStore((s) => s.canvasSize);
@@ -131,11 +148,18 @@ export function SystemUniformsSection({
       </div>
       {specs.map((s) => {
         const desc = SYSTEM_UNIFORM_DESCRIPTIONS[s.name];
-        const binding = systemUniformBinding(s.name, owner.kind, isFullscreen);
+        const binding = systemUniformBinding(
+          s.name,
+          owner.kind,
+          isFullscreen,
+          hasPass,
+        );
         // A value next to "not bound (fullscreen pass)" reads as "here's what
         // your shader is receiving" — but nothing is uploaded for that
         // uniform at all, so the shader sees GL zero. Withhold it: the row's
-        // job in that state is to explain the absence.
+        // job in that state is to explain the absence. [#10] Same for a node
+        // with no pass: a live `u_time` under a compile-error overlay reads as
+        // "the shader is running, only the picture is missing".
         const value = binding.bound
           ? valueFor(s.name, sample, shaderRow, canvasSize)
           : "—";

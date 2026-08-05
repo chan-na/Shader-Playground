@@ -218,6 +218,33 @@ describe("ProblemsPanel", () => {
       expect(screen.getByText("1 warning")).not.toBeNull();
     });
 
+    // [9]/[12]: the connected-but-empty-source sampler reaches this panel as
+    // its own kind, so the message can name the real cause (the edge is fine,
+    // the source has no texture) instead of "연결된 입력이 없습니다".
+    it("renders a sampler-source-empty warning with its own kind and a source-empty message", () => {
+      usePassPlanStore.getState().publish(
+        [
+          shaderRowFixture({
+            samplers: [{ uniformName: "u_tex", sourceNodeId: "img1", unit: 0 }],
+            silentWarnings: [
+              { uniformName: "u_tex", kind: "sampler-source-empty" },
+            ],
+          }),
+        ],
+        {},
+        {},
+      );
+
+      render(<ProblemsPanel />);
+
+      const row = screen.getByTestId("silent-warning-row");
+      expect(row.getAttribute("data-kind")).toBe("sampler-source-empty");
+      expect(row.getAttribute("data-uniform-name")).toBe("u_tex");
+      expect(row.textContent).toContain("텍스처가 없습니다");
+      expect(row.textContent).not.toContain("연결된 입력이 없습니다");
+      expect(screen.getByText("1 warning")).not.toBeNull();
+    });
+
     it("clicking a silent-warning-row selects its node", () => {
       usePassPlanStore.getState().publish(
         [

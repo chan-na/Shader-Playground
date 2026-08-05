@@ -163,7 +163,7 @@
 ### 3.2 sampler vs param 라우팅 — 한 번 더
 
 - **sampler 경로**: 실행 시 `bindSamplers` 가 `pass.samplers[]` 를 따라가며, `passByNode.get(source).fbo.color.texture` → `plan.imageTextures[source]` → `getExternalTexture(source)` (Phase 14a, webcam 같은 live source) 순으로 텍스처를 찾아 `gl.uniform1i` + `bindTexture`. 어디서도 못 찾으면 sampler 스킵(검은 frame fallback) — external 핸들이 acquire 중이라 아직 텍스처가 없는 경우가 정상 케이스. 메시 그래프의 텍스처 라우팅 = ShaderNode → ShaderNode 체이닝 = 자동 FBO ping-pong.
-- **param 경로**: 실행 시 `bindUserUniforms` 가 `pass.uniformValues` 를 베이스로 시작해 `paramBindings` 가 가리키는 노드를 `resolveValueFor(sourceId, graph, {time}, cache)` 로 재귀 평가해 덮어쓴다. utility 노드들은 GL 패스를 만들지 않고 CPU 에서만 평가된다. ShaderPass 와 ComputePass 가 같은 캐시 + 같은 resolver 를 공유.
+- **param 경로**: 실행 시 `bindUserUniforms` 가 `{...pass.seededDefaults, ...pass.uniformValues}` 를 베이스로 만들고, `paramBindings` 가 가리키는 노드를 `resolveValueFor(sourceId, graph, {time}, cache)` 로 재귀 평가해 그 위에 덮어쓴다. 우선순위는 **paramBindings > 저장된 `uniformValues` > GLSL `@default`(`seededDefaults`) > GL zero** 다(학습 가시성 라운드 C-2). `seededDefaults` 는 컴파일 시점에 `withExplicitDefaults(컴파일된 vertex + fragment 소스)` 로 채워지는 **별도 필드**이며 `uniformValues` 에 병합하지 않는다 — 병합하면 Viewport 가 매 RAF 수행하는 `pass.uniformValues = node.uniformValues` 핫패치가 첫 draw 전에 시드를 통째로 덮어써 사라진다(실제 회귀 사례라 `execute.test.ts` 에 가드가 있다). utility 노드들은 GL 패스를 만들지 않고 CPU 에서만 평가된다. ShaderPass 와 ComputePass 가 같은 캐시 + 같은 resolver 를 공유.
 
 ---
 
@@ -197,7 +197,7 @@
 for each pass in plan.passes:           # 토포 순서가 보존되어 있음 (Shader | Compute union)
     if pass.kind == 'compute':
         useProgram(pass.program)
-        bindUserUniforms     # uniformValues + paramBindings; system u_time / u_frame 자동
+        bindUserUniforms     # seededDefaults(@default) < uniformValues(저장값) < paramBindings; system u_time / u_frame 자동
         bindVertexArray(pass.read == 'A' ? vaoA : vaoB)             # 입력 attribute
         bindTransformFeedback(pass.read == 'A' ? tfB : tfA)         # 캡처 대상
         enable(RASTERIZER_DISCARD)
@@ -211,7 +211,7 @@ for each pass in plan.passes:           # 토포 순서가 보존되어 있음 (
         depth on if !fullscreen, off if fullscreen
         useProgram(pass.program)
         bindSystemUniforms   # u_time, u_resolution, u_mouse, u_frame; matrix(u_view/u_proj/u_model/u_camera) 는 메시일 때만
-        bindUserUniforms     # uniformValues 위에 paramBindings 덮어쓰기
+        bindUserUniforms     # seededDefaults(@default) < uniformValues(저장값) < paramBindings
         bindSamplers         # FBO color attach 또는 imageTextures 에서
         if pass.meshComputeNodeId:                                  # 컴퓨트 mesh 입력
             cp = passByNode.get(pass.meshComputeNodeId)

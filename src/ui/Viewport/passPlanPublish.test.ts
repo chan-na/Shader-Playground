@@ -270,6 +270,132 @@ describe("buildPassRows", () => {
       const { graph, assets, plan } = buildFixture();
       const rows = buildPassRows(plan, graph, assets);
       const row = shaderRow(rows, "s3");
+      // s3's u_tex source is s1, a shader pass — `bindSamplers` resolves it
+      // through `shaderPassByNode`, so the edge really is a binding.
+      expect(row.silentWarnings).toEqual([]);
+      plan.dispose();
+    });
+  });
+
+  // [9]/[12]: an edge is not a binding. `execute.ts`'s `bindSamplers` skips
+  // the unit entirely (no uniform1i, no bindTexture) when the source hands it
+  // no texture, so the row must not report the sampler as bound.
+  describe("silentWarnings — sampler source resolution", () => {
+    const SAMPLER_FRAG = `#version 300 es
+uniform sampler2D u_tex;
+out vec4 fragColor;
+void main() { fragColor = texture(u_tex, vec2(0.0)); }`;
+
+    function samplerSourceFixture(
+      sourceNode: Graph["nodes"][number],
+      images: Record<
+        string,
+        {
+          id: string;
+          name: string;
+          width: number;
+          height: number;
+          bitmap: HTMLImageElement | null;
+        }
+      > = {},
+    ) {
+      const graph: Graph = {
+        nodes: [
+          sourceNode,
+          {
+            id: "s1",
+            kind: "shader",
+            vertexSource: "//v",
+            fragmentSource: SAMPLER_FRAG,
+            uniformValues: {},
+          },
+        ],
+        edges: [
+          {
+            id: "e1",
+            source: sourceNode.id,
+            sourceHandle: "texture",
+            target: "s1",
+            targetHandle: "u_tex",
+          },
+        ],
+      };
+      const assets = { meshes: {}, images };
+      const plan = compileGraph(makeGl(), graph, {
+        width: 64,
+        height: 64,
+        assets,
+      });
+      return { graph, assets, plan };
+    }
+
+    it("flags a connected ImageNode with no assetId as sampler-source-empty", () => {
+      const { graph, assets, plan } = samplerSourceFixture({
+        id: "img",
+        kind: "image",
+        assetId: null,
+      });
+      expect(Object.keys(plan.imageTextures)).toEqual([]);
+      const row = shaderRow(buildPassRows(plan, graph, assets), "s1");
+      expect(row.silentWarnings).toEqual([
+        { uniformName: "u_tex", kind: "sampler-source-empty" },
+      ]);
+      plan.dispose();
+    });
+
+    it("flags a connected ImageNode whose asset never loaded (restored session) too", () => {
+      // assetId is set, but the catalog has no handle for it — compile.ts's
+      // `if (!handle?.bitmap) continue;` leaves imageTextures empty exactly as
+      // the assetId:null case does.
+      const { graph, assets, plan } = samplerSourceFixture({
+        id: "img",
+        kind: "image",
+        assetId: "imgA",
+      });
+      expect(Object.keys(plan.imageTextures)).toEqual([]);
+      const row = shaderRow(buildPassRows(plan, graph, assets), "s1");
+      expect(row.silentWarnings).toEqual([
+        { uniformName: "u_tex", kind: "sampler-source-empty" },
+      ]);
+      plan.dispose();
+    });
+
+    it("carries no warning once the image asset really is uploaded", () => {
+      const { graph, assets, plan } = samplerSourceFixture(
+        { id: "img", kind: "image", assetId: "imgA" },
+        {
+          imgA: {
+            id: "imgA",
+            name: "Photo",
+            width: 2,
+            height: 2,
+            bitmap: document.createElement("img"),
+          },
+        },
+      );
+      expect(Object.keys(plan.imageTextures)).toEqual(["img"]);
+      const row = shaderRow(buildPassRows(plan, graph, assets), "s1");
+      expect(row.silentWarnings).toEqual([]);
+      plan.dispose();
+    });
+
+    it("carries no warning for a compute source — execute binds its blank placeholder rather than skipping", () => {
+      // A compute node is absent from shaderPassByNode and from
+      // imageTextures, but `bindSamplers` still calls setUniform for it
+      // (ensureBlankTexture, execute.ts L5) — so the unit genuinely is bound
+      // and reporting "unbound" here would be the opposite false claim.
+      const { graph, assets, plan } = samplerSourceFixture({
+        id: "c1",
+        kind: "compute",
+        vertexSource: "//v",
+        count: 4,
+        primitive: "POINTS",
+        attributes: [
+          { inName: "a_pos", outName: "v_pos", size: 3, seed: "zero" },
+        ],
+        uniformValues: {},
+      });
+      const row = shaderRow(buildPassRows(plan, graph, assets), "s1");
       expect(row.silentWarnings).toEqual([]);
       plan.dispose();
     });
@@ -277,7 +403,11 @@ describe("buildPassRows", () => {
 
   // B-2 (T2): mesh-attribute consumption per shader pass.
   describe("meshAttributeUse", () => {
-    it("marks every attribute consumed for a shader whose program declares all of them", () => {
+    // The fixture's shader sources declare no attributes at all — `makeGl`'s
+    // fake reflection is what resolves all three. The title says so on
+    // purpose: the previous "whose program declares all of them" claimed a
+    // property of the GLSL that the fixture never had.
+    it("marks every attribute consumed when the linked program resolves all of them", () => {
       const { graph, assets, plan } = buildFixture();
       const rows = buildPassRows(plan, graph, assets);
       const row = shaderRow(rows, "s2");
@@ -285,6 +415,38 @@ describe("buildPassRows", () => {
         { name: "a_position", size: 3, consumed: true },
         { name: "a_normal", size: 3, consumed: true },
         { name: "a_uv", size: 2, consumed: true },
+      ]);
+      plan.dispose();
+    });
+
+    // The consumed:false side of `compile.ts`'s
+    // `consumed: !(loc === undefined || loc < 0)`. Without this case the whole
+    // predicate could be replaced by `true` and every unit test stayed green —
+    // only the SwiftShader e2e caught it.
+    it("marks an attribute the linked program never bound as consumed:false", () => {
+      const { graph } = buildFixture();
+      // a_pos stays in the list so the compute pass still links; a_normal/a_uv
+      // drop out, so fakeGl's getAttribLocation returns -1 for them.
+      const gl = createFakeGl({
+        attributes: ["a_position", "a_pos"],
+        uniforms: ["u_tex"],
+      });
+      const assets = {
+        meshes: {
+          assetA: {
+            id: "assetA",
+            name: "Bunny",
+            data: makePrimitive("sphere"),
+          },
+        },
+        images: {},
+      };
+      const plan = compileGraph(gl, graph, { width: 64, height: 64, assets });
+      const rows = buildPassRows(plan, graph, assets);
+      expect(shaderRow(rows, "s2").meshAttributeUse).toEqual([
+        { name: "a_position", size: 3, consumed: true },
+        { name: "a_normal", size: 3, consumed: false },
+        { name: "a_uv", size: 2, consumed: false },
       ]);
       plan.dispose();
     });

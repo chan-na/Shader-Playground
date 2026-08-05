@@ -29,6 +29,22 @@ describe("formatSampler", () => {
   it("formats a higher texture unit index", () => {
     expect(formatSampler("u_prev", "blur1", 3)).toBe("u_prev ← blur1 (unit 3)");
   });
+
+  // [12]: `bindSamplers` skips the unit outright when the source hands it no
+  // texture, so the plan's unit number is precisely the one never assigned —
+  // printing it would restate the false binding claim.
+  it("drops the unit and says 미바인딩 when the source produced no texture", () => {
+    expect(formatSampler("u_tex", "image1", 0, false)).toBe(
+      "u_tex ← image1 (미바인딩)",
+    );
+    expect(formatSampler("u_tex", "image1", 2, false)).not.toContain("unit");
+  });
+
+  it("still reports the unit when explicitly bound", () => {
+    expect(formatSampler("u_tex", "noise1", 1, true)).toBe(
+      "u_tex ← noise1 (unit 1)",
+    );
+  });
 });
 
 describe("formatGpuMs", () => {

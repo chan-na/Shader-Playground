@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useBootstrapStore } from "../../state/bootstrapStore";
 import { useDebugUiStore } from "../../state/debugUiStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
 import { StatusOverlays } from "./StatusOverlays";
 
 const initialDebugUi = useDebugUiStore.getState();
@@ -19,6 +20,9 @@ function resetStores() {
   // precedent) — tests that don't care about the skeleton force "done"
   // since the store is a module singleton.
   useBootstrapStore.setState({ ...initialBootstrap, phase: "done" }, true);
+  // The passes overlay mounts PassInspector, which reads this store; one
+  // test publishes into it, so clear it rather than leaking across cases.
+  usePassPlanStore.getState().reset();
 }
 
 beforeEach(resetStores);
@@ -75,7 +79,13 @@ describe("StatusOverlays", () => {
     expect(screen.getByTestId("passes-overlay").textContent).toContain(
       "▤ Passes",
     );
-    // Empty-state text from PassInspector (no rows published in this test).
+    // Empty-state text from PassInspector, standing in for "the table is
+    // mounted here". Published with no rows on purpose: unpublished renders
+    // the *other* empty state ("renderer not running"), which would make this
+    // assertion pass for the wrong reason if the mount ever regressed.
+    act(() => {
+      usePassPlanStore.getState().publish([], {}, {});
+    });
     expect(screen.getByTestId("passes-overlay").textContent).toContain(
       "no passes — compile a shader node first",
     );

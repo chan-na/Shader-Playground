@@ -7,6 +7,7 @@ import {
   MiniMap,
   type Node,
   type NodeChange,
+  type OnBeforeDelete,
   type OnConnectEnd,
   type OnConnectStart,
   type OnNodeDrag,
@@ -18,6 +19,7 @@ import "@xyflow/react/dist/style.css";
 import "./nodeCard.css";
 
 import {
+  allDescendants,
   getAbsolutePosition,
   hasCollapsedAncestor,
 } from "../../core/graph/parents";
@@ -316,6 +318,51 @@ export function NodeEditor() {
     [graphEdges, graphNodes],
   );
 
+  /**
+   * Delete key guard for group nodes.
+   *
+   * React Flow's delete path expands a doomed node into its children
+   * (@xyflow/system `getElementsToRemove`, the `parentHit` branch) and then
+   * pulls in every edge connected to them. Since every starter graph now ships
+   * lesson groups, pressing Delete on a label box would silently take the node
+   * inside it — and its wiring — along: exactly what
+   * `removeGroup(id, "delete-children")` does, minus the confirmation
+   * GroupInspector demands before doing it.
+   *
+   * So a group deleted from the canvas means *ungroup*: the group node goes,
+   * its descendants stay (removeNode promotes their positions back to
+   * absolute). A descendant is only deleted alongside it when the user picked
+   * that descendant too — `selected` is what the delete-key handler filtered
+   * on, so it marks the explicitly targeted elements.
+   */
+  const onBeforeDelete = useCallback<OnBeforeDelete>(
+    async ({ nodes, edges }) => {
+      const groupIds = nodes.filter((n) => n.type === "group").map((n) => n.id);
+      if (groupIds.length === 0) return { nodes, edges };
+      const state = useGraphStore.getState();
+      const released = new Set<string>();
+      for (const gid of groupIds) {
+        for (const d of allDescendants(gid, state.nodes, state.parents)) {
+          released.add(d.id);
+        }
+      }
+      const doomedNodes = nodes.filter(
+        (n) => n.selected === true || !released.has(n.id),
+      );
+      const doomedIds = new Set(doomedNodes.map((n) => n.id));
+      // Edges were only pulled in because a node they touch was doomed, so
+      // the ones whose nodes just got released have to be released too.
+      const doomedEdges = edges.filter(
+        (e) =>
+          e.selected === true ||
+          doomedIds.has(e.source) ||
+          doomedIds.has(e.target),
+      );
+      return { nodes: doomedNodes, edges: doomedEdges };
+    },
+    [],
+  );
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       // Fold the whole batch into the running selection so shift-box selects
@@ -593,6 +640,7 @@ export function NodeEditor() {
           nodeTypes={NODE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onBeforeDelete={onBeforeDelete}
           onPaneClick={onPaneClick}
           onConnect={onConnect}
           onConnectStart={onConnectStart}

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Graph } from "../core/graph/types";
+import type { Graph, ShaderGraphNode } from "../core/graph/types";
 import { tokens } from "../theme";
 import { buildExportedHtml, downloadExportedHtml } from "./htmlExport";
 
@@ -216,6 +216,120 @@ describe("buildExportedHtml — @default materialization (C-2)", () => {
     expect(sd.uniformValues).toEqual({ u_amt: 2 });
     expect(cd.uniformValues).toEqual({});
   });
+
+  // The vertex half of the seed comes from the source the *player* will
+  // actually compile: standalonePlayer.js substitutes FULLSCREEN_VERT for a
+  // shader node with no resolvable mesh edge (its `meshIsFullscreen` branch),
+  // exactly as compile.ts does. The same node body is exported twice below —
+  // once fullscreen, once mesh-driven — so the only difference is the edge.
+  const vertexDefaultShader: ShaderGraphNode = {
+    id: "sv",
+    kind: "shader",
+    vertexSource: "uniform float u_wobble; // @default 7\nvoid main(){}",
+    fragmentSource: "uniform float u_gain; // @default 4\nvoid main(){}",
+    uniformValues: {},
+  };
+
+  const fullscreenGraph: Graph = {
+    nodes: [vertexDefaultShader, { id: "o1", kind: "output" }],
+    edges: [
+      {
+        id: "e1",
+        source: "sv",
+        sourceHandle: "texture",
+        target: "o1",
+        targetHandle: "texture",
+      },
+    ],
+  };
+
+  const meshDrivenGraph: Graph = {
+    nodes: [
+      { id: "m1", kind: "mesh", primitive: "sphere" },
+      vertexDefaultShader,
+      { id: "o1", kind: "output" },
+    ],
+    edges: [
+      {
+        id: "e0",
+        source: "m1",
+        sourceHandle: "mesh",
+        target: "sv",
+        targetHandle: "mesh",
+      },
+      {
+        id: "e1",
+        source: "sv",
+        sourceHandle: "texture",
+        target: "o1",
+        targetHandle: "texture",
+      },
+    ],
+  };
+
+  it("omits a vertex-only @default when no mesh edge resolves (the player runs fullscreen.vert there)", () => {
+    const graph = embeddedGraph(buildExportedHtml(fullscreenGraph, {}));
+    const sv = graph.nodes.find((n) => n.id === "sv");
+    expect(sv?.kind).toBe("shader");
+    if (sv?.kind !== "shader") return;
+    // Neither runtime ever binds it — and the value is not inert on the round
+    // trip: re-importing promotes it to a *stored* value that would then beat
+    // the GLSL `@default` the moment a mesh is attached.
+    expect("u_wobble" in sv.uniformValues).toBe(false);
+    // The fragment source is compiled verbatim either way, so its `@default`
+    // is seeded regardless of the mesh edge.
+    expect(sv.uniformValues.u_gain).toBe(4);
+  });
+
+  it("seeds that same vertex-only @default once a real mesh node feeds the mesh port", () => {
+    const graph = embeddedGraph(buildExportedHtml(meshDrivenGraph, {}));
+    const sv = graph.nodes.find((n) => n.id === "sv");
+    expect(sv?.kind).toBe("shader");
+    if (sv?.kind !== "shader") return;
+    expect(sv.uniformValues.u_wobble).toBe(7);
+    expect(sv.uniformValues.u_gain).toBe(4);
+  });
+});
+
+// F-2 (T3): every demo wraps its nodes in lesson Groups, and a grouped node's
+// `positions` entry is group-relative (GroupGraphNode semantics). An export
+// that drops `parents` therefore re-imports as a graph laid out against groups
+// that no longer exist — every lesson node stacked at the origin — so the map
+// has to travel with the coordinates through serializeProject.
+describe("buildExportedHtml — group parents forwarding (F-2)", () => {
+  const groupedGraph: Graph = {
+    nodes: [
+      {
+        id: "g1",
+        kind: "group",
+        label: "2 · Shader",
+        width: 264,
+        height: 200,
+      },
+      ...sample.nodes,
+    ],
+    edges: sample.edges,
+  };
+
+  function embeddedParents(html: string): Record<string, string> {
+    const literal = html
+      .split("window.__SP_PROJECT = ")[1]
+      ?.split(";</script>")[0];
+    expect(literal).toBeTruthy();
+    const project = JSON.parse(literal ?? "") as {
+      parents?: Record<string, string>;
+    };
+    return project.parents ?? {};
+  }
+
+  it("forwards the parents option into the embedded project", () => {
+    const html = buildExportedHtml(groupedGraph, {}, { parents: { s1: "g1" } });
+    expect(embeddedParents(html)).toEqual({ s1: "g1" });
+  });
+
+  it("still embeds an empty parents map when the option is omitted", () => {
+    expect(embeddedParents(buildExportedHtml(groupedGraph, {}))).toEqual({});
+  });
 });
 
 /**
@@ -329,5 +443,46 @@ describe("downloadExportedHtml", () => {
     ).toHaveBeenCalledWith("blob:fake-url");
 
     createSpy.mockRestore();
+  });
+
+  it("forwards its parents argument into the downloaded document (F-2)", () => {
+    // jsdom's Blob exposes neither text() nor arrayBuffer(), so the only way
+    // to read back what was written is to intercept the parts at construction.
+    const parts: string[] = [];
+    class RecordingBlob extends Blob {
+      constructor(blobParts: BlobPart[], options?: BlobPropertyBag) {
+        super(blobParts, options);
+        for (const p of blobParts) parts.push(String(p));
+      }
+    }
+    vi.stubGlobal("Blob", RecordingBlob);
+    const origCreateElement = document.createElement.bind(document);
+    const createSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tag: string) => {
+        const el = origCreateElement(tag);
+        if (tag === "a") (el as HTMLAnchorElement).click = vi.fn();
+        return el;
+      });
+
+    const grouped: Graph = {
+      nodes: [
+        {
+          id: "g1",
+          kind: "group",
+          label: "2 · Shader",
+          width: 264,
+          height: 200,
+        },
+        ...sample.nodes,
+      ],
+      edges: sample.edges,
+    };
+    downloadExportedHtml(grouped, {}, "grouped", { s1: "g1" });
+
+    createSpy.mockRestore();
+    vi.unstubAllGlobals();
+    expect(parts).toHaveLength(1);
+    expect(parts.join("")).toContain('"parents":{"s1":"g1"}');
   });
 });

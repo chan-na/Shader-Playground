@@ -46,7 +46,9 @@ export function UniformControl({
         marginTop: 4,
       }}
     >
-      driven by {drivenBy} — 슬라이더 값은 무시됩니다
+      {/* Not "슬라이더" — this same note renders under the color swatch and
+          the toggle too, neither of which is a slider. */}
+      driven by {drivenBy} — 이 값은 무시됩니다
     </div>
   ) : null;
 

@@ -9,6 +9,7 @@ import {
   deserializeProject,
   type SerializedProject,
 } from "../state/serialization";
+import { toast } from "../state/toastStore";
 import { log, normalizeError } from "../utils/log";
 import { RecoveryDialog, swallowEscape } from "./RecoveryDialog";
 
@@ -44,6 +45,17 @@ export function BootstrapGate() {
           }
         } catch (e) {
           log.warn("app", "share hash decode failed", normalizeError(e));
+          // `decodeShareHash` swallows its own parse failures and returns
+          // null, so before T0-3 this catch had no realistic trigger. Now
+          // that `shareUrl` is a separately-fetched chunk, the `await
+          // import()` above can reject on a network hiccup or a stale cached
+          // index.html mid-deploy — and the user, who followed a share link,
+          // would silently land on the demo graph or a recovery prompt with
+          // no indication their link was ever read. `<Toasts />` is mounted
+          // unconditionally in App.tsx, so it renders during bootstrap.
+          toast.error(
+            "공유 링크를 불러오지 못했습니다 — 새로고침 후 다시 시도해 주세요.",
+          );
         }
       }
       const saved = await loadSession();

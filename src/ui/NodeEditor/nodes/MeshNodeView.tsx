@@ -112,7 +112,7 @@ export function MeshNodeView({ id, data }: NodeProps) {
               style={{ color: "var(--warning)" }}
               data-testid="mesh-skipped-attrs"
             >
-              {skippedAttrNames.join(", ")} — 제공되지만 미선언(스킵됨)
+              {skippedAttrNames.join(", ")} — vertex가 사용하지 않음(스킵됨)
             </div>
           )}
         </div>

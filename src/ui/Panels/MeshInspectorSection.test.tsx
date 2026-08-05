@@ -83,7 +83,7 @@ describe("MeshInspectorSection — attribute status markers [B-2]", () => {
     expect(uv?.getAttribute("data-attr-status")).toBe("unknown");
 
     expect(position?.textContent).toContain("✓");
-    expect(normal?.textContent).toContain("제공되지만 미선언(스킵됨)");
+    expect(normal?.textContent).toContain("vertex가 사용하지 않음(스킵됨)");
     expect(uv?.textContent).not.toContain("✓");
     expect(uv?.textContent).not.toContain("스킵됨");
   });

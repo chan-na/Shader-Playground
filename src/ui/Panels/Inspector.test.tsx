@@ -16,8 +16,13 @@ import type {
 } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 import { useMouseStore } from "../../state/mouseStore";
-import type { NodeVaryingRow, NodeVaryings } from "../../state/passPlanStore";
+import type {
+  NodeVaryingRow,
+  NodeVaryings,
+  ShaderPassRow,
+} from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
+import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { useTimeStore } from "../../state/timeStore";
 import { Inspector } from "./Inspector";
@@ -327,6 +332,15 @@ function findSystemUniformRow(name: string): HTMLElement {
   return row;
 }
 
+/** The trailing value span of a `system-uniform-row` — always the row's last
+ *  child, and the only place a bare "—" reads as "no value": the description
+ *  span in the middle carries an em dash of its own. */
+function systemUniformValue(name: string): string {
+  const span = findSystemUniformRow(name).lastElementChild;
+  if (!span) throw new Error(`system-uniform-row has no value span: ${name}`);
+  return span.textContent ?? "";
+}
+
 // [C-1] The "System uniforms (auto-bound)" section — binding status mirrors
 // `plan.fullscreenByNode` (A-1's publish), never re-derived from the graph.
 describe("Inspector — System uniforms section [C-1]", () => {
@@ -393,6 +407,147 @@ describe("Inspector — System uniforms section [C-1]", () => {
     });
 
     expect(findSystemUniformRow("u_time").textContent).toContain("3.50s");
+  });
+});
+
+// [C-1] The value column of that same section. `u_mouse` and `u_resolution`
+// sit one row apart and used to disagree about coordinate space: the mouse
+// store holds canvas-framebuffer pixels, but every pass receives them
+// rescaled by `pass.width / ctx.width` (execute.ts's `bindSystemUniforms`) —
+// which is the space `u_resolution` has always been printed in. A row the
+// section itself marks `data-bound="false"` also used to print a live value,
+// which reads as "this is what your shader receives" when in fact nothing is
+// uploaded for that uniform at all.
+describe("Inspector — System uniform values [C-1]", () => {
+  const mouseShaderNode: ShaderGraphNode = {
+    id: "sm1",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "uniform vec4 u_mouse;",
+    uniformValues: {},
+  };
+
+  const mouseResShaderNode: ShaderGraphNode = {
+    id: "sm2",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "uniform vec4 u_mouse;\nuniform vec2 u_resolution;",
+    uniformValues: {},
+  };
+
+  const mouseComputeNode: ComputeGraphNode = {
+    id: "cm1",
+    kind: "compute",
+    vertexSource: "uniform vec4 u_mouse;\nuniform float u_time;",
+    count: 1024,
+    primitive: "POINTS",
+    attributes: [],
+    uniformValues: {},
+  };
+
+  /** Fills in every field `ShaderPassRow` requires; the overrides carry the
+   *  pass size under test. Same factory shape as PassInspector.test.tsx. */
+  function shaderPassRow(
+    overrides: Partial<ShaderPassRow> & { nodeId: string },
+  ): ShaderPassRow {
+    return {
+      kind: "shader",
+      width: 800,
+      height: 600,
+      resolutionScale: 1,
+      meshIsFullscreen: true,
+      meshLabel: "fullscreen quad",
+      meshComputeNodeId: null,
+      samplers: [],
+      meshAttributeUse: [],
+      silentWarnings: [],
+      ...overrides,
+    };
+  }
+
+  // Same 500ms sampling interval as the [C-1] block above.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    // rendererStore has no reset(); put the canvas back at its 1×1 default so
+    // the sizes set here cannot leak into the describes below.
+    useRendererStore.getState().setCanvasSize({ width: 1, height: 1 });
+  });
+
+  it("rescales u_mouse into the pass's own space at resolutionScale < 1", () => {
+    useGraphStore.getState().addNode(mouseShaderNode);
+    const row = shaderPassRow({
+      nodeId: "sm1",
+      width: 400,
+      height: 300,
+      resolutionScale: 0.5,
+    });
+    usePassPlanStore.getState().publish([row], { sm1: true }, {});
+    useRendererStore.getState().setCanvasSize({ width: 800, height: 600 });
+    useMouseStore.getState().setPosition(800, 600);
+    useSelectionStore.getState().select("sm1");
+    render(<Inspector embedded />);
+
+    // execute.ts uploads (800·400/800, 600·300/600): the far corner of the
+    // *pass*, not the far corner of the canvas.
+    expect(systemUniformValue("u_mouse")).toBe("400, 300");
+  });
+
+  it("leaves u_mouse unscaled when the pass renders at the full canvas size", () => {
+    useGraphStore.getState().addNode(mouseShaderNode);
+    const row = shaderPassRow({ nodeId: "sm1", width: 800, height: 600 });
+    usePassPlanStore.getState().publish([row], { sm1: true }, {});
+    useRendererStore.getState().setCanvasSize({ width: 800, height: 600 });
+    useMouseStore.getState().setPosition(800, 600);
+    useSelectionStore.getState().select("sm1");
+    render(<Inspector embedded />);
+
+    expect(systemUniformValue("u_mouse")).toBe("800, 600");
+  });
+
+  it("reads u_resolution from the published row, in the same space as the u_mouse row beside it", () => {
+    useGraphStore.getState().addNode(mouseResShaderNode);
+    const row = shaderPassRow({
+      nodeId: "sm2",
+      width: 640,
+      height: 360,
+      resolutionScale: 0.5,
+    });
+    usePassPlanStore.getState().publish([row], { sm2: true }, {});
+    useRendererStore.getState().setCanvasSize({ width: 1280, height: 720 });
+    useMouseStore.getState().setPosition(1280, 720);
+    useSelectionStore.getState().select("sm2");
+    render(<Inspector embedded />);
+
+    expect(systemUniformValue("u_resolution")).toBe("640×360");
+    // A pointer at the canvas corner is at the pass corner too, so the two
+    // rows have to name the same number — otherwise the reader cannot compute
+    // the `u_mouse.xy / u_resolution` the shader actually sees.
+    expect(systemUniformValue("u_mouse")).toBe("640, 360");
+  });
+
+  it("withholds the value of a row it marks unbound, keeping the bound row's own value", () => {
+    useGraphStore.getState().addNode(mouseComputeNode);
+    useTimeStore.getState().setTime(1.25);
+    useMouseStore.getState().setPosition(800, 600);
+    useSelectionStore.getState().select("cm1");
+    render(<Inspector embedded />);
+
+    const mouseRow = findSystemUniformRow("u_mouse");
+    expect(mouseRow.getAttribute("data-bound")).toBe("false");
+    expect(mouseRow.textContent).toContain("not bound (compute pass)");
+    // A compute pass uploads no pointer at all, so printing the store's live
+    // position beside that note claimed something the program never receives.
+    expect(systemUniformValue("u_mouse")).toBe("—");
+    expect(mouseRow.textContent).not.toContain("800, 600");
+
+    expect(findSystemUniformRow("u_time").getAttribute("data-bound")).toBe(
+      "true",
+    );
+    expect(systemUniformValue("u_time")).toBe("1.25s");
   });
 });
 

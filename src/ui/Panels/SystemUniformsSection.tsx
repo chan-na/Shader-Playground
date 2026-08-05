@@ -7,6 +7,7 @@ import {
 import { mouseVec4, useMouseStore } from "../../state/mouseStore";
 import type { ShaderPassRow } from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
+import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { systemUniformBinding } from "./systemUniformStatus";
 
@@ -27,12 +28,14 @@ interface UniformSample {
   mouseY: number;
 }
 
+/** Raw canvas-framebuffer pixels — `valueFor` rescales to pass space, so
+ *  rounding has to happen after that multiply, not here. */
 function sampleNow(): UniformSample {
   const m = mouseVec4(useMouseStore.getState());
   return {
     time: `${useTimeStore.getState().simTime.toFixed(2)}s`,
-    mouseX: Math.round(m[0]),
-    mouseY: Math.round(m[1]),
+    mouseX: m[0],
+    mouseY: m[1],
   };
 }
 
@@ -57,12 +60,23 @@ function valueFor(
   name: string,
   sample: UniformSample,
   shaderRow: ShaderPassRow | undefined,
+  canvas: { width: number; height: number },
 ): string {
   switch (name) {
     case "u_time":
       return sample.time;
-    case "u_mouse":
-      return `${sample.mouseX}, ${sample.mouseY}`;
+    case "u_mouse": {
+      // Mirrors `execute.ts`'s `bindSystemUniforms` exactly: the store holds
+      // canvas-framebuffer pixels, but each pass receives them rescaled by
+      // `pass.width / ctx.width` so `u_mouse.xy / u_resolution` stays in
+      // range at resolutionScale < 1. Showing the unscaled store value put
+      // this row in a different coordinate space from the `u_resolution` row
+      // directly below it, which has always been pass-space — at 0.5× on an
+      // 800×600 canvas the shader saw (400, 300) while this read "800, 600".
+      const mx = shaderRow ? shaderRow.width / Math.max(1, canvas.width) : 1;
+      const my = shaderRow ? shaderRow.height / Math.max(1, canvas.height) : 1;
+      return `${Math.round(sample.mouseX * mx)}, ${Math.round(sample.mouseY * my)}`;
+    }
     case "u_resolution":
       return shaderRow ? `${shaderRow.width}×${shaderRow.height}` : "—";
     default:
@@ -96,6 +110,9 @@ export function SystemUniformsSection({
       (r): r is ShaderPassRow => r.kind === "shader" && r.nodeId === owner.id,
     ),
   );
+  // Changes only on canvas resize (`setCanvasSize` keeps the previous object
+  // when the dimensions are unchanged), so subscribing is reference-stable.
+  const canvasSize = useRendererStore((s) => s.canvasSize);
   const sample = useUniformSample();
 
   return (
@@ -115,7 +132,13 @@ export function SystemUniformsSection({
       {specs.map((s) => {
         const desc = SYSTEM_UNIFORM_DESCRIPTIONS[s.name];
         const binding = systemUniformBinding(s.name, owner.kind, isFullscreen);
-        const value = valueFor(s.name, sample, shaderRow);
+        // A value next to "not bound (fullscreen pass)" reads as "here's what
+        // your shader is receiving" — but nothing is uploaded for that
+        // uniform at all, so the shader sees GL zero. Withhold it: the row's
+        // job in that state is to explain the absence.
+        const value = binding.bound
+          ? valueFor(s.name, sample, shaderRow, canvasSize)
+          : "—";
         return (
           <div
             key={s.name}

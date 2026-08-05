@@ -9,6 +9,28 @@ export interface ValidationError {
   edgeIds?: string[];
 }
 
+/**
+ * The three codes that abort compilation outright: `compileGraph` returns an
+ * `emptyPlan` without touching the GL layer when any of them is present, so
+ * the resulting plan describes nothing. `missing_node` is deliberately absent
+ * — a dangling edge is reported but compilation proceeds normally around it.
+ *
+ * Exported so UI that has to recognise "this plan is a transient blank, keep
+ * showing the last real one" tests the same condition the compiler did.
+ * Inferring it from the plan's shape instead (`passes.length === 0 &&
+ * errors.length > 0`) is not equivalent: a graph whose only fault is a
+ * `missing_node` and that legitimately produces zero passes reads as fatal
+ * under that heuristic, freezing every plan-derived surface on stale data.
+ */
+export function isFatalValidation(errors: readonly ValidationError[]): boolean {
+  return errors.some(
+    (e) =>
+      e.code === "cycle" ||
+      e.code === "multi_input" ||
+      e.code === "multiple_outputs",
+  );
+}
+
 export function validateGraph(graph: Graph): ValidationError[] {
   const errors: ValidationError[] = [];
   const nodeIds = new Set(graph.nodes.map((n) => n.id));

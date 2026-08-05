@@ -70,6 +70,35 @@ uniform mat4 u_view, u_proj;
     for (const s of t.symbols) expect(s.scope).toBeNull();
   });
 
+  it("harvests a declarator whose array size is a symbolic constant", () => {
+    // An array size may be any constant expression, not just a decimal
+    // literal. A decimal-only suffix rejected `[MAX_LIGHTS]`/`[N]` lines
+    // wholesale, so the name vanished from the table and came back out of
+    // `computeVaryingContract` as a confident false "vertex가 제공하지 않음"
+    // warning — the same over-reporting the declarator walk above fixed.
+    const src = `const int MAX_LIGHTS = 4;
+out vec2 v_uv[MAX_LIGHTS];
+uniform vec3 u_dirs[MAX_LIGHTS];
+out vec4 v_lit[2];
+`;
+    const t = buildSymbolTable(src);
+    const byName = new Map(t.symbols.map((s) => [s.name, s]));
+    expect(byName.get("v_uv")?.kind).toBe("out");
+    expect(byName.get("v_uv")?.type).toBe("vec2");
+    expect(byName.get("u_dirs")?.kind).toBe("uniform");
+    expect(byName.get("u_dirs")?.type).toBe("vec3");
+    // The literal-size form the old suffix already covered still lands, and
+    // the size token itself is never mistaken for a declarator.
+    expect(byName.get("v_lit")?.kind).toBe("out");
+    expect(byName.has("MAX_LIGHTS")).toBe(true);
+    expect(t.symbols.map((s) => s.name)).toEqual([
+      "MAX_LIGHTS",
+      "v_uv",
+      "u_dirs",
+      "v_lit",
+    ]);
+  });
+
   it("does not harvest call-initializer args of a global const as phantom globals", () => {
     // `[^,;]+` stops at the first comma, which for a call initializer sits
     // *inside* the parens — the bracketDepth guard must refuse the walk, so

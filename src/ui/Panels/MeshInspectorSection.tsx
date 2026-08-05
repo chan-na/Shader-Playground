@@ -104,7 +104,7 @@ export function MeshInspectorSection({ node }: MeshInspectorSectionProps) {
               {status === "skipped" && (
                 <span style={{ color: "var(--warning)" }}>
                   {" "}
-                  — 제공되지만 미선언(스킵됨)
+                  — vertex가 사용하지 않음(스킵됨)
                 </span>
               )}
             </div>

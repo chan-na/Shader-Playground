@@ -104,7 +104,7 @@ describe("VaryingBridgeSection — row states", () => {
     const section = screen.getByTestId("varying-bridge");
     expect(section.getAttribute("data-confident")).toBe("false");
     expect(section.textContent).toContain(
-      "전처리기/인터페이스 블록 — 판정 보류",
+      "파서가 확신할 수 없는 선언 형태 — 판정 보류",
     );
   });
 
@@ -126,6 +126,39 @@ describe("VaryingBridgeSection — row states", () => {
     const row = rowFor("v_normal");
     expect(row.getAttribute("data-status")).toBe("unused");
     expect(row.textContent).toContain("미사용 — fragment가 받지 않음");
+    expect(row.textContent).not.toContain("✓");
+    expect(row.textContent).not.toContain("⚠");
+    expect(screen.getByText("v_normal").style.color).toBe(
+      "var(--text-disabled)",
+    );
+  });
+
+  it("withholds the unused note and its muting when the contract is not confident", () => {
+    // "fragment가 받지 않음" asserts as much as the ✓ does, and it fabricates
+    // the same way: an unterminated `/*` in the fragment source erases every
+    // `in` below it, so vertex outputs that *are* consumed show up as unused.
+    // Same hold as the linked ✓ — the factual status stays, the verdict goes.
+    seed(
+      "s1",
+      contractOf(
+        [
+          {
+            name: "v_normal",
+            vertexType: "vec3",
+            fragmentType: null,
+            fragmentUsed: false,
+            status: "unused",
+          },
+        ],
+        false,
+      ),
+    );
+    render(<VaryingBridgeSection nodeId="s1" />);
+
+    const row = rowFor("v_normal");
+    expect(row.getAttribute("data-status")).toBe("unused");
+    expect(row.textContent).not.toContain("미사용 — fragment가 받지 않음");
+    expect(screen.getByText("v_normal").style.color).toBe("");
     expect(row.textContent).not.toContain("✓");
     expect(row.textContent).not.toContain("⚠");
   });
@@ -192,7 +225,9 @@ describe("VaryingBridgeSection — row states", () => {
 
     const row = rowFor("v_branch");
     expect(row.textContent).not.toContain("⚠");
-    expect(row.textContent).toContain("전처리기/인터페이스 블록 — 판정 보류");
+    expect(row.textContent).toContain(
+      "파서가 확신할 수 없는 선언 형태 — 판정 보류",
+    );
   });
 
   it("warns on a confident, statically-used type-mismatch row with both types named", () => {

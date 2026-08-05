@@ -1,9 +1,14 @@
 import { history, undo } from "@codemirror/commands";
 import { EditorSelection, EditorState } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
-import { describe, expect, it } from "vitest";
+import { EditorView, keymap } from "@codemirror/view";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ShaderGraphNode } from "../../core/graph/types";
+import { useEditorStore } from "../../state/editorStore";
+import { useGraphStore } from "../../state/graphStore";
+import { useSelectionStore } from "../../state/selectionStore";
 import {
   type CrossStageRenameContext,
+  glslRename,
   runRename,
   validateRenameName,
 } from "./rename";
@@ -501,6 +506,166 @@ void main() {
     // helper's job is to rewrite correctly, not to reconcile the two. Import is
     // normalised (F22), so production never gets here with a mixed node.
     expect(captured.origin).toBe(FRAG_LF.replace(/u_amount/g, "u_gain"));
+    view.destroy();
+  });
+});
+
+/**
+ * F2 while the editor is read-only (A-1).
+ *
+ * The Code panel substitutes `fullscreen.vert` into the vertex tab when the
+ * node's mesh input does not resolve, and marks the editor read-only. The
+ * visible document is then NOT the node's `vertexSource` — so a rename computed
+ * from it and committed through `applyBothStages` writes a renamed
+ * `fullscreen.vert` over the user's real source, which is gone.
+ *
+ * `EditorState.readOnly` does not stop that by itself: CodeMirror consults the
+ * facet in its DOM input handlers, not in `dispatch`, and `applyBothStages`
+ * reaches `graphStore` without going through the view at all. Both halves are
+ * exercised here — the visible doc and the stored sources.
+ */
+describe("glslRename — F2 read-only guard (A-1)", () => {
+  /** What the Code panel actually shows while the vertex stage is auto — the
+   * shipped `src/shaders/fullscreen.vert`, not the node's source. */
+  const AUTO_VERT = `#version 300 es
+
+in vec2 a_position;
+out vec2 v_uv;
+
+void main() {
+  v_uv = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}
+`;
+  /** The user's real vertex source, sitting in the store behind that
+   * substitution. Nothing about it is visible to the editor. */
+  const NODE_VERT = `#version 300 es
+in vec3 a_position;
+uniform mat4 u_model;
+out vec2 v_uv;
+
+void main() {
+  v_uv = a_position.xy;
+  gl_Position = u_model * vec4(a_position, 1.0);
+}
+`;
+  const NODE_FRAG = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+
+void main() {
+  outColor = vec4(v_uv, 0.0, 1.0);
+}
+`;
+  /** Offset of the `v_uv` declarator, in either vertex source. */
+  const vUvDecl = (src: string) =>
+    src.indexOf("out vec2 v_uv") + "out vec2 ".length + 1;
+
+  /**
+   * Mount a view carrying the real F2 keymap at the given read-only setting,
+   * and hand back the command CodeMirror would run for F2 — read out of the
+   * `keymap` facet the same way `runHandlers` does, so the shipped binding is
+   * what runs rather than a copy of its body.
+   */
+  function f2View(
+    doc: string,
+    cursorAt: number,
+    readOnly: boolean,
+  ): { view: EditorView; runF2: () => boolean } {
+    const state = EditorState.create({
+      doc,
+      selection: EditorSelection.cursor(cursorAt),
+      extensions: [EditorState.readOnly.of(readOnly), glslRename()],
+    });
+    const parent = document.createElement("div");
+    const view = new EditorView({ state, parent });
+    const run = view.state
+      .facet(keymap)
+      .flat()
+      .find((b) => b.key === "F2")?.run;
+    if (!run) throw new Error("glslRename() exposes no F2 binding");
+    return { view, runF2: () => run(view) };
+  }
+
+  /** Read the seeded shader node back out of the store. */
+  function storedNode(): ShaderGraphNode {
+    return useGraphStore.getState().nodes[0] as ShaderGraphNode;
+  }
+
+  /**
+   * Call counter on the store write `applyBothStages` funnels into — the only
+   * observable end of the F2 keymap's self-built cross-stage context.
+   *
+   * zustand hands out a fresh state object on every `set`, so a spy installed
+   * on an earlier one rides along into its successors and outlives
+   * `restoreAllMocks`; `vi.spyOn` then hands the very same mock back, carrying
+   * the previous case's calls. Clearing keeps each case's count its own.
+   */
+  function watchCommit() {
+    const spy = vi.spyOn(useGraphStore.getState(), "updateShaderSource");
+    spy.mockClear();
+    return spy;
+  }
+
+  beforeEach(() => {
+    const node: ShaderGraphNode = {
+      id: "s1",
+      kind: "shader",
+      vertexSource: NODE_VERT,
+      fragmentSource: NODE_FRAG,
+      uniformValues: {},
+    };
+    useGraphStore.setState({
+      nodes: [node],
+      edges: [],
+      positions: {},
+      parents: {},
+    });
+    useSelectionStore.getState().select("s1");
+    // The F2 keymap builds its cross-stage context from the live stores, so the
+    // vertex tab has to be the active one for this to be the A-1 situation.
+    useEditorStore.getState().setStage("vertex");
+    // Without a working prompt the pre-fix path would bail as `prompt-cancelled`
+    // and this suite would pass for the wrong reason.
+    vi.spyOn(window, "prompt").mockReturnValue("v_texcoord");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("does nothing when the read-only auto vertex doc is showing", () => {
+    const { view, runF2 } = f2View(AUTO_VERT, vUvDecl(AUTO_VERT), true);
+    const commit = watchCommit();
+
+    expect(runF2()).toBe(false);
+    // Bailed before the prompt — the user is never even asked.
+    expect(window.prompt).not.toHaveBeenCalled();
+    expect(view.state.doc.toString()).toBe(AUTO_VERT);
+    expect(commit).not.toHaveBeenCalled();
+    // The actual data loss: a renamed `fullscreen.vert` landing in the store as
+    // this node's vertex source, with the real one overwritten.
+    expect(storedNode().vertexSource).toBe(NODE_VERT);
+    expect(storedNode().fragmentSource).toBe(NODE_FRAG);
+    view.destroy();
+  });
+
+  it("still renames when the same editor is writable", () => {
+    // Same node, same symbol, same keymap — only `readOnly` differs, so the
+    // guard is proven to be scoped rather than a blanket disable of F2.
+    const { view, runF2 } = f2View(NODE_VERT, vUvDecl(NODE_VERT), false);
+    const commit = watchCommit();
+
+    expect(runF2()).toBe(true);
+    const afterVert = view.state.doc.toString();
+    expect(afterVert).toBe(NODE_VERT.replace(/v_uv/g, "v_texcoord"));
+    expect(commit).toHaveBeenCalledTimes(1);
+    // Both stages committed as one patch, as the cross-stage path promises.
+    expect(storedNode().vertexSource).toBe(afterVert);
+    expect(storedNode().fragmentSource).toBe(
+      NODE_FRAG.replace(/v_uv/g, "v_texcoord"),
+    );
     view.destroy();
   });
 });

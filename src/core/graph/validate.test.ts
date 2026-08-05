@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Graph } from "./types";
-import { topologicalOrder, validateGraph } from "./validate";
+import { isFatalValidation, topologicalOrder, validateGraph } from "./validate";
 
 const shader = (id: string) => ({
   id,
@@ -156,6 +156,141 @@ describe("validateGraph", () => {
       ],
     };
     expect(validateGraph(g)).toEqual([]);
+  });
+});
+
+describe("isFatalValidation", () => {
+  // Driven through `validateGraph` rather than hand-written error literals: the
+  // predicate's contract is "does compileGraph bail with an empty plan for this
+  // graph", so the fixtures have to be graphs the validator actually rejects.
+
+  it("is false when validation found nothing", () => {
+    const g: Graph = {
+      nodes: [shader("s"), out("o")],
+      edges: [
+        {
+          id: "e1",
+          source: "s",
+          sourceHandle: "texture",
+          target: "o",
+          targetHandle: "texture",
+        },
+      ],
+    };
+    const errors = validateGraph(g);
+    expect(errors).toEqual([]);
+    expect(isFatalValidation(errors)).toBe(false);
+  });
+
+  it("is true for a cycle", () => {
+    const g: Graph = {
+      nodes: [shader("a"), shader("b")],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "texture",
+          target: "b",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e2",
+          source: "b",
+          sourceHandle: "texture",
+          target: "a",
+          targetHandle: "u_tex",
+        },
+      ],
+    };
+    expect(isFatalValidation(validateGraph(g))).toBe(true);
+  });
+
+  it("is true for an N:1 multi-input", () => {
+    const g: Graph = {
+      nodes: [shader("a"), shader("b"), shader("c")],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "texture",
+          target: "c",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e2",
+          source: "b",
+          sourceHandle: "texture",
+          target: "c",
+          targetHandle: "u_tex",
+        },
+      ],
+    };
+    expect(isFatalValidation(validateGraph(g))).toBe(true);
+  });
+
+  it("is true past the Output-node limit", () => {
+    const g: Graph = {
+      nodes: [out("o1"), out("o2"), out("o3"), out("o4"), out("o5")],
+      edges: [],
+    };
+    expect(isFatalValidation(validateGraph(g))).toBe(true);
+  });
+
+  it("is false when the only fault is a dangling edge (missing_node)", () => {
+    // The distinction the whole predicate exists for. A deleted node leaving an
+    // edge behind is reported, but compilation proceeds around it — so a caller
+    // that gates on "is this plan a transient blank, keep the last real one"
+    // must NOT treat this graph as fatal, or every plan-derived surface freezes
+    // on stale data for as long as the dangling edge survives.
+    const g: Graph = {
+      nodes: [shader("a")],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "texture",
+          target: "ghost",
+          targetHandle: "u_tex",
+        },
+      ],
+    };
+    const errors = validateGraph(g);
+    // Non-vacuous: the graph really did produce errors, just not fatal ones.
+    expect(errors.map((e) => e.code)).toEqual(["missing_node"]);
+    expect(isFatalValidation(errors)).toBe(false);
+  });
+
+  it("is true when a fatal code accompanies a dangling edge", () => {
+    // Any-not-all: one fatal code among non-fatal ones still aborts.
+    const g: Graph = {
+      nodes: [shader("a"), shader("b")],
+      edges: [
+        {
+          id: "e1",
+          source: "a",
+          sourceHandle: "texture",
+          target: "ghost",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e2",
+          source: "a",
+          sourceHandle: "texture",
+          target: "b",
+          targetHandle: "u_tex",
+        },
+        {
+          id: "e3",
+          source: "b",
+          sourceHandle: "texture",
+          target: "a",
+          targetHandle: "u_tex",
+        },
+      ],
+    };
+    const errors = validateGraph(g);
+    expect(errors.some((e) => e.code === "missing_node")).toBe(true);
+    expect(isFatalValidation(errors)).toBe(true);
   });
 });
 

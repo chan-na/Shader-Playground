@@ -40,6 +40,7 @@ import type {
 } from "./types";
 import { withExplicitDefaults } from "./uniformDefaults";
 import {
+  isFatalValidation,
   topologicalOrder,
   type ValidationError,
   validateGraph,
@@ -546,12 +547,7 @@ export function compileGraph(
   const shaderErrors: Record<string, ShaderError[]> = {};
   const compiledVertexSource: Record<string, string> = {};
   const fullscreenByNode: Record<string, boolean> = {};
-  const fatal = errors.some(
-    (e) =>
-      e.code === "cycle" ||
-      e.code === "multi_input" ||
-      e.code === "multiple_outputs",
-  );
+  const fatal = isFatalValidation(errors);
   if (fatal) {
     return { ...emptyPlan(opts.width, opts.height), errors, hasExternal };
   }

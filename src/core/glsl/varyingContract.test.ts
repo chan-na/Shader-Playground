@@ -409,4 +409,126 @@ void main() { outColor = vec4(float(v_id), 0.0, 0.0, 1.0); }
     expect(c.confident).toBe(true);
     expect(c.rows.find((r) => r.name === "v_id")?.status).toBe("linked");
   });
+
+  it("does not let a superstring neighbour stand in for the varying being checked", () => {
+    // `v_id2` is declared *above* `v_id` on both stages. Without the `\b`
+    // anchor after the name, looking up `v_id` matched the `v_id2` line
+    // first, so both stages reported `v_id2`'s signature — identical, so
+    // `v_id`'s real flat/smooth split compared equal and the ✓ came back
+    // beside a program that does not link.
+    const c = computeVaryingContract(
+      vertOf("flat out float v_id2;\nflat out float v_id;"),
+      fragOf("flat in float v_id2;\nin float v_id;"),
+    );
+    expect(c.confident).toBe(false);
+  });
+
+  it("keeps confidence when the superstring neighbour and the varying both agree", () => {
+    // The anchor must not degrade into blanket silence: the same
+    // two-declaration shape with matching qualifiers keeps its ✓.
+    const c = computeVaryingContract(
+      vertOf("flat out float v_id2;\nflat out float v_id;"),
+      fragOf("flat in float v_id2;\nflat in float v_id;"),
+    );
+    expect(c.confident).toBe(true);
+    expect(c.rows.find((r) => r.name === "v_id")?.status).toBe("linked");
+    expect(c.rows.find((r) => r.name === "v_id2")?.status).toBe("linked");
+  });
+
+  it("withdraws confidence when a symbolic array size faces a literal one", () => {
+    // `[N]` is a legal constant expression, but `RE_STORAGE_DECL`'s
+    // decimal-only array suffix rejected the vertex line wholesale — `v_id`
+    // vanished from the vertex table and the fragment's input resurfaced as a
+    // *confident* missing-out warning. Both stages are parsed now, and
+    // `[N]` vs `[2]` is a real disagreement, so the verdict is held instead.
+    const c = computeVaryingContract(
+      vertOf("const int N = 2;\nout float v_id[N];"),
+      fragOf("in float v_id[2];"),
+    );
+    expect(c.confident).toBe(false);
+    expect(confidentVaryingWarnings(c)).toHaveLength(0);
+  });
+
+  it("keeps confidence when both stages spell the same literal array size", () => {
+    const c = computeVaryingContract(
+      vertOf("out float v_id[2];"),
+      fragOf("in float v_id[2];"),
+    );
+    expect(c.confident).toBe(true);
+    expect(c.rows.find((r) => r.name === "v_id")?.status).toBe("linked");
+  });
+});
+
+describe("unterminated block comment (T4/M4 regression)", () => {
+  // `maskComments` blanks an unterminated `/*` all the way to EOF, so every
+  // declaration below it disappears from the masked source the diff is
+  // computed over — and none of the masked-source hazards can fire on a file
+  // that now looks perfectly clean. The verdict is held on the *raw* source
+  // instead, in both stage directions.
+  const VERT = `#version 300 es
+out vec2 v_uv;
+void main() {
+  v_uv = vec2(0.0);
+  gl_Position = vec4(0.0);
+}
+`;
+  const FRAG = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+void main() {
+  outColor = vec4(v_uv, 0.0, 1.0);
+}
+`;
+
+  it("withdraws confidence when the vertex stage never closes a block comment", () => {
+    // The vertex `out` is swallowed by the half-typed opener, so the
+    // fragment's input used to come back as a confident missing-out warning
+    // for a varying the vertex stage does declare.
+    const vert = `#version 300 es
+/* TODO: document the UV convention
+out vec2 v_uv;
+void main() {
+  v_uv = vec2(0.0);
+  gl_Position = vec4(0.0);
+}
+`;
+    const c = computeVaryingContract(vert, FRAG);
+    expect(c.confident).toBe(false);
+    expect(confidentVaryingWarnings(c)).toHaveLength(0);
+  });
+
+  it("withdraws confidence when the fragment stage never closes a block comment", () => {
+    // The mirror direction: the fragment's inputs vanish instead, so every
+    // vertex output reads `unused`. No warning is produced either way, but
+    // that fabricated diff must not be presented as a settled verdict — the
+    // ✓ is withheld too (see `VaryingContract.confident`).
+    const frag = `#version 300 es
+precision highp float;
+/* TODO: document the UV convention
+in vec2 v_uv;
+out vec4 outColor;
+void main() {
+  outColor = vec4(v_uv, 0.0, 1.0);
+}
+`;
+    const c = computeVaryingContract(VERT, frag);
+    expect(c.confident).toBe(false);
+    expectStatus(rowByName(c.rows, "v_uv"), "unused");
+    expect(confidentVaryingWarnings(c)).toHaveLength(0);
+  });
+
+  it("keeps confidence when the block comment is properly closed", () => {
+    const vert = `#version 300 es
+/* UV origin is bottom-left. */
+out vec2 v_uv;
+void main() {
+  v_uv = vec2(0.0);
+  gl_Position = vec4(0.0);
+}
+`;
+    const c = computeVaryingContract(vert, FRAG);
+    expect(c.confident).toBe(true);
+    expectStatus(rowByName(c.rows, "v_uv"), "linked");
+  });
 });

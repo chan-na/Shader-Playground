@@ -211,7 +211,13 @@ test.describe("Phase 39 — varying contract visualization", () => {
       ),
     ).toBeVisible();
 
+    // The 172px status overlay is time-shared three ways since D-1
+    // (diagnostics/problems/passes, `debugUiStore`), so "zero warning rows"
+    // is only evidence of anything once the *problems* slot is the one
+    // actually mounted — otherwise a broken trigger reads as a clean bill of
+    // health. Same guard precedent as phase-16-diagnostics.spec.ts.
     await page.getByTestId("status-problems").click();
+    await expect(page.getByTestId("problems-overlay")).toBeVisible();
     await expect(
       page.locator('[data-testid="varying-warning-row"]'),
     ).toHaveCount(0);
@@ -236,6 +242,7 @@ test.describe("Phase 39 — varying contract visualization", () => {
     // to actually link — deliberately not asserting on any other
     // diagnostic row's presence/absence here.
     await page.getByTestId("status-problems").click();
+    await expect(page.getByTestId("problems-overlay")).toBeVisible();
     await expect(
       page.locator(
         '[data-testid="varying-warning-row"][data-varying-name="v_normal"]',
@@ -261,6 +268,7 @@ test.describe("Phase 39 — varying contract visualization", () => {
     ).toBeVisible();
 
     await page.getByTestId("status-problems").click();
+    await expect(page.getByTestId("problems-overlay")).toBeVisible();
     await expect(
       page.locator('[data-testid="varying-warning-row"]'),
     ).toHaveCount(0);
@@ -294,6 +302,7 @@ test.describe("Phase 39 — varying contract visualization", () => {
     );
 
     await page.getByTestId("status-problems").click();
+    await expect(page.getByTestId("problems-overlay")).toBeVisible();
     await expect(
       page.locator('[data-testid="varying-warning-row"]'),
     ).toHaveCount(0);
@@ -324,6 +333,7 @@ test.describe("Phase 39 — varying contract visualization", () => {
     await expect(row).not.toContainText("✓");
 
     await page.getByTestId("status-problems").click();
+    await expect(page.getByTestId("problems-overlay")).toBeVisible();
     await expect(
       page.locator('[data-testid="varying-warning-row"]'),
     ).toHaveCount(0);
@@ -352,6 +362,7 @@ test.describe("Phase 39 — varying contract visualization", () => {
     // module exists to guarantee (core/glsl/varyingContract.ts's
     // `isStaticallyUsed`/`confidentVaryingWarnings`).
     await page.getByTestId("status-problems").click();
+    await expect(page.getByTestId("problems-overlay")).toBeVisible();
     await expect(
       page.locator('[data-testid="varying-warning-row"]'),
     ).toHaveCount(0);

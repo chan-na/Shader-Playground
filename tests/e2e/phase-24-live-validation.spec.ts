@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { seedShaderAndSelect } from "./helpers/editor";
 import { bootApp } from "./helpers/fixtures";
-import { readSp } from "./helpers/sp";
+import { readSp, withSp } from "./helpers/sp";
 
 // Phase 24 — live GLSL validation via OffscreenCanvas WebGL2 worker.
 //   - The validator client returns parsed GLSLDiagnostic[] from a real
@@ -39,11 +40,11 @@ test.describe("Phase 24 — live GLSL validation (OffscreenCanvas worker)", () =
     // Direct API call — proves the worker pipeline end-to-end:
     //   client → ?worker bundle → OffscreenCanvas WebGL2 compile →
     //   InfoLog → parseShaderInfoLog → GLSLDiagnostic[].
-    const diags = await page.evaluate(async (src) => {
-      const sp = window.__sp;
-      if (!sp) throw new Error("__sp not exposed");
-      return await sp.glslValidator().validate("fragment", src);
-    }, FRAG_BAD);
+    const diags = await withSp(
+      page,
+      (sp, src) => sp.glslValidator().validate("fragment", src),
+      FRAG_BAD,
+    );
 
     expect(diags.length).toBeGreaterThan(0);
     const first = diags[0];
@@ -55,11 +56,11 @@ test.describe("Phase 24 — live GLSL validation (OffscreenCanvas worker)", () =
   test("validator returns an empty array for a clean fragment", async ({
     page,
   }) => {
-    const diags = await page.evaluate(async (src) => {
-      const sp = window.__sp;
-      if (!sp) throw new Error("__sp not exposed");
-      return await sp.glslValidator().validate("fragment", src);
-    }, FRAG_CLEAN);
+    const diags = await withSp(
+      page,
+      (sp, src) => sp.glslValidator().validate("fragment", src),
+      FRAG_CLEAN,
+    );
     expect(diags).toEqual([]);
   });
 
@@ -67,14 +68,7 @@ test.describe("Phase 24 — live GLSL validation (OffscreenCanvas worker)", () =
     page,
   }) => {
     // Seed the demo shader node with a clean fragment so we start green.
-    await page.evaluate(async (src) => {
-      const sp = window.__sp;
-      if (!sp) throw new Error("__sp not exposed");
-      const s = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-      if (!s) throw new Error("no shader node in demo");
-      sp.selection.getState().select(s.id);
-      sp.graph.getState().updateShaderSource(s.id, { fragmentSource: src });
-    }, FRAG_CLEAN);
+    await seedShaderAndSelect(page, { fragment: FRAG_CLEAN });
 
     // Fragment tab starts green.
     await page.getByTestId("stage-tab-fragment").click();

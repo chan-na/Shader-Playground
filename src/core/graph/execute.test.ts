@@ -8,13 +8,18 @@ import { disposeAllExternal } from "../external/registry";
 import { createFakeGl } from "../gl/fakeGl";
 import type { CompiledProgram } from "../gl/program";
 import { compileGraph } from "./compile";
-import { executePlan, type FrameContext, resetComposite } from "./execute";
-import type {
-  ComputeGraphNode,
-  Graph,
-  GraphNode,
-  ShaderGraphNode,
-} from "./types";
+import {
+  executePlan,
+  type FrameContext,
+  resetComposite,
+  splitLayout,
+} from "./execute";
+import {
+  computeNode as baseComputeNode,
+  outputNode,
+  shaderNode,
+} from "./testNodes";
+import type { ComputeGraphNode, Graph, ShaderGraphNode } from "./types";
 
 // Render-heart harness for executePlan. `createFakeGl` returns truthy handles so
 // `compileGraph` builds real ShaderPass/ComputePass objects (FBOs, VAOs, TF
@@ -45,30 +50,12 @@ function frameCtx(graph?: Graph): FrameContext {
   };
 }
 
-function shaderNode(id: string): ShaderGraphNode {
-  return {
-    id,
-    kind: "shader",
-    vertexSource: "//v",
-    fragmentSource: "//f",
-    uniformValues: {},
-  };
-}
-
+/** A compute node reading `a_pos`, the attribute `makeGl` marks active. */
 function computeNode(id: string): ComputeGraphNode {
-  return {
-    id,
-    kind: "compute",
-    vertexSource: "//v",
+  return baseComputeNode(id, {
     count: 4,
-    primitive: "POINTS",
     attributes: [{ inName: "a_pos", outName: "v_pos", size: 3, seed: "zero" }],
-    uniformValues: {},
-  };
-}
-
-function outputNode(id: string): GraphNode {
-  return { id, kind: "output" };
+  });
 }
 
 type Edge = Graph["edges"][number];
@@ -774,5 +761,53 @@ describe("executePlan — dispose", () => {
     expect(delFbo).toHaveBeenCalled();
     expect(delBuffer).toHaveBeenCalled();
     expect(delTf).toHaveBeenCalled();
+  });
+});
+
+describe("splitLayout", () => {
+  it("1 → full canvas", () => {
+    const cells = splitLayout(1, 800, 600);
+    expect(cells).toEqual([{ x: 0, y: 0, w: 800, h: 600 }]);
+  });
+
+  it("2 → left/right halves", () => {
+    const cells = splitLayout(2, 800, 600);
+    expect(cells).toHaveLength(2);
+    expect(cells[0]!.x).toBe(0);
+    expect(cells[1]!.x).toBe(400);
+    expect(cells[0]!.w + cells[1]!.w).toBe(800);
+    expect(cells[0]!.h).toBe(600);
+  });
+
+  it("3 → 2 on top, 1 below", () => {
+    const cells = splitLayout(3, 800, 600);
+    expect(cells).toHaveLength(3);
+    // Top cells split horizontally
+    expect(cells[0]!.w + cells[1]!.w).toBe(800);
+    expect(cells[0]!.h).toBe(cells[1]!.h);
+    // Bottom cell spans full width
+    expect(cells[2]!.w).toBe(800);
+    // Stack
+    expect(cells[0]!.y + cells[0]!.h).toBe(600);
+    expect(cells[2]!.y).toBe(0);
+  });
+
+  it("4 → 2×2 grid", () => {
+    const cells = splitLayout(4, 800, 600);
+    expect(cells).toHaveLength(4);
+    // Each cell ~400×300
+    for (const c of cells) {
+      expect(c.w).toBeGreaterThanOrEqual(399);
+      expect(c.h).toBeGreaterThanOrEqual(299);
+    }
+  });
+
+  it("5+ clamps to 4", () => {
+    expect(splitLayout(7, 800, 600)).toHaveLength(4);
+  });
+
+  it("odd canvas sizes still tile losslessly horizontally", () => {
+    const cells = splitLayout(2, 801, 600);
+    expect(cells[0]!.w + cells[1]!.w).toBe(801);
   });
 });

@@ -6,22 +6,13 @@ import {
 } from "../../state/diagnosticsStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
+import { resetAllStores } from "../../state/testStores";
 import { DiagnosticsMetricStrip } from "./DiagnosticsMetricStrip";
 
-const initialRenderer = useRendererStore.getState();
-const initialGraph = useGraphStore.getState();
-const initialDiagnostics = useDiagnosticsStore.getState();
-
-function resetStores() {
-  useRendererStore.setState(initialRenderer, true);
-  useGraphStore.setState(initialGraph, true);
-  useDiagnosticsStore.setState(initialDiagnostics, true);
-}
-
-beforeEach(resetStores);
+beforeEach(resetAllStores);
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 describe("DiagnosticsMetricStrip", () => {

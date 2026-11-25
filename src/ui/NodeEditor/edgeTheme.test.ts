@@ -1,37 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type {
-  GraphEdge,
-  GraphNode,
-  MeshGraphNode,
-  ParamGraphNode,
-  ShaderGraphNode,
-} from "../../core/graph/types";
+import { meshNode, paramNode, shaderNode } from "../../core/graph/testNodes";
+import type { GraphEdge, GraphNode } from "../../core/graph/types";
 import { tokens } from "../../theme";
 import { type EdgeVisualStyle, edgeStyleFor } from "./edgeTheme";
 
-const meshNode: MeshGraphNode = {
-  id: "mesh1",
-  kind: "mesh",
-  primitive: "cube",
-  assetId: null,
-};
-
-const paramFloatNode: ParamGraphNode = {
-  id: "param1",
-  kind: "param",
-  paramKind: "float",
-  value: 0.5,
-};
-
-const shaderNode: ShaderGraphNode = {
-  id: "shader1",
-  kind: "shader",
-  vertexSource: "",
-  fragmentSource: "uniform float u_x;",
-  uniformValues: {},
-};
-
-const nodes: GraphNode[] = [meshNode, paramFloatNode, shaderNode];
+// The shader declares only `u_x`, so an edge into `u_y` is an orphan.
+const nodes: GraphNode[] = [
+  meshNode("mesh1", { assetId: null }),
+  paramNode("param1", { value: 0.5 }),
+  shaderNode("shader1", { fragmentSource: "uniform float u_x;" }),
+];
 
 describe("edgeStyleFor", () => {
   it("(a) mesh -> shader mesh-in: valid edge, resource family, solid 2.5", () => {
@@ -65,7 +43,7 @@ describe("edgeStyleFor", () => {
   });
 
   it("(c) target uniform removed from shader source: orphan edge -> semantic.error dashed", () => {
-    // shaderNode's fragmentSource only declares u_x — u_y is a stale target
+    // shader1's fragmentSource only declares u_x — u_y is a stale target
     // handle left over from an edit that deleted the uniform declaration.
     const edge: GraphEdge = {
       id: "e3",

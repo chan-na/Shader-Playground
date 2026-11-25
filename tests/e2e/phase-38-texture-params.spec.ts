@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph, trivialShaderSources } from "./helpers/fixtures";
-import { withSp } from "./helpers/sp";
+import {
+  bootApp,
+  selectNode,
+  setGraph,
+  trivialShaderSources,
+} from "./helpers/fixtures";
 
 /**
  * Phase 38 — mental-model correction (E-3,
@@ -48,11 +52,7 @@ test.describe("Phase 38 — texture parameters (Image vs. Shader FBO)", () => {
     page,
   }) => {
     await setGraph(page, imageAndShaderGraph(), {});
-    await withSp(
-      page,
-      (sp) => sp.selection.getState().select("img1"),
-      undefined,
-    );
+    await selectNode(page, "img1");
 
     const section = page.getByTestId("texture-params");
     await expect(section).toBeVisible();
@@ -65,7 +65,7 @@ test.describe("Phase 38 — texture parameters (Image vs. Shader FBO)", () => {
     page,
   }) => {
     await setGraph(page, imageAndShaderGraph(), {});
-    await withSp(page, (sp) => sp.selection.getState().select("s1"), undefined);
+    await selectNode(page, "s1");
 
     const section = page.getByTestId("texture-params");
     await expect(section).toBeVisible();

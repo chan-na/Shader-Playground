@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
+import {
+  openStageEditor,
+  renameViaF2,
+  seedShaderAndSelect,
+  shaderSources,
+} from "./helpers/editor";
 import { bootApp } from "./helpers/fixtures";
+import { expectNoRendererErrors } from "./helpers/render";
 import { readSp, withSp } from "./helpers/sp";
 
 // Phase 28 — Cross-stage rename for ShaderNode.
@@ -41,56 +48,27 @@ test.describe("Phase 28 — cross-stage rename", () => {
   test("renaming a uniform from the fragment side updates BOTH stages", async ({
     page,
   }) => {
-    await page.evaluate(
-      async ({ v, f }) => {
-        const sp = window.__sp;
-        if (!sp) throw new Error("__sp not exposed");
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        if (!node) throw new Error("no shader node");
-        sp.selection.getState().select(node.id);
-        sp.graph
-          .getState()
-          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
-      },
-      { v: VERT, f: FRAG },
-    );
-    await page.getByTestId("stage-tab-fragment").click();
-
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("u_amount"))
-      .toBe(true);
+    await seedShaderAndSelect(page, { vertex: VERT, fragment: FRAG });
+    const content = await openStageEditor(page, "fragment", "u_amount");
 
     // Click on the fragment-side `u_amount` use inside main(), then F2.
     const useToken = content.getByText("u_amount", { exact: true }).last();
     await useToken.click();
-    page.once("dialog", (d) => {
-      void d.accept("u_strength");
-    });
-    await page.keyboard.press("F2");
+    await renameViaF2(page, "u_strength");
 
     // Both stages should now hold the renamed identifier — and ZERO copies
     // of the old name remain.
     await expect
       .poll(async () => {
-        return await readSp(page, (sp) => {
-          const node = sp.graph
-            .getState()
-            .nodes.find((n) => n.kind === "shader");
-          if (!node) return null;
-          const n = node as {
-            vertexSource?: string;
-            fragmentSource?: string;
-          };
-          return {
-            vHas: n.vertexSource?.includes("u_strength") ?? false,
-            fHas: n.fragmentSource?.includes("u_strength") ?? false,
-            vOld: n.vertexSource?.includes("u_amount") ?? true,
-            fOld: n.fragmentSource?.includes("u_amount") ?? true,
-            vCount: (n.vertexSource?.match(/u_strength/g) ?? []).length,
-            fCount: (n.fragmentSource?.match(/u_strength/g) ?? []).length,
-          };
-        });
+        const { vertex, fragment } = await shaderSources(page);
+        return {
+          vHas: vertex.includes("u_strength"),
+          fHas: fragment.includes("u_strength"),
+          vOld: vertex.includes("u_amount"),
+          fOld: fragment.includes("u_amount"),
+          vCount: (vertex.match(/u_strength/g) ?? []).length,
+          fCount: (fragment.match(/u_strength/g) ?? []).length,
+        };
       })
       .toEqual({
         vHas: true,
@@ -106,50 +84,22 @@ test.describe("Phase 28 — cross-stage rename", () => {
   test("renaming a uniform from the vertex side updates BOTH stages", async ({
     page,
   }) => {
-    await page.evaluate(
-      async ({ v, f }) => {
-        const sp = window.__sp;
-        if (!sp) throw new Error("__sp not exposed");
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        if (!node) throw new Error("no shader node");
-        sp.selection.getState().select(node.id);
-        sp.graph
-          .getState()
-          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
-      },
-      { v: VERT, f: FRAG },
-    );
-    await page.getByTestId("stage-tab-vertex").click();
-
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("u_amount"))
-      .toBe(true);
+    await seedShaderAndSelect(page, { vertex: VERT, fragment: FRAG });
+    const content = await openStageEditor(page, "vertex", "u_amount");
 
     const useToken = content.getByText("u_amount", { exact: true }).last();
     await useToken.click();
-    page.once("dialog", (d) => {
-      void d.accept("u_k");
-    });
-    await page.keyboard.press("F2");
+    await renameViaF2(page, "u_k");
 
     await expect
       .poll(async () => {
-        return await readSp(page, (sp) => {
-          const node = sp.graph
-            .getState()
-            .nodes.find((n) => n.kind === "shader");
-          const n = (node ?? {}) as {
-            vertexSource?: string;
-            fragmentSource?: string;
-          };
-          return {
-            vOld: n.vertexSource?.includes("u_amount") ?? true,
-            fOld: n.fragmentSource?.includes("u_amount") ?? true,
-            vNew: (n.vertexSource?.match(/u_k\b/g) ?? []).length,
-            fNew: (n.fragmentSource?.match(/u_k\b/g) ?? []).length,
-          };
-        });
+        const { vertex, fragment } = await shaderSources(page);
+        return {
+          vOld: vertex.includes("u_amount"),
+          fOld: fragment.includes("u_amount"),
+          vNew: (vertex.match(/u_k\b/g) ?? []).length,
+          fNew: (fragment.match(/u_k\b/g) ?? []).length,
+        };
       })
       .toEqual({ vOld: false, fOld: false, vNew: 2, fNew: 2 });
   });
@@ -157,58 +107,23 @@ test.describe("Phase 28 — cross-stage rename", () => {
   test("renaming a vertex-only attribute does NOT touch fragment", async ({
     page,
   }) => {
-    await page.evaluate(
-      async ({ v, f }) => {
-        const sp = window.__sp;
-        if (!sp) throw new Error("__sp not exposed");
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        if (!node) throw new Error("no shader node");
-        sp.selection.getState().select(node.id);
-        sp.graph
-          .getState()
-          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
-      },
-      { v: VERT, f: FRAG },
-    );
-    await page.getByTestId("stage-tab-vertex").click();
-    const fragBefore = await readSp(page, (sp) => {
-      const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-      return (node as { fragmentSource?: string } | undefined)?.fragmentSource;
-    });
-
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("a_position"))
-      .toBe(true);
+    await seedShaderAndSelect(page, { vertex: VERT, fragment: FRAG });
+    const fragBefore = (await shaderSources(page)).fragment;
+    const content = await openStageEditor(page, "vertex", "a_position");
     const useToken = content.getByText("a_position", { exact: true }).last();
     await useToken.click();
-    page.once("dialog", (d) => {
-      void d.accept("a_pos");
-    });
-    await page.keyboard.press("F2");
+    await renameViaF2(page, "a_pos");
 
     // Vertex got rewritten; fragment is unchanged byte-for-byte.
     await expect
-      .poll(async () =>
-        withSp(
-          page,
-          (sp, args: { fragBefore: string | undefined }) => {
-            const node = sp.graph
-              .getState()
-              .nodes.find((n) => n.kind === "shader");
-            const n = (node ?? {}) as {
-              vertexSource?: string;
-              fragmentSource?: string;
-            };
-            return {
-              vRenamed: n.vertexSource?.includes("a_pos") ?? false,
-              vOld: n.vertexSource?.includes("a_position") ?? true,
-              fragUnchanged: n.fragmentSource === args.fragBefore,
-            };
-          },
-          { fragBefore },
-        ),
-      )
+      .poll(async () => {
+        const { vertex, fragment } = await shaderSources(page);
+        return {
+          vRenamed: vertex.includes("a_pos"),
+          vOld: vertex.includes("a_position"),
+          fragUnchanged: fragment === fragBefore,
+        };
+      })
       .toEqual({ vRenamed: true, vOld: false, fragUnchanged: true });
   });
 
@@ -237,87 +152,35 @@ void main() {
   outColor = pocket;
 }
 `;
-    await page.evaluate(
-      async ({ v, f }) => {
-        const sp = window.__sp;
-        if (!sp) throw new Error("__sp not exposed");
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        if (!node) throw new Error("no shader node");
-        sp.selection.getState().select(node.id);
-        sp.graph
-          .getState()
-          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
-      },
-      { v: V, f: F },
-    );
-    await page.getByTestId("stage-tab-vertex").click();
-
-    const fragBefore = await readSp(page, (sp) => {
-      const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-      return (node as { fragmentSource?: string } | undefined)?.fragmentSource;
-    });
-
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("vec2 pocket"))
-      .toBe(true);
+    await seedShaderAndSelect(page, { vertex: V, fragment: F });
+    const fragBefore = (await shaderSources(page)).fragment;
+    const content = await openStageEditor(page, "vertex", "vec2 pocket");
 
     // Click on the vertex local `pocket` — the unique multi-letter name
     // resolves to a CM token element directly.
     const useToken = content.getByText("pocket", { exact: true }).last();
     await useToken.click();
-    page.once("dialog", (d) => {
-      void d.accept("amt");
-    });
-    await page.keyboard.press("F2");
+    await renameViaF2(page, "amt");
 
     // Vertex got rewritten; fragment's `pocket` is a DIFFERENT local binding
     // and must stay byte-identical.
     await expect
-      .poll(async () =>
-        withSp(
-          page,
-          (sp, args: { fragBefore: string | undefined }) => {
-            const node = sp.graph
-              .getState()
-              .nodes.find((n) => n.kind === "shader");
-            const n = (node ?? {}) as {
-              vertexSource?: string;
-              fragmentSource?: string;
-            };
-            return {
-              vRenamed: n.vertexSource?.includes("vec2 amt =") ?? false,
-              vOldGone: !(n.vertexSource?.includes("pocket") ?? true),
-              fragUnchanged: n.fragmentSource === args.fragBefore,
-            };
-          },
-          { fragBefore },
-        ),
-      )
+      .poll(async () => {
+        const { vertex, fragment } = await shaderSources(page);
+        return {
+          vRenamed: vertex.includes("vec2 amt ="),
+          vOldGone: !vertex.includes("pocket"),
+          fragUnchanged: fragment === fragBefore,
+        };
+      })
       .toEqual({ vRenamed: true, vOldGone: true, fragUnchanged: true });
   });
 
   test("single graph-history entry for a cross-stage rename", async ({
     page,
   }) => {
-    await page.evaluate(
-      async ({ v, f }) => {
-        const sp = window.__sp;
-        if (!sp) throw new Error("__sp not exposed");
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        if (!node) throw new Error("no shader node");
-        sp.selection.getState().select(node.id);
-        sp.graph
-          .getState()
-          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
-      },
-      { v: VERT, f: FRAG },
-    );
-    await page.getByTestId("stage-tab-fragment").click();
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("u_amount"))
-      .toBe(true);
+    await seedShaderAndSelect(page, { vertex: VERT, fragment: FRAG });
+    const content = await openStageEditor(page, "fragment", "u_amount");
 
     const before = await readSp(
       page,
@@ -326,10 +189,7 @@ void main() {
 
     const useToken = content.getByText("u_amount", { exact: true }).last();
     await useToken.click();
-    page.once("dialog", (d) => {
-      void d.accept("u_strength");
-    });
-    await page.keyboard.press("F2");
+    await renameViaF2(page, "u_strength");
 
     // The cross-stage commit happens through ONE updateShaderSource patch =
     // one history push. (The CM dispatch's debounced commit a moment later
@@ -345,16 +205,13 @@ void main() {
     // The rename refactor passes the exact old→new pair with the both-stages
     // patch, so the store moves the input port's edge instead of reading the
     // old name as a deleted uniform.
-    const shaderId = await page.evaluate(
-      async ({ v, f }) => {
-        const sp = window.__sp;
-        if (!sp) throw new Error("__sp not exposed");
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        if (!node) throw new Error("no shader node");
-        sp.selection.getState().select(node.id);
-        sp.graph
-          .getState()
-          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
+    const shaderId = await seedShaderAndSelect(page, {
+      vertex: VERT,
+      fragment: FRAG,
+    });
+    await withSp(
+      page,
+      (sp, id: string) => {
         sp.graph.getState().addNode({
           id: "p-xstage",
           kind: "param",
@@ -365,26 +222,18 @@ void main() {
           id: "e-xstage",
           source: "p-xstage",
           sourceHandle: "value",
-          target: node.id,
+          target: id,
           targetHandle: "u_amount",
         });
-        sp.graph.getState().setUniformValue(node.id, "u_amount", 0.5);
-        return node.id;
+        sp.graph.getState().setUniformValue(id, "u_amount", 0.5);
       },
-      { v: VERT, f: FRAG },
+      shaderId,
     );
-    await page.getByTestId("stage-tab-fragment").click();
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("u_amount"))
-      .toBe(true);
+    const content = await openStageEditor(page, "fragment", "u_amount");
 
     const useToken = content.getByText("u_amount", { exact: true }).last();
     await useToken.click();
-    page.once("dialog", (d) => {
-      void d.accept("u_strength");
-    });
-    await page.keyboard.press("F2");
+    await renameViaF2(page, "u_strength");
 
     await expect
       .poll(async () =>
@@ -413,25 +262,8 @@ void main() {
   test("cross-stage rename keeps the cursor in place (no offset-0 collapse)", async ({
     page,
   }) => {
-    await page.evaluate(
-      async ({ v, f }) => {
-        const sp = window.__sp;
-        if (!sp) throw new Error("__sp not exposed");
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        if (!node) throw new Error("no shader node");
-        sp.selection.getState().select(node.id);
-        sp.graph
-          .getState()
-          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
-      },
-      { v: VERT, f: FRAG },
-    );
-    await page.getByTestId("stage-tab-fragment").click();
-
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("u_amount"))
-      .toBe(true);
+    await seedShaderAndSelect(page, { vertex: VERT, fragment: FRAG });
+    const content = await openStageEditor(page, "fragment", "u_amount");
 
     // Click the fragment-side use of u_amount inside main() — the cursor lands
     // well past offset 0 (line 1).
@@ -442,34 +274,24 @@ void main() {
     );
     expect(cursorBefore ?? 0).toBeGreaterThan(1);
 
-    page.once("dialog", (d) => {
-      void d.accept("u_strength");
-    });
-    await page.keyboard.press("F2");
+    await renameViaF2(page, "u_strength");
 
     // Wait for the cross-stage rewrite to land in the store.
     await expect
-      .poll(async () =>
-        readSp(page, (sp) => {
-          const node = sp.graph
-            .getState()
-            .nodes.find((n) => n.kind === "shader");
-          const n = (node ?? {}) as { fragmentSource?: string };
-          return n.fragmentSource?.includes("u_strength") ?? false;
-        }),
-      )
-      .toBe(true);
+      .poll(async () => (await shaderSources(page)).fragment)
+      .toContain("u_strength");
 
     // The rename mutates the doc AND commits to the store in one turn. The
     // reload effect must recognize the editor already shows `source` and skip
     // the full {from:0,to:len} replace — that dispatch carries no selection and
     // would collapse the cursor to offset 0 (line 1). The cursor must stay on
-    // its original line. (M11)
+    // its original line.
     await expect
       .poll(() => readSp(page, (sp) => sp.codeEditor.getCursorLine()))
       .toBe(cursorBefore);
   });
-  // F3 — CRLF in the paired stage. The reference finder reports absolute
+
+  // CRLF in the paired stage. The reference finder reports absolute
   // document offsets and `rename.ts` slices the OTHER stage's source with them
   // directly (`applyEdits`), but that source comes raw out of graphStore, not
   // out of CodeMirror. The line walk used to drop each line's `\r` while only
@@ -480,88 +302,42 @@ void main() {
   // (`resolveCrossStageContext` reading the store, CodeMirror normalising only
   // the document it holds).
   //
-  // Originally a project authored on Windows landed in the store with `\r\n`,
-  // because `deserializeProject` passed shader sources through verbatim. F22
-  // normalises them at the import boundary, so this spec now plants the CRLF
-  // through the `__sp` dev hook instead — `updateShaderSource` still accepts
-  // whatever it is given, which is exactly the writer this arithmetic guards.
+  // `deserializeProject` normalises imported sources to LF, so this spec
+  // plants the CRLF through the `__sp` dev hook — `updateShaderSource` still
+  // accepts whatever it is given, which is exactly the writer this arithmetic
+  // guards.
   test("renaming into a CRLF paired stage rewrites the right offsets", async ({
     page,
   }) => {
     const vertCrlf = VERT.replace(/\n/g, "\r\n");
 
-    await page.evaluate(
-      async ({ v, f }) => {
-        const sp = window.__sp;
-        if (!sp) throw new Error("__sp not exposed");
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        if (!node) throw new Error("no shader node");
-        sp.selection.getState().select(node.id);
-        sp.graph
-          .getState()
-          .updateShaderSource(node.id, { vertexSource: v, fragmentSource: f });
-      },
-      { v: vertCrlf, f: FRAG },
-    );
+    await seedShaderAndSelect(page, { vertex: vertCrlf, fragment: FRAG });
 
     // The store really is holding CRLF — `updateShaderSource` does not
     // normalise, and the fragment-only editor never rewrites the vertex stage.
-    expect(
-      await readSp(page, (sp) => {
-        const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-        const n = (node ?? {}) as { vertexSource?: string };
-        return n.vertexSource?.includes("\r\n") ?? false;
-      }),
-    ).toBe(true);
+    expect((await shaderSources(page)).vertex).toContain("\r\n");
 
     // A CRLF vertex source must still compile, or the rename below would be
     // renaming a shader that never linked.
-    await expect
-      .poll(() =>
-        readSp(page, (sp) => sp.renderer.getState().stats.errors.length),
-      )
-      .toBe(0);
+    await expectNoRendererErrors(page, { eventually: true });
 
-    await page.getByTestId("stage-tab-fragment").click();
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("u_amount"))
-      .toBe(true);
+    const content = await openStageEditor(page, "fragment", "u_amount");
 
     await content.getByText("u_amount", { exact: true }).last().click();
-    page.once("dialog", (d) => {
-      void d.accept("u_strength");
-    });
-    await page.keyboard.press("F2");
+    await renameViaF2(page, "u_strength");
 
     await expect
-      .poll(async () =>
-        readSp(page, (sp) => {
-          const node = sp.graph
-            .getState()
-            .nodes.find((n) => n.kind === "shader");
-          const n = (node ?? {}) as { vertexSource?: string };
-          return n.vertexSource?.includes("u_strength") ?? false;
-        }),
-      )
-      .toBe(true);
+      .poll(async () => (await shaderSources(page)).vertex)
+      .toContain("u_strength");
 
     // The vertex stage must be EXACTLY the original with both `u_amount`
     // occurrences swapped: same CRLF terminators, nothing else touched. On the
     // unfixed build the two edits landed one and two characters late, eating
     // parts of `a_position.xy` and `vec4(a_position`.
-    const vertexAfter = await readSp(page, (sp) => {
-      const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-      const n = (node ?? {}) as { vertexSource?: string };
-      return n.vertexSource ?? "";
-    });
+    const vertexAfter = (await shaderSources(page)).vertex;
     expect(vertexAfter).toBe(vertCrlf.replace(/u_amount/g, "u_strength"));
 
     // …and the rewritten program still compiles.
-    await expect
-      .poll(() =>
-        readSp(page, (sp) => sp.renderer.getState().stats.errors.length),
-      )
-      .toBe(0);
+    await expectNoRendererErrors(page, { eventually: true });
   });
 });

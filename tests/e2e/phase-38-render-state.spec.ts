@@ -1,7 +1,5 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { bootApp } from "./helpers/fixtures";
-import { readSp } from "./helpers/sp";
+import { bootApp, loadChainDemo } from "./helpers/fixtures";
 
 /**
  * Phase 38 — mental model correction I: render state (E-2,
@@ -17,23 +15,6 @@ import { readSp } from "./helpers/sp";
  * visible on screen; see renderState.ts's module doc). The footnote states
  * that precisely, and this spec pins its two load-bearing substrings.
  */
-
-/** Load the built-in Chain demo through the real toolbar preset (mirrors
- * phase-36-pipeline-visibility.spec.ts's `loadChainDemo`, duplicated rather
- * than imported so this spec stays independently runnable/decoupled). */
-async function loadChainDemo(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Presets" }).click();
-  await page.getByRole("menuitem", { name: "Chain", exact: true }).click();
-  await expect
-    .poll(() =>
-      readSp(page, (sp) =>
-        sp.graph.getState().nodes.find((n) => n.id === "tonemap1")
-          ? "ok"
-          : "no",
-      ),
-    )
-    .toBe("ok");
-}
 
 test.describe("Phase 38 — render state visibility", () => {
   test.beforeEach(async ({ page }) => {

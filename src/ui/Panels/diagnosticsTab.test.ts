@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type {
-  ComputeGraphNode,
-  MeshGraphNode,
-  ShaderGraphNode,
-} from "../../core/graph/types";
+import { computeNode, meshNode, shaderNode } from "../../core/graph/testNodes";
 import {
   emptyDiagnostics,
   type NodeDiagnostics,
@@ -15,32 +11,6 @@ import {
   linkedProgramsValue,
   relativeLogTime,
 } from "./diagnosticsTab";
-
-function shaderNode(id: string): ShaderGraphNode {
-  return {
-    id,
-    kind: "shader",
-    vertexSource: "",
-    fragmentSource: "",
-    uniformValues: {},
-  };
-}
-
-function computeNode(id: string): ComputeGraphNode {
-  return {
-    id,
-    kind: "compute",
-    vertexSource: "",
-    count: 1,
-    primitive: "POINTS",
-    attributes: [],
-    uniformValues: {},
-  };
-}
-
-function meshNode(id: string): MeshGraphNode {
-  return { id, kind: "mesh", primitive: "cube" };
-}
 
 describe("frameMetricValue", () => {
   it("returns an em dash when fps is 0 (no frames yet)", () => {

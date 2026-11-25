@@ -9,20 +9,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GeometryHandle, ImageHandle } from "../../core/assets/types";
 import { useAssetStore } from "../../state/assetStore";
 import { useBootstrapStore } from "../../state/bootstrapStore";
-import { useDebugUiStore } from "../../state/debugUiStore";
-import { useDiagnosticsStore } from "../../state/diagnosticsStore";
 import { useDockStore } from "../../state/dockStore";
 import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
-import { useRendererStore } from "../../state/rendererStore";
+import { resetAllStores } from "../../state/testStores";
 import { DockLeafContext } from "../dockLeafContext";
 import { SidePanel } from "./SidePanel";
-
-const initialAsset = useAssetStore.getState();
-const initialDiagnostics = useDiagnosticsStore.getState();
-const initialRenderer = useRendererStore.getState();
-const initialBootstrap = useBootstrapStore.getState();
-const initialDebugUi = useDebugUiStore.getState();
-const initialDock = useDockStore.getState();
 
 const meshHandle: GeometryHandle = {
   id: "mesh-1",
@@ -38,24 +29,17 @@ const imageHandle: ImageHandle = {
 };
 
 function resetStores() {
-  useAssetStore.setState(initialAsset, true);
-  useDiagnosticsStore.setState(initialDiagnostics, true);
-  useRendererStore.setState(initialRenderer, true);
-  useDebugUiStore.setState(initialDebugUi, true);
-  useDockStore.setState(
-    { ...initialDock, tree: createDefaultDockTree() },
-    true,
-  );
-  // SidePanel only shows its real tab content once bootstrap has finished
-  // (M7-U1) — the store is a module singleton, so tests that don't care
-  // about the loading skeleton need it forced to "done" here.
-  useBootstrapStore.setState({ ...initialBootstrap, phase: "done" });
+  resetAllStores();
+  useDockStore.setState({ tree: createDefaultDockTree() });
+  // SidePanel only shows its real tab content once bootstrap has finished —
+  // tests that don't care about the loading skeleton force it to "done".
+  useBootstrapStore.setState({ phase: "done" });
 }
 
 beforeEach(resetStores);
 afterEach(() => {
   cleanup();
-  useBootstrapStore.setState(initialBootstrap, true);
+  resetAllStores();
 });
 
 /** B2-U1: SidePanel now reads its collapsed state via `useDockLeaf()` (routed
@@ -124,7 +108,7 @@ describe("SidePanel", () => {
   });
 
   it("shows the panel skeleton instead of tab content while bootstrap phase is not 'done'", () => {
-    useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
+    useBootstrapStore.setState({ phase: "init" });
 
     renderSidePanel();
 
@@ -135,7 +119,7 @@ describe("SidePanel", () => {
   });
 
   it("shows the panel skeleton while a recovery prompt is pending", () => {
-    useBootstrapStore.setState({ ...initialBootstrap, phase: "prompt" });
+    useBootstrapStore.setState({ phase: "prompt" });
 
     renderSidePanel();
 
@@ -143,7 +127,7 @@ describe("SidePanel", () => {
   });
 
   it("swaps back to real tab content once bootstrap phase is 'done'", () => {
-    useBootstrapStore.setState({ ...initialBootstrap, phase: "done" });
+    useBootstrapStore.setState({ phase: "done" });
 
     renderSidePanel();
 

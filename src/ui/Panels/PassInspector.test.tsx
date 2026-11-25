@@ -1,39 +1,16 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
+import { computeNode, shaderNode } from "../../core/graph/testNodes";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
 import type { ComputePassRow, ShaderPassRow } from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
+import { resetAllStores } from "../../state/testStores";
 import { PassInspector } from "./PassInspector";
 
-const initialGraph = useGraphStore.getState();
-const initialPassPlan = usePassPlanStore.getState();
-const initialGpuTimer = useGpuTimerStore.getState();
-
-function shaderNode(id: string, name: string): ShaderGraphNode {
-  return {
-    id,
-    kind: "shader",
-    name,
-    vertexSource: "",
-    fragmentSource: "",
-    uniformValues: {},
-  };
-}
-
-function computeNode(id: string, name: string): ComputeGraphNode {
-  return {
-    id,
-    kind: "compute",
-    name,
-    vertexSource: "",
-    count: 1024,
-    primitive: "POINTS",
-    attributes: [],
-    uniformValues: {},
-  };
-}
+/** The one compute pass these tests publish; `count` shows up in the mesh
+ *  column ("POINTS ×1024"). */
+const PARTICLES = computeNode("compute1", { name: "Particles", count: 1024 });
 
 function computeRow(
   nodeId: string,
@@ -66,16 +43,10 @@ function shaderRow(
   };
 }
 
-function resetStores() {
-  useGraphStore.setState(initialGraph, true);
-  usePassPlanStore.setState(initialPassPlan, true);
-  useGpuTimerStore.setState(initialGpuTimer, true);
-}
-
-beforeEach(resetStores);
+beforeEach(resetAllStores);
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
   vi.useRealTimers();
 });
 
@@ -97,7 +68,9 @@ describe("PassInspector", () => {
     // Viewport unmounted (panel closed): the rows survive for the surfaces
     // that describe the *graph*, but this table describes *this frame*, so it
     // must not list a disposed plan's passes — nor imply the graph has none.
-    useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
+    useGraphStore.setState({
+      nodes: [shaderNode("noise1", { name: "Noise" })],
+    });
     usePassPlanStore
       .getState()
       .publish([shaderRow({ nodeId: "noise1" })], {}, {});
@@ -118,9 +91,9 @@ describe("PassInspector", () => {
   it("renders rows in plan order with correct kind/FBO/mesh/sampler cells", () => {
     useGraphStore.setState({
       nodes: [
-        computeNode("compute1", "Particles"),
-        shaderNode("noise1", "Noise"),
-        shaderNode("blur1", "Blur"),
+        PARTICLES,
+        shaderNode("noise1", { name: "Noise" }),
+        shaderNode("blur1", { name: "Blur" }),
       ],
     });
     usePassPlanStore.getState().publish(
@@ -201,7 +174,10 @@ describe("PassInspector", () => {
   // read as a unit binding `execute.ts` never performs.
   it("marks a sampler whose source produced no texture as 미바인딩, leaving sibling samplers alone", () => {
     useGraphStore.setState({
-      nodes: [shaderNode("blur1", "Blur"), shaderNode("noise1", "Noise")],
+      nodes: [
+        shaderNode("blur1", { name: "Blur" }),
+        shaderNode("noise1", { name: "Noise" }),
+      ],
     });
     usePassPlanStore.getState().publish(
       [
@@ -233,7 +209,7 @@ describe("PassInspector", () => {
 
   it("gives the compute row's State cell an explanatory title, no title on shader rows", () => {
     useGraphStore.setState({
-      nodes: [computeNode("compute1", "Particles"), shaderNode("s1", "S1")],
+      nodes: [PARTICLES, shaderNode("s1", { name: "S1" })],
     });
     usePassPlanStore
       .getState()
@@ -251,10 +227,7 @@ describe("PassInspector", () => {
 
   it("resolves a shader row's compute-driven mesh via the driving ComputePassRow", () => {
     useGraphStore.setState({
-      nodes: [
-        computeNode("compute1", "Particles"),
-        shaderNode("draw1", "Draw"),
-      ],
+      nodes: [PARTICLES, shaderNode("draw1", { name: "Draw" })],
     });
     usePassPlanStore.getState().publish(
       [
@@ -278,7 +251,7 @@ describe("PassInspector", () => {
   });
 
   it('falls back to "compute" when the driving ComputePassRow is missing', () => {
-    useGraphStore.setState({ nodes: [shaderNode("draw1", "Draw")] });
+    useGraphStore.setState({ nodes: [shaderNode("draw1", { name: "Draw" })] });
     usePassPlanStore.getState().publish(
       [
         shaderRow({
@@ -310,7 +283,9 @@ describe("PassInspector", () => {
   });
 
   it('renders "—" in the GPU ms column when the timer extension is unsupported', () => {
-    useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
+    useGraphStore.setState({
+      nodes: [shaderNode("noise1", { name: "Noise" })],
+    });
     usePassPlanStore
       .getState()
       .publish([shaderRow({ nodeId: "noise1" })], {}, {});
@@ -325,7 +300,9 @@ describe("PassInspector", () => {
   });
 
   it('renders "—" in the GPU ms column when the timer is disabled', () => {
-    useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
+    useGraphStore.setState({
+      nodes: [shaderNode("noise1", { name: "Noise" })],
+    });
     usePassPlanStore
       .getState()
       .publish([shaderRow({ nodeId: "noise1" })], {}, {});
@@ -340,7 +317,9 @@ describe("PassInspector", () => {
   });
 
   it("renders the formatted GPU ms when supported and enabled", () => {
-    useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
+    useGraphStore.setState({
+      nodes: [shaderNode("noise1", { name: "Noise" })],
+    });
     usePassPlanStore
       .getState()
       .publish([shaderRow({ nodeId: "noise1" })], {}, {});
@@ -356,7 +335,7 @@ describe("PassInspector", () => {
 
   it("polls the live compute read side every 250ms while mounted, without any store publish", () => {
     vi.useFakeTimers();
-    useGraphStore.setState({ nodes: [computeNode("compute1", "Particles")] });
+    useGraphStore.setState({ nodes: [PARTICLES] });
     let read: "A" | "B" = "A";
     const rows = [computeRow("compute1", () => read)];
     usePassPlanStore.getState().publish(rows, {}, {});

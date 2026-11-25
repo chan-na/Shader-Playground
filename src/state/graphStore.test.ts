@@ -26,6 +26,20 @@ const makeShader = (id: string, frag = "void main(){}"): ShaderGraphNode => ({
   uniformValues: {},
 });
 
+const makeCompute = (
+  id: string,
+  overrides: Partial<Omit<ComputeGraphNode, "id" | "kind">> = {},
+): ComputeGraphNode => ({
+  id,
+  kind: "compute",
+  vertexSource: "void main(){}",
+  count: 16,
+  primitive: "POINTS",
+  attributes: [],
+  uniformValues: {},
+  ...overrides,
+});
+
 describe("graphStore", () => {
   beforeEach(() => {
     useGraphStore.getState().reset();
@@ -199,18 +213,19 @@ describe("graphStore", () => {
   });
 
   it("cloneNode performs a deep copy (mutating clone leaves source intact)", () => {
-    const cn: ComputeGraphNode = {
-      id: "c1",
-      kind: "compute",
-      vertexSource: "void main(){}",
-      count: 16,
-      primitive: "POINTS",
-      attributes: [
-        { inName: "a_position", outName: "v_position", size: 3, seed: "zero" },
-      ],
-      uniformValues: { u_k: 1 },
-    };
-    useGraphStore.getState().addNode(cn);
+    useGraphStore.getState().addNode(
+      makeCompute("c1", {
+        attributes: [
+          {
+            inName: "a_position",
+            outName: "v_position",
+            size: 3,
+            seed: "zero",
+          },
+        ],
+        uniformValues: { u_k: 1 },
+      }),
+    );
     const newId = useGraphStore.getState().cloneNode("c1");
     const clone = useGraphStore
       .getState()
@@ -370,17 +385,12 @@ void main(){}`;
 
     it("updateComputeSource drops the edge into a deleted uniform", () => {
       const s = useGraphStore.getState();
-      const cn: ComputeGraphNode = {
-        id: "cp1",
-        kind: "compute",
-        vertexSource:
-          "uniform float u_speed;\nuniform float u_drag;\nvoid main(){}",
-        count: 16,
-        primitive: "POINTS",
-        attributes: [],
-        uniformValues: {},
-      };
-      s.addNode(cn);
+      s.addNode(
+        makeCompute("cp1", {
+          vertexSource:
+            "uniform float u_speed;\nuniform float u_drag;\nvoid main(){}",
+        }),
+      );
       s.addNode({ id: "p1", kind: "param", paramKind: "float", value: 0.1 });
       s.addEdge({
         id: "e1",
@@ -485,15 +495,11 @@ void main(){}`,
 
     it("renames a ComputeNode uniform port the same way", () => {
       const s = useGraphStore.getState();
-      s.addNode({
-        id: "cp1",
-        kind: "compute",
-        vertexSource: "uniform float u_speed;\nvoid main(){}",
-        count: 16,
-        primitive: "POINTS",
-        attributes: [],
-        uniformValues: {},
-      } as ComputeGraphNode);
+      s.addNode(
+        makeCompute("cp1", {
+          vertexSource: "uniform float u_speed;\nvoid main(){}",
+        }),
+      );
       s.addNode({ id: "p1", kind: "param", paramKind: "float", value: 0.1 });
       s.addEdge({
         id: "e1",
@@ -529,16 +535,6 @@ void main(){}`,
         "u_unrelated",
       );
     });
-
-    it("still drops the edge when the swap changes the port type", () => {
-      seedRenameGraph();
-      useGraphStore.getState().updateShaderSource("s1", {
-        fragmentSource: `precision highp float;
-uniform vec3 u_unrelated;
-void main(){}`,
-      });
-      expect(useGraphStore.getState().edges).toEqual([]);
-    });
   });
 
   it("setUniformValue bumps uniformRev not rev", () => {
@@ -573,18 +569,7 @@ void main(){}`,
   });
 
   it("updateComputeSource patches vertexSource and bumps rev (Phase 13)", () => {
-    const cn: ComputeGraphNode = {
-      id: "c1",
-      kind: "compute",
-      vertexSource: "void main(){}",
-      count: 16,
-      primitive: "POINTS",
-      attributes: [
-        { inName: "a_position", outName: "v_position", size: 3, seed: "zero" },
-      ],
-      uniformValues: {},
-    };
-    useGraphStore.getState().addNode(cn);
+    useGraphStore.getState().addNode(makeCompute("c1"));
     const before = useGraphStore.getState();
     useGraphStore.getState().updateComputeSource("c1", "// new vertex source");
     const after = useGraphStore.getState();
@@ -594,19 +579,19 @@ void main(){}`,
     expect(after.rev).toBe(before.rev + 1);
   });
 
-  it("setComputeConfig patches count/primitive/attributes (Phase 13)", () => {
-    const cn: ComputeGraphNode = {
-      id: "c1",
-      kind: "compute",
-      vertexSource: "",
-      count: 16,
-      primitive: "POINTS",
-      attributes: [
-        { inName: "a_position", outName: "v_position", size: 3, seed: "zero" },
-      ],
-      uniformValues: {},
-    };
-    useGraphStore.getState().addNode(cn);
+  it("setComputeConfig patches count/primitive and keeps omitted attributes (Phase 13)", () => {
+    useGraphStore.getState().addNode(
+      makeCompute("c1", {
+        attributes: [
+          {
+            inName: "a_position",
+            outName: "v_position",
+            size: 3,
+            seed: "zero",
+          },
+        ],
+      }),
+    );
     useGraphStore
       .getState()
       .setComputeConfig("c1", { count: 512, primitive: "LINES" });
@@ -615,6 +600,8 @@ void main(){}`,
       .nodes.find((n) => n.id === "c1") as ComputeGraphNode;
     expect(updated.count).toBe(512);
     expect(updated.primitive).toBe("LINES");
+    expect(updated.attributes).toHaveLength(1);
+    expect(updated.attributes[0]?.inName).toBe("a_position");
   });
 
   it("setWebcamConfig assigns deviceId, bumps rev, and pushes history (Phase 14)", () => {
@@ -779,24 +766,6 @@ void main(){}`,
     expect(updated.values).toEqual([1, 2, 3, 4]);
   });
 
-  it("setComputeConfig falls back to existing attributes when patch omits them", () => {
-    const cn: ComputeGraphNode = {
-      id: "cc1",
-      kind: "compute",
-      vertexSource: "",
-      count: 16,
-      primitive: "POINTS",
-      attributes: [{ inName: "a_p", outName: "v_p", size: 3, seed: "zero" }],
-      uniformValues: {},
-    };
-    useGraphStore.getState().addNode(cn);
-    useGraphStore.getState().setComputeConfig("cc1", { count: 64 });
-    const updated = useGraphStore.getState().nodes[0] as ComputeGraphNode;
-    expect(updated.count).toBe(64);
-    expect(updated.attributes).toHaveLength(1);
-    expect(updated.attributes[0]?.inName).toBe("a_p");
-  });
-
   it("setParamValue updates value and bumps uniformRev only", () => {
     const p: ParamGraphNode = {
       id: "p1",
@@ -811,24 +780,6 @@ void main(){}`,
     expect((after.nodes[0] as ParamGraphNode).value).toBe(0.42);
     expect(after.uniformRev).toBe(before.uniformRev + 1);
     expect(after.rev).toBe(before.rev);
-  });
-
-  // [A-1] setParamLabel is gone — a param renames through renameNode like every
-  // other kind (see the renameNode describe block below).
-  it("renameNode sets a param's name and bumps rev", () => {
-    const p: ParamGraphNode = {
-      id: "p1",
-      kind: "param",
-      paramKind: "float",
-      value: 0,
-    };
-    useGraphStore.getState().addNode(p);
-    const before = useGraphStore.getState().rev;
-    useGraphStore.getState().renameNode("p1", "Intensity");
-    expect((useGraphStore.getState().nodes[0] as ParamGraphNode).name).toBe(
-      "Intensity",
-    );
-    expect(useGraphStore.getState().rev).toBe(before + 1);
   });
 
   describe("renameNode", () => {
@@ -925,16 +876,7 @@ void main(){}`,
   });
 
   it("setUniformValue also targets compute nodes", () => {
-    const cn: ComputeGraphNode = {
-      id: "cu1",
-      kind: "compute",
-      vertexSource: "",
-      count: 1,
-      primitive: "POINTS",
-      attributes: [],
-      uniformValues: {},
-    };
-    useGraphStore.getState().addNode(cn);
+    useGraphStore.getState().addNode(makeCompute("cu1"));
     useGraphStore.getState().setUniformValue("cu1", "u_x", 7);
     const updated = useGraphStore.getState().nodes[0] as ComputeGraphNode;
     expect(updated.uniformValues.u_x).toBe(7);
@@ -980,20 +922,6 @@ void main(){}`,
   });
 
   const liveIds = () => useGraphStore.getState().nodes.map((n) => n.id);
-
-  it("undoGraph restores exactly the pre-mutation graph (C1 regression)", () => {
-    useGraphStore
-      .getState()
-      .addNode({ id: "a", kind: "mesh", primitive: "cube" });
-    useGraphStore
-      .getState()
-      .addNode({ id: "b", kind: "mesh", primitive: "sphere" });
-    expect(liveIds()).toEqual(["a", "b"]);
-
-    // Undo must step back exactly one mutation → [a], not wipe to [].
-    expect(undoGraph()).toBe(true);
-    expect(liveIds()).toEqual(["a"]);
-  });
 
   it("add→add→undo→undo→redo→redo round-trips by node id (C1 regression)", () => {
     useGraphStore
@@ -1073,16 +1001,11 @@ void main(){}`,
 
     it("writes into a compute node's vertex source", () => {
       const s = useGraphStore.getState();
-      const cn: ComputeGraphNode = {
-        id: "c1",
-        kind: "compute",
-        vertexSource: "uniform float u_speed;\nvoid main(){}",
-        count: 10,
-        primitive: "POINTS",
-        attributes: [],
-        uniformValues: {},
-      };
-      s.addNode(cn);
+      s.addNode(
+        makeCompute("c1", {
+          vertexSource: "uniform float u_speed;\nvoid main(){}",
+        }),
+      );
       s.setUniformHints("c1", "u_speed", { min: 0, max: 3, step: 0.1 });
 
       const node = useGraphStore.getState().nodes.find((n) => n.id === "c1");

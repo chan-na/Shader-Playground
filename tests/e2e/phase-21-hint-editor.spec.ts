@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   bootApp,
+  selectNode,
   setGraph,
   trivialMeshGraph,
   trivialShaderSources,
@@ -18,7 +19,7 @@ test.describe("Phase 21 — Inspector hint editor (annotation write-back)", () =
     });
 
     await page.getByTestId("tab-inspector").click();
-    await withSp(page, (sp) => sp.selection.getState().select("s1"), undefined);
+    await selectNode(page, "s1");
 
     // Add a plain float uniform so the editor has a slider to retarget.
     const before = await readSp(page, (sp) => sp.graph.getState().rev);

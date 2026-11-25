@@ -1,7 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { type NodeProps, ReactFlowProvider } from "@xyflow/react";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { GeometryHandle } from "../../../core/assets/types";
 import { IMAGE_TEXTURE_PARAMS } from "../../../core/gl/texture";
@@ -21,6 +18,7 @@ import { useGraphStore } from "../../../state/graphStore";
 import type { ShaderPassRow } from "../../../state/passPlanStore";
 import { usePassPlanStore } from "../../../state/passPlanStore";
 import { tokens } from "../../../theme";
+import { nodeProps, renderInFlow, renderInFlowStatic } from "../testFlow";
 import { ComputeNodeView } from "./ComputeNodeView";
 import { ImageNodeView } from "./ImageNodeView";
 import { MeshNodeView } from "./MeshNodeView";
@@ -40,15 +38,6 @@ import {
 // simTime in time param) are covered by their helpers' direct unit tests
 // instead — see paramNodeViewHelpers.test.ts.
 
-function mockProps(id: string, node: unknown): NodeProps {
-  return { id, data: { node } } as unknown as NodeProps;
-}
-
-/** ReactFlow's Handle requires ReactFlowProvider context to mount. */
-function renderInFlow(element: ReactElement): string {
-  return renderToStaticMarkup(<ReactFlowProvider>{element}</ReactFlowProvider>);
-}
-
 describe("MeshNodeView", () => {
   it("renders the primitive label when no asset is bound", () => {
     const node: MeshGraphNode = {
@@ -57,7 +46,9 @@ describe("MeshNodeView", () => {
       primitive: "cube",
       assetId: null,
     };
-    const html = renderInFlow(<MeshNodeView {...mockProps("m1", node)} />);
+    const html = renderInFlowStatic(
+      <MeshNodeView {...nodeProps("m1", node)} />,
+    );
     expect(html).toContain("Mesh");
     expect(html).toContain("cube");
     expect(html).toContain("handle-mesh");
@@ -73,7 +64,9 @@ describe("MeshNodeView", () => {
       primitive: "sphere",
       assetId: null,
     };
-    const html = renderInFlow(<MeshNodeView {...mockProps("m1", node)} />);
+    const html = renderInFlowStatic(
+      <MeshNodeView {...nodeProps("m1", node)} />,
+    );
     for (const p of ["cube", "sphere", "plane", "torus", "quad"]) {
       expect(html).toContain(`value="${p}"`);
     }
@@ -88,7 +81,9 @@ describe("MeshNodeView", () => {
       primitive: "cube",
       assetId: null,
     };
-    const html = renderInFlow(<MeshNodeView {...mockProps("m1", node)} />);
+    const html = renderInFlowStatic(
+      <MeshNodeView {...nodeProps("m1", node)} />,
+    );
     expect(html).toContain('data-testid="mesh-contract"');
     expect(html).toContain("a_position vec3");
     expect(html).toContain("a_normal vec3");
@@ -99,10 +94,9 @@ describe("MeshNodeView", () => {
   });
 });
 
-// [B-1] Asset-store-dependent branch — needs a live (client) render rather
-// than renderInFlow's renderToStaticMarkup, which (per the NOTE at the top of
-// this file) always sees zustand's frozen *initial* snapshot and would never
-// observe an addMesh() call made before rendering.
+// Asset-store-dependent branch — needs a live (client) render: static markup
+// always sees zustand's frozen *initial* snapshot and would never observe an
+// addMesh() call made before rendering.
 describe("MeshNodeView — asset attribute contract [B-1]", () => {
   const initialAssetState = useAssetStore.getState();
 
@@ -133,11 +127,7 @@ describe("MeshNodeView — asset attribute contract [B-1]", () => {
       assetId: "a1",
     };
 
-    render(
-      <ReactFlowProvider>
-        <MeshNodeView {...mockProps("m1", node)} />
-      </ReactFlowProvider>,
-    );
+    renderInFlow(<MeshNodeView {...nodeProps("m1", node)} />);
 
     const contract = screen.getByTestId("mesh-contract");
     expect(contract.textContent).toContain("a_position vec3");
@@ -207,11 +197,7 @@ describe("MeshNodeView — attribute consumption warning [B-2]", () => {
       {},
     );
 
-    render(
-      <ReactFlowProvider>
-        <MeshNodeView {...mockProps("m1", meshNode)} />
-      </ReactFlowProvider>,
-    );
+    renderInFlow(<MeshNodeView {...nodeProps("m1", meshNode)} />);
 
     const warn = screen.getByTestId("mesh-skipped-attrs");
     expect(warn.textContent).toContain("a_normal");
@@ -235,22 +221,14 @@ describe("MeshNodeView — attribute consumption warning [B-2]", () => {
       {},
     );
 
-    render(
-      <ReactFlowProvider>
-        <MeshNodeView {...mockProps("m1", meshNode)} />
-      </ReactFlowProvider>,
-    );
+    renderInFlow(<MeshNodeView {...nodeProps("m1", meshNode)} />);
 
     expect(screen.queryByTestId("mesh-skipped-attrs")).toBeNull();
   });
 
   it("renders no warning line when there is no connected consumer (unknown, not skipped)", () => {
     // No edges published — every attribute aggregates to "unknown".
-    render(
-      <ReactFlowProvider>
-        <MeshNodeView {...mockProps("m1", meshNode)} />
-      </ReactFlowProvider>,
-    );
+    renderInFlow(<MeshNodeView {...nodeProps("m1", meshNode)} />);
 
     expect(screen.queryByTestId("mesh-skipped-attrs")).toBeNull();
   });
@@ -259,7 +237,9 @@ describe("MeshNodeView — attribute consumption warning [B-2]", () => {
 describe("ImageNodeView", () => {
   it("renders placeholder when no asset is bound", () => {
     const node: ImageGraphNode = { id: "i1", kind: "image", assetId: null };
-    const html = renderInFlow(<ImageNodeView {...mockProps("i1", node)} />);
+    const html = renderInFlowStatic(
+      <ImageNodeView {...nodeProps("i1", node)} />,
+    );
     expect(html).toContain("Image");
     expect(html).toContain("No image");
     expect(html).toContain("handle-texture");
@@ -270,7 +250,9 @@ describe("ImageNodeView", () => {
   // it must show the actual sampling contract regardless of asset binding.
   it("shows the wrap/mipmap meta line derived from IMAGE_TEXTURE_PARAMS", () => {
     const node: ImageGraphNode = { id: "i1", kind: "image", assetId: null };
-    const html = renderInFlow(<ImageNodeView {...mockProps("i1", node)} />);
+    const html = renderInFlowStatic(
+      <ImageNodeView {...nodeProps("i1", node)} />,
+    );
     expect(html).toContain(IMAGE_TEXTURE_PARAMS.wrapS);
     expect(html).toContain("mipmap");
   });
@@ -285,7 +267,9 @@ describe("ShaderNodeView", () => {
       fragmentSource: "",
       uniformValues: {},
     };
-    const html = renderInFlow(<ShaderNodeView {...mockProps("s1", node)} />);
+    const html = renderInFlowStatic(
+      <ShaderNodeView {...nodeProps("s1", node)} />,
+    );
     expect(html).toContain("Shader");
     expect(html).toContain("handle-mesh");
     expect(html).toContain("handle-texture");
@@ -307,7 +291,9 @@ describe("ShaderNodeView", () => {
       fragmentSource: "uniform float u_intensity;",
       uniformValues: {},
     };
-    const html = renderInFlow(<ShaderNodeView {...mockProps("s1", node)} />);
+    const html = renderInFlowStatic(
+      <ShaderNodeView {...nodeProps("s1", node)} />,
+    );
     expect(html).toContain("handle-float");
     expect(html).toContain(">u_intensity<");
   });
@@ -320,7 +306,9 @@ describe("ShaderNodeView", () => {
       fragmentSource: "uniform sampler2D u_tex;",
       uniformValues: {},
     };
-    const html = renderInFlow(<ShaderNodeView {...mockProps("s1", node)} />);
+    const html = renderInFlowStatic(
+      <ShaderNodeView {...nodeProps("s1", node)} />,
+    );
     // mesh handle + sampler handle + output texture handle → at least 2 handle-texture occurrences
     expect((html.match(/handle-texture/g) ?? []).length).toBeGreaterThanOrEqual(
       2,
@@ -336,20 +324,10 @@ describe("ShaderNodeView", () => {
       uniformValues: {},
       name: "Fresnel Glow",
     };
-    const html = renderInFlow(<ShaderNodeView {...mockProps("s1", node)} />);
+    const html = renderInFlowStatic(
+      <ShaderNodeView {...nodeProps("s1", node)} />,
+    );
     expect(html).toContain("Fresnel Glow");
-  });
-
-  it("does not render the internal node id anywhere in the card [D15]", () => {
-    const node: ShaderGraphNode = {
-      id: "s1",
-      kind: "shader",
-      vertexSource: "",
-      fragmentSource: "",
-      uniformValues: {},
-    };
-    const html = renderInFlow(<ShaderNodeView {...mockProps("s1", node)} />);
-    expect(html).not.toContain("s1");
   });
 });
 
@@ -364,7 +342,9 @@ describe("ComputeNodeView", () => {
       attributes: [{ inName: "a_p", outName: "v_p", size: 3, seed: "sphere" }],
       uniformValues: {},
     };
-    const html = renderInFlow(<ComputeNodeView {...mockProps("c1", node)} />);
+    const html = renderInFlowStatic(
+      <ComputeNodeView {...nodeProps("c1", node)} />,
+    );
     expect(html).toContain("Compute");
     // Body is now a key-value row list (design/Node Editor.dc.html L221-225):
     // label(primitive/verts/attrs) + value, instead of a composite string.
@@ -388,7 +368,9 @@ describe("ComputeNodeView", () => {
       attributes: [],
       uniformValues: {},
     };
-    const html = renderInFlow(<ComputeNodeView {...mockProps("c1", node)} />);
+    const html = renderInFlowStatic(
+      <ComputeNodeView {...nodeProps("c1", node)} />,
+    );
     expect(html).toContain("handle-float");
     expect(html).toContain(">u_dt<");
     expect(html).toContain("node-card__port-label--out");
@@ -398,7 +380,9 @@ describe("ComputeNodeView", () => {
 describe("OutputNodeView", () => {
   it("renders the static Output card with a single target handle", () => {
     const node: GraphNode = { id: "o1", kind: "output" };
-    const html = renderInFlow(<OutputNodeView {...mockProps("o1", node)} />);
+    const html = renderInFlowStatic(
+      <OutputNodeView {...nodeProps("o1", node)} />,
+    );
     expect(html).toContain("Output");
     expect(html).toContain("→ viewport");
     expect(html).toContain("handle-texture");
@@ -409,7 +393,9 @@ describe("OutputNodeView", () => {
 
   it("renders the custom name as the title when set [D15]", () => {
     const node: GraphNode = { id: "o1", kind: "output", name: "Main Output" };
-    const html = renderInFlow(<OutputNodeView {...mockProps("o1", node)} />);
+    const html = renderInFlowStatic(
+      <OutputNodeView {...nodeProps("o1", node)} />,
+    );
     expect(html).toContain("Main Output");
   });
 });
@@ -422,7 +408,9 @@ describe("ParamNodeView", () => {
       paramKind: "float",
       value: 0.42,
     };
-    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
+    const html = renderInFlowStatic(
+      <ParamNodeView {...nodeProps("p1", node)} />,
+    );
     // Unnamed param falls back to NODE_META.param.label ("Parameter"), not
     // the legacy hardcoded "Param" string [D15].
     expect(html).toContain("Parameter");
@@ -440,7 +428,9 @@ describe("ParamNodeView", () => {
       paramKind: "vec3",
       value: [0.1, 0.2, 0.3],
     };
-    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
+    const html = renderInFlowStatic(
+      <ParamNodeView {...nodeProps("p1", node)} />,
+    );
     expect(html).toContain('value="0.100"');
     expect(html).toContain('value="0.200"');
     expect(html).toContain('value="0.300"');
@@ -454,26 +444,16 @@ describe("ParamNodeView", () => {
       paramKind: "color",
       value: [1, 0, 0],
     };
-    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
+    const html = renderInFlowStatic(
+      <ParamNodeView {...nodeProps("p1", node)} />,
+    );
     expect(html).toContain("node-card__param-swatch");
     expect(html).toContain("ff0000");
     expect(html).toContain('type="color"');
     expect(html).toContain("handle-vec3");
   });
 
-  it("uses the custom name when defined", () => {
-    const node: ParamGraphNode = {
-      id: "p1",
-      kind: "param",
-      paramKind: "float",
-      value: 1,
-      name: "Intensity",
-    };
-    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
-    expect(html).toContain("Intensity");
-  });
-
-  // [A-1] `name` is now the only user-set title source for a param.
+  // `name` is the only user-set title source for a param.
   it("renders the user-set name [D15·A-1]", () => {
     const node: ParamGraphNode = {
       id: "p1",
@@ -482,19 +462,10 @@ describe("ParamNodeView", () => {
       value: 1,
       name: "Wave Speed",
     };
-    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
+    const html = renderInFlowStatic(
+      <ParamNodeView {...nodeProps("p1", node)} />,
+    );
     expect(html).toContain("Wave Speed");
-  });
-
-  it("does not render the internal node id anywhere in the card [D15]", () => {
-    const node: ParamGraphNode = {
-      id: "p1",
-      kind: "param",
-      paramKind: "float",
-      value: 0.42,
-    };
-    const html = renderInFlow(<ParamNodeView {...mockProps("p1", node)} />);
-    expect(html).not.toContain("p1");
   });
 });
 
@@ -507,7 +478,9 @@ describe("MathNodeView", () => {
       a: 0.5,
       b: 0,
     };
-    const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
+    const html = renderInFlowStatic(
+      <MathNodeView {...nodeProps("m1", node)} />,
+    );
     expect(html).toContain("Math");
     expect(html).toContain("sin");
     // One editable field with the "a" label, and no "b" field surfaces.
@@ -527,31 +500,23 @@ describe("MathNodeView", () => {
       a: 1,
       b: 2,
     };
-    const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
+    const html = renderInFlowStatic(
+      <MathNodeView {...nodeProps("m1", node)} />,
+    );
     expect(html).toContain(">a<");
     expect(html).toContain(">b<");
     expect(html).toContain('value="1.000"');
     expect(html).toContain('value="2.000"');
     expect(html).toContain(">value<");
   });
-
-  it("does not render the internal node id anywhere in the card [D15]", () => {
-    const node: MathGraphNode = {
-      id: "m1",
-      kind: "math",
-      op: "add",
-      a: 1,
-      b: 2,
-    };
-    const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
-    expect(html).not.toContain("m1");
-  });
 });
 
 describe("SwizzleNodeView", () => {
   it("renders a valid mask and shows the resulting type", () => {
     const node: SwizzleGraphNode = { id: "z1", kind: "swizzle", mask: "xyz" };
-    const html = renderInFlow(<SwizzleNodeView {...mockProps("z1", node)} />);
+    const html = renderInFlowStatic(
+      <SwizzleNodeView {...nodeProps("z1", node)} />,
+    );
     expect(html).toContain('value="xyz"');
     expect(html).toContain("vec3");
     expect(html).toContain("handle-vec4"); // input
@@ -560,7 +525,9 @@ describe("SwizzleNodeView", () => {
 
   it("flags an invalid mask", () => {
     const node: SwizzleGraphNode = { id: "z1", kind: "swizzle", mask: "abc" };
-    const html = renderInFlow(<SwizzleNodeView {...mockProps("z1", node)} />);
+    const html = renderInFlowStatic(
+      <SwizzleNodeView {...nodeProps("z1", node)} />,
+    );
     expect(html).toContain("invalid mask");
   });
 });
@@ -573,7 +540,9 @@ describe("CombineNodeView", () => {
       arity: 2,
       values: [0.1, 0.2, 0, 0],
     };
-    const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
+    const html = renderInFlowStatic(
+      <CombineNodeView {...nodeProps("cb1", node)} />,
+    );
     expect(html).toContain("Combine");
     expect(html).toContain("vec2");
     expect(html).toContain(">x<");
@@ -592,29 +561,48 @@ describe("CombineNodeView", () => {
       arity: 4,
       values: [0.1, 0.2, 0.3, 0.4],
     };
-    const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
+    const html = renderInFlowStatic(
+      <CombineNodeView {...nodeProps("cb1", node)} />,
+    );
     expect(html).toContain(">w<");
     expect(html).toContain('value="0.400"');
     expect(html).toContain("handle-vec4");
   });
+});
 
-  it("does not render the internal node id anywhere in the card [D15]", () => {
-    const node: CombineGraphNode = {
-      id: "cb1",
-      kind: "combine",
-      arity: 2,
-      values: [0.1, 0.2, 0, 0],
-    };
-    const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
-    expect(html).not.toContain("cb1");
+describe("node cards never show the internal node id [D15]", () => {
+  const shader: ShaderGraphNode = {
+    id: "s1",
+    kind: "shader",
+    vertexSource: "",
+    fragmentSource: "",
+    uniformValues: {},
+  };
+  const param: ParamGraphNode = {
+    id: "p1",
+    kind: "param",
+    paramKind: "float",
+    value: 0.42,
+  };
+  const math: MathGraphNode = { id: "m1", kind: "math", op: "add", a: 1, b: 2 };
+  const combine: CombineGraphNode = {
+    id: "cb1",
+    kind: "combine",
+    arity: 2,
+    values: [0.1, 0.2, 0, 0],
+  };
+  it.each([
+    { view: "ShaderNodeView", View: ShaderNodeView, node: shader },
+    { view: "ParamNodeView", View: ParamNodeView, node: param },
+    { view: "MathNodeView", View: MathNodeView, node: math },
+    { view: "CombineNodeView", View: CombineNodeView, node: combine },
+  ])("$view", ({ View, node }) => {
+    const html = renderInFlowStatic(<View {...nodeProps(node.id, node)} />);
+    expect(html).not.toContain(node.id);
   });
 });
 
 describe("fixed-arity port stride [Q7·R15]", () => {
-  it("PORT_STRIDE is the CHANGELOG §v1.3 Q7 / §v1.4 R15 canonical value (27)", () => {
-    expect(PORT_STRIDE).toBe(27);
-  });
-
   it("steps Math binary op inputs by PORT_STRIDE, not the old 18-stride offset", () => {
     const node: MathGraphNode = {
       id: "m1",
@@ -623,7 +611,9 @@ describe("fixed-arity port stride [Q7·R15]", () => {
       a: 1,
       b: 2,
     };
-    const html = renderInFlow(<MathNodeView {...mockProps("m1", node)} />);
+    const html = renderInFlowStatic(
+      <MathNodeView {...nodeProps("m1", node)} />,
+    );
     expect(html).toContain(`top:${PORT_TOP_PAD}px`);
     expect(html).toContain(`top:${PORT_TOP_PAD + PORT_STRIDE}px`);
     // Pre-fix artifact (PORT_STRIDE=18): 38 + 18 = 56.
@@ -637,7 +627,9 @@ describe("fixed-arity port stride [Q7·R15]", () => {
       arity: 4,
       values: [0.1, 0.2, 0.3, 0.4],
     };
-    const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
+    const html = renderInFlowStatic(
+      <CombineNodeView {...nodeProps("cb1", node)} />,
+    );
     for (let i = 0; i < 4; i++) {
       expect(html).toContain(`top:${PORT_TOP_PAD + i * PORT_STRIDE}px`);
     }
@@ -653,7 +645,9 @@ describe("fixed-arity port stride [Q7·R15]", () => {
       arity: 4,
       values: [0.1, 0.2, 0.3, 0.4],
     };
-    const html = renderInFlow(<CombineNodeView {...mockProps("cb1", node)} />);
+    const html = renderInFlowStatic(
+      <CombineNodeView {...nodeProps("cb1", node)} />,
+    );
     // The out port renders once at PORT_TOP_PAD; dc's centered dc handle
     // (70, midway of 44-96) is a dc presentation detail pending designer
     // follow-up, not ported into this implementation's convention.

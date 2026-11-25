@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph } from "./helpers/fixtures";
-import { withSp } from "./helpers/sp";
+import { bootApp, selectNode, setGraph } from "./helpers/fixtures";
 
 /**
  * Phase 39 — varying contract visualization (A-2,
@@ -183,14 +182,6 @@ function meshConnectedGraph(
       },
     ],
   };
-}
-
-async function selectNode(page: import("@playwright/test").Page, id: string) {
-  await withSp(
-    page,
-    (sp, nodeId) => sp.selection.getState().select(nodeId),
-    id,
-  );
 }
 
 test.describe("Phase 39 — varying contract visualization", () => {

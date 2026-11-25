@@ -636,7 +636,8 @@ ShaderPlayground/
 ├─ Architecture.md
 ├─ README.md
 ├─ CLAUDE.md                         # Claude 작업 규약 / 품질 게이트
-├─ tests/e2e/                        # Playwright E2E 스펙 (45 파일 / 172 테스트 — Phase 1~39 + 도킹 m1~m7)
+├─ tests/e2e/                        # Playwright E2E 스펙 (40 파일 / 156 테스트 — Phase 1~39, 도킹은 phase-35-*)
+│  └─ helpers/                      # fixtures·sp(window.__sp)·dom·editor·render·canvas 공용 헬퍼
 └─ src/
    ├─ main.tsx                       # React 엔트리, App 마운트
    ├─ App.tsx                        # 셸 (NodeEditor / Viewport / CodeEditor / SidePanel / StatusBar + overlay)

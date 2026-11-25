@@ -1,12 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { blurActive } from "./helpers/dom";
 import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
+import { expectNoRendererErrors } from "./helpers/render";
 import { readSp, withSp } from "./helpers/sp";
 
 // Phase 29 — node groups. Pure visual containers tracked via a `parents` map
 // in graphStore. ExecutionPlan and the render path ignore them entirely;
 // these tests verify the editor-side behaviors: create, assign via store,
-// nested groups, ungroup release, cascade delete, and that the demo graph
-// keeps rendering with a group dropped on top.
+// cascade delete, Cmd+G, undo, and that the demo graph keeps rendering with a
+// group dropped on top. Nested grouping and ungroup-release are covered by
+// the graphStore unit tests ("groups" describe block).
 
 test.describe("Phase 29 — node groups", () => {
   test.beforeEach(async ({ page }) => {
@@ -93,39 +96,6 @@ test.describe("Phase 29 — node groups", () => {
     expect(next.s1Pos!.x).toBeGreaterThan(next.m1Pos!.x);
   });
 
-  test("nested groups: groupSelected on already-parented children creates an inner group inside the outer", async ({
-    page,
-  }) => {
-    await setGraph(page, trivialMeshGraph(), {
-      m1: { x: 100, y: 100 },
-      s1: { x: 300, y: 200 },
-      o1: { x: 500, y: 100 },
-    });
-
-    // First wrap m1+s1 in an outer group.
-    const outer = await withSp(
-      page,
-      (sp) => sp.graph.getState().groupSelected(["m1", "s1"]),
-      null,
-    );
-    expect(outer).not.toBeNull();
-
-    // Then wrap just m1 in a sub-group. Because m1's parent is `outer`,
-    // groupSelected should detect the common parent and place the new
-    // inner group inside `outer`.
-    const inner = await withSp(
-      page,
-      (sp) => sp.graph.getState().groupSelected(["m1"]),
-      null,
-    );
-    expect(inner).not.toBeNull();
-
-    const next = await readSp(page, (sp) => sp.graph.getState().parents);
-    expect(next[inner!]).toBe(outer);
-    expect(next.m1).toBe(inner);
-    expect(next.s1).toBe(outer);
-  });
-
   test("setParent rejects a cycle and returns false", async ({ page }) => {
     await setGraph(page, trivialMeshGraph(), {});
 
@@ -152,56 +122,6 @@ test.describe("Phase 29 — node groups", () => {
     // g2 remained child of g1; g1 has no parent.
     expect(parents[g2]).toBe(g1);
     expect(parents[g1]).toBeUndefined();
-  });
-
-  test("removeGroup release-children promotes direct children at their absolute positions", async ({
-    page,
-  }) => {
-    await setGraph(page, trivialMeshGraph(), {
-      m1: { x: 240, y: 230 },
-      s1: { x: 280, y: 270 },
-      o1: { x: 500, y: 100 },
-    });
-
-    const gid = await withSp(
-      page,
-      (sp) =>
-        sp.graph
-          .getState()
-          .addGroup("G", { x: 200, y: 200 }, { width: 300, height: 200 }),
-      null,
-    );
-    await withSp(
-      page,
-      (sp, args) => {
-        sp.graph.getState().setParent("m1", args.gid);
-      },
-      { gid },
-    );
-
-    await withSp(
-      page,
-      (sp, args) => {
-        sp.graph.getState().removeGroup(args.gid, "release-children");
-      },
-      { gid },
-    );
-    const next = await withSp(
-      page,
-      (sp, args) => {
-        const g = sp.graph.getState();
-        return {
-          groupGone: !g.nodes.some((n) => n.id === args.gid),
-          m1Pos: g.positions.m1,
-          m1Parent: g.parents.m1,
-        };
-      },
-      { gid },
-    );
-    expect(next.groupGone).toBe(true);
-    expect(next.m1Parent).toBeUndefined();
-    // Position should be promoted back to absolute (m1 was at abs 240,230).
-    expect(next.m1Pos).toEqual({ x: 240, y: 230 });
   });
 
   test("removeGroup delete-children cascades through descendants", async ({
@@ -272,10 +192,7 @@ test.describe("Phase 29 — node groups", () => {
       (sp) => sp.selection.getState().setSelectedIds(["m1", "s1"]),
       null,
     );
-    await page.evaluate(() => {
-      const el = document.activeElement;
-      if (el instanceof HTMLElement) el.blur();
-    });
+    await blurActive(page);
 
     const beforeCount = await readSp(
       page,
@@ -342,11 +259,7 @@ test.describe("Phase 29 — node groups", () => {
       .toBeGreaterThan(beforeTick);
 
     // No runtime errors recorded after the group landed.
-    const errors = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.errors,
-    );
-    expect(errors).toEqual([]);
+    await expectNoRendererErrors(page);
   });
 
   test("setGraph with a parents map round-trips through history (undo restores groups)", async ({
@@ -375,10 +288,7 @@ test.describe("Phase 29 — node groups", () => {
     // Now undo through the global key to roll the group back. The graph
     // should lose the group node and the parents map should be empty for
     // the children that were just placed inside it.
-    await page.evaluate(() => {
-      const el = document.activeElement;
-      if (el instanceof HTMLElement) el.blur();
-    });
+    await blurActive(page);
     await page.keyboard.press("Meta+z");
 
     const after = await readSp(page, (sp) => {

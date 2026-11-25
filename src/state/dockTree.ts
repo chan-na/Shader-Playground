@@ -472,15 +472,15 @@ export function clampDividerRatio(
 
 /** dc `computeDrop`의 `y - reg.y <= 34`(L445) — region 상단 탭바 존 높이(px).
  * R11: 픽셀은 규칙으로 받는다(매직 넘버 금지). */
-export const TAB_BAR_DROP_PX = 34;
+const TAB_BAR_DROP_PX = 34;
 
 /** dc `computeDrop`의 `band = 42`(L443) — 셸 바깥 가장자리 도킹 밴드
  * 두께(px). R11: 픽셀은 규칙으로 받는다. */
-export const OUTER_DROP_BAND_PX = 42;
+const OUTER_DROP_BAND_PX = 42;
 
 /** dc `computeDrop`의 `E = 0.22`(L453) — region 내부 가장자리 스플릿
  * 존(비율). 이보다 커서가 중심에 가까우면(m > E) 스플릿 대신 탭 병합. */
-export const REGION_EDGE_DROP_FRAC = 0.22;
+const REGION_EDGE_DROP_FRAC = 0.22;
 
 /** dc `dockGhost`의 outer 분기 `ratio: first ? 0.28 : 0.72`(L474) — 셸
  * 바깥 도킹 시 새 leaf(좌/상)가 차지하는 비율. 우/하는 `1 -
@@ -692,9 +692,10 @@ export function fallbackDropTarget(regions: DockRegion[]): DockDropTarget {
  *   — 새 leaf가 우측 40%). ⚠ 여기서 원본 `tree`를 그대로 반환하면 이미
  *   트리에서 분리된 leaf가 통째로 유실된다(R1 위반 — 드래그 중이던 leaf는
  *   반드시 어딘가에 다시 도킹돼야 한다) — 그래서 not-found 방어 가드(아래)와
- *   달리 이 분기는 "포기"가 아니라 "폴백"이다. `m2-dock-dragdrop.spec.ts`
- *   Test2(툴바 위에서 release → `fallbackDropTarget`이 `regions[0]`인 code
- *   leaf의 center를 고르는 케이스)가 이 스플릿 폴백 덕에 여전히 패널을
+ *   달리 이 분기는 "포기"가 아니라 "폴백"이다. `phase-35-dock-drag.spec.ts`
+ *   의 "release outside any target" 테스트(툴바 위에서 release →
+ *   `fallbackDropTarget`이 `regions[0]`인 code leaf의 center를 고르는
+ *   케이스)가 이 스플릿 폴백 덕에 여전히 패널을
  *   잃지 않고 green을 유지한다 — 잠정 결정(정본에 명시된 폴백 형태가 아니라
  *   구현판단, `temp/design-followup-v2.0.md` 대상). 정본: `design/
  *   CHANGELOG.md` §v2.0 "이종 탭 병합 = 완전한 도킹 단위(S5·T1)" +

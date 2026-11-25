@@ -84,8 +84,8 @@ textarea {
    containers with a recursive .dock-split/.dock-leaf tree. The legacy
    shell-left/shell-right-top/shell-right-bottom/shell-code class names stay
    on the DOM (dockLayoutModel.legacyLeafClass) purely to preserve the
-   selector contract — tests/e2e/m1-dock-header-collapse.spec.ts queries
-   .shell-left directly — but their layout rules (flex/direction/min-*) now
+   selector contract — tests/e2e/phase-35-dock-*.spec.ts query .shell-*
+   directly — but their layout rules (flex/direction/min-*) now
    live in the generic .dock-split/.dock-leaf rules below. */
 .dock-split {
   display: flex;

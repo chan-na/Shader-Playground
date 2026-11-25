@@ -163,13 +163,21 @@ describe("DockPanelHeader", () => {
       useDockLeaf();
       return null;
     }
-    // React logs an error boundary-less throw to console; suppress that
-    // noise for this expected-failure assertion.
+    // React logs an error boundary-less throw to console, and jsdom reports
+    // the same throw as an uncaught window error with a full stack trace.
+    // Marking the window "error" event handled silences jsdom; the console
+    // spy silences React. Both are expected noise for this assertion.
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(() => render(<Bare />)).toThrow(
-      "useDockLeaf must be used inside DockLeafContext.Provider",
-    );
-    spy.mockRestore();
+    const markHandled = (event: ErrorEvent) => event.preventDefault();
+    window.addEventListener("error", markHandled);
+    try {
+      expect(() => render(<Bare />)).toThrow(
+        "useDockLeaf must be used inside DockLeafContext.Provider",
+      );
+    } finally {
+      window.removeEventListener("error", markHandled);
+      spy.mockRestore();
+    }
   });
 
   // B3-U2/R6: DockPanelHeader now renders `leaf.tabs` directly as dock tabs

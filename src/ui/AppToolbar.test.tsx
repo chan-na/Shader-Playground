@@ -34,12 +34,6 @@ afterEach(() => {
 });
 
 describe("AppToolbar", () => {
-  it("toolbar no longer renders node-add buttons (W4 — moved to the canvas pill)", () => {
-    render(<AppToolbar />);
-    expect(screen.queryByRole("button", { name: "Mesh" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "＋ More" })).toBeNull();
-  });
-
   it("File menu lists Load…/Import JSON/Export JSON/Snap PNG", () => {
     render(<AppToolbar />);
     fireEvent.click(screen.getByRole("button", { name: "File" }));

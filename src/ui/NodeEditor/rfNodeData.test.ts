@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { paramNode } from "../../core/graph/testNodes";
 import type {
   GroupGraphNode,
   ParamGraphNode,
@@ -12,10 +13,6 @@ import {
   groupBoxHeight,
   pendingAddedIds,
 } from "./rfNodeData";
-
-function paramNode(id: string): ParamGraphNode {
-  return { id, kind: "param", paramKind: "float", value: 0 };
-}
 
 const STAND_IN = { width: 180, height: 64 };
 

@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
 import {
   bootApp,
+  selectNode,
   setGraph,
   trivialMeshGraph,
   trivialShaderSources,
 } from "./helpers/fixtures";
+import { readRenderTick, waitForRenderIdle } from "./helpers/render";
 import { readSp, waitForRev, withSp } from "./helpers/sp";
 
 test.describe("Phase 9 — editor UX", () => {
@@ -17,13 +19,7 @@ test.describe("Phase 9 — editor UX", () => {
       o1: { x: 400, y: 0 },
     });
     await page.getByTestId("tab-inspector").click();
-    await withSp(
-      page,
-      (sp) => {
-        sp.selection.getState().select("s1");
-      },
-      undefined,
-    );
+    await selectNode(page, "s1");
   });
 
   test("GLSL `// @range 0..5 @default 2.5` hint propagates to inspector", async ({
@@ -208,18 +204,12 @@ test.describe("Phase 9 — editor UX", () => {
       },
       undefined,
     );
-    // Give the loop one window to flush the pause-frame and the structural
-    // dirty bits, then sample renderTick and confirm it's frozen.
-    await page.waitForTimeout(400);
-    const idleStart = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.renderTick,
-    );
+    // Let the loop flush the pause-frame and the structural dirty bits, then
+    // confirm renderTick stays frozen.
+    const idleStart = await waitForRenderIdle(page);
+    // Elapsed time is the subject: a frozen tick must stay frozen across it.
     await page.waitForTimeout(500);
-    const idleEnd = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.renderTick,
-    );
+    const idleEnd = await readRenderTick(page);
     expect(idleEnd).toBe(idleStart);
 
     // 2. Camera mutation must wake the loop. renderTick increases on the next

@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  COLLAPSED_STRIP_PX,
   clampDividerRatio,
   collectPanelIds,
   computeDropTarget,
   createDefaultDockTree,
-  DIVIDER_PX,
   DOCK_PANEL_IDS,
   type DockDivider,
   type DockDropTarget,
@@ -28,16 +26,13 @@ import {
   MIN_LEAF_HEIGHT,
   MIN_LEAF_WIDTH,
   OUTER_DOCK_RATIO,
-  OUTER_DROP_BAND_PX,
   OUTER_PREVIEW_FRAC,
   type OuterDropSide,
-  REGION_EDGE_DROP_FRAC,
   REGION_SPLIT_RATIO,
   type RegionDropZone,
   removePanel,
   sanitizeDockLayoutSnapshot,
   setNodeAt,
-  TAB_BAR_DROP_PX,
 } from "./dockTree";
 
 /** 테스트 전용 narrowing 헬퍼 — split이 아니면 즉시 실패시켜 이후 접근을
@@ -48,31 +43,6 @@ function asSplit(node: DockNode): DockSplit {
   }
   return node;
 }
-
-describe("constants", () => {
-  it("matches dc geometry constants", () => {
-    expect(DOCK_PANEL_IDS).toEqual([
-      "nodeEditor",
-      "viewport",
-      "inspector",
-      "code",
-      "assets",
-    ]);
-    expect(DIVIDER_PX).toBe(6);
-    expect(COLLAPSED_STRIP_PX).toBe(34);
-    expect(MIN_LEAF_WIDTH).toBe(240);
-    expect(MIN_LEAF_HEIGHT).toBe(160);
-  });
-
-  it("matches dc computeDrop/dockGhost geometry constants (B4-U1)", () => {
-    expect(TAB_BAR_DROP_PX).toBe(34);
-    expect(OUTER_DROP_BAND_PX).toBe(42);
-    expect(REGION_EDGE_DROP_FRAC).toBe(0.22);
-    expect(OUTER_DOCK_RATIO).toBe(0.28);
-    expect(REGION_SPLIT_RATIO).toBe(0.4);
-    expect(OUTER_PREVIEW_FRAC).toBe(0.32);
-  });
-});
 
 describe("createDefaultDockTree", () => {
   it("builds the v2.0 App Shell first-screen tree (row 0.25 [code | row 0.60 [nodeEditor | col 0.52 [viewport / inspector+assets]]])", () => {

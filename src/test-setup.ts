@@ -103,3 +103,25 @@ class MemoryStorage implements Storage {
     });
   }
 }
+
+// Silent stand-ins for jsdom's "not implemented" media/canvas methods. jsdom's
+// versions report through the virtual console, which prints a full stack trace
+// per call and buries real failures in the run output. These keep jsdom's
+// observable results — play/pause/load return undefined, getContext returns
+// null (no canvas package installed) — so code paths and `vi.spyOn` overrides
+// behave exactly as before. `defineProperty` keeps the prototype slots
+// writable/configurable, which spying relies on.
+for (const [proto, name, result] of [
+  [HTMLMediaElement.prototype, "play", undefined],
+  [HTMLMediaElement.prototype, "pause", undefined],
+  [HTMLMediaElement.prototype, "load", undefined],
+  [HTMLCanvasElement.prototype, "getContext", null],
+] as const) {
+  Object.defineProperty(proto, name, {
+    value: function notImplementedUnderJsdom() {
+      return result;
+    },
+    configurable: true,
+    writable: true,
+  });
+}

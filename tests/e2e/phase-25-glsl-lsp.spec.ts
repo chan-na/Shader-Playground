@@ -1,15 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { boxOf } from "./helpers/dom";
+import { openStageEditor, seedShaderAndSelect } from "./helpers/editor";
 import { bootApp } from "./helpers/fixtures";
 import { withSp } from "./helpers/sp";
 
-// Phase 25 — LSP-like editor features layered onto CodeMirror 6:
-//   - Scope-aware symbol table (autocomplete enhancement).
-//   - Hover tooltip that reads symbols, builtin signatures, system uniforms.
-//
-// Both features share the `__sp.glslSymbols` bridge for direct verification
-// without round-tripping through CM event dispatch. The hover wiring itself
-// is exercised by typing into the editor and asserting the CodeMirror
-// tooltip DOM appears with the correct content.
+// Phase 25 — LSP-like editor features layered onto CodeMirror 6: a
+// scope-aware symbol table (unit-tested in src/core/glsl/symbolTable.test.ts)
+// and a hover tooltip that reads symbols, builtin signatures and system
+// uniforms. The hover wiring is exercised by loading a fragment into the
+// editor and asserting the CodeMirror tooltip DOM appears with the right
+// content.
 
 const FRAG_WITH_HELPER = `#version 300 es
 precision highp float;
@@ -35,84 +35,14 @@ test.describe("Phase 25 — GLSL LSP (symbol table + hover)", () => {
     await bootApp(page);
   });
 
-  test("symbol table captures globals, function parameters, and locals", async ({
-    page,
-  }) => {
-    const result = await withSp(
-      page,
-      (sp, args: { src: string }) => {
-        const table = sp.glslSymbols.build(args.src);
-        return table.symbols.map(
-          (s) => `${s.kind}:${s.name}@${s.scope ?? "*"}`,
-        );
-      },
-      { src: FRAG_WITH_HELPER },
-    );
-
-    // Globals at top-level scope (`*`).
-    expect(result).toContain("in:v_uv@*");
-    expect(result).toContain("uniform:u_time@*");
-    expect(result).toContain("uniform:u_strength@*");
-    expect(result).toContain("out:outColor@*");
-    expect(result).toContain("function:hash@*");
-    expect(result).toContain("function:main@*");
-
-    // hash() parameter `p` belongs to scope `hash`.
-    expect(result).toContain("parameter:p@hash");
-
-    // main()'s locals are scoped to `main`.
-    expect(result).toContain("local:n@main");
-    expect(result).toContain("local:col@main");
-
-    // Locals from other functions don't leak.
-    expect(result).not.toContain("local:n@hash");
-  });
-
-  test("symbolsVisibleAt narrows to in-scope locals + globals", async ({
-    page,
-  }) => {
-    const visibleInMain = await withSp(
-      page,
-      (sp, args: { src: string }) => {
-        const table = sp.glslSymbols.build(args.src);
-        // Line numbers are 1-based. Find the line of `float n = hash(...)` —
-        // we approximate by counting newlines up to that token.
-        const idx = args.src.indexOf("float n = hash");
-        const line = args.src.slice(0, idx).split(/\r?\n/).length;
-        return sp.glslSymbols.visibleAt(table, line).map((s) => s.name);
-      },
-      { src: FRAG_WITH_HELPER },
-    );
-
-    // Inside main(): locals so far (`n`) are visible, globals are visible.
-    expect(visibleInMain).toContain("n");
-    expect(visibleInMain).toContain("u_time");
-    expect(visibleInMain).toContain("hash");
-    // hash()'s param `p` is NOT in scope from main().
-    expect(visibleInMain).not.toContain("p");
-  });
-
   test("hovering over a uniform shows the system-uniform description", async ({
     page,
   }) => {
     // Drive the editor: select the demo shader node, paste a known fragment,
     // wait for the editor to load it, then hover the `u_time` token in
     // CodeMirror's content area.
-    await page.evaluate(async (src) => {
-      const sp = window.__sp;
-      if (!sp) throw new Error("__sp not exposed");
-      const node = sp.graph.getState().nodes.find((n) => n.kind === "shader");
-      if (!node) throw new Error("no shader node");
-      sp.selection.getState().select(node.id);
-      sp.graph.getState().updateShaderSource(node.id, { fragmentSource: src });
-    }, FRAG_WITH_HELPER);
-
-    // Ensure fragment tab is active and editor has the new source.
-    await page.getByTestId("stage-tab-fragment").click();
-    const content = page.locator(".cm-content").first();
-    await expect
-      .poll(async () => (await content.textContent())?.includes("u_time"))
-      .toBe(true);
+    await seedShaderAndSelect(page, { fragment: FRAG_WITH_HELPER });
+    const content = await openStageEditor(page, "fragment", "u_time");
 
     // Locate the `u_time` text and hover it. CodeMirror tokenizes into
     // multiple spans; grabbing the first span matching the exact text is
@@ -122,10 +52,8 @@ test.describe("Phase 25 — GLSL LSP (symbol table + hover)", () => {
     // Two hover events — CM's hoverTooltip uses a small delay before it
     // shows. Move within the token to trigger pointer motion.
     await token.hover();
-    await page.mouse.move(
-      (await token.boundingBox().then((b) => b!.x + b!.width / 2)) ?? 0,
-      (await token.boundingBox().then((b) => b!.y + b!.height / 2)) ?? 0,
-    );
+    const tokenBox = await boxOf(token);
+    await page.mouse.move(tokenBox.cx, tokenBox.cy);
 
     const tooltip = page.locator(".cm-glsl-hover");
     await expect(tooltip).toBeVisible({ timeout: 5_000 });
@@ -142,7 +70,8 @@ test.describe("Phase 25 — GLSL LSP (symbol table + hover)", () => {
     // builtin fallback path inside `lookupHover` we lean on the unit tests
     // (hover.test.ts) and only verify here that the catalogue itself is
     // exposed on the DEV bridge with the shape the hover renderer reads —
-    // signatures[] non-empty plus a description string.
+    // signatures[] non-empty plus a description string. (The `texture`
+    // sampler2D signature check is not yet mirrored in builtins.test.ts.)
     const result = await withSp(
       page,
       (sp, args: { names: string[] }) => {

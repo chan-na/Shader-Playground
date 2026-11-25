@@ -289,7 +289,7 @@ import하는데 `ExportShare/ExportShareDialog.tsx`가 정적 import해서 동�
 4. vertex 에러 오버레이의 발췌 라인이 화면에 보이는 소스와 일치.
 
 **테스트**: 단위(스토어 발행 + 탭 라벨 분기), E2E 신규 스펙(`phase-36-*.spec.ts`).
-**리스크**: `phase-3-4-editor-uniform`, `phase-9-editor-ux`, `m7-code-auto-open`이
+**리스크**: `phase-3-4-editor-uniform`, `phase-9-editor-ux`, `phase-35-code-auto-open`이
 vertex 탭 내용을 가정할 수 있음 → 먼저 확인.
 
 ---

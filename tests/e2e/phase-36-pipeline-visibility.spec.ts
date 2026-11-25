@@ -1,7 +1,11 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered } from "./helpers/canvas";
-import { bootApp, setGraph } from "./helpers/fixtures";
+import {
+  bootApp,
+  loadChainDemo,
+  selectNode,
+  setGraph,
+} from "./helpers/fixtures";
 import { readSp, waitForRev, withSp } from "./helpers/sp";
 
 /**
@@ -135,24 +139,6 @@ function computeDemoGraph() {
   };
 }
 
-/** Load the built-in Chain demo through the real toolbar preset (M1-U3's
- * "Presets" dropdown) — same path phase-5-6-graph-chain.spec.ts's chain
- * test uses, so this exercises the real preset wiring rather than a
- * hand-rolled literal. */
-async function loadChainDemo(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Presets" }).click();
-  await page.getByRole("menuitem", { name: "Chain", exact: true }).click();
-  await expect
-    .poll(() =>
-      readSp(page, (sp) =>
-        sp.graph.getState().nodes.find((n) => n.id === "tonemap1")
-          ? "ok"
-          : "no",
-      ),
-    )
-    .toBe("ok");
-}
-
 test.describe("Phase 36 — execution pipeline visibility I", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
@@ -162,11 +148,7 @@ test.describe("Phase 36 — execution pipeline visibility I", () => {
   test("A-1: fullscreen substitution is shown honestly, then reverses cleanly", async ({
     page,
   }) => {
-    await withSp(
-      page,
-      (sp) => sp.selection.getState().select("shader1"),
-      undefined,
-    );
+    await selectNode(page, "shader1");
     await page.getByTestId("stage-tab-vertex").click();
 
     const vertexTab = page.getByTestId("stage-tab-vertex");
@@ -261,11 +243,7 @@ test.describe("Phase 36 — execution pipeline visibility I", () => {
       await expect(page.getByTestId(`node-fullscreen-${id}`)).toBeVisible();
     }
 
-    await withSp(
-      page,
-      (sp) => sp.selection.getState().select("blur1"),
-      undefined,
-    );
+    await selectNode(page, "blur1");
     // Stage-independent label: activeStage still defaults to "fragment"
     // here, and the vertex tab must ALREADY tell the truth about the vertex
     // document before anyone clicks it — the node card says FULLSCREEN, so
@@ -283,11 +261,7 @@ test.describe("Phase 36 — execution pipeline visibility I", () => {
   test("C-1: system uniforms show binding state tied to fullscreen substitution", async ({
     page,
   }) => {
-    await withSp(
-      page,
-      (sp) => sp.selection.getState().select("shader1"),
-      undefined,
-    );
+    await selectNode(page, "shader1");
 
     const uView = page.locator(
       '[data-testid="system-uniform-row"][data-uniform-name="u_view"]',
@@ -343,11 +317,7 @@ test.describe("Phase 36 — execution pipeline visibility I", () => {
     const halfW = Math.round(Number(wStr) * 0.5);
     const halfH = Math.round(Number(hStr) * 0.5);
 
-    await withSp(
-      page,
-      (sp) => sp.selection.getState().select("shader1"),
-      undefined,
-    );
+    await selectNode(page, "shader1");
     const select = page.getByTestId("resolution-scale");
     await expect(select).toBeVisible();
     const before = await readSp(page, (sp) => sp.graph.getState().rev);
@@ -424,11 +394,7 @@ test.describe("Phase 36 — execution pipeline visibility I", () => {
     );
     await expect(contract).toContainText("verts");
 
-    await withSp(
-      page,
-      (sp) => sp.selection.getState().select("mesh1"),
-      undefined,
-    );
+    await selectNode(page, "mesh1");
     await expect(page.getByTestId("mesh-attributes")).toBeVisible();
   });
 });

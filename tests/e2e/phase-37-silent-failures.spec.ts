@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
+import {
+  bootApp,
+  selectNode,
+  setGraph,
+  trivialMeshGraph,
+} from "./helpers/fixtures";
 import { readSp, withSp } from "./helpers/sp";
 
 /**
@@ -221,7 +226,7 @@ test.describe("Phase 37 — silent failure diagnostics", () => {
     await expect(skipped).toContainText("a_uv");
     await expect(skipped).not.toContainText("a_position");
 
-    await withSp(page, (sp) => sp.selection.getState().select("m1"), undefined);
+    await selectNode(page, "m1");
 
     const meshAttrs = page.getByTestId("mesh-attributes");
     await expect(meshAttrs).toBeVisible();

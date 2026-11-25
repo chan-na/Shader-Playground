@@ -1,20 +1,11 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { ReactFlowProvider } from "@xyflow/react";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { MeshGraphNode } from "../../../core/graph/types";
 import { useGraphStore } from "../../../state/graphStore";
 import { tokens, withAlpha } from "../../../theme";
 import { NODE_GLYPH } from "../nodeTheme";
+import { renderInFlow, renderInFlowStatic } from "../testFlow";
 import { NodeCardHeader } from "./NodeCardHeader";
-
-/** Same pattern as nodeViews.test.tsx's renderInFlow — kept local since this
- * component has no Handle, but the wrapper is cheap and future-proofs against
- * a header that later grows a Handle-dependent meta slot. */
-function renderInFlow(element: ReactElement): string {
-  return renderToStaticMarkup(<ReactFlowProvider>{element}</ReactFlowProvider>);
-}
 
 /** `useGraphStore` is a real live store here (not renderToStaticMarkup) —
  * the rename path calls `renameNode`, which needs a seeded node to act on
@@ -28,11 +19,7 @@ function renderRenameable(id: string, title: string) {
     assetId: null,
   };
   useGraphStore.getState().addNode(node);
-  return render(
-    <ReactFlowProvider>
-      <NodeCardHeader kind="mesh" title={title} nodeId={id} />
-    </ReactFlowProvider>,
-  );
+  return renderInFlow(<NodeCardHeader kind="mesh" title={title} nodeId={id} />);
 }
 
 /** Two clicks within the 350ms double-click window used by the title button. */
@@ -45,7 +32,9 @@ function doubleClickTitle() {
 describe("NodeCardHeader", () => {
   it("renders the source category (Mesh): glyph, title, category colors", () => {
     const cat = tokens.nodeCategory.source;
-    const html = renderInFlow(<NodeCardHeader kind="mesh" title="Mesh" />);
+    const html = renderInFlowStatic(
+      <NodeCardHeader kind="mesh" title="Mesh" />,
+    );
     expect(html).toContain(NODE_GLYPH.mesh);
     expect(html).toContain("Mesh");
     expect(html).toContain(withAlpha(cat, 0.22));
@@ -56,7 +45,7 @@ describe("NodeCardHeader", () => {
 
   it("renders the process category (Shader) with a meta slot", () => {
     const cat = tokens.nodeCategory.process;
-    const html = renderInFlow(
+    const html = renderInFlowStatic(
       <NodeCardHeader
         kind="shader"
         title="Shader"
@@ -74,7 +63,9 @@ describe("NodeCardHeader", () => {
 
   it("renders the value category (Param) and omits the meta slot when absent", () => {
     const cat = tokens.nodeCategory.value;
-    const html = renderInFlow(<NodeCardHeader kind="param" title="Param" />);
+    const html = renderInFlowStatic(
+      <NodeCardHeader kind="param" title="Param" />,
+    );
     expect(html).toContain(NODE_GLYPH.param);
     expect(html).toContain("Param");
     expect(html).toContain(withAlpha(cat, 0.22));
@@ -86,7 +77,7 @@ describe("NodeCardHeader", () => {
   it("renders the error tone gradient (0.26/0.1 semantic.error) instead of the category color", () => {
     const err = tokens.semantic.error;
     const cat = tokens.nodeCategory.process;
-    const html = renderInFlow(
+    const html = renderInFlowStatic(
       <NodeCardHeader kind="shader" title="Shader" tone="error" />,
     );
     expect(html).toContain(withAlpha(err, 0.26));
@@ -109,11 +100,7 @@ describe("NodeCardHeader — inline rename (D15)", () => {
   });
 
   it("without a nodeId, renders the static title div — no title button at all", () => {
-    render(
-      <ReactFlowProvider>
-        <NodeCardHeader kind="mesh" title="Mesh" />
-      </ReactFlowProvider>,
-    );
+    renderInFlow(<NodeCardHeader kind="mesh" title="Mesh" />);
     expect(screen.queryByTestId("node-title-text")).toBeNull();
     expect(screen.queryByTestId("node-title-input")).toBeNull();
     expect(screen.getByText("Mesh")).not.toBeNull();

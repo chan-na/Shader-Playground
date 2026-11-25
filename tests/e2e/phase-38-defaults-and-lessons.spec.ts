@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered, readCanvasStats } from "./helpers/canvas";
-import { bootApp } from "./helpers/fixtures";
+import { bootApp, loadChainDemo } from "./helpers/fixtures";
 import { readSp, withSp } from "./helpers/sp";
 
 /**
@@ -174,20 +174,7 @@ test.describe("Phase 38 — F-2 demo lesson groups", () => {
   test("Presets → Chain loads with its own lesson group labels", async ({
     page,
   }) => {
-    // Same path as phase-5-6-graph-chain.spec.ts's chain load: the dropdown
-    // item carries an explicit role="menuitem" (AppToolbar's ToolbarMenu).
-    await page.getByRole("button", { name: "Presets" }).click();
-    await page.getByRole("menuitem", { name: "Chain", exact: true }).click();
-
-    await expect
-      .poll(() =>
-        readSp(page, (sp) =>
-          sp.graph.getState().nodes.find((n) => n.id === "tonemap1")
-            ? "ok"
-            : "no",
-        ),
-      )
-      .toBe("ok");
+    await loadChainDemo(page);
 
     await expect(page.getByTestId("group-label-text").first()).toBeVisible();
     const parents = await readSp(page, (sp) => sp.graph.getState().parents);

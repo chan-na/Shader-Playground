@@ -9,26 +9,20 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useBootstrapStore } from "../../state/bootstrapStore";
 import { useDebugUiStore } from "../../state/debugUiStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
+import { resetAllStores } from "../../state/testStores";
 import { StatusOverlays } from "./StatusOverlays";
 
-const initialDebugUi = useDebugUiStore.getState();
-const initialBootstrap = useBootstrapStore.getState();
-
 function resetStores() {
-  useDebugUiStore.setState(initialDebugUi, true);
-  // StatusOverlays gates its body on bootstrap phase (SidePanel L96-97
-  // precedent) — tests that don't care about the skeleton force "done"
-  // since the store is a module singleton.
-  useBootstrapStore.setState({ ...initialBootstrap, phase: "done" }, true);
-  // The passes overlay mounts PassInspector, which reads this store; one
-  // test publishes into it, so clear it rather than leaking across cases.
-  usePassPlanStore.getState().reset();
+  resetAllStores();
+  // StatusOverlays gates its body on bootstrap phase, like SidePanel — tests
+  // that don't care about the skeleton force it to "done".
+  useBootstrapStore.setState({ phase: "done" });
 }
 
 beforeEach(resetStores);
 afterEach(() => {
   cleanup();
-  useBootstrapStore.setState(initialBootstrap, true);
+  resetAllStores();
 });
 
 describe("StatusOverlays", () => {
@@ -103,7 +97,7 @@ describe("StatusOverlays", () => {
   });
 
   it("shows the panel skeleton instead of the diagnostics panel while bootstrap isn't done", () => {
-    useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
+    useBootstrapStore.setState({ phase: "init" });
     render(<StatusOverlays />);
 
     act(() => {
@@ -153,7 +147,7 @@ describe("StatusOverlays", () => {
   });
 
   it("renders the metric strip alongside the panel skeleton while bootstrap isn't done (interim decision)", () => {
-    useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
+    useBootstrapStore.setState({ phase: "init" });
     render(<StatusOverlays />);
 
     act(() => {

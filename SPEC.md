@@ -43,9 +43,9 @@ WebGL2 기반 쉐이더 작성/체이닝 플레이그라운드. 노드 그래프
 | 11 | 공유/배포 | `#share=` URL, WebM 녹화, 의존성 0 정적 HTML export(에셋 blob 미임베드) | `phase-11-share-export.spec.ts` | persist-export-record |
 | 12 | 회복성·표현력 보강 | Problems → 라인 점프, 자동저장 + 복구 다이얼로그, `@color/@slider/@multi`, Math/Swizzle/Combine, PBO 썸네일 | `phase-12-resilience.spec.ts` | graph-nodes |
 | 13 | Transform Feedback 컴퓨트 | Compute 노드(ping-pong TF), `mesh` 출력, Particle 프리셋 | `phase-13-compute.spec.ts` | rendering |
-| 14a | Webcam | `getUserMedia` 라이브 텍스처, 외부 소스 레지스트리 | `phase-14-webcam.spec.ts` | inputs-assets |
-| 14b | Video | 비디오 에셋 → 텍스처, 재생/루프/뮤트/seek | `phase-14b-video.spec.ts` | inputs-assets |
-| 14c | Audio | 마이크/파일 → FFT 텍스처 | `phase-14c-audio.spec.ts` | inputs-assets |
+| 14a | Webcam | `getUserMedia` 라이브 텍스처, 외부 소스 레지스트리 | `phase-14-external-sources.spec.ts` | inputs-assets |
+| 14b | Video | 비디오 에셋 → 텍스처, 재생/루프/뮤트/seek | `phase-14-external-sources.spec.ts` | inputs-assets |
+| 14c | Audio | 마이크/파일 → FFT 텍스처 | `phase-14-external-sources.spec.ts` | inputs-assets |
 | 15 | GPU Timer Overlay | 패스별 GPU 시간(`EXT_disjoint_timer_query_webgl2`), 미지원 시 no-op | `phase-15-gpu-timer.spec.ts` | diagnostics-learnability |
 | 16 | 디버깅·진단 인프라 | 중앙 로거 + 링버퍼, 전역 안전망, ErrorBoundary, 진단 패널/복사 | `phase-16-diagnostics.spec.ts` | diagnostics-learnability |
 | 17 | Pass별 해상도 스케일 | Shader 노드별 FBO 배율 0.25/0.5/1 | `phase-17-resolution-scale.spec.ts` | rendering |
@@ -66,7 +66,7 @@ WebGL2 기반 쉐이더 작성/체이닝 플레이그라운드. 노드 그래프
 | 32 | GIF 워커 오프로드 | 인코딩을 Web Worker 로, 실패 시 메인 스레드 폴백 | — | persist-export-record |
 | 33 | GIF 로컬 팔레트 + 디더링 | 프레임별 팔레트, Floyd–Steinberg | `phase-33-gif-quality.spec.ts` | persist-export-record |
 | 34 | GIF 진행률 | 워커 progress 메시지 → 툴바 진행률 | `phase-34-gif-progress.spec.ts` | persist-export-record |
-| 35 | 도킹 레이아웃 | 트리 도크(split/leaf), 탭 드래그 도킹, 접기/최대화, 영속화, 컴팩트 폭 폴백, Code 자동 열기 | `m1-dock-header-collapse.spec.ts`, `m2-dock-drag.spec.ts`, `m3-dock-b6.spec.ts`, `m4-dock-dragdrop.spec.ts`, `m5-dock-chrome.spec.ts`, `m6-dock-fallback.spec.ts`, `m7-code-auto-open.spec.ts` | layout |
+| 35 | 도킹 레이아웃 | 트리 도크(split/leaf), 탭 드래그 도킹, 접기/최대화, 영속화, 컴팩트 폭 폴백, Code 자동 열기 | `phase-35-dock-chrome.spec.ts`, `phase-35-dock-drag.spec.ts`, `phase-35-dock-persistence.spec.ts`, `phase-35-code-auto-open.spec.ts` | layout |
 | 36 | 파이프라인 가시성 I | 풀스크린 대체 표시, Pass Inspector, 시스템 유니폼 섹션, Mesh attribute 계약 | `phase-36-pipeline-visibility.spec.ts` | diagnostics-learnability |
 | 37 | 조용한 실패 진단 승격 | 미연결 sampler/미사용 유니폼 경고, 연결된 슬라이더 표시, attribute 소비 체크 | `phase-37-silent-failures.spec.ts`, `phase-37-driven-uniforms.spec.ts` | diagnostics-learnability |
 | 38 | 멘탈 모델 교정 | GLSL `@default` 초기값, 렌더 상태·텍스처 파라미터 표시, 좌표계 카드, 레슨형 데모 | `phase-38-defaults-and-lessons.spec.ts`, `phase-38-render-state.spec.ts`, `phase-38-texture-params.spec.ts`, `phase-38-coordinate-card.spec.ts` | diagnostics-learnability |

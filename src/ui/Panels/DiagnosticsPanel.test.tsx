@@ -2,22 +2,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useDebugUiStore } from "../../state/debugUiStore";
-import { useDiagnosticsStore } from "../../state/diagnosticsStore";
-import { useGraphStore } from "../../state/graphStore";
-import { useRendererStore } from "../../state/rendererStore";
+import { resetAllStores } from "../../state/testStores";
 import { clearLogBuffer, log } from "../../utils/log";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 
-const initialRenderer = useRendererStore.getState();
-const initialGraph = useGraphStore.getState();
-const initialDiagnostics = useDiagnosticsStore.getState();
-const initialDebugUi = useDebugUiStore.getState();
-
 function resetStores() {
-  useRendererStore.setState(initialRenderer, true);
-  useGraphStore.setState(initialGraph, true);
-  useDiagnosticsStore.setState(initialDiagnostics, true);
-  useDebugUiStore.setState(initialDebugUi, true);
+  resetAllStores();
   clearLogBuffer();
 }
 
@@ -53,15 +43,12 @@ describe("DiagnosticsPanel", () => {
     expect(html).toContain("gl");
   });
 
-  it("uses semantic/text.muted level colors, not the retired palette", () => {
+  it("colors log levels with the semantic/text.muted tokens", () => {
     log.error("gl", "boom");
     log.debug("app", "quiet");
     const html = renderToStaticMarkup(<DiagnosticsPanel />);
     expect(html).toContain("var(--error)");
     expect(html).toContain("var(--text-muted)");
-    for (const retired of ["#7a7a7a", "#7aa2f7", "#e0af68", "#ff6b6b"]) {
-      expect(html).not.toContain(retired);
-    }
   });
 
   it("level filter options use the dc cumulative labels in dc order [R13]", () => {

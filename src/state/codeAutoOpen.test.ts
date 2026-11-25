@@ -1,41 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type {
-  ComputeGraphNode,
-  MeshGraphNode,
-  ShaderGraphNode,
-} from "../core/graph/types";
+import { computeNode, meshNode, shaderNode } from "../core/graph/testNodes";
 import { startCodeAutoOpen } from "./codeAutoOpen";
 import { useDockStore } from "./dockStore";
 import { createDefaultDockTree, findTabLeafPath, getNodeAt } from "./dockTree";
 import { useEditorStore } from "./editorStore";
 import { useGraphStore } from "./graphStore";
 import { useSelectionStore } from "./selectionStore";
-
-const shaderNode: ShaderGraphNode = {
-  id: "shader1",
-  kind: "shader",
-  vertexSource: "void main(){ gl_Position = vec4(0); }",
-  fragmentSource: "void main(){}",
-  uniformValues: {},
-};
-
-const computeNode: ComputeGraphNode = {
-  id: "compute1",
-  kind: "compute",
-  vertexSource: "void main(){}",
-  count: 16,
-  primitive: "POINTS",
-  attributes: [
-    { inName: "a_position", outName: "v_position", size: 3, seed: "zero" },
-  ],
-  uniformValues: {},
-};
-
-const meshNode: MeshGraphNode = {
-  id: "mesh1",
-  kind: "mesh",
-  primitive: "cube",
-};
 
 /** code leaf의 collapsed 여부를 트리에서 직접 읽는다(findTabLeafPath +
  * getNodeAt). leaf가 트리에 없으면(패널이 닫힘) undefined. */
@@ -60,7 +30,13 @@ describe("codeAutoOpen — W5 노드 선택 → Code 자동 접기/펼침", () =
     });
     useSelectionStore.setState({ selectedNodeIds: [], selectedNodeId: null });
     useEditorStore.setState({ autoCode: true });
-    useGraphStore.setState({ nodes: [shaderNode, computeNode, meshNode] });
+    useGraphStore.setState({
+      nodes: [
+        shaderNode("shader1"),
+        computeNode("compute1"),
+        meshNode("mesh1"),
+      ],
+    });
     unsub = startCodeAutoOpen();
   });
 

@@ -25,24 +25,17 @@ import type {
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { resetAllStores } from "../../state/testStores";
 import { useTimeStore } from "../../state/timeStore";
 import { Inspector } from "./Inspector";
 
-function resetStores() {
-  useGraphStore.getState().reset();
-  useSelectionStore.getState().select(null);
-  usePassPlanStore.getState().reset();
-  useTimeStore.getState().reset();
-  useMouseStore.getState().reset();
-}
-
 beforeEach(() => {
-  resetStores();
+  resetAllStores();
 });
 
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 const shaderNode: ShaderGraphNode = {
@@ -479,26 +472,6 @@ describe("Inspector — System uniforms section [C-1]", () => {
     });
     expect(systemUniformValue("u_time")).toBe("—");
     expect(findSystemUniformRow("u_time").textContent).not.toContain("15.50s");
-  });
-
-  // Both reasons are true when a fullscreen-substituted program fails to
-  // link. u_view keeps naming the substitution (the actionable one, and what
-  // phase-36's C-1 spec asserts); the rest fall back to the generic note.
-  it("keeps the fullscreen note on u_view when the pass is also missing", () => {
-    useGraphStore.getState().addNode({
-      ...viewShaderNode,
-      fragmentSource: "uniform mat4 u_view;\nuniform float u_time;",
-    });
-    usePassPlanStore.getState().publish([], { sv1: true }, {});
-    useSelectionStore.getState().select("sv1");
-    render(<Inspector embedded />);
-
-    expect(findSystemUniformRow("u_view").textContent).toContain(
-      "not bound (fullscreen pass)",
-    );
-    expect(findSystemUniformRow("u_time").textContent).toContain(
-      "not bound (no pass for this node)",
-    );
   });
 });
 

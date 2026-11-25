@@ -53,8 +53,8 @@ export function leafPanelKind(leaf: DockLeaf): LeafPanelKind {
 }
 
 /** leaf의 레거시(현행 App.tsx 하드코딩) 셀렉터 클래스명.
- * ⚠ E2E 셀렉터 계약: `tests/e2e/m1-dock-header-collapse.spec.ts`가
- * `.shell-left`를 직접 조회한다 — 이 매핑을 깨면 그 스펙이 회귀한다. */
+ * ⚠ E2E 셀렉터 계약: `tests/e2e/phase-35-dock-*.spec.ts`가 `.shell-*`
+ * 클래스를 직접 조회한다 — 이 매핑을 깨면 그 스펙들이 회귀한다. */
 export function legacyLeafClass(leaf: DockLeaf): string | null {
   const kind = leafPanelKind(leaf);
   if (kind === "nodeEditor") return "shell-left";
@@ -71,18 +71,17 @@ export interface SplitChildFlex {
 }
 
 /** split 노드의 두 자식에게 줄 flex 문자열 + divider 렌더 여부. dc `_layout`
- * (L308-309)의 접힘 판정과 동일: `aCol`/`bCol`은 **직계 자식**이 leaf이고
+ * 의 접힘 판정과 동일: `aCol`/`bCol`은 **직계 자식**이 leaf이고
  * `collapsed === true`일 때만 참(조상/자손의 collapsed는 무관).
  *
  * - 한쪽만 접힘 → 접힌 쪽은 `COLLAPSED_STRIP_PX` 고정 strip, 반대쪽이 나머지
  *   전부(`1 - ratio` 아님 — flex-grow 1이 나머지 공간을 전부 채움).
  * - 그 외(양쪽 정상 또는 양쪽 접힘 — 인위적 케이스, dc 정본대로 가드 없음)
  *   → `ratio` 기반 두 flex.
- * - `showDivider = !(aCol || bCol)` — **R4 정본**: 접힌 leaf가 하나라도
+ * - `showDivider = !(aCol || bCol)` — 정본 규칙: 접힌 leaf가 하나라도
  *   있으면 그 split의 divider는 렌더되지 않는다(접힌 34px strip은 드래그로
- *   리사이즈할 수 없다는 의미). 현행 App.tsx는 접힘 중에도 스플리터를
- *   남겼지만 R4가 이를 갱신한다 — E2E는 이 동작을 단언하지 않음(확인 완료,
- *   `m1-dock-header-collapse.spec.ts`는 shell-left 폭/버튼 도달성만 본다). */
+ *   리사이즈할 수 없다는 의미). `phase-35-dock-chrome.spec.ts`의 Code 레일
+ *   접힘 테스트가 divider 수 3→2를 단언한다. */
 export function splitChildFlex(split: DockSplit): SplitChildFlex {
   const aCol = split.a.type === "leaf" && split.a.collapsed === true;
   const bCol = split.b.type === "leaf" && split.b.collapsed === true;

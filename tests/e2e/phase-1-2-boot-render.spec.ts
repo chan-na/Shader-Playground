@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered, readCanvasStats } from "./helpers/canvas";
+import { boxOf } from "./helpers/dom";
 import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
 import { readSp, withSp } from "./helpers/sp";
 
@@ -65,10 +66,7 @@ test.describe("Phase 1-2 — boot & render", () => {
 
     // The OrbitCamera state lives in cameraStore via __sp. We don't expose
     // it directly — assert indirectly via graph rev / visible change.
-    const box = await canvas.boundingBox();
-    if (!box) throw new Error("canvas has no bounding box");
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
+    const { cx, cy } = await boxOf(canvas);
 
     const before = await readSp(page, (sp) => sp.graph.getState().uniformRev);
 

@@ -8,11 +8,9 @@ import {
 import {
   collapseChevron,
   collapsesToRail,
-  GHOST_POINTER_OFFSET,
   ghostSize,
   leafPanelKind,
   legacyLeafClass,
-  PANEL_TITLES,
   splitChildFlex,
   splitterLabel,
 } from "./dockLayoutModel";
@@ -310,18 +308,6 @@ describe("splitterLabel", () => {
   });
 });
 
-describe("PANEL_TITLES", () => {
-  it("covers all 5 dockable panel ids with the dc META titles", () => {
-    expect(PANEL_TITLES).toEqual({
-      nodeEditor: "Node Editor",
-      viewport: "Viewport",
-      inspector: "Inspector",
-      code: "Code",
-      assets: "Assets",
-    });
-  });
-});
-
 // B4-U3: dc `onMove`'s pending-drag ghost-size clamp (L398-406) — leaf mode
 // clamps 92% of the source region to 320~540 × 220~440, tab mode clamps 85%
 // to 300~460 × 200~360; a null region (defensive — no source region found)
@@ -379,11 +365,5 @@ describe("ghostSize", () => {
     it("falls back to 380×260 when the source region is null", () => {
       expect(ghostSize("tab", null)).toEqual({ w: 380, h: 260 });
     });
-  });
-});
-
-describe("GHOST_POINTER_OFFSET", () => {
-  it("matches dc's fixed cursor offset (-70, -15, L408-409)", () => {
-    expect(GHOST_POINTER_OFFSET).toEqual({ x: 70, y: 15 });
   });
 });

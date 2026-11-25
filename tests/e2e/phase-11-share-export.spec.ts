@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered } from "./helpers/canvas";
 import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
+import { readRenderTick, waitForRenderIdle } from "./helpers/render";
 import { readSp, withSp } from "./helpers/sp";
 
 test.describe("Phase 11 — share URL & HTML export", () => {
@@ -89,8 +90,8 @@ test.describe("Phase 11 — share URL & HTML export", () => {
     await setGraph(page, trivialMeshGraph(), {});
     await expectCanvasRendered(page.getByTestId("viewport-canvas"));
 
-    // Pause and let the loop go idle (phase-9's B2 idle pattern): renderTick
-    // freezes because executePlan is skipped entirely.
+    // Pause and let the loop go idle (the phase-9 paused-idle pattern):
+    // renderTick freezes because executePlan is skipped entirely.
     await withSp(
       page,
       (sp) => {
@@ -98,16 +99,10 @@ test.describe("Phase 11 — share URL & HTML export", () => {
       },
       undefined,
     );
-    await page.waitForTimeout(400);
-    const idleStart = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.renderTick,
-    );
+    const idleStart = await waitForRenderIdle(page);
+    // Elapsed time is the subject: a frozen tick must stay frozen across it.
     await page.waitForTimeout(500);
-    const idleEnd = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.renderTick,
-    );
+    const idleEnd = await readRenderTick(page);
     expect(idleEnd).toBe(idleStart);
 
     const downloadPromise = page.waitForEvent("download", { timeout: 15_000 });

@@ -1,20 +1,9 @@
-import { cleanup, render } from "@testing-library/react";
-import type { NodeProps } from "@xyflow/react";
-import { ReactFlowProvider } from "@xyflow/react";
-import type { ReactElement } from "react";
+import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { disposeAllExternal } from "../../../core/external/registry";
 import type { AudioGraphNode } from "../../../core/graph/types";
+import { nodeProps, renderInFlow } from "../testFlow";
 import { AudioNodeView } from "./AudioNodeView";
-
-function mockProps(id: string, node: AudioGraphNode): NodeProps {
-  return { id, data: { node } } as unknown as NodeProps;
-}
-
-/** ReactFlow's Handle requires ReactFlowProvider context to mount. */
-function renderInFlow(element: ReactElement) {
-  return render(<ReactFlowProvider>{element}</ReactFlowProvider>);
-}
 
 afterEach(() => {
   cleanup();
@@ -35,7 +24,7 @@ describe("AudioNodeView — waveform canvas (V2-U2)", () => {
     };
 
     const { container } = renderInFlow(
-      <AudioNodeView {...mockProps("a1", node)} />,
+      <AudioNodeView {...nodeProps("a1", node)} />,
     );
 
     // Both the placeholder and the meta line read "no asset" here (no
@@ -59,7 +48,7 @@ describe("AudioNodeView — waveform canvas (V2-U2)", () => {
     };
 
     const { getByTestId, getByText } = renderInFlow(
-      <AudioNodeView {...mockProps("a2", node)} />,
+      <AudioNodeView {...nodeProps("a2", node)} />,
     );
 
     const card = getByTestId("audio-node");
@@ -81,7 +70,7 @@ describe("AudioNodeView — waveform canvas (V2-U2)", () => {
     };
 
     const { container } = renderInFlow(
-      <AudioNodeView {...mockProps("a3", node)} />,
+      <AudioNodeView {...nodeProps("a3", node)} />,
     );
 
     const canvas = container.querySelector("canvas");

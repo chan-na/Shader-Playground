@@ -89,7 +89,7 @@ if (import.meta.env.DEV) {
     assets: useAssetStore,
     assetActions,
     diagnostics: useDiagnosticsStore,
-    // B7 — E2E dock-tree setup/inspection (m5-dock-chrome.spec.ts R8).
+    // E2E dock-tree setup/inspection (`setDockTree` in tests/e2e/helpers).
     dock: useDockStore,
     time: useTimeStore,
     viewport: useViewportStore,

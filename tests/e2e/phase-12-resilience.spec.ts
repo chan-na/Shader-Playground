@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   bootApp,
+  selectNode,
   setGraph,
   trivialMeshGraph,
   trivialShaderSources,
@@ -152,13 +153,7 @@ test.describe("Phase 12 — resilience & expressiveness", () => {
     await bootApp(page);
     await setGraph(page, trivialMeshGraph(), {});
     await page.getByTestId("tab-inspector").click();
-    await withSp(
-      page,
-      (sp) => {
-        sp.selection.getState().select("s1");
-      },
-      undefined,
-    );
+    await selectNode(page, "s1");
 
     const frag = trivialShaderSources.fragment.replace(
       "out vec4 fragColor;",

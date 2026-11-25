@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
-import { waitForApp, waitForReady, withSp } from "./sp";
+import { expect } from "@playwright/test";
+import { readSp, waitForApp, waitForReady, withSp } from "./sp";
 import type { DockTreeNodeMinimal, GraphEdge, GraphNodeMinimal } from "./types";
 
 /** Wait for the app boot + demo bootstrap to complete. */
@@ -23,7 +24,7 @@ export async function setGraph(
   );
 }
 
-/** Replace the dock tree wholesale (R8 setup — avoids 3-4 real drags). */
+/** Replace the dock tree wholesale (avoids driving 3-4 real drags). */
 export async function setDockTree(
   page: Page,
   tree: DockTreeNodeMinimal,
@@ -40,6 +41,36 @@ export async function setDockTree(
     },
     { tree, nextLeafId },
   );
+}
+
+/** Dock layout localStorage key — mirrors `autoSave.ts`'s module-private
+ * `LAYOUT_KEY` (not exported, so the string is duplicated here). */
+export const LAYOUT_STORAGE_KEY = "shader-playground.dock-layout";
+
+/** Select a single node (or clear the selection with `null`). */
+export async function selectNode(page: Page, id: string | null): Promise<void> {
+  await withSp(
+    page,
+    (sp, args) => {
+      sp.selection.getState().select(args.id);
+    },
+    { id },
+  );
+}
+
+/** Load the built-in Chain demo through the real toolbar Presets menu. The
+ * menu items carry an explicit role="menuitem" (AppToolbar's ToolbarMenu),
+ * which overrides the underlying <button>'s implicit role. */
+export async function loadChainDemo(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Presets" }).click();
+  await page.getByRole("menuitem", { name: "Chain", exact: true }).click();
+  await expect
+    .poll(() =>
+      readSp(page, (sp) =>
+        sp.graph.getState().nodes.some((n) => n.id === "tonemap1"),
+      ),
+    )
+    .toBe(true);
 }
 
 const TRIVIAL_VERT = `#version 300 es

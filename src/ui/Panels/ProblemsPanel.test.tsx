@@ -14,21 +14,8 @@ import type {
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { resetAllStores } from "../../state/testStores";
 import { ProblemsPanel } from "./ProblemsPanel";
-
-const initialDiagnostics = useDiagnosticsStore.getState();
-const initialEditor = useEditorStore.getState();
-const initialRenderer = useRendererStore.getState();
-const initialPassPlan = usePassPlanStore.getState();
-
-function resetStores() {
-  useDiagnosticsStore.setState(initialDiagnostics, true);
-  useEditorStore.setState(initialEditor, true);
-  useRendererStore.setState(initialRenderer, true);
-  usePassPlanStore.setState(initialPassPlan, true);
-  useGraphStore.getState().reset();
-  useSelectionStore.getState().select(null);
-}
 
 function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {
   return {
@@ -65,10 +52,10 @@ function varyingsFixture(
   return { rows, confident };
 }
 
-beforeEach(resetStores);
+beforeEach(resetAllStores);
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 describe("ProblemsPanel", () => {

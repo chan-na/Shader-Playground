@@ -1,7 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import type { NodeProps } from "@xyflow/react";
-import { ReactFlowProvider } from "@xyflow/react";
-import type { ReactElement } from "react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   __setGetUserMediaForTests,
@@ -9,16 +6,8 @@ import {
   reconcileExternal,
 } from "../../../core/external/registry";
 import type { WebcamGraphNode } from "../../../core/graph/types";
+import { nodeProps, renderInFlow } from "../testFlow";
 import { WebcamNodeView } from "./WebcamNodeView";
-
-function mockProps(id: string, node: WebcamGraphNode): NodeProps {
-  return { id, data: { node } } as unknown as NodeProps;
-}
-
-/** ReactFlow's Handle requires ReactFlowProvider context to mount. */
-function renderInFlow(element: ReactElement) {
-  return render(<ReactFlowProvider>{element}</ReactFlowProvider>);
-}
 
 afterEach(() => {
   cleanup();
@@ -34,7 +23,7 @@ describe("WebcamNodeView — permission states (M7-U3)", () => {
     reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
     const node: WebcamGraphNode = { id: "w1", kind: "webcam" };
 
-    renderInFlow(<WebcamNodeView {...mockProps("w1", node)} />);
+    renderInFlow(<WebcamNodeView {...nodeProps("w1", node)} />);
 
     // The very first render is "pending" (initial state, before the first
     // poll observes the rejection) — wait for the *denied* copy specifically
@@ -62,7 +51,7 @@ describe("WebcamNodeView — permission states (M7-U3)", () => {
     reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
     const node: WebcamGraphNode = { id: "w1", kind: "webcam" };
 
-    renderInFlow(<WebcamNodeView {...mockProps("w1", node)} />);
+    renderInFlow(<WebcamNodeView {...nodeProps("w1", node)} />);
 
     await waitFor(
       () => {
@@ -81,7 +70,7 @@ describe("WebcamNodeView — permission states (M7-U3)", () => {
     reconcileExternal([{ nodeId: "w1", kind: "webcam" }]);
     const node: WebcamGraphNode = { id: "w1", kind: "webcam" };
 
-    renderInFlow(<WebcamNodeView {...mockProps("w1", node)} />);
+    renderInFlow(<WebcamNodeView {...nodeProps("w1", node)} />);
 
     const lens = await waitFor(
       () => {

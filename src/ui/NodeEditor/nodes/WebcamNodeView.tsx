@@ -56,7 +56,8 @@ export function WebcamNodeView({ id, data }: NodeProps) {
         v.playsInline = true;
         // play() may reject (autoplay policy) OR throw synchronously/return
         // undefined (jsdom's HTMLMediaElement.play is not implemented) —
-        // same non-fatal handling as registry.ts's startWebcam/applyVideoSpec.
+        // same non-fatal handling as webcam.ts's startWebcam /
+        // video.ts's applyVideoSpec.
         try {
           const p = v.play();
           if (p && typeof p.catch === "function") p.catch(() => {});

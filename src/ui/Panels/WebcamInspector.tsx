@@ -1,32 +1,20 @@
 import { useEffect, useState } from "react";
-import type { ExternalStatusKind } from "../../core/external/registry";
-import {
-  getExternalStatus,
-  retryExternalSource,
-} from "../../core/external/registry";
+import { retryExternalSource } from "../../core/external/registry";
 import type { WebcamGraphNode } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 import { log, normalizeError } from "../../utils/log";
 import { SelectField } from "../controls/SelectField";
 import { PermissionBanner } from "./PermissionBanner";
 import { StatusPill } from "./StatusPill";
+import { useExternalStatus } from "./useExternalStatus";
 
 interface DeviceInfo {
   deviceId: string;
   label: string;
 }
 
-interface StatusSnapshot {
-  ready: boolean;
-  error: string | null;
-  width: number;
-  height: number;
-  statusKind: ExternalStatusKind;
-}
-
 export function WebcamInspector({ node }: { node: WebcamGraphNode }) {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
-  const [status, setStatus] = useState<StatusSnapshot | null>(null);
   const setWebcamConfig = useGraphStore((s) => s.setWebcamConfig);
 
   // enumerateDevices labels are empty until the user grants permission once.
@@ -65,20 +53,7 @@ export function WebcamInspector({ node }: { node: WebcamGraphNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    let timer: number | null = null;
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      setStatus(getExternalStatus(node.id));
-      timer = window.setTimeout(tick, 500);
-    };
-    tick();
-    return () => {
-      cancelled = true;
-      if (timer !== null) clearTimeout(timer);
-    };
-  }, [node.id]);
+  const status = useExternalStatus(node.id);
 
   const deviceSelectId = `webcam-device-${node.id}`;
   const isPending = status?.statusKind === "pending";

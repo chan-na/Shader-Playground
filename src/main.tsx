@@ -11,7 +11,7 @@ import { App } from "./App";
 import {
   setAudioBlobResolver,
   setVideoBlobResolver,
-} from "./core/external/registry";
+} from "./core/external/resolvers";
 import { BUILTIN_FUNCTIONS, KEYWORD_DESCRIPTIONS } from "./core/glsl/builtins";
 import { glslValidator } from "./core/glsl/glslValidator";
 import { findReferences } from "./core/glsl/references";

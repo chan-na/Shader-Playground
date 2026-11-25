@@ -1,10 +1,10 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  __setGetUserMediaForTests,
   disposeAllExternal,
   reconcileExternal,
 } from "../../../core/external/registry";
+import { __setGetUserMediaForTests } from "../../../core/external/resolvers";
 import type { WebcamGraphNode } from "../../../core/graph/types";
 import { nodeProps, renderInFlow } from "../testFlow";
 import { WebcamNodeView } from "./WebcamNodeView";

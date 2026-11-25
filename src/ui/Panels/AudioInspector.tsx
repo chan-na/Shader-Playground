@@ -1,9 +1,4 @@
-import { useEffect, useState } from "react";
-import type { ExternalStatusKind } from "../../core/external/registry";
-import {
-  getExternalStatus,
-  retryExternalSource,
-} from "../../core/external/registry";
+import { retryExternalSource } from "../../core/external/registry";
 import type { AudioFftSize, AudioGraphNode } from "../../core/graph/types";
 import { AUDIO_FFT_SIZES } from "../../core/graph/types";
 import { useAssetStore } from "../../state/assetStore";
@@ -14,12 +9,7 @@ import { Slider } from "../controls/Slider";
 import { Toggle } from "../controls/Toggle";
 import { PermissionBanner } from "./PermissionBanner";
 import { StatusPill } from "./StatusPill";
-
-interface StatusSnapshot {
-  ready: boolean;
-  error: string | null;
-  statusKind: ExternalStatusKind;
-}
+import { useExternalStatus } from "./useExternalStatus";
 
 const SOURCE_OPTIONS = [
   { value: "mic", label: "Microphone", dataTestId: "audio-source-mic" },
@@ -30,25 +20,7 @@ export function AudioInspector({ node }: { node: AudioGraphNode }) {
   const setAudioConfig = useGraphStore((s) => s.setAudioConfig);
   const audios = useAssetStore((s) => s.audios);
   const audioList = Object.values(audios);
-  const [status, setStatus] = useState<StatusSnapshot | null>(null);
-
-  useEffect(() => {
-    let timer: number | null = null;
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      const s = getExternalStatus(node.id);
-      setStatus(
-        s ? { ready: s.ready, error: s.error, statusKind: s.statusKind } : null,
-      );
-      timer = window.setTimeout(tick, 500);
-    };
-    tick();
-    return () => {
-      cancelled = true;
-      if (timer !== null) clearTimeout(timer);
-    };
-  }, [node.id]);
+  const status = useExternalStatus(node.id);
 
   const assetSelectId = `audio-asset-${node.id}`;
   const fftSelectId = `audio-fft-${node.id}`;

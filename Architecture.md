@@ -682,7 +682,13 @@ ShaderPlayground/
    │  │  └─ scheduler.ts             # 10Hz 스로틀 + 가시성 큐 (+ test)
    │  │
    │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
-   │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
+   │  │  ├─ registry.ts              # singleton handle pool · reconcile/update/dispose · 종류별 디스패치 (+ test)
+   │  │  ├─ types.ts                 # ExternalSpec / 핸들 타입 (leaf)
+   │  │  ├─ resolvers.ts             # 주입 훅 — getUserMedia · video/audio blob resolver · AudioContext factory (leaf)
+   │  │  ├─ videoFrame.ts            # <video> 생성 + 프레임 텍스처 업로드 (webcam·video 공용)
+   │  │  ├─ webcam.ts                # webcam acquire/update/release
+   │  │  ├─ video.ts                 # video acquire/in-place 적용/update/release
+   │  │  └─ audio.ts                 # audio(mic·file) acquire/in-place 적용/FFT 업로드/release
    │  │
    │  ├─ gif/                        # Phase 31~34 — 의존성 0 애니메이션 GIF 인코더 (worker 오프로드 · per-frame 팔레트 · 진행률)
    │  │  ├─ quantize.ts              # median-cut 팔레트 + nearest / Floyd–Steinberg 디더 매핑 (+ test)
@@ -806,6 +812,7 @@ ShaderPlayground/
    │     ├─ WebcamInspector.tsx      # Phase 14a — device dropdown + live status
    │     ├─ VideoInspector.tsx       # Phase 14b — 에셋 선택 / play·loop·mute / seek
    │     ├─ AudioInspector.tsx       # Phase 14c — mic↔file / fftSize / smoothing / play·loop
+   │     ├─ useExternalStatus.ts     # Webcam/Video/Audio 인스펙터 공용 — 외부 소스 상태 500ms 폴링 훅
    │     ├─ GroupInspector.tsx       # Phase 29 — label/color 편집 + ungroup / delete-with-children
    │     ├─ ViewportControls.tsx     # 카메라 Reset/FOV + 배경색 + 시간 (+ test)
    │     ├─ ProblemsPanel.tsx        # 진단 → select + setStage + requestJump

@@ -2,7 +2,8 @@ import fullscreenVert from "../../shaders/fullscreen.vert?raw";
 import tfNoopFrag from "../../shaders/tfNoop.frag?raw";
 import { makePrimitive } from "../assets/primitives";
 import type { GeometryHandle, ImageHandle } from "../assets/types";
-import { type ExternalSpec, reconcileExternal } from "../external/registry";
+import { reconcileExternal } from "../external/registry";
+import type { ExternalSpec } from "../external/types";
 import {
   createFramebuffer,
   disposeFramebuffer,

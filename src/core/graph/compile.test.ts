@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  __setGetUserMediaForTests,
-  disposeAllExternal,
-  externalHandleCount,
-} from "../external/registry";
+import { disposeAllExternal, externalHandleCount } from "../external/registry";
+import { __setGetUserMediaForTests } from "../external/resolvers";
 import { createFakeGl } from "../gl/fakeGl";
 import { compileGraph, emptyPlan, scaledDimensions } from "./compile";
 import type { Graph } from "./types";

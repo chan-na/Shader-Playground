@@ -80,7 +80,7 @@ let _active: ActiveGif | null = null;
  * loop, which the browser throttles to ~1 Hz (or suspends entirely) while the
  * tab is hidden, and which also stalls behind a long recompile. The resulting
  * multi-second — sometimes multi-minute — gap between two consecutive captures
- * would otherwise be baked in verbatim, freezing the GIF on one frame. (#31)
+ * would otherwise be baked in verbatim, freezing the GIF on one frame.
  */
 const MAX_FRAME_DELAY_MS = 1000;
 
@@ -113,7 +113,7 @@ export function frameDelays(
  * The viewport's clear colour as a CSS `rgb()` string. GIF has no alpha channel
  * worth the name, so the scratch canvas needs an opaque backdrop that matches
  * what the user sees in the viewport — the background is user-configurable
- * (`viewportStore.setBackground`), so it cannot be hard-coded. (#16)
+ * (`viewportStore.setBackground`), so it cannot be hard-coded.
  */
 function matteColor(): string {
   const [r, g, b] = useViewportStore.getState().background;
@@ -211,7 +211,7 @@ export const useGifRecorderStore = create<GifRecorderState>((set, get) => ({
       // GIF encoder then discards alpha and those pixels read as black. Filling
       // with the viewport's own clear colour makes the composite match what the
       // user sees. `clearRect` is deliberately NOT used — it would reset the
-      // canvas to transparent and reintroduce the same hard-edged rims. (#16)
+      // canvas to transparent and reintroduce the same hard-edged rims.
       active.ctx.fillStyle = matteColor();
       active.ctx.fillRect(0, 0, active.width, active.height);
       active.ctx.drawImage(canvas, 0, 0, active.width, active.height);

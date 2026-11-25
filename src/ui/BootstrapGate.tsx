@@ -46,8 +46,9 @@ export function BootstrapGate() {
         } catch (e) {
           log.warn("app", "share hash decode failed", normalizeError(e));
           // `decodeShareHash` swallows its own parse failures and returns
-          // null, so before T0-3 this catch had no realistic trigger. Now
-          // that `shareUrl` is a separately-fetched chunk, the `await
+          // null, so on its own this catch has no realistic trigger. But
+          // `shareUrl` is a separately-fetched chunk (learnability plan
+          // T0-3), the `await
           // import()` above can reject on a network hiccup or a stale cached
           // index.html mid-deploy — and the user, who followed a share link,
           // would silently land on the demo graph or a recovery prompt with

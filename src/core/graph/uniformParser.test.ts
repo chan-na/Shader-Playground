@@ -341,7 +341,7 @@ describe("hasExplicitDefault (T3/C-2)", () => {
   it("is unset for a color-named uniform with no @default hint (heuristic-only default)", () => {
     // u_baseColor's [1,1,1] here comes from defaultRangeFor's name-based
     // heuristic, not an explicit hint — withExplicitDefaults must not bind
-    // this (C-2's explicit-only decision).
+    // this (only explicit @default hints are seeded).
     const src = `uniform vec3 u_baseColor;`;
     const x = parseUniforms(src).find((u) => u.name === "u_baseColor")!;
     expect(x.hasExplicitDefault).toBeUndefined();

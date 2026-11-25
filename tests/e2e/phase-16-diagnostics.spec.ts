@@ -27,17 +27,15 @@ test.describe("Phase 16 — diagnostics panel", () => {
 
     await page.getByTestId("open-diagnostics").click();
     await expect(panel).toBeVisible();
-    // R5: Diagnostics는 상태바 토글 → 하단 트랜지언트 오버레이(172px). Not a Side
-    // Panel tab — `tab-diagnostics` no longer exists (SidePanel/
-    // DockPanelHeader legacy path removed). The StatusBar toggle's
-    // aria-pressed + the overlay's own testid are the new-path activation
-    // signals.
+    // Diagnostics는 상태바 토글 → 하단 트랜지언트 오버레이(172px), Side Panel
+    // 탭이 아니다. The StatusBar toggle's aria-pressed + the overlay's own
+    // testid are the activation signals.
     await expect(page.getByTestId("open-diagnostics")).toHaveAttribute(
       "aria-pressed",
       "true",
     );
     await expect(page.getByTestId("diagnostics-overlay")).toBeVisible();
-    // S7/T3 (design/CHANGELOG.md §v1.6): 오버레이는 헤더 아래 26px 단일 행
+    // 오버레이는 헤더 아래 26px 단일 행
     // 메트릭 스트립만 — 전체 2×2 카드는 억제된다.
     const strip = page.getByTestId("diagnostics-metric-strip");
     await expect(strip).toBeVisible();
@@ -56,7 +54,7 @@ test.describe("Phase 16 — diagnostics panel", () => {
 
     await page.getByTestId("open-diagnostics").click();
     await expect(panel).toHaveCount(0);
-    // R5 (B5-U5): the overlay itself (not just its inner panel testid) must
+    // The overlay itself (not just its inner panel testid) must
     // unmount on re-toggle close — guards against the overlay wrapper
     // lingering (e.g. StatusOverlays still rendering a stale open/problemsOpen
     // state) while the inner DiagnosticsPanel disappears.

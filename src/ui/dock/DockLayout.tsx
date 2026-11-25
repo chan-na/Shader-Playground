@@ -1,10 +1,9 @@
 /**
- * 도킹 트리 재귀 flex 렌더러 — B2-U1. `App.tsx`의 하드코딩 4패널 마크업
- * (shell-main/shell-left/shell-right/shell-code + 스플리터 3개)을 대체한다.
+ * 도킹 트리 재귀 flex 렌더러.
  *
- * dc(`Docking Prototype.dc.html`)의 absolute 픽셀 배치 대신 **중첩 flex
- * 재귀**를 쓴다 — 이유: (1) 현행 CSS/셀렉터 계약(`.shell-left` 등) 보존,
- * (2) ResizeObserver 없이 픽셀 동치, (3) `geometry.ts`의 `layoutDockTree`는 B4
+ * dc(`App Shell.dc.html` 도킹 엔진)의 absolute 픽셀 배치 대신 **중첩 flex
+ * 재귀**를 쓴다 — 이유: (1) 레거시 CSS/셀렉터 계약(`.shell-left` 등) 보존,
+ * (2) ResizeObserver 없이 픽셀 동치, (3) `geometry.ts`의 `layoutDockTree`는
  * 드래그 히트테스트용으로 별도 남는다. flex 수식 `${ratio} 1 0px`은 dc
  * `_layout`의 `aw=(w-D)*ratio`와 동치(playwright viewport 1440×900).
  *
@@ -13,30 +12,29 @@
  * 뿐 컴포넌트는 항상 마운트 유지(WebGL/CodeMirror 보존). 트리 모양은
  * 리사이즈/접기/최대화/드래그 재도킹 어떤 조작에서도 재귀 위치가 안정적인
  * 한 React가 리마운트하지 않는다.
- * ⚠ S5 각주(v2.0, 이 불변식의 유일한 완화 지점): `leafPanelKind`가
- * `leaf.active` 기준으로 바뀌면서, **이종 탭을 가진 leaf**에서 active를
+ * ⚠ 이 불변식의 유일한 완화 지점: `leafPanelKind`가 `leaf.active`
+ * 기준이므로, **이종 탭을 가진 leaf**에서 active를
  * 전환하면 `DockLeafView`가 렌더하는 컴포넌트 자체가 바뀐다(예:
  * `tabs:["nodeEditor","assets"]`에서 active가 assets→nodeEditor로 바뀌면
  * SidePanel이 언마운트되고 NodeEditor가 마운트된다) — 이건 CSS
  * display:none이 아니라 진짜 조건부 렌더링 분기 전환이라 위 불변식이 지키는
- * "컴포넌트는 항상 마운트 유지"가 그 leaf 내부에서는 깨진다. 다만 T1
- * (`tree.ts`의 `canMergeDockTabs`)이 viewport/code를 이종 병합
+ * "컴포넌트는 항상 마운트 유지"가 그 leaf 내부에서는 깨진다. 다만
+ * `tree.ts`의 `canMergeDockTabs`가 viewport/code를 이종 병합
  * 자체에서 배제하므로, WebGL(Viewport)·CodeMirror(CodeEditor)처럼 재초기화
  * 비용이 큰 두 패널은 애초에 이종 leaf에 들어갈 수 없다 — 이 완화가 실제로
  * 영향을 주는 건 nodeEditor/inspector/assets 조합뿐이고, 그중 재마운트
  * 비용이 큰 건 없다(ReactFlow도 매 마운트 상태를 그래프 스토어에서 다시
  * 읽으므로 안전).
  *
- * B4-U3(드래그 엔진 + 고스트/프리뷰 오버레이): `DockLayout` 루트가 드래그
+ * 드래그 엔진 + 고스트/프리뷰 오버레이: `DockLayout` 루트가 드래그
  * 오케스트레이션 전체(pending → 고스트 전환 임계값, 고스트 추적, 드롭
- * 판정, release 처리)를 소유한다 — dc `onMove`/`onUp`(Docking
- * Prototype.dc.html L385-440) 이식. **`pointer*` 이벤트만 사용한다(R10 —
- * mouse 계열/키보드 DnD 금지)**. 트리 변형(분리/재도킹) 자체는
- * `dockStore.detachForDrag`/`dockDetached`(B4-U2)에 위임 — 이 컴포넌트는
- * (1) 임계값/좌표/드롭 판정, (2) 트랜지언트 고스트·프리뷰의 렌더링만
- * 담당한다. 드래그 시작 트리거(`startLeafDrag`/`startTabDrag`)는
- * `DockDragContext`로 서브트리 전체에 내려보낸다 — leaf 헤더(grab
- * handle/탭)의 실제 배선은 B4-U4.
+ * 판정, release 처리)를 소유한다 — dc `onMove`/`onUp` 이식. **`pointer*`
+ * 이벤트만 사용한다(mouse 계열/키보드 DnD 금지 — 디자인 결정)**. 트리
+ * 변형(분리/재도킹) 자체는 `dockStore.detachForDrag`/`dockDetached`에
+ * 위임 — 이 컴포넌트는 (1) 임계값/좌표/드롭 판정, (2) 트랜지언트 고스트·
+ * 프리뷰의 렌더링만 담당한다. 드래그 시작 트리거(`startLeafDrag`/
+ * `startTabDrag`)는 `DockDragContext`로 서브트리 전체에 내려보내고, leaf
+ * 헤더(`DockPanelHeader`의 grab handle/탭)가 이를 배선한다.
  */
 
 import {
@@ -84,24 +82,22 @@ import {
   findLeafPath,
 } from "./tree";
 
-/** 조건부 className을 공백으로 이어붙이는 최소 헬퍼(falsy는 생략). 이전
- * App.tsx의 동일 헬퍼를 이 파일로 복제(그 하드코딩 마크업은 사라졌으므로
- * 헬퍼 자체도 이 렌더러가 단독 소유). */
+/** 조건부 className을 공백으로 이어붙이는 최소 헬퍼(falsy는 생략). */
 function cx(...parts: Array<string | false | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
 
-/** dc `onMove`의 `Math.hypot(e.clientX - d.sx, ...) < 4`(L390) — pending
+/** dc `onMove`의 `Math.hypot(e.clientX - d.sx, ...) < 4` — pending
  * 드래그가 실제 고스트로 전환되는 최소 이동 거리(px). 이보다 작은 이동은
  * 드래그가 아니라 클릭(탭 선택)으로 그대로 통과한다. */
 const DRAG_THRESHOLD_PX = 4;
 
-/** R11(반응형) — 컴팩트 도킹 폴백의 임계값. C-6(`src/styles/60-viewport.css`의
- * `@container vp-body (max-width: 990px)`, 트랜스포트 바 컴팩트 변형)이 이미
- * 확정한 990px·inclusive(`max-width`, ≤990) 시맨틱을 그대로 재사용한다 — 신규
- * 임계 상수 도입 금지(CHANGELOG §v1.4 R11). C-6은 도킹 패널 내부 크기의
- * container query이고 이건 셸 전체 폭의 media query라 셀렉터 종류는 다르지만
- * 픽셀 값·경계 포함 여부는 동일해야 한다는 게 R11의 요구사항이다. */
+/** 반응형 — 컴팩트 도킹 폴백의 임계값. 뷰포트 트랜스포트 바 컴팩트 변형
+ * (`src/styles/60-viewport.css`의 `@container vp-body (max-width: 990px)`)의
+ * 990px·inclusive(≤990) 시맨틱을 그대로 재사용한다 — 신규 임계 상수 도입
+ * 금지(디자인 결정). 저쪽은 패널 내부 container query, 이쪽은 셸 전체 폭
+ * media query라 셀렉터 종류는 다르지만 픽셀 값·경계 포함 여부는 동일해야
+ * 한다. */
 const COMPACT_MEDIA_QUERY = "(max-width: 990px)";
 
 /** `useCompactShell`의 `subscribe`. 함수 참조가 안정적이어야
@@ -132,7 +128,7 @@ function getCompactShellSnapshot(): boolean {
   return window.matchMedia(COMPACT_MEDIA_QUERY).matches;
 }
 
-/** R11 — 셸 폭이 컴팩트(≤990px, C-6 임계 재사용) 밴드에 들어왔는지. 도킹
+/** 셸 폭이 컴팩트(≤990px, 뷰포트 컴팩트 임계 재사용) 밴드에 들어왔는지. 도킹
  * 트리 자체(`dockStore.tree`)는 절대 건드리지 않는다 — `DockLayout`이 이
  * 값을 읽어 **렌더만** 세로 스택으로 바꾸는 순수 폴백이다(넓어지면
  * 사용자 레이아웃이 그대로 복원됨). export하지 않는다 — 이 파일(과
@@ -141,7 +137,7 @@ function useCompactShell(): boolean {
   return useSyncExternalStore(subscribeCompactShell, getCompactShellSnapshot);
 }
 
-/** compact(R11)에서 드래그 시작 트리거를 무력화하는 공유 no-op — 시그니처가
+/** compact에서 드래그 시작 트리거를 무력화하는 공유 no-op — 시그니처가
  * 다른 `startLeafDrag`/`startTabDrag` 양쪽에 그대로 대입 가능하다(인자 0개
  * 함수는 더 많은 인자를 받는 함수 타입에 항상 대입 가능). */
 function noopDragStart(): void {}
@@ -161,7 +157,7 @@ interface PendingDrag {
 }
 
 /** 커서를 따라다니는 트랜지언트 드래그 고스트의 렌더 상태. dc의
- * `state.ghost`(L252·L398-409) 이식 — `x`/`y`는 컨테이너 상대 좌표. */
+ * `state.ghost` 이식 — `x`/`y`는 컨테이너 상대 좌표. */
 interface GhostState {
   tabs: DockPanelId[];
   active: DockPanelId;
@@ -215,7 +211,7 @@ export function DockLayout() {
     setArmed(true);
   }, []);
 
-  // R11: compact(≤990px)에서는 grab handle/탭 pointerdown이 애초에
+  // compact(≤990px)에서는 grab handle/탭 pointerdown이 애초에
   // startLeafDrag/startTabDrag를 호출하지 않도록(DockPanelHeader의
   // dragEnabled 분기) 공유 no-op으로 교체한다 — 드래그 오케스트레이션
   // 자체(아래 pointer 리스너)는 손대지 않고 "시작 트리거"만 차단한다.
@@ -246,10 +242,10 @@ export function DockLayout() {
     setDrop(null);
   }, []);
 
-  // R11: 좁은 화면으로 전환되는 순간 진행 중인 드래그 세션을 정리한다.
+  // 좁은 화면으로 전환되는 순간 진행 중인 드래그 세션을 정리한다.
   // pending뿐이면(고스트 미전환) 트리가 아직 안 건드려졌으므로 단순 취소로
   // 충분하다. 이미 고스트로 전환됐다면(detachForDrag로 트리에서 분리된
-  // 상태) 단순 취소는 그 패널을 유실시킨다(R1 '플로팅/유실 없음' 불변식
+  // 상태) 단순 취소는 그 패널을 유실시킨다('플로팅/유실 없음' 불변식
   // 위반) — dockDetached로 폴백 타깃에 강제 도킹한 뒤 세션을 정리한다.
   // `compact`만 deps에 두면 되는 이유는 handleUp과 동일: region 계산에
   // 필요한 tree/rect는 이 시점에 useDockStore.getState()/rootRef로 1회
@@ -380,9 +376,9 @@ export function DockLayout() {
         return;
       }
 
-      // R1: 드롭 타깃이 없어도(밴드/region 밖) 반드시 도킹한다 — 뜬 상태로
+      // 드롭 타깃이 없어도(밴드/region 밖) 반드시 도킹한다 — 뜬 상태로
       // 남는 경우는 없다. dc `onUp`의 `this.dc.dropTarget ||
-      // this._fallbackTarget()`(L436) 이식.
+      // this._fallbackTarget()` 이식.
       const rect = rootRef.current?.getBoundingClientRect();
       const { regions } = layoutDockTree(
         useDockStore.getState().tree,
@@ -419,9 +415,8 @@ export function DockLayout() {
     >
       <DockDragContext.Provider value={dragContextValue}>
         {tree === null ? (
-          // R1 정본 카피 — v1.3의 "drop a floating panel here"는 폐기됐다
-          // (플로팅 없음). ＋ Panel 버튼 자체는 B6에서 툴바에 붙는다. 트리가
-          // null이어도 이 분기는 `.dock-root` 컨테이너 **안**에 있다 —
+          // 정본 카피 — 플로팅이 없으므로 "＋ Panel"(툴바)로 재오픈을
+          // 안내한다. 트리가 null이어도 이 분기는 `.dock-root` 컨테이너 **안**에 있다 —
           // 마지막 남은 패널을 드래그로 분리하는 중에는 트리가 일시적으로
           // null이 되지만 고스트/프리뷰 오버레이와 pointer 리스너는 계속
           // 살아있어야 하기 때문이다.
@@ -479,8 +474,8 @@ export function DockLayout() {
             top: ghost.y,
             width: ghost.w,
             height: ghost.h,
-            // dc box-shadow `0 22px 54px rgba(0,0,0,0.66), 0 0 0 1px
-            // rgba(61,155,255,0.5)`(L609) — 앞부분은 shadow.modal 근사(둘 다
+            // dc 고스트 box-shadow `0 22px 54px rgba(0,0,0,0.66), 0 0 0 1px
+            // rgba(61,155,255,0.5)` — 앞부분은 shadow.modal 근사(둘 다
             // "모달급 부유 요소"의 큰 드롭섀도), accent 링은
             // withAlpha(accent,0.5)로 합성(CSS 변수로 못 만드는 알파 파생).
             boxShadow: `${tokens.shadow.modal}, 0 0 0 1px ${withAlpha(tokens.accent.default, 0.5)}`,
@@ -526,7 +521,7 @@ interface DockNodeViewProps {
   maxRemaining: DockPath | null;
   /** 조상 split이 이 서브트리를 최대화 때문에 숨기기로 정했는지. */
   hidden: boolean;
-  /** R11 — 셸이 컴팩트(≤990px) 밴드인지. 트리 구조는 그대로 두고 렌더만
+  /** 셸이 컴팩트(≤990px) 밴드인지. 트리 구조는 그대로 두고 렌더만
    * 세로 스택으로 바꾼다(`DockSplitView`는 스플리터를 그리지 않고,
    * `DockLeafView`는 flex를 `0 0 auto`로 고정 — 나머지는 `.dock-root--compact`
    * CSS가 처리). */
@@ -613,7 +608,7 @@ function DockSplitView({
         hidden={head === "b"}
         compact={compact}
       />
-      {/* R11: 컴팩트에서는 스플리터를 렌더하지 않는다 — 실수 드래그 방지
+      {/* 컴팩트에서는 스플리터를 렌더하지 않는다 — 실수 드래그 방지
           (드롭 프리뷰/고스트와 마찬가지로 재도킹 표면 전체가 사라진다).
           자리(showDivider일 때의 placeholder)는 그대로 유지되므로 형제
           leaf들의 React 위치는 안정적이다(리마운트 없음, 기존

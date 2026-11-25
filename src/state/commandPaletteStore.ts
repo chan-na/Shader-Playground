@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /**
- * Command Palette open/closed state (M1-U3).
+ * Command Palette open/closed state.
  *
  * Pulled out of `CommandPalette`'s local `useState` so the AppToolbar's
  * "Search" button can open the palette without importing the component

@@ -1,4 +1,4 @@
-/* ── Export & Share dialog (design/Export & Share.dc.html, M6-U3) ──
+/* ── Export & Share dialog (design/Export & Share.dc.html) ──
  * Its own overlay/modal (not .cmdk-overlay/.cmdk-modal) — different size
  * (880×600 vs 624px-wide command palette) and a lower z-index so the
  * command palette always wins if both were somehow open at once. */
@@ -268,8 +268,8 @@
   font-size: 10.5px;
   color: var(--text-muted);
 }
-/* ── [C-10] HTML export "File name" field (design/Export & Share.dc.html
-   L167-171) ── The editable base and the static `-{timestamp}.html` suffix
+/* ── HTML export "File name" field (design/Export & Share.dc.html
+   CONFIGURE · HTML) ── The editable base and the static `-{timestamp}.html` suffix
    share one field box, so the box chrome moves from the inner `.ctl-text`
    (see controls.css) onto this wrapper and the input goes transparent. */
 .es-field-label {
@@ -382,9 +382,9 @@
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
-  /* design/Export & Share.dc.html L284/L295 — inset highlight is a plain
-   * white channel with no brand/semantic token (same policy as
-   * controls.css's .ctl-slider-input thumb shadow: literal rgba() for
+  /* design/Export & Share.dc.html primary buttons (DONE / FOOTER) — inset
+   * highlight is a plain white channel with no brand/semantic token (same
+   * policy as controls.css's .ctl-slider-input thumb shadow: literal rgba() for
    * non-token structural highlights, not a "raw brand hex"). */
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset;
 }
@@ -521,9 +521,9 @@
   gap: 10px;
 }
 
-/* ── Export & Share · Record configure/recording/encoding (GIF/WebM, M6-U4)
- * design/Export & Share.dc.html L100-144 (configure), L214-234 (recording),
- * L238-251 (encoding). Segmented/slider/toggle controls are ui/controls —
+/* ── Export & Share · Record configure/recording/encoding (GIF/WebM)
+ * design/Export & Share.dc.html CONFIGURE · RECORD, RECORDING and ENCODING
+ * sections. Segmented/slider/toggle controls are ui/controls —
  * only the layout scaffolding + est chip/progress bar/ring/REC chip below
  * are new. */
 .es-rec-header {
@@ -607,7 +607,7 @@
   max-width: 480px;
 }
 
-/* Recording (L214-234) */
+/* Recording (dc RECORDING) */
 @keyframes es-rec-pulse {
   0%,
   100% {
@@ -711,7 +711,7 @@
   transition: width 0.06s linear;
 }
 
-/* Encoding (L238-251, GIF only) */
+/* Encoding (dc ENCODING, GIF only) */
 .es-enc-ring {
   position: relative;
   width: 96px;
@@ -745,7 +745,7 @@
   color: var(--text-muted);
 }
 
-/* Done · record file card tints (extends .es-done-file-icon from M6-U3) */
+/* Done · record file card tints (extend .es-done-file-icon above) */
 .es-done-file-icon--gif {
   background: color-mix(in srgb, var(--warning) 13%, transparent);
   border-color: color-mix(in srgb, var(--warning) 35%, transparent);

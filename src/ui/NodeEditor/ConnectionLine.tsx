@@ -9,7 +9,7 @@ import { portFamilyHex } from "./nodeTheme";
 
 /**
  * Live bezier line drawn while a port drag is in progress (design/Node
- * Editor.dc.html L64 "DRAG IN PROGRESS" reference + L19 `neDash` keyframes,
+ * Editor.dc.html "DRAG IN PROGRESS" edge + its `neDash` keyframes,
  * ported as `sp-edge-dash` in nodeCard.css). Colored by the family of the
  * handle the drag started from, dashed, and always animated — the one
  * exception to the "no idle animation" rule since it only mounts while a

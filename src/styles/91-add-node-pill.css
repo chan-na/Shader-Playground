@@ -1,26 +1,23 @@
-/* ── Add-node pill (W4, design/App Shell.dc.html L131-136) — floating
-   quick-add palette centered above the Node Editor canvas. AddNodePill.tsx.
+/* ── Add-node pill (design/App Shell.dc.html "floating add-node palette")
+   — floating quick-add palette centered above the Node Editor canvas.
+   AddNodePill.tsx.
    dc `background:rgba(19,21,25,0.92)` == tokens.surface.panel(#131519) at
-   92% alpha; color-mix pattern follows the .graph-skeleton-status (L3416)
-   convention above. dc `border-radius:10px` + `box-shadow:0 8px
+   92% alpha; color-mix pattern follows the .graph-skeleton-status
+   convention (90-skeletons.css). dc `border-radius:10px` + `box-shadow:0 8px
    24px rgba(0,0,0,0.5)` match radius/shadow.floatingPill exactly — reused
-   rather than adding a new token (S26 adds exactly 6, no more). `blur(8px)`
-   is a non-tokenized literal (see .graph-skeleton-status's blur(6px)
-   convention, L3423).
+   rather than adding a new token. `blur(8px)` is a non-tokenized literal
+   (see .graph-skeleton-status's blur(6px) convention).
 
-   z-index:11, NOT the dc's z-index:6 — the dc's App Shell mockup has no
-   welcome-overlay layer to sit above, so 6 was only ever "above the ReactFlow
-   pane". In this codebase the pill and .welcome-overlay (z-index:10,
-   pointer-events:auto, inset:0 — see its comment above) share the same
+   z-index:11 (as in the dc): the pill and .welcome-overlay (z-index:10,
+   pointer-events:auto, inset:0 — see 70-welcome.css) share the same
    .panel-body stacking context, and the pill's whole purpose is adding the
    *first* node to an empty graph, i.e. exactly when the welcome overlay is
-   mounted. At z-index:6 the overlay's pointer-events:auto (load-bearing for
-   its own wheel-scroll, see L2211-2221) swallows every click before it
-   reaches the pill, even though the pill paints on top visually in some
-   browsers' z-fighting — Playwright caught this as "welcome-content subtree
-   intercepts pointer events". 11 keeps the pill clickable in both the empty
-   (welcome overlay) and populated (bare ReactFlow pane) states without
-   touching welcome-overlay's pointer-events. */
+   mounted. At 10 or below, the overlay's pointer-events:auto (load-bearing
+   for its own wheel-scroll) swallows every click before it reaches the pill —
+   Playwright reports "welcome-content subtree intercepts pointer events".
+   11 keeps the pill clickable in both the empty (welcome overlay) and
+   populated (bare ReactFlow pane) states without touching welcome-overlay's
+   pointer-events. */
 .add-node-pill {
   position: absolute;
   left: 50%;

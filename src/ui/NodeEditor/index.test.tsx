@@ -238,7 +238,7 @@ describe("NodeEditor — panning an added node into view", () => {
     addParam("far", { x: 4000, y: 0 });
     flushFrames();
     // Center of the 180×64 card, at the zoom the user left behind — a pan,
-    // never a refit [#38].
+    // never a refit.
     expect(rf.setCenter).toHaveBeenCalledWith(4090, 32, {
       zoom: 1,
       duration: MOTION_MAX_MS,
@@ -400,7 +400,7 @@ describe("NodeEditor — panning an added node into view", () => {
   });
 
   it("pans without refitting on a plain add, and refits on a replace", () => {
-    // [#38] The auto-fit belongs to wholesale replacements only; a plain add
+    // The auto-fit belongs to wholesale replacements only; a plain add
     // must never re-frame the canvas out from under the user.
     renderEditor();
     addParam("far", { x: 4000, y: 0 });

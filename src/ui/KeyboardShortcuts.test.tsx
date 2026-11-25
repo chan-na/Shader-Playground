@@ -7,7 +7,7 @@ import { useTimeStore } from "../state/timeStore";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 
 /**
- * 전역 단축키의 Space 스코프 회귀 가드(2026-07 리뷰 #15). 이 컴포넌트는
+ * 전역 단축키의 Space 스코프 회귀 가드. 이 컴포넌트는
  * `window`에 keydown 리스너 하나만 걸고 아무것도 렌더하지 않으므로, 테스트는
  * "어떤 엘리먼트를 타깃으로 keydown을 쏘면 스토어가 어떻게 되는가"만 본다.
  */

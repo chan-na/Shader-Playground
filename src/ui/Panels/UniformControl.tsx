@@ -10,7 +10,7 @@ export interface UniformControlProps {
   value: number | number[] | undefined;
   onChange: (v: number | number[]) => void;
   /**
-   * [L1/E-4] Name of the node feeding this uniform via a graph edge
+   * Name of the node feeding this uniform via a graph edge
    * (Inspector resolves it from `graphStore.edges` — see Inspector.tsx).
    * When present, `execute.ts`'s `bindUserUniforms` overwrites whatever this
    * control would send with the edge's live value every frame, so the

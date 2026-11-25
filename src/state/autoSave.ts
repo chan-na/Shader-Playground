@@ -221,13 +221,13 @@ export function stopAutoSave(): void {
   }
 }
 
-// ── Dock layout persistence (R9) ────────────────────────────────────────────
-// 정본: `design/CHANGELOG.md` §v1.4 R9 — 도킹 레이아웃은 프로젝트 데이터가
+// ── Dock layout persistence ─────────────────────────────────────────────────
+// 도킹 레이아웃은 프로젝트 데이터가
 // 아니라 "사용자 작업 환경"이므로 프로젝트 `.json`(`serialization.ts`)이
 // 아닌 localStorage에 저장한다. 위의 IndexedDB 세션 오토세이브(그래프)와는
 // 완전히 별개 저장소/스케줄러 — 서로 관여하지 않는다.
 
-/** localStorage 키(모듈 프라이빗) — R9 레이아웃 스냅샷 전용. */
+/** localStorage 키(모듈 프라이빗) — 레이아웃 스냅샷 전용. */
 const LAYOUT_KEY = "shader-playground.dock-layout";
 
 /** divider 드래그는 pointermove마다 `setDividerRatio`를 호출해 `dockStore`를
@@ -238,7 +238,7 @@ const LAYOUT_SAVE_DEBOUNCE_MS = 500;
 /** localStorage에서 레이아웃 스냅샷을 읽어 검증한다. 어떤 실패
  * 경로(SSR/구버전 브라우저의 `localStorage` 부재, 손상된 JSON, 스키마
  * 불일치)에서도 절대 throw하지 않고 `null`을 반환한다 — 호출측이 조용히
- * 기본 트리를 유지하게 하기 위함(R9). */
+ * 기본 트리를 유지하게 하기 위함. */
 function loadDockLayout(): DockLayoutSnapshot | null {
   if (typeof localStorage === "undefined") return null;
   try {
@@ -275,7 +275,7 @@ function saveDockLayout(): void {
 }
 
 /**
- * 도킹 레이아웃 영속화를 시작한다(R9) — 저장된 스냅샷이 있으면 즉시
+ * 도킹 레이아웃 영속화를 시작한다 — 저장된 스냅샷이 있으면 즉시
  * `dockStore`를 하이드레이션하고, 이후 변경을 디바운스해 localStorage에
  * 반영한다. `main.tsx`가 `createRoot` 렌더 **전**에 1회 호출해야 한다(기본
  * 트리 → 저장된 트리로 바뀌는 첫 프레임 플래시를 막기 위함).

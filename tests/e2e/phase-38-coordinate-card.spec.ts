@@ -3,11 +3,10 @@ import { bootApp } from "./helpers/fixtures";
 
 /**
  * Phase 38 — mental-model correction (F-1, `docs/learnability-plan-2026-08.md`
- * T3). HelpModal gains a "Coordinate Spaces" section listing verified facts
+ * T3). HelpModal has a "Coordinate Spaces" section listing verified facts
  * about the app's coordinate conventions (v_uv, gl_FragCoord, u_mouse, image
- * upload flip, thumbnail flip). This is a pure UI addition on top of the
- * existing shortcuts modal — the coordinate section coexists with the
- * pre-existing shortcut sections and the Esc-to-close behavior is unchanged.
+ * upload flip, thumbnail flip). It coexists with the shortcut sections and
+ * the modal's Esc-to-close behavior.
  */
 test.describe("Phase 38 — HelpModal coordinate-system card", () => {
   test.beforeEach(async ({ page }) => {

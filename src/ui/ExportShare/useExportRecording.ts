@@ -5,7 +5,7 @@ import { useRecorderStore } from "../../state/recorder";
 
 /** Export & Share dialog local phases (design/Export & Share.dc.html's
  * `phase` prop). "recording"/"encoding" drive the GIF/WebM Record flow
- * (M6-U4) on top of M6-U3's "configure"/"done". */
+ * on top of "configure"/"done". */
 export type ExportSharePhase = "configure" | "recording" | "encoding" | "done";
 
 /**

@@ -46,7 +46,7 @@ const GPU_TIPS: ReadonlyArray<{ n: string; text: string }> = [
 
 /**
  * Full-app blocking screen for a missing WebGL2 context (design/System
- * States.dc.html gpu-unsupported, L389-424, M7-U5). Renders on top of the
+ * States.dc.html, `gpu-unsupported` state). Renders on top of the
  * entire shell whenever rendererStore.contextUnavailable is true — set by
  * Viewport's GL boot effect when `createGLContext` throws, cleared either by
  * that same effect succeeding or by this screen's own Retry button

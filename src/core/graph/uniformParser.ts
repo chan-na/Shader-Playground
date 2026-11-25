@@ -62,7 +62,7 @@ export interface UniformSpec {
   defaultValue: number | number[];
   /**
    * True only when an explicit `@default` hint was present in a comment AND
-   * actually merged into `defaultValue` (C-2). Left unset for uniforms that
+   * actually merged into `defaultValue`. Left unset for uniforms that
    * only got a value from `defaultRangeFor`'s name-based heuristic — binding
    * those too would be a much bigger behavior change (every unannotated
    * color-named uniform in an existing project would jump from GL's zero
@@ -351,7 +351,7 @@ function stripManagedTokens(line: string): string | null {
  * both, and a leftover preceding `@range` would otherwise win). Returns the
  * rewritten source, or null when no matching declaration is found.
  *
- * Declaration *matching* runs against a block-comment-masked copy (L33) so a
+ * Declaration *matching* runs against a block-comment-masked copy so a
  * `uniform` line that only exists inside `/* … *\/` is never rewritten — that
  * would have edited commented-out code and left the live declaration alone.
  * The rewrite itself reads the RAW line: masking is length-preserving, so the

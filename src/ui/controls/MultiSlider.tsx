@@ -14,8 +14,8 @@ export interface MultiSliderProps {
 
 /**
  * Per-axis label + fill color, up to 4 components (vec2..vec4).
- * design/Side Panel.dc.html L107-108 (vec2 X/Y) and L246-248 (vec3
- * X/Y/Z) fix X=semantic.error, Y=portFamily.scalar, Z=accent.default.
+ * design/Side Panel.dc.html "vec2 multi-axis" (X/Y) and "Vec3 multi"
+ * (X/Y/Z) fix X=semantic.error, Y=portFamily.scalar, Z=accent.default.
  * Neither mock includes a vec4 example, so W extends the same sequence
  * to portFamily.resource — the 4th of the brief's 4 port-type families,
  * keeping the axis palette and the port-color palette in step.

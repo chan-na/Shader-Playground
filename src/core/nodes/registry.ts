@@ -182,7 +182,7 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
 
 /**
  * Resolve a node's display name for card titles / pane labels / export
- * filenames [D15·A-1·A-2]. Precedence:
+ * filenames. Precedence:
  *  1. `group` — `label` is the single source of truth; a group node has no
  *     independent `name` concept, so `name` is never consulted here. The
  *     Inspector's common Name field routes group renames into `label`
@@ -190,8 +190,8 @@ export const NODE_META: Record<GraphNodeKind, NodeKindMeta> = {
  *  2. user-set `name` (trimmed; blank-after-trim is treated as unset).
  *  3. the static `NODE_META[kind].label`.
  *
- * The former `param.label` step is gone [A-1]: a param is renamed through
- * `name` like every other kind, and projectSanitize migrates legacy values.
+ * A param has no `label` step: it is renamed through `name` like every other
+ * kind, and projectSanitize migrates legacy `label` values into `name`.
  */
 export function displayNodeName(node: GraphNode): string {
   if (node.kind === "group") return node.label;

@@ -76,7 +76,7 @@ describe("AudioNodeView — waveform canvas (V2-U2)", () => {
     const canvas = container.querySelector("canvas");
     expect(canvas).not.toBeNull();
     // Regression guard: canvas must not carry a raw black inline background —
-    // it should stay transparent so the card gradient shows through [D7].
+    // it should stay transparent so the card gradient shows through.
     expect(canvas?.style.background).toBe("");
     // Node isn't registered/ready yet, so the canvas stays dimmed.
     expect(canvas?.style.opacity).toBe("0.4");

@@ -25,7 +25,7 @@ function meshSourceNode(graph: Graph, shaderNodeId: string) {
 
 /**
  * Label for a shader pass's mesh input, one of:
- *  - "fullscreen quad" — the auto-substituted fullscreen pass (A-1).
+ *  - "fullscreen quad" — the auto-substituted fullscreen pass.
  *  - "" — compute-driven; the caller renders the driving ComputeNode's own
  *    row instead of a mesh label here.
  *  - the built-in primitive name, or the loaded asset's display name.
@@ -121,10 +121,10 @@ function emptySourceSamplers(
  * primitive read straight off the pass/node — recompile already runs on
  * every structural graph edit, so allocating a second nested copy of pass
  * state here would add avoidable GC pressure on top of that. `silentWarnings`
- * is the one field genuinely computed here (E-1, T2): it's a `parseUniforms`
+ * is the one field genuinely computed here: it's a `parseUniforms`
  * pass plus a small set diff, cheap enough at recompile frequency (not a RAF
  * hot path — see `Viewport/index.tsx`'s `recompile`). `buildVaryingContracts`
- * below is the same story for A-2 (T4): one `computeVaryingContract` call per
+ * below is the same story for the varying contract: one `computeVaryingContract` call per
  * shader node, i.e. two `buildSymbolTable` passes — also recompile-frequency,
  * not RAF.
  */
@@ -152,11 +152,11 @@ export function buildPassRows(
     const shaderNode =
       node && node.kind === "shader" ? (node as ShaderGraphNode) : null;
     const resolutionScale = shaderNode?.resolutionScale ?? 1;
-    // Declared-uniform set for E-1 is read from the *compiled* vertex source
+    // Declared-uniform set for silent-warning diffing is read from the *compiled* vertex source
     // (plan.compiledVertexSource), not node.vertexSource — a fullscreen-
     // substituted node's user vertex declarations never reached the GL
     // compiler, so asserting against them would manufacture warning noise
-    // (see compile.ts:144-153's doc on why compiledVertexSource exists).
+    // (see `ExecutionPlan.compiledVertexSource`'s doc in compile.ts).
     const silentWarnings = shaderNode
       ? computeSilentUniformWarnings(
           parseUniforms(
@@ -194,7 +194,7 @@ export function buildPassRows(
 }
 
 /**
- * Vertex↔fragment varying contract per shader node (A-2, T4), for the Pass
+ * Vertex↔fragment varying contract per shader node, for the Pass
  * Inspector to surface via `passPlanStore.varyingsByNode`.
  *
  * Reads `plan.compiledVertexSource[node.id]` — the vertex source actually

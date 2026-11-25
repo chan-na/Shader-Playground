@@ -1,21 +1,17 @@
 /**
- * Single source of truth for a shader pass's GL render state (E-2,
- * `docs/learnability-plan-2026-08.md` T3). Before this module existed,
- * `execute.ts` decided depth/cull state inline and the Pass Inspector UI had
- * no way to show it without hand-copying the same logic into a string —
- * exactly the kind of drift this round exists to remove. `execute.ts`'s
+ * Single source of truth for a shader pass's GL render state
+ * (`docs/learnability-plan-2026-08.md` E-2). `execute.ts`'s
  * `applyRenderState` call and `PassInspector.tsx`'s `State` column both
- * derive from {@link renderStateFor}, so a future change here reaches both
- * consumers for free instead of silently going stale in one of them.
+ * derive from {@link renderStateFor}, so the UI can never drift from what
+ * the executor actually sets.
  *
  * Current values, fixed by what the rest of the codebase actually does
  * today:
  *  - `depthTest` is the only field that varies: off for a fullscreen quad
  *    pass (2D compositing — there is nothing behind anything), on for a
- *    mesh-connected pass (3D geometry needs occlusion). This mirrors the
- *    `pass.meshIsFullscreen` branch `execute.ts` used to have inline.
+ *    mesh-connected pass (3D geometry needs occlusion).
  *  - `cull` is always `false` — face culling has never been exposed as a
- *    node or port (L4), so there is no graph state that could turn it on.
+ *    node or port, so there is no graph state that could turn it on.
  *  - `blend` is always `false` for the same reason: no `gl.enable(gl.BLEND)`
  *    call exists anywhere in this repository, so no *in-pass* alpha blending
  *    ever happens. That does **not** mean `outColor.a` is discarded: the

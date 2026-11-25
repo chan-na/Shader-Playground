@@ -3,8 +3,8 @@ import { useCommandPaletteStore } from "../state/commandPaletteStore";
 import { withAlpha } from "../theme";
 
 /**
- * Empty-graph onboarding (design/System States.dc.html L104-119,
- * "graph: EMPTY" state, M7-U2). NodeEditor mounts this in the same
+ * Empty-graph onboarding (design/System States.dc.html,
+ * "graph: EMPTY" state). NodeEditor mounts this in the same
  * `.panel-body` slot as GraphSkeleton/WelcomeOverlay/the
  * selection-count-badge, once WelcomeOverlay's "Start blank" has been
  * clicked (see WelcomeOverlay.tsx's `dismissed` state) — i.e. exactly the
@@ -28,7 +28,7 @@ interface GraphEmptyStateProps {
   onLoadPreset: () => void;
 }
 
-/** "+ Add node" button's solid-white label (dc L115: `color:#fff`) — same
+/** "+ Add node" button's solid-white label (dc "graph: EMPTY" button: `color:#fff`) — same
  * white-channel exception as WelcomeOverlay's CHIP_STYLE/CREATE_SHADOW
  * (no var(--*) expresses literal white), kept inline via withAlpha so the
  * raw hex stays confined to this one documented call. */
@@ -36,7 +36,7 @@ const ADD_BUTTON_TEXT_STYLE: CSSProperties = {
   color: withAlpha("#ffffff", 1),
 };
 
-/** kbd chip background (dc L115: `rgba(255,255,255,0.18)`) — WelcomeOverlay
+/** kbd chip background (same dc button: `rgba(255,255,255,0.18)`) — WelcomeOverlay
  * KBD_STYLE's pattern reused for the same reason as above. */
 const KBD_STYLE: CSSProperties = {
   background: withAlpha("#ffffff", 0.18),

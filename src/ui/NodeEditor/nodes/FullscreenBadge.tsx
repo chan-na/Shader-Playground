@@ -3,7 +3,7 @@ import { usePassPlanStore } from "../../../state/passPlanStore";
 /**
  * Node-card header badge (selectors/style follow the ErrorBadge/GpuTimerChip
  * precedent) marking a shader node whose mesh input didn't resolve, so the
- * compiler substituted fullscreen.vert for its vertex stage (A-1). Reads
+ * compiler substituted fullscreen.vert for its vertex stage. Reads
  * `passPlanStore.fullscreenByNode` — the same per-node record the Code
  * editor's auto-vertex label/readOnly mode reads (`CodeEditor/index.tsx`),
  * so the badge and the tab can never disagree about which nodes are auto.
@@ -33,8 +33,8 @@ export function FullscreenBadge({ nodeId }: { nodeId: string }) {
         color: "var(--text-muted)",
         border: "1px solid var(--border-default)",
         background: "var(--surface-card)",
-        // Inspector's AUTO badge (Panels/Inspector.tsx ~L381) uses the same
-        // 4px one-off literal — design/Side Panel.dc.html L79's radius has
+        // Inspector › AUTO badge (Panels/Inspector.tsx) uses the same 4px
+        // one-off literal — design/Side Panel.dc.html (AUTO badge)'s radius has
         // no matching tokens.radius entry.
         borderRadius: 4,
         padding: "1px 5px",

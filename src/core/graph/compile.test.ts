@@ -379,8 +379,8 @@ describe("compileGraph withExplicitDefaults binding (T3/C-2)", () => {
   // Seeds land in the pass's separate `seededDefaults` field, NOT merged
   // into `uniformValues`: the Viewport hot-patches
   // `pass.uniformValues = node.uniformValues` every frame, so a merged-in
-  // seed was clobbered before the first draw ever bound it (the original
-  // C-2 regression — near-black glow on every new node). The stored-wins
+  // seed was clobbered before the first draw ever bound it (the regression:
+  // near-black glow on every new node). The stored-wins
   // ordering is enforced by `bindUserUniforms`'s effective-map spread and is
   // covered execute-side in execute.test.ts.
   it("seeds a shader pass's seededDefaults from the fragment source's @default", () => {

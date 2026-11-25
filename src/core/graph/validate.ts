@@ -122,7 +122,7 @@ export function topologicalOrder(graph: Graph): GraphNode[] {
   // from the drain walk — filtering just one of the two reintroduces the bug in
   // a different shape: a phantom target id gets pushed onto the queue and is
   // drained before real nodes, so a live node can be emitted ahead of the
-  // dependency it samples. (#12)
+  // dependency it samples.
   const live = graph.edges.filter(
     (e) => byId.has(e.source) && byId.has(e.target),
   );

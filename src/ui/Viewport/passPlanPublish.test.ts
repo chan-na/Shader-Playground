@@ -253,7 +253,7 @@ describe("buildPassRows", () => {
     plan.dispose();
   });
 
-  // E-1 (T2): declared-vs-active-vs-bound uniform diffing.
+  // Declared-vs-active-vs-bound uniform diffing.
   describe("silentWarnings", () => {
     it("flags an active sampler with no incoming edge as sampler-unconnected, and a never-active uniform as uniform-inactive", () => {
       const { graph, assets, plan } = buildFixture();
@@ -382,7 +382,7 @@ void main() { fragColor = texture(u_tex, vec2(0.0)); }`;
     it("carries no warning for a compute source — execute binds its blank placeholder rather than skipping", () => {
       // A compute node is absent from shaderPassByNode and from
       // imageTextures, but `bindSamplers` still calls setUniform for it
-      // (ensureBlankTexture, execute.ts L5) — so the unit genuinely is bound
+      // (`ensureBlankTexture` in core/graph/execute.ts) — so the unit genuinely is bound
       // and reporting "unbound" here would be the opposite false claim.
       const { graph, assets, plan } = samplerSourceFixture({
         id: "c1",
@@ -401,7 +401,7 @@ void main() { fragColor = texture(u_tex, vec2(0.0)); }`;
     });
   });
 
-  // B-2 (T2): mesh-attribute consumption per shader pass.
+  // Mesh-attribute consumption per shader pass.
   describe("meshAttributeUse", () => {
     // The fixture's shader sources declare no attributes at all — `makeGl`'s
     // fake reflection is what resolves all three. The title says so on
@@ -469,7 +469,7 @@ void main() { fragColor = texture(u_tex, vec2(0.0)); }`;
   });
 });
 
-// A-2 (T4): vertex↔fragment varying contract, keyed off the *compiled*
+// Vertex↔fragment varying contract, keyed off the *compiled*
 // vertex source rather than the node's own `vertexSource`.
 describe("buildVaryingContracts", () => {
   // Both shader nodes declare the same fragment: `basic.vert`'s v_normal,

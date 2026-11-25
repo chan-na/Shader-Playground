@@ -19,7 +19,7 @@
  *     visible doc updates without waiting for a reload. Locals and parameters
  *     never cross stages — that matches the GLSL linker model.
  *
- *     **Undo scope (#1c).** That CM dispatch is marked
+ *     **Undo scope.** That CM dispatch is marked
  *     `Transaction.addToHistory.of(false)`. CodeMirror's history only covers
  *     the one document the view holds, so an undoable cross-stage rename would
  *     revert the visible stage while the paired stage kept the new name — a
@@ -153,7 +153,7 @@ export function runRename(
   // Cursor on a member / swizzle (`v.xyz`, `light.color`): the reference
   // finder excludes such occurrences, so without this guard F2 would prompt
   // and then rename the unrelated same-named global everywhere *except* under
-  // the cursor. Clean no-op instead (L5).
+  // the cursor. Clean no-op instead.
   if (precededByDot(line.text, ident.from - line.from)) {
     return { applied: false, reason: "no-binding" };
   }
@@ -197,8 +197,8 @@ export function runRename(
     // holds one stage, but the edit also rewrote the paired stage in the graph
     // store. Leaving it on the CM undo stack meant Cmd+Z reverted the visible
     // stage while the other stage kept the new name — a program that no longer
-    // links. Keeping it off the stack makes the visible doc and the store agree
-    // (#1c). Single-document renames are unaffected and stay one undo step.
+    // links. Keeping it off the stack makes the visible doc and the store agree.
+    // Single-document renames are unaffected and stay one undo step.
     ...(wroteOtherStage
       ? { annotations: Transaction.addToHistory.of(false) }
       : {}),
@@ -274,7 +274,7 @@ function applyEdits(
  * in that case.
  *
  * The node is resolved with {@link currentEditorNodeId}, the *same* rule the
- * Code panel uses to pick its document (#10). Reading `selectedNodeId` directly
+ * Code panel uses to pick its document. Reading `selectedNodeId` directly
  * was wrong: with nothing selected the editor still shows the first shader node,
  * so F2 rewrote the visible stage through the single-document path and left the
  * paired stage untouched — a half-renamed program with no error reported.
@@ -284,7 +284,7 @@ function applyEdits(
  * source for both stages, so graph history records a single entry regardless
  * of how many stages were touched.
  *
- * ⚠ Undo scope (#1c): when the rename actually writes the other stage, the CM
+ * ⚠ Undo scope: when the rename actually writes the other stage, the CM
  * transaction carries `Transaction.addToHistory.of(false)`, so the editor's
  * Cmd+Z will not revert it. Neither will the global graph undo —
  * `KeyboardShortcuts.tsx` treats anything inside `.cm-editor` as an editing
@@ -328,7 +328,8 @@ export function glslRename() {
     {
       key: "F2",
       run: (view) => {
-        // A-1 guard, mirroring `CodeEditor/index.tsx`'s commit-path guard.
+        // Auto-vertex guard, mirroring `CodeEditor/index.tsx`'s commit-path
+        // guard.
         // While the vertex tab shows the auto-substituted `fullscreen.vert`,
         // the visible document is NOT this node's `vertexSource` — so a
         // rename computed from it would write a renamed `fullscreen.vert`

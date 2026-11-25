@@ -1,4 +1,4 @@
-/* ── Problems tab (Side Panel.dc.html L188-205, M5-U5 reskin) ────────── */
+/* ── Problems tab (design/System States.dc.html "panel: PROBLEMS") ──── */
 .problems-chip-row {
   display: flex;
   gap: 6px;
@@ -12,7 +12,8 @@
   padding: 4px 10px;
   background: var(--surface-card);
   border: 1px solid var(--border-strong);
-  /* design/Side Panel.dc.html L192-194: border-radius:15px — no
+  /* severity summary chip: border-radius:15px (from the Problems tab of an
+     earlier Side Panel.dc.html revision; the current bundle has no chip) — no
      tokens.radius entry matches (nearest neighbors are chip=6 and
      panel=14); one-off, same precedent as assets-dropzone/AUTO badge. */
   border-radius: 15px;
@@ -27,9 +28,10 @@
   margin: 0 0 8px;
   background: var(--surface-card);
   border: 1px solid var(--border-default);
-  /* design/Side Panel.dc.html L198: border-radius:8px — no tokens.radius
-     entry matches (button/input=7, panel=14); one-off, same precedent as
-     .panel-tab-badge above. border-left color/width is set inline per row
+  /* design/System States.dc.html "panel: PROBLEMS" card: border-radius:8px
+     — no tokens.radius entry matches (button/input=7, panel=14); one-off,
+     same precedent as .panel-tab-badge (21-dock-panels.css). border-left
+     color/width is set inline per row
      (severity color), overriding this shorthand's left side. */
   border-radius: 8px;
   text-align: left;
@@ -72,7 +74,7 @@
   color: var(--accent-hover);
 }
 
-/* ── Assets tab (Side Panel.dc.html L173-186, M5-U4) ─────────────── */
+/* ── Assets tab (design/Side Panel.dc.html ASSETS section) ────────── */
 .assets-dropzone {
   width: 100%;
   height: 70px;
@@ -147,7 +149,7 @@
   top: 6px;
   font-family: var(--font-mono);
   font-size: 8.5px;
-  /* design/Side Panel.dc.html L180: border-radius:4px — no tokens.radius
+  /* design/Side Panel.dc.html asset tag: border-radius:4px — no tokens.radius
      entry matches (iconBox is the nearest at 5); same one-off precedent as
      Inspector.tsx's AUTO badge. color/background/border come from
      tokens.portFamily.resource via inline style (AssetBrowser.tsx). */

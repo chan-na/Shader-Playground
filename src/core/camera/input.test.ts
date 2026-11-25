@@ -242,7 +242,7 @@ describe("createCameraController", () => {
     // Viewport subscribes to cameraStore and pushes external writes (Reset
     // view, zoom buttons, share restore) into `ctrl.state`. Without that
     // mirror the controller kept mutating its own stale copy, so the first
-    // drag after such a write snapped the pose back. (#6)
+    // drag after such a write snapped the pose back.
     const ctrl = createCameraController();
     ctrl.attach(canvas);
 

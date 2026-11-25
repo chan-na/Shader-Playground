@@ -109,7 +109,7 @@ describe("ExportShareDialog", () => {
     expect(screen.queryByTestId("export-share-dialog")).toBeNull();
   });
 
-  // [#41] The dialog is mounted for the whole session. The KB estimate memo
+  // The dialog is mounted for the whole session. The KB estimate memo
   // used to key on `rev` alone, so every structural graph edit built the
   // entire standalone HTML document just to measure its length — for a panel
   // that isn't on screen.
@@ -160,7 +160,7 @@ describe("ExportShareDialog", () => {
       ),
     ).not.toBeNull();
 
-    // [C-10] The editable base keeps its own field, and the completed name is
+    // The editable base keeps its own field, and the completed name is
     // conveyed by a static suffix rather than a live preview (the timestamp is
     // only fixed at download time).
     expect(screen.getByTestId("es-html-filename")).not.toBeNull();

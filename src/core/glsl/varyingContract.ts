@@ -1,6 +1,6 @@
 /**
- * Vertex↔fragment varying contract (A-2, `docs/learnability-plan-2026-08.md`
- * T4). GLSL links a vertex `out` to a fragment `in` of the same name
+ * Vertex↔fragment varying contract (`docs/learnability-plan-2026-08.md`
+ * A-2). GLSL links a vertex `out` to a fragment `in` of the same name
  * *implicitly* — there is no port/edge for it anywhere in this app's graph —
  * so a mismatch between the two stages only ever surfaces as a WebGL link
  * error (or, worse, a silently-undefined value) with no indication of which
@@ -128,16 +128,14 @@ const RE_MACRO_QUALIFIER =
   /^[ \t]*#[ \t]*define[ \t]+\w+[^\r\n]*\b(?:in|out|varying|flat|smooth|noperspective|centroid|invariant)\b/m;
 
 /**
- * Formerly this list also excused array-size mismatches (`out vec3 v[2];` vs
- * `in vec3 v[3];`) and interpolation-qualifier mismatches (`flat out int v;`
- * vs `smooth in int v;`) on the grounds that failing to detect them is mere
- * silence. That reasoning was wrong, and it failed this list's own admission
- * criterion below: both shapes link-fail on ANGLE/SwiftShader, yet the type
- * token alone compares equal — so the row rendered a confident `linked` ✓
- * next to a program that does not link. That is fabricated reassurance, the
- * exact failure this gate exists to prevent, not silence.
+ * Array-size mismatches (`out vec3 v[2];` vs `in vec3 v[3];`) and
+ * interpolation-qualifier mismatches (`flat out int v;` vs `smooth in int v;`)
+ * must NOT be excused here: both link-fail on ANGLE/SwiftShader, yet the type
+ * token alone compares equal — so excusing them would render a confident
+ * `linked` ✓ next to a program that does not link. That is fabricated
+ * reassurance (failing the admission criterion below), not silence.
  *
- * They are now handled by {@link hasSignatureDisagreement}, which compares
+ * They are handled by {@link hasSignatureDisagreement}, which compares
  * the qualifier and array suffix that `RE_STORAGE_DECL` discards. A
  * disagreement withdraws confidence for the whole contract rather than
  * inventing a new row status: the ✓ and the warnings both go quiet, which is
@@ -212,14 +210,13 @@ const RE_DECLARATOR = /^([A-Za-z_]\w*)[ \t]*(\[[^\]]*\])?/;
  * disagreement would withdraw confidence from correct shaders.
  *
  * Walks the whole declarator list of every declaration rather than reading
- * the first name after the type token. That earlier shape could not see past
- * the first declarator of a comma multi-declaration (`flat out float v_a,
- * v_b;`) — a shape `symbolTable.ts` explicitly supports — so `v_b` always
- * came back `null` and its comparison was skipped in silence, leaving a
+ * the first name after the type token. Reading only the first name cannot
+ * see past the first declarator of a comma multi-declaration (`flat out float
+ * v_a, v_b;`) — a shape `symbolTable.ts` explicitly supports — so `v_b` would
+ * come back `null` and its comparison be skipped in silence, leaving a
  * `linked` ✓ beside a stage pair whose interpolation qualifiers (or array
  * sizes) genuinely disagree. Comparing declarator names for *equality* also
- * subsumes the `\b` anchor that used to keep a lookup of `v_uv` from
- * matching a `v_uv2` declared above it.
+ * keeps a lookup of `v_uv` from matching a `v_uv2` declared above it.
  */
 function declarationSignature(
   name: string,
@@ -253,8 +250,8 @@ function declarationSignature(
  * differ — a real link failure that type-token comparison alone reads as
  * `linked` — or one of them could not be located at all.
  *
- * The `null` case is deliberately counted as a disagreement. Skipping it was
- * how the comma multi-declaration hole above stayed invisible, and a name the
+ * The `null` case is deliberately counted as a disagreement. Skipping it
+ * would hide holes like the comma multi-declaration case above, and a name the
  * symbol table found but this module cannot locate in the source means the
  * two parsers disagree about what is declared — not a shape whose ✓ we can
  * vouch for. Withdrawing confidence there is silence, which this module ranks

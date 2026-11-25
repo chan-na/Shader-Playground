@@ -266,12 +266,12 @@ describe("insertDetachedLeaf — B4-U1 (dc dockGhost L466-487)", () => {
     const originalCode = asSplit(tree).a;
     const originalNodeEditor = asSplit(asSplit(tree).b).a;
     const path: DockPath = ["b", "b", "b"]; // l2: inspector/assets
-    // mergeLeaf carries a tab ("nodeEditor", non-exclusive under T1) not
+    // mergeLeaf carries a tab ("nodeEditor", non-exclusive kind) not
     // already on l2 — dc dockGhost does not dedupe (tabs: [...node.tabs,
     // ...g.tabs]), so a leaf carrying a tab id already present elsewhere in
     // the tree is a valid (if unusual) input to this pure function; the
     // caller is responsible for having removed that id from its previous
-    // leaf beforehand. (Using "code" here instead would trip the T1 gate
+    // leaf beforehand. (Using "code" here instead would trip the exclusive-kind gate
     // below and split instead of merge — that case has its own test.)
     const mergeLeaf: DockLeaf = {
       type: "leaf",

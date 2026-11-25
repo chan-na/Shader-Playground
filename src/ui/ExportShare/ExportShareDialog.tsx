@@ -179,7 +179,7 @@ export function ExportShareDialog() {
   // uniform drag elsewhere (new `nodes` array reference, same `rev`) can't
   // re-trigger this string-length recompute.
   const sizeKB = useMemo(() => {
-    // [#41] The dialog is mounted for the whole session but rendered only
+    // The dialog is mounted for the whole session but rendered only
     // while `open`. Without this guard, every structural graph edit — every
     // node add, every edge, every source recompile that bumps `rev` — built
     // the entire standalone HTML document just to measure its length, for a

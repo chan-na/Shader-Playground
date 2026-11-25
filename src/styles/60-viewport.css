@@ -1,4 +1,4 @@
-/* ── Viewport pane overlay (Viewport.dc.html L65-87, M3-U2) ───────── */
+/* ── Viewport pane overlay (design/Viewport.dc.html RENDER GRID) ──── */
 .vp-overlay {
   position: absolute;
   inset: 0;
@@ -52,7 +52,8 @@
   background: var(--border-header-divider);
 }
 
-/* ── Viewport transport bar (Viewport.dc.html L107-135, M3-U3) ──
+/* ── Viewport transport bar (design/Viewport.dc.html "overlay control bar —
+   full") ──
    The dc mock is authored against a 1320px-wide canvas, where the bar's
    natural (unconstrained) content width comfortably fits. Real docked
    layouts give the viewport panel far less width (the default 3-column
@@ -106,7 +107,7 @@
 .vp-transport-play:hover {
   background: var(--accent-hover);
 }
-/* dc L110 [D14]: 30×30 box, surface.input bg + border.stronger border,
+/* dc "reset time": 30×30 box, surface.input bg + border.stronger border,
    radius.overlay corners, text.brightBody glyph — not a transparent
    text button (that's the *camera* Reset button further right). */
 .vp-transport-reset-time {
@@ -226,7 +227,8 @@
   accent-color: var(--accent-default);
   cursor: pointer;
 }
-/* Design widths (196px scrub, 96px FOV, Viewport.dc.html L114/L127) are the
+/* Design widths (196px scrub, 96px FOV, Viewport.dc.html "time + scrub" /
+   "FOV slider") are the
    ceiling, not a fixed size — `flex` lets each slider give up its own track
    width first when the bar has to shrink (see `.vp-transport` above),
    before anything else in the bar is asked to compress. `min-width` keeps
@@ -257,9 +259,10 @@
   background: var(--text-primary);
   margin-top: -3.5px;
 }
-/* Compact-variant-only FOV stepper (dc L149, [D3]) — hidden by default,
+/* Compact-variant-only FOV stepper (dc compact control bar) — hidden by
+   default,
    swapped in for `.vp-transport-fov-group` by the `vp-body` container query
-   below once the panel narrows past 990px [C-6]. */
+   below once the panel narrows past 990px. */
 .vp-transport-fov-step {
   display: none;
   align-items: center;
@@ -278,7 +281,7 @@
   border-color: var(--accent-default);
 }
 
-/* ── Viewport empty state (Viewport.dc.html L49-63, M3-U4) ──
+/* ── Viewport empty state (design/Viewport.dc.html EMPTY STATE) ──
    The dc mock is authored against an ~816px-tall viewport canvas; the
    default docked layout gives the real viewport panel only ~290px, so the
    full-size layout below (icon 64px, 22px gaps, roomy hint cards) both
@@ -290,7 +293,7 @@
    compact layout once the panel is too short for the full design spacing,
    and `padding-bottom` reserves the transport bar's own footprint so the
    hints never sit behind it even before that swap kicks in. The background
-   is the 2-stop radial from dc L51 (tokens.gradient.emptyState, [D10]). */
+   is the dc empty state's 2-stop radial (tokens.gradient.emptyState). */
 .panel--viewport .panel-body {
   container-type: size;
   container-name: vp-body;
@@ -405,8 +408,8 @@
   }
 }
 
-/* ── Viewport compile-error overlay (System States.dc.html L216-244,
-   M7-U4) ── Shown instead of the canvas when the graph's first shader node
+/* ── Viewport compile-error overlay (design/System States.dc.html
+   "viewport: COMPILE ERROR") ── Shown instead of the canvas when the graph's first shader node
    with an error-severity diagnostic drops every drawable pane. Structural
    layout only lives here; the error-tinted backgrounds (radial gradient,
    card/gutter/footer washes, per-row error highlight) are `withAlpha`
@@ -566,10 +569,10 @@
   }
 }
 
-/* ── Viewport transport bar — compact variant (Viewport.dc.html L141-152,
-   [D3·C-6]) ── Same `vp-body` size container as the tiers above, but keyed on
-   `max-width` instead of `max-height`: the default docked layout's viewport
-   panel is ~590px wide, comfortably under this threshold, so this is
+/* ── Viewport transport bar — compact variant (design/Viewport.dc.html
+   "overlay control bar — compact") ── Same `vp-body` size container as the
+   tiers above, but keyed on `max-width` instead of `max-height`: the default
+   docked layout's viewport panel is ~590px wide, comfortably under this threshold, so this is
    the transport bar's primary rendering in a fresh docked layout rather than
    an edge case. Swaps the scrub/FOV sliders for taps + a stepper (dc's
    narrow control bar collapses draggable range inputs to discrete presets,
@@ -578,11 +581,10 @@
    omits in favor of the bare icon/value. One DOM tree throughout — see
    TransportBar.tsx's doc comment — so this block is pure CSS toggling of
    `display`, no conditional rendering.
-   Threshold 990px (was 700) [C-6]: between 700 and 989px the *full* bar
-   overlapped the bottom row's pane resolution caption by a few px — the
-   compact tier now covers that range, and the caption offset below moves with
-   it. Radius: dc's compact bar is 11px / buttons 8px, now canonical tokens
-   rather than the 1px-over inheritance from the full bar's 12/9 [B-5]. */
+   Threshold 990px: below it the *full* bar overlaps the bottom row's pane
+   resolution caption by a few px, so the compact tier covers that range and
+   the caption offset below moves with it. Radius: dc's compact bar is 11px /
+   buttons 8px (own tokens, not the full bar's 12/9). */
 @container vp-body (max-width: 990px) {
   .vp-transport {
     border-radius: var(--radius-transport-bar-compact);
@@ -650,7 +652,7 @@
   }
   /* 하단 행 캡션을 컴팩트 바 위로: bottom 16px + 바 높이 ~46px
      (padding 7×2 + play 30 + border 2) + 기본 인셋과 같은 10px 여백 = 72px.
-     design/README.md §C [D3] "하단 행 pane 해상도 캡션은 컴팩트 바 위로 오프셋". */
+     design/README.md §C — pane 해상도 캡션은 컴팩트 바 위로 오프셋. */
   .vp-pane--bottom .vp-pane-res {
     bottom: 72px;
   }

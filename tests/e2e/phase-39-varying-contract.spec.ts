@@ -99,11 +99,11 @@ function meshDisconnectedGraph(fragmentSource: string) {
   };
 }
 
-// Comma multi-declaration (`out vec2 v_uv, v_st;`) — legal GLSL that the
-// symbol table's old single-declarator regex rejected wholesale, which made
-// the bridge report a *confident* "missing-out" (link-error) warning for
-// BOTH names while the real program compiled and linked fine. Regression
-// guard for the T4 verification fix (declarator walk in symbolTable.ts).
+// Comma multi-declaration (`out vec2 v_uv, v_st;`) — legal GLSL that a
+// single-declarator regex would reject wholesale, making the bridge report a
+// *confident* "missing-out" (link-error) warning for BOTH names while the
+// real program compiles and links fine. Regression guard for the declarator
+// walk in symbolTable.ts.
 const VERT_COMMA_DECL = `#version 300 es
 in vec3 a_position;
 in vec2 a_uv;
@@ -202,7 +202,7 @@ test.describe("Phase 39 — varying contract visualization", () => {
       ),
     ).toBeVisible();
 
-    // The 172px status overlay is time-shared three ways since D-1
+    // The 172px status overlay is time-shared three ways
     // (diagnostics/problems/passes, `debugUiStore`), so "zero warning rows"
     // is only evidence of anything once the *problems* slot is the one
     // actually mounted — otherwise a broken trigger reads as a clean bill of

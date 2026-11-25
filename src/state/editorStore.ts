@@ -17,9 +17,9 @@ export interface EditorState {
   jumpRequest: JumpRequest | null;
   requestJump: (req: Omit<JumpRequest, "rev">) => void;
   clearJump: () => void;
-  /** W5(design/CHANGELOG.md §v2.0) — Code 자동 접기/펼침 게이트. ON(기본)이면
+  /** Code 자동 접기/펼침 게이트(codeAutoOpen.ts). ON(기본)이면
    * 노드 선택이 code leaf의 collapsed를 구동하고, OFF면 수동 chevron만
-   * 유효하다. 비영속(리로드 시 기본 ON) — temp/design-followup-v2.0.md 참조. */
+   * 유효하다. 비영속(리로드 시 기본 ON). */
   autoCode: boolean;
   setAutoCode: (on: boolean) => void;
 }

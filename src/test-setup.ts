@@ -3,7 +3,7 @@
 import "fake-indexeddb/auto";
 import { setMinLevel } from "./utils/log";
 
-// Keep the dev logger's console mirroring quiet under tests — the P3 catch-site
+// Keep the dev logger's console mirroring quiet under tests — the catch-site log
 // traces would otherwise flood test output. The buffer still records every
 // entry, so tests asserting log behavior are unaffected (log.test.ts sets its
 // own level).
@@ -60,8 +60,8 @@ if (typeof globalThis.ImageData === "undefined") {
 //
 // So we install a small spec-compatible in-memory Storage *unconditionally* —
 // a version-sniffing guard (`typeof globalThis.localStorage === "undefined"`)
-// is exactly what made this fragile. Tests that exercise real localStorage (R9
-// dock layout persistence, `src/state/autoSave.test.ts`) then always see one
+// is exactly what made this fragile. Tests that exercise real localStorage (dock
+// layout persistence, `src/state/autoSave.test.ts`) then always see one
 // stable instance, matching a real browser. `.nvmrc` pins Node 22.
 class MemoryStorage implements Storage {
   #data = new Map<string, string>();

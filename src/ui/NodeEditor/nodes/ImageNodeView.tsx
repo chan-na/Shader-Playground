@@ -63,7 +63,7 @@ export function ImageNodeView({ id, data }: NodeProps) {
         <div className="node-card__meta">
           {asset ? `${asset.width}×${asset.height}` : id}
         </div>
-        {/* [E-3] Drift-proof meta line: reads the same constant the
+        {/* Drift-proof meta line: reads the same constant the
             Inspector's texture-params section and createImageTexture itself
             derive from (core/gl/texture.ts), never a copied string. */}
         <div className="node-card__meta">

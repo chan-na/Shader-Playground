@@ -1,6 +1,8 @@
-/* ── Permission state (design/System States.dc.html L344-363/L484, M7-U3) —
+/* ── Permission state (design/System States.dc.html "panel: INSPECTOR
+   (permission context)") —
    PermissionBanner.tsx's pending dot. Same "bounded transition, not idle
-   decoration" exception as es-rec-pulse/sp-shimmer/sp-spin above: sp-pulse
+   decoration" exception as es-rec-pulse (80-export-share.css) and
+   sp-shimmer/sp-spin (90-skeletons.css): sp-pulse
    only ever runs while the banner is mounted with state="pending", i.e. the
    window between a Webcam/Audio node requesting getUserMedia and the
    browser prompt resolving (granted → banner unmounts; denied → banner
@@ -15,8 +17,8 @@
   }
 }
 
-/* ── Shared modal skin (design/System States.dc.html gpu-unsupported
-   L389-424, M7-U5) — GpuBlockScreen/RecoveryDialog/ErrorBoundary's common
+/* ── Shared modal skin (design/System States.dc.html "GPU UNSUPPORTED")
+   — GpuBlockScreen/RecoveryDialog/ErrorBoundary's common
    full-screen scrim + card shell. `.modal-scrim` deliberately omits
    `background`: the scrim tint is `withAlpha(tokens.surface.appDarker,
    0.72)`, which needs the JS helper's rgba() output (CSS has no token-alpha
@@ -41,7 +43,7 @@
   color: var(--text-primary);
 }
 
-/* ── GpuBlockScreen (design/System States.dc.html L389-424, M7-U5) ── */
+/* ── GpuBlockScreen (design/System States.dc.html "GPU UNSUPPORTED") ── */
 .gpu-block-card {
   width: 440px;
 }

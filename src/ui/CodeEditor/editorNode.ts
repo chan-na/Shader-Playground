@@ -1,6 +1,5 @@
 /**
- * Single source of truth for **which graph node the Code editor is bound to**
- * (review #10).
+ * Single source of truth for **which graph node the Code editor is bound to**.
  *
  * The Code panel does not require a selection: with nothing selected it falls
  * back to the first `shader` node in the graph so the editor is never blank on

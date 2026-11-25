@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 /** 기본 트리의 nodeEditor leaf(l3, path ["b","a"])로 감싼 정적 provider —
- * B2-U1: leaf 데이터(collapsed/active)는 컨텍스트가 아니라 dockStore에서
+ * leaf 데이터(collapsed/active)는 컨텍스트가 아니라 dockStore에서
  * path로 직접 구독하므로, provider는 라우팅 정보(leafId/path)만 고정해도
  * 스토어 변경에 반응한다. */
 function withLeaf(leafId: string, path: ("a" | "b")[], children: ReactNode) {
@@ -48,7 +48,7 @@ function withLeaf(leafId: string, path: ("a" | "b")[], children: ReactNode) {
   );
 }
 
-/** Same as `withLeaf`, plus a `DockDragContext.Provider` wrapping it — B4-U4:
+/** Same as `withLeaf`, plus a `DockDragContext.Provider` wrapping it —
  * lets a test hand in spy `startLeafDrag`/`startTabDrag` to assert what the
  * grab handle/tab pointerdown wiring calls. Tests that don't need this
  * (the vast majority above) render with bare `withLeaf` and get the
@@ -121,7 +121,7 @@ describe("DockPanelHeader", () => {
     expect(useDockStore.getState().maximized).toBeNull();
   });
 
-  // dc `maxIcon: full ? "⤡" : "⤢"` (Docking Prototype.dc.html L562)
+  // dc `maxIcon: full ? "⤡" : "⤢"` (App Shell.dc.html panel header)
   // — the glyph itself toggles with maximized state, not just the aria-label.
   it("shows ⤢ (U+2922) when idle and flips to ⤡ (U+2921) once maximized", () => {
     render(withLeaf("l4", ["a"], <DockPanelHeader />));
@@ -133,7 +133,7 @@ describe("DockPanelHeader", () => {
     expect(restoreBtn.textContent).toBe("⤡");
   });
 
-  // R6: the header ✕ closes the whole panel (every tab on the leaf), unlike
+  // The header ✕ closes the whole panel (every tab on the leaf), unlike
   // a per-tab ✕ (tab-level close is covered by the "dock tabs" describe below).
   describe("Close panel", () => {
     it("removes every tab of this leaf from the tree (l2 sidePanel: inspector + assets)", () => {
@@ -180,9 +180,8 @@ describe("DockPanelHeader", () => {
     }
   });
 
-  // B3-U2/R6: DockPanelHeader now renders `leaf.tabs` directly as dock tabs
-  // (dot + title + per-tab ✕) instead of taking a `label` prop — the label
-  // prop is retired because the tab(s) occupy that slot instead.
+  // DockPanelHeader renders `leaf.tabs` directly as dock tabs (dot + title +
+  // per-tab ✕) — the tab(s) occupy the label slot, so there's no `label` prop.
   describe("dock tabs (leaf.tabs → panel-tab, R6/R12)", () => {
     it("renders one dock tab per leaf.tabs entry, active tab underlined (l2: inspector + assets)", () => {
       render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
@@ -208,7 +207,7 @@ describe("DockPanelHeader", () => {
       });
     });
 
-    // R6 core: closing an *inactive* tab's ✕ must not first activate it —
+    // Core rule: closing an *inactive* tab's ✕ must not first activate it —
     // only that tab leaves the tree, and the leaf's active tab is untouched.
     it("closing an inactive tab's ✕ removes only that tab and leaves the active tab unchanged", () => {
       render(withLeaf("l2", ["b", "b", "b"], <DockPanelHeader />));
@@ -229,9 +228,8 @@ describe("DockPanelHeader", () => {
       });
     });
 
-    // dc `t.xDown: (e) => e.stopPropagation()` (Docking Prototype.dc.html
-    // L546) — guards the ✕ from a future B4 drag-start listener on an
-    // ancestor that also handles pointerdown.
+    // dc `t.xDown: (e) => e.stopPropagation()` — guards the ✕ from the
+    // tab's drag-start listener (or any ancestor that handles pointerdown).
     it("stops the tab ✕'s pointerdown from bubbling to an ancestor", () => {
       const onPointerDown = vi.fn();
       render(
@@ -249,8 +247,7 @@ describe("DockPanelHeader", () => {
       expect(onPointerDown).not.toHaveBeenCalled();
     });
 
-    // R10(design/CHANGELOG.md §v1.4) 이행 — 탭 ✕는 키보드로 도달 가능해야
-    // 한다. 부모 탭의 onKeyDown이 Enter/Space를 preventDefault하면 버튼의
+    // 탭 ✕는 키보드로 도달 가능해야 한다(디자인 결정). 부모 탭의 onKeyDown이 Enter/Space를 preventDefault하면 버튼의
     // 네이티브 활성화(→ click)가 통째로 죽는다.
     it.each([
       ["Enter"],
@@ -291,7 +288,8 @@ describe("DockPanelHeader", () => {
         expect(onWindowKey).toHaveBeenCalledTimes(2);
 
         // 알려진 부수효과: 활성화 키는 여기서 멈춘다 — 포커스된 ✕ 위 Space는
-        // 재생 토글이 아니라 버튼을 누른다(#36 followup).
+        // 재생 토글이 아니라 버튼을 누른다(승인된 동작 —
+        // docs/review-2026-07-followup.md "포커스된 탭 ✕ 위의 Space").
         fireEvent.keyDown(closeAssets, { key: " " });
         expect(onWindowKey).toHaveBeenCalledTimes(2);
       } finally {
@@ -343,9 +341,8 @@ describe("DockPanelHeader", () => {
     });
   });
 
-  // R8/B3-U3: 탭바 가로 스크롤(스크롤바 숨김) + 우측 페이드 마스크는
-  // leaf.tabs.length > 3에서만 켜진다 — dc `tabMask` (Docking
-  // Prototype.dc.html L557) 이식. 기본 트리에는 4탭 leaf가 없으므로 여기서는
+  // 탭바 가로 스크롤(스크롤바 숨김) + 우측 페이드 마스크는
+  // leaf.tabs.length > 3에서만 켜진다 — dc `tabMask`(App Shell.dc.html) 이식. 기본 트리에는 4탭 leaf가 없으므로 여기서는
   // 트리를 직접 조작해 루트를 4탭 leaf로 바꿔치기한다(path=[] → 루트 그
   // 자체가 대상 leaf).
   describe("tab overflow mask (leaf.tabs.length > 3, R8)", () => {
@@ -369,7 +366,7 @@ describe("DockPanelHeader", () => {
 
       const tabsEl = container.querySelector(".dock-header-tabs");
       expect(tabsEl?.className).toContain("dock-header-tabs--masked");
-      // dc L557 hint-placeholder-count=4 — all 4 tabs still render as tabs,
+      // dc tab list hint-placeholder-count=4 — all 4 tabs still render as tabs,
       // just inside the scrollable/masked container.
       expect(container.querySelectorAll('[role="tab"]')).toHaveLength(4);
     });
@@ -391,10 +388,10 @@ describe("DockPanelHeader", () => {
     });
   });
 
-  // B3-U1: whether a collapsed leaf renders as a vertical rail is no longer a
-  // prop — it's derived from the tree (collapsesToRail: does this leaf's
-  // direct parent split run row-direction, i.e. does it collapse to a
-  // *width* strip?). In the v2.0 default tree, l3 (nodeEditor, parent is the
+  // Whether a collapsed leaf renders as a vertical rail isn't a prop — it's
+  // derived from the tree (collapsesToRail: does this leaf's direct parent
+  // split run row-direction, i.e. does it collapse to a *width* strip?). In
+  // the default tree, l3 (nodeEditor, parent is the
   // inner row split) and l4 (code, parent is the row-direction root split)
   // both do; l1 (viewport, parent is the col-direction split) doesn't.
   describe("rail derivation from the tree", () => {
@@ -461,11 +458,11 @@ describe("DockPanelHeader", () => {
     });
   });
 
-  // X17: the collapsed 34px rail is no longer chrome-only (grip only) — it
-  // now renders a full identity interior (panel dot + vertical "title · meta"
-  // label + a code-only compile error dot), App Shell.dc.html L109-117.
+  // The collapsed 34px rail renders a full identity interior (panel dot +
+  // vertical "title · meta" label + a code-only compile error dot), not just
+  // the grip — App Shell.dc.html collapsed-panel rail.
   describe("rail interior (X17)", () => {
-    // Z5(§v2.2): the code-rail error dot is scoped to the shader the Code
+    // The code-rail error dot is scoped to the shader the Code
     // editor currently has open (selectedNodeId ?? first shader). These tests
     // wire a shader node so `openCodeNodeId` resolves to it.
     const shaderN1: ShaderGraphNode = {
@@ -587,11 +584,11 @@ describe("DockPanelHeader", () => {
     });
   });
 
-  // req1: the collapse button's glyph is position-based (parent split dir +
+  // The collapse button's glyph is position-based (parent split dir +
   // a/b side), not tied to panel kind — see `dockLayoutModel.collapseChevron`
   // for the full 8-combination unit coverage. This just asserts the rendered
   // button actually consumes that helper (no leftover literal `⌄`/`⌃`
-  // branch) on a couple of v2.0 default-tree positions.
+  // branch) on a couple of default-tree positions.
   describe("collapse chevron glyph is position-based (req1)", () => {
     it("row-a (l4 code, path [a]): ‹ while open, › once collapsed", () => {
       render(withLeaf("l4", ["a"], <DockPanelHeader />));
@@ -614,8 +611,8 @@ describe("DockPanelHeader", () => {
     });
   });
 
-  // D13: 메타 배지 정렬. 기본은 spacer *앞*(좌측, 기존 패널 보존), "end"는
-  // App Shell.dc.html L361-369의 Code Editor 정본 순서인 spacer *뒤*(우측).
+  // 메타 배지 정렬. 기본은 spacer *앞*(좌측), "end"는 Code Editor 정본
+  // 순서인 spacer *뒤*(우측) — design/README.md "도킹 헤더 메타 배지 정렬".
   describe("metaAlign", () => {
     it("defaults to start — meta renders before the spacer", () => {
       const { container } = render(
@@ -681,8 +678,8 @@ describe("DockPanelHeader", () => {
     });
   });
 
-  // B4-U4: the grab handle drags the whole leaf (every tab); a tab drags
-  // only itself. dc `grabDown`/`down` (Docking Prototype.dc.html L558/L544).
+  // The grab handle drags the whole leaf (every tab); a tab drags only
+  // itself. dc `grabDown`/tab `down` (App Shell.dc.html docking engine).
   describe("drag start wiring (B4-U4)", () => {
     it("⣿ grab pointerdown calls startLeafDrag with this leaf's path, not startTabDrag", () => {
       const startLeafDrag = vi.fn();
@@ -722,7 +719,7 @@ describe("DockPanelHeader", () => {
       expect(startLeafDrag).not.toHaveBeenCalled();
     });
 
-    // dc t.xDown: e.stopPropagation() (L546) — the ✕'s own pointerdown
+    // dc t.xDown: e.stopPropagation() — the ✕'s own pointerdown
     // handler stops the event before it bubbles to the tab's onPointerDown,
     // so closing a tab never arms a drag.
     it("the tab ✕'s pointerdown does not call startTabDrag (stopPropagation)", () => {
@@ -762,12 +759,12 @@ describe("DockPanelHeader", () => {
       ).not.toThrow();
     });
 
-    // R11: a `dragEnabled:false` provider (DockLayout's compact branch) must
+    // A `dragEnabled:false` provider (DockLayout's compact branch) must
     // remove the ⣿ grab handle from the DOM entirely — not just visually
     // hide it — so a narrow-screen tap can't accidentally arm a drag. The
     // default context (no provider, exercised just above) keeps
-    // `dragEnabled:true` so every pre-R11 test in this file — none of which
-    // wrap a provider — kept seeing the handle without modification.
+    // `dragEnabled:true`, so the other tests in this file — none of which
+    // wrap a provider — see the handle.
     it("R11: dragEnabled:false hides the ⣿ grab handle; the default context (no provider) still shows it", () => {
       const { container } = render(
         withLeafAndDrag("l2", ["b", "b", "b"], <DockPanelHeader />, {

@@ -85,7 +85,7 @@ export const EDITOR_CHROME: Record<string, Record<string, string>> = {
     color: tokens.text.muted,
   },
 
-  // Inline diagnostic underlines (dc helmet L19-20 .ce-err/.ce-warn). Gutter
+  // Inline diagnostic underlines (dc `.ce-err`/`.ce-warn` styles). Gutter
   // marker SVGs keep CodeMirror's built-in error/warning colors.
   ".cm-lintRange-error": {
     backgroundImage: "none",

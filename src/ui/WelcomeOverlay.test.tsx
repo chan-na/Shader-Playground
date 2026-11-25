@@ -143,7 +143,7 @@ describe("WelcomeOverlay", () => {
     fireEvent.click(screen.getByTestId("welcome-card-torus"));
     // jsdom doesn't move focus on a plain click() the way a real browser
     // does for a <button>, so focus it explicitly to reproduce the
-    // post-click state the browser leaves us in (B2's actual bug trigger).
+    // post-click state the browser leaves us in (the real bug's trigger).
     (screen.getByTestId("welcome-card-torus") as HTMLButtonElement).focus();
     expect(document.activeElement).toBe(
       screen.getByTestId("welcome-card-torus"),

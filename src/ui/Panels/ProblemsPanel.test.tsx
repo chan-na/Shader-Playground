@@ -141,8 +141,8 @@ describe("ProblemsPanel", () => {
     expect(screen.queryByTestId("problem-row")).toBeNull();
   });
 
-  // D15: the diagnostic row's location text used to read `${kind} · ${id}`,
-  // leaking the internal id. It should show the node's display name instead.
+  // The diagnostic row's location text must show the node's display name,
+  // never `${kind} · ${id}` (the internal id is not user-facing).
   it("shows the node's display name (not its raw id) once a node exists for the diagnostic", () => {
     useGraphStore.getState().addNode({
       id: "s1",
@@ -180,7 +180,7 @@ describe("ProblemsPanel", () => {
     expect(row.textContent).toContain("deleted-node");
   });
 
-  // E-1 (T2): silent uniform warnings surfaced from passPlanStore rows.
+  // Silent uniform warnings surfaced from passPlanStore rows.
   describe("Pipeline warnings (E-1)", () => {
     it("renders a silent-warning-row per warning and folds it into the warning chip", () => {
       usePassPlanStore.getState().publish(
@@ -263,7 +263,7 @@ describe("ProblemsPanel", () => {
     });
   });
 
-  // A-2 (T4): varying-bridge warnings surfaced from passPlanStore.varyingsByNode.
+  // Varying-bridge warnings surfaced from passPlanStore.varyingsByNode.
   describe("Pipeline warnings (A-2 varying bridge)", () => {
     it("renders a varying-warning-row per confident warning and folds it into the warning chip", () => {
       usePassPlanStore.getState().publish(

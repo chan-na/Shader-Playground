@@ -93,8 +93,8 @@
 - 천장 `396 KiB` gzip (`scripts/check-bundle-size.mjs:54`), **현재 약 395.12 KiB**.
 - **여유 0.88 KiB.** 이 계획은 거의 전부 UI 추가라서 T1 하나만으로도 초과가 확실하다.
 - 측정은 **Node 22 기준**만 유효하다 (Node ≥24는 zlib-ng라 ~1.8 KiB 낮게 나옴 —
-  로컬 PASS가 CI PASS를 보장하지 않는다). `check-bundle-size.mjs:28-37` 참고.
-  버전 관리자가 없으면 스크립트 주석의 절차대로:
+  로컬 PASS가 CI PASS를 보장하지 않는다). `docs/archive/bundle-budget-history.md`의
+  "Measurement correction" 항목 참고. 버전 관리자가 없으면 그 절차대로:
   `npm i --prefix <tmp> node@22` 후 그 바이너리를 PATH 앞에 두고 build + size:check.
 
 **✅ D-0 결정 완료 (2026-08-01): 선택 1 — 게이트를 고치고 예산을 벌어온다.**
@@ -535,4 +535,4 @@ uniform vec3 u_baseColor;
 - `SPEC.md` — Phase 인덱스. 본문은 `docs/spec/*.md` (이 라운드의 Phase 36~39 는 `docs/spec/diagnostics-learnability.md`, 최신 Phase 39)
 - `CLAUDE.md` — 품질 게이트 규약, 게이트 우회 금지 목록
 - `design/CHANGELOG.md` — UI 정본 v2.0/v2.1/v2.2
-- `scripts/check-bundle-size.mjs` — 번들 천장의 역사와 측정 주의사항
+- `scripts/check-bundle-size.mjs` — 번들 게이트와 측정 주의사항 (천장의 역사는 `docs/archive/bundle-budget-history.md`)

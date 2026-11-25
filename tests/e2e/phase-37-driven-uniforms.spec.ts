@@ -7,7 +7,7 @@ import {
 } from "./helpers/fixtures";
 import { withSp } from "./helpers/sp";
 
-// Phase 37 — driven-uniform disable + note (L1/E-4), and Sampler inputs
+// Phase 37 — driven-uniform disable + note, and Sampler inputs
 // connection state. A uniform is also an input port (registry.ts): when a
 // graph edge targets it, execute.ts's bindUserUniforms overwrites whatever
 // the Inspector slider would send every frame, so the slider must disable

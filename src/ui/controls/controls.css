@@ -1,16 +1,16 @@
-/* ─── Form control library (M5-U1 + M5-U2 + M5-U3) ───────────────────
+/* ─── Form control library ──────────────────────────────────────────
  * Shared skin for Slider / MultiSlider / NumberField / ColorField /
- * Toggle (M5-U1), SelectField / TextField / buttons (M5-U2), and
- * SegmentedControl / the danger button variant (M5-U3). Values are
+ * Toggle, SelectField / TextField / buttons, and
+ * SegmentedControl / the danger button variant. Values are
  * tokenized via var(--*) (src/theme.ts is the single source) except two
  * literal rgba() values called out below, which have no semantic/brand
  * token equivalent — same policy the rest of the codebase already
- * follows for one-off drop shadows (see src/styles/40-command-palette.css's `.cmdk-modal`
- * box-shadow).
- * design/Side Panel.dc.html — L85 (slider), L92/L264 (color), L107-108 +
- * L246-248 (multi-axis), L121/L232 (toggle), L257 (number input),
- * L115/L138/L167 (select), L129 (text input), L219-221 (buttons), L231
- * (segmented).
+ * follows for one-off drop shadows (see src/styles/40-command-palette.css's
+ * `.cmdk-modal` box-shadow).
+ * design/Side Panel.dc.html — the Inspector mocks (float slider, color
+ * picker, vec2 multi-axis, bool toggle, select, Name field) and the
+ * CONTROL LIBRARY column (Buttons, Segmented / toggle, Slider, Vec3 multi,
+ * Select / inputs, Color).
  */
 
 /* ── Slider ──────────────────────────────────────────────────────── */
@@ -65,7 +65,7 @@
   height: 14px;
   border-radius: 50%;
   background: var(--text-primary);
-  /* design/Side Panel.dc.html L85 — thumb drop shadow is a fixed-alpha
+  /* design/Side Panel.dc.html float slider — thumb drop shadow is a fixed-alpha
      black, not a semantic/brand color; kept as the design's literal
      value (no var(--shadow-*) token fits a plain black shadow). */
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
@@ -83,8 +83,8 @@
   cursor: pointer;
 }
 
-/* Multi-axis rows use a 5px track (design L107-108) instead of the
- * primary slider's 6px (L85) — thumb size stays 14px, so only the
+/* Multi-axis rows use a 5px track (design "vec2 multi-axis") instead of the
+ * primary slider's 6px ("float slider") — thumb size stays 14px, so only the
  * webkit thumb's vertical-centering margin needs to shift with it. */
 .ctl-slider--sm .ctl-slider-input::-webkit-slider-runnable-track {
   height: 5px;
@@ -142,7 +142,8 @@
   width: 30px;
   height: 30px;
   border-radius: var(--radius-button);
-  /* design/Side Panel.dc.html L92, L264 — swatch border is a fixed-alpha
+  /* design/Side Panel.dc.html color picker / library Color — swatch border
+     is a fixed-alpha
      white overlay (no accent/semantic token fits a plain white), same
      policy as the slider thumb shadow above. */
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -226,9 +227,9 @@
   text-transform: uppercase;
 }
 
-/* ── Select field (M5-U2) ────────────────────────────────────────── */
-/* design/Side Panel.dc.html L115 (u_blendMode) / L138 (webcam device) /
- * L167 (output resolution) — all three mocks share this exact skin. */
+/* ── Select field ────────────────────────────────────────────────── */
+/* design/Side Panel.dc.html SHADER select (u_blendMode) / WEBCAM device /
+ * OUTPUT resolution — all three mocks share this exact skin. */
 .ctl-select-wrap {
   position: relative;
 }
@@ -268,9 +269,9 @@
   pointer-events: none;
 }
 
-/* ── Text field (M5-U2) ──────────────────────────────────────────── */
-/* design/Side Panel.dc.html L129 (Param label input) / L257 (mono value
- * input in the control-library preview). */
+/* ── Text field ──────────────────────────────────────────────────── */
+/* design/Side Panel.dc.html Name field / mono value input in the
+ * control-library "Select / inputs" row. */
 .ctl-text {
   box-sizing: border-box;
   width: 100%;
@@ -305,9 +306,9 @@
   height: 28px;
 }
 
-/* ── Buttons (M5-U2) ─────────────────────────────────────────────── */
-/* design/Side Panel.dc.html L219 (Primary) / L220 (Secondary) / L221
- * (Ghost) — control-library "Buttons" row. */
+/* ── Buttons ─────────────────────────────────────────────────────── */
+/* design/Side Panel.dc.html Primary / Secondary / Ghost — control-library
+ * "Buttons" row. */
 .ctl-btn {
   height: 30px;
   padding: 0 14px;
@@ -352,9 +353,9 @@
   color: var(--error);
 }
 
-/* ── Segmented control (M5-U3) ───────────────────────────────────── */
-/* design/Side Panel.dc.html L231 (control-library "Segmented · toggle"
- * sample). The mock's container background is a literal #0e1013, between
+/* ── Segmented control ───────────────────────────────────────────── */
+/* design/Side Panel.dc.html control-library "Segmented / toggle"
+ * sample. The mock's container background is a literal #0e1013, between
  * surface.appDarker (#08090b) and surface.rail (#0f1114) — rail is the
  * closer/only named token in that range, so it stands in here. */
 /* A native <fieldset> (a11y/useSemanticElements over a bare role="group"

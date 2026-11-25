@@ -16,7 +16,7 @@ export function formatZoom(zoom: number): string {
 
 /**
  * Custom bottom-left zoom cluster replacing React Flow's built-in
- * `<Controls>` (design/Node Editor.dc.html L296-302): − / current-zoom% / +
+ * `<Controls>` (design/Node Editor.dc.html "zoom controls"): − / zoom% / +
  * / a divider / fit. Must be rendered as a child of `<ReactFlow>` so
  * useViewport()/useReactFlow() resolve against the surrounding provider.
  */

@@ -118,7 +118,7 @@ export const useGraphStore = create<GraphState>((set, get, api) => ({
     const trimmed = name.trim().slice(0, SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
     const target = get().nodes.find((n) => n.id === id);
     if (!target) return;
-    // [A-2] The Inspector now shows one common Name field for every kind,
+    // The Inspector shows one common Name field for every kind,
     // groups included. A group's title lives in `label` (its single source —
     // also what GroupNodeView's inline edit and serialization use), so route
     // there instead of giving the node a second, competing `name`. Blank is a

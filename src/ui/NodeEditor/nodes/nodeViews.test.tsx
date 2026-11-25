@@ -72,7 +72,7 @@ describe("MeshNodeView", () => {
     }
   });
 
-  // [B-1] The fixed a_position/a_normal/a_uv attribute contract, surfaced on
+  // The fixed a_position/a_normal/a_uv attribute contract, surfaced on
   // the card so the `mesh` port stops being an opaque type name.
   it("shows the built-in primitive's attribute contract + counts", () => {
     const node: MeshGraphNode = {
@@ -137,7 +137,7 @@ describe("MeshNodeView — asset attribute contract [B-1]", () => {
   });
 });
 
-// [B-2] Same store-dependent-branch reasoning as the asset describe block
+// Same store-dependent-branch reasoning as the asset describe block
 // above: needs a live render so useGraphStore/usePassPlanStore updates are
 // observed.
 describe("MeshNodeView — attribute consumption warning [B-2]", () => {
@@ -246,7 +246,7 @@ describe("ImageNodeView", () => {
     expect(html).toContain(">texture<");
   });
 
-  // [E-3] Meta line reads IMAGE_TEXTURE_PARAMS, not a hard-coded string —
+  // Meta line reads IMAGE_TEXTURE_PARAMS, not a hard-coded string —
   // it must show the actual sampling contract regardless of asset binding.
   it("shows the wrap/mipmap meta line derived from IMAGE_TEXTURE_PARAMS", () => {
     const node: ImageGraphNode = { id: "i1", kind: "image", assetId: null };
@@ -277,9 +277,9 @@ describe("ShaderNodeView", () => {
     expect(html).toContain("node-card__port-label--out");
     expect(html).toContain(">mesh<");
     expect(html).toContain(">texture<");
-    // Thumbnail insets by the 46px port rail on both sides [D2/B5].
+    // Thumbnail insets by the 46px port rail on both sides.
     expect(html).toContain("margin:0 46px");
-    // Rail label color = port type family, not a static text token [D2].
+    // Rail label color = port type family, not a static text token.
     expect(html).toContain(`color:${tokens.portFamily.resource}`);
   });
 
@@ -346,7 +346,7 @@ describe("ComputeNodeView", () => {
       <ComputeNodeView {...nodeProps("c1", node)} />,
     );
     expect(html).toContain("Compute");
-    // Body is now a key-value row list (design/Node Editor.dc.html L221-225):
+    // Body is a key-value row list (design/Node Editor.dc.html "Compute node"):
     // label(primitive/verts/attrs) + value, instead of a composite string.
     expect(html).toContain("POINTS");
     expect(html).toContain("verts");
@@ -386,7 +386,7 @@ describe("OutputNodeView", () => {
     expect(html).toContain("Output");
     expect(html).toContain("→ viewport");
     expect(html).toContain("handle-texture");
-    // Rail input label (texture) and body meta (→ viewport) coexist [D2].
+    // Rail input label (texture) and body meta (→ viewport) coexist.
     expect(html).toContain(">texture<");
     expect(html).toContain(`color:${tokens.portFamily.resource}`);
   });
@@ -412,7 +412,7 @@ describe("ParamNodeView", () => {
       <ParamNodeView {...nodeProps("p1", node)} />,
     );
     // Unnamed param falls back to NODE_META.param.label ("Parameter"), not
-    // the legacy hardcoded "Param" string [D15].
+    // the legacy hardcoded "Param" string.
     expect(html).toContain("Parameter");
     expect(html).toContain("float");
     // Inline numeric input must surface the canonical formatted value.
@@ -649,8 +649,8 @@ describe("fixed-arity port stride [Q7·R15]", () => {
       <CombineNodeView {...nodeProps("cb1", node)} />,
     );
     // The out port renders once at PORT_TOP_PAD; dc's centered dc handle
-    // (70, midway of 44-96) is a dc presentation detail pending designer
-    // follow-up, not ported into this implementation's convention.
+    // (70, midway of 44-96) is a dc presentation detail, not ported into
+    // this implementation's convention.
     expect(html).toContain(`top:${PORT_TOP_PAD}px`);
   });
 });

@@ -151,7 +151,8 @@ function kindCounts(graph: Graph): Partial<Record<GraphNodeKind, number>> {
   return out;
 }
 
-// F-2 (T3): every demo now carries lesson Group nodes + a parents map.
+// F-2 (docs/learnability-plan-2026-08.md T3): every demo carries lesson Group
+// nodes + a parents map.
 // Parametrized across all 5 factories so the same invariants (group-before-
 // children ordering, parents pointing at real groups, unchanged functional
 // node composition, non-empty labels) are pinned once instead of five times.

@@ -81,7 +81,7 @@ describe("StatusBar", () => {
     expect(html).toContain("◨ Diagnostics");
   });
 
-  // T1/D-1: the "▤ Passes" toggle is a sibling of ◨ Diagnostics — same
+  // The "▤ Passes" toggle is a sibling of ◨ Diagnostics — same
   // debugUiStore 3-way exclusion wiring, no dock tree involvement.
   it("renders the ▤ Passes toggle button", () => {
     const html = renderToStaticMarkup(<StatusBar />);
@@ -95,7 +95,7 @@ describe("StatusBar", () => {
   });
 });
 
-// B5-U3 (R5): diagnostics/problems are no longer Side Panel tabs — they're
+// Diagnostics/problems are not Side Panel tabs — they're
 // bottom transient overlays toggled purely by debugUiStore. These tests need
 // a live DOM (fireEvent) rather than the static-markup snapshots above, so
 // they get their own describe/afterEach pair (initial-snapshot reset pattern
@@ -139,7 +139,7 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     expect(problems.textContent).toBe("⚠ 3 problems");
   });
 
-  // E-1 (T2): silent uniform warnings from passPlanStore rows count toward
+  // Silent uniform warnings from passPlanStore rows count toward
   // the same status-problems total as compile diagnostics/runtime errors.
   it("sums silentWarnings across shader pass rows into the status-problems count", () => {
     usePassPlanStore.getState().publish(
@@ -161,9 +161,10 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     expect(problems.textContent).toBe("⚠ 2 problems");
   });
 
-  // A-2 (T4): varying-bridge warnings land in the same ProblemsPanel section
-  // as the E-1 rows above, so the bar has to count them the way the panel
-  // does — otherwise the bar reads "no problems" over a visible warning row.
+  // Varying-bridge warnings land in the same ProblemsPanel section as the
+  // silent-warning rows above, so the bar has to count them the way the
+  // panel does — otherwise the bar reads "no problems" over a visible
+  // warning row.
   it("sums confident varying-bridge warnings into the status-problems count", () => {
     usePassPlanStore.getState().publish(
       [],
@@ -357,8 +358,8 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
     fireEvent.click(screen.getByTestId("open-diagnostics"));
 
     expect(useDebugUiStore.getState().open).toBe(true);
-    // Regression guard for the un-collapse removal (R5): the leaf stays
-    // collapsed — StatusBar no longer touches dockStore at all.
+    // Regression guard: the leaf stays collapsed — toggling diagnostics
+    // never touches the dock tree.
     const treeAfter = useDockStore.getState().tree;
     const leafAfter =
       treeAfter === null ? null : getNodeAt(treeAfter, ["b", "b", "b"]);
@@ -370,7 +371,7 @@ describe("StatusBar — problems count and diagnostics toggle (R5)", () => {
   });
 });
 
-// B6-U2 (R9): 'N panels docked' — GL status pill's neighbor in the status
+// 'N panels docked' — GL status pill's neighbor in the status
 // bar, tracking `collectPanelIds(dockStore.tree).length` in real time.
 describe("StatusBar — 'N panels docked' (B6-U2)", () => {
   const initialDock = useDockStore.getState();
@@ -414,7 +415,7 @@ describe("StatusBar — 'N panels docked' (B6-U2)", () => {
   });
 });
 
-// [#42] The bar subscribes to individual `stats` fields, not to the `stats`
+// The bar subscribes to individual `stats` fields, not to the `stats`
 // object. `bumpRenderTick()` runs on every RAF frame that does GPU work and
 // spreads a fresh `stats` object each time, so an object-level subscription
 // re-rendered the whole bar ~60x/sec for a counter it never displays.

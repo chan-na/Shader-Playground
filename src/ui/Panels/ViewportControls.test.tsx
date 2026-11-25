@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { ViewportControls } from "./ViewportControls";
 
-// Time/Camera controls moved to TransportBar (M3-U3) — see
+// Time/Camera controls live in TransportBar — see
 // src/ui/Viewport/TransportBar.test.tsx. This suite only covers what's left:
 // the Viewport section (background swatch + GPU timer toggle).
 
@@ -49,9 +49,8 @@ describe("ViewportControls", () => {
     render(<ViewportControls />);
     const toggle = screen.getByTestId("gpu-timer-toggle");
     expect(toggle).not.toBeNull();
-    // GPU timer switched from a native checkbox to the shared Toggle
-    // (role=switch button, M5-U3) — aria-checked is the accessible +
-    // testable equivalent of the old .checked property.
+    // GPU timer uses the shared Toggle (role=switch button) — aria-checked
+    // is the accessible + testable equivalent of a checkbox's .checked.
     expect(toggle.getAttribute("aria-checked")).toBe("true");
   });
 });

@@ -98,7 +98,7 @@ describe("MultiSlider", () => {
     expect(original).toEqual([0.1, 0.2, 0.3]);
   });
 
-  // [L1/E-4] Driven-uniform disable propagates to every axis's Slider and
+  // Driven-uniform disable propagates to every axis's Slider and
   // NumberField.
   describe("disabled", () => {
     it("disables every slider and number field for each axis", () => {

@@ -12,7 +12,7 @@
  *     cursor sits on an identifier.
  *   - `ui/CodeEditor/rename.ts` — drive a single-transaction rename refactor.
  *
- * Two occurrence classes are excluded even when the spelling matches (L5),
+ * Two occurrence classes are excluded even when the spelling matches,
  * because neither binds to the global:
  *   - **Member / swizzle access** — the `color` in `light.color`, the `xyz` in
  *     `v.xyz`. See `precededByDot`, including its documented line-break
@@ -118,10 +118,10 @@ export function findReferencesOf(
   const masked = maskComments(source);
   // Split on "\n" alone so a CRLF document keeps each line's trailing `\r`.
   // The `lineStart` walk below advances by `line.length + 1`, i.e. it accounts
-  // for the `\n` only; `split(/\r?\n/)` stripped the `\r` and so under-advanced
-  // by one character per preceding line. These offsets become raw string slices
-  // and CodeMirror edit ranges in `rename.ts`, so on a CRLF source the drift
-  // rewrote the wrong characters. Line *numbering* is identical either way
+  // for the `\n` only; `split(/\r?\n/)` would strip the `\r` and so
+  // under-advance by one character per preceding line. These offsets become raw
+  // string slices and CodeMirror edit ranges in `rename.ts`, so on a CRLF source
+  // the drift would rewrite the wrong characters. Line *numbering* is identical either way
   // (same piece count, same 1-based indices), so it still agrees with
   // `symbolTable.ts`'s own `/\r?\n/` walk — that module derives line/column
   // only and does no offset arithmetic. `\r` is not an identifier character and
@@ -129,7 +129,7 @@ export function findReferencesOf(
   // `identRe`, `column`, or `precededByDot`.
   const lines = masked.split("\n");
   // Struct member *names* share the global namespace's spelling but not its
-  // binding (L5) — see `structMemberNameOffsets`. Member types and array sizes
+  // binding — see `structMemberNameOffsets`. Member types and array sizes
   // are deliberately NOT excluded: they are real uses of real globals.
   const memberNameOffsets = structMemberNameOffsets(masked);
   const sites: ReferenceSite[] = [];

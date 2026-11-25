@@ -104,8 +104,8 @@ describe("Inspector (smoke)", () => {
     );
   });
 
-  // D15: the "· editing <id>" fragment used to render the raw node id. It
-  // should show the primary (last-selected) node's display name instead.
+  // The "· editing <name>" fragment must show the primary (last-selected)
+  // node's display name, never its raw internal id.
   it("shows the primary node's display name, not its raw id, in the multi-select banner", () => {
     useGraphStore.getState().addNode(shaderNode);
     useGraphStore.getState().addNode(otherNode);
@@ -119,7 +119,7 @@ describe("Inspector (smoke)", () => {
   });
 });
 
-// D15: the common Name field. Same store source (node.name / renameNode) as
+// The common Name field. Same store source (node.name / renameNode) as
 // the node card header's inline rename — see NodeCardHeader.tsx.
 describe("Inspector — Name field (D15)", () => {
   it("renders for a selected shader node with the fallback label as placeholder", () => {
@@ -160,9 +160,9 @@ describe("Inspector — Name field (D15)", () => {
     ).toBe("Blur pass");
   });
 
-  // [A-2] The Name field is now common to every kind, groups included — it
-  // used to be suppressed for groups, which left them with a separate "Group
-  // label" field. It seeds from the group's `label` and commits back into it.
+  // The Name field is common to every kind, groups included (there is no
+  // separate "Group label" field). It seeds from the group's `label` and
+  // commits back into it.
   it("renders for a selected group node, seeded from the group's label", () => {
     useGraphStore.getState().addNode(groupNode);
     useSelectionStore.getState().select("g1");
@@ -194,7 +194,7 @@ describe("Inspector — Name field (D15)", () => {
     ).toBe("Renamed via card");
   });
 
-  // [#35] Seed, Escape-revert and the remount key must all read the same
+  // Seed, Escape-revert and the remount key must all read the same
   // field. Escape used to revert to `node.name ?? ""`, which for a group is
   // always "" — abandoning an edit blanked the field of a group that has a
   // perfectly good `label`.
@@ -228,7 +228,7 @@ describe("Inspector — Name field (D15)", () => {
   });
 });
 
-// [#8] The open-hint-editor marker used to be the bare uniform name, which is
+// The open-hint-editor marker used to be the bare uniform name, which is
 // not unique across nodes.
 describe("Inspector — hint editor is scoped to the owning node (#8)", () => {
   it("closes the editor when a different node with the same uniform name is selected", () => {
@@ -276,7 +276,7 @@ describe("Inspector — hint editor is scoped to the owning node (#8)", () => {
   });
 });
 
-// [#25] GroupInspector is rendered unkeyed, so switching groups reuses the
+// GroupInspector is rendered unkeyed, so switching groups reuses the
 // component instance. A boolean `confirmingDelete` survived the switch and
 // left the destructive confirm box armed on a group the user never opened it
 // on — only reproducible from the Inspector, not by rendering GroupInspector
@@ -337,7 +337,7 @@ function systemUniformValue(name: string): string {
 
 /** Fills in every field `ShaderPassRow` requires; the overrides carry the
  *  pass size under test. Same factory shape as PassInspector.test.tsx.
- *  [#10] Module-scoped because the binding-state block below needs it too:
+ *  Module-scoped because the binding-state block below needs it too:
  *  "this node has a pass at all" is now part of the binding verdict. */
 function shaderPassRow(
   overrides: Partial<ShaderPassRow> & { nodeId: string },
@@ -369,8 +369,9 @@ function computePassRow(nodeId: string): ComputePassRow {
   };
 }
 
-// [C-1] The "System uniforms (auto-bound)" section — binding status mirrors
-// `plan.fullscreenByNode` (A-1's publish), never re-derived from the graph.
+// The "System uniforms (auto-bound)" section — binding status mirrors
+// `plan.fullscreenByNode` (the compiler's publish), never re-derived from the
+// graph.
 describe("Inspector — System uniforms section [C-1]", () => {
   const viewShaderNode: ShaderGraphNode = {
     id: "sv1",
@@ -448,7 +449,7 @@ describe("Inspector — System uniforms section [C-1]", () => {
     expect(findSystemUniformRow("u_time").textContent).toContain("3.50s");
   });
 
-  // [#10] A shader error is not fatal validation: compile.ts drops the failed
+  // A shader error is not fatal validation: compile.ts drops the failed
   // node's pass and the plan is republished without it, while
   // `fullscreenByNode` keeps the node's entry. Nothing of this node runs, so
   // every row has to say so — a live u_time under a compile-error overlay
@@ -475,7 +476,7 @@ describe("Inspector — System uniforms section [C-1]", () => {
   });
 });
 
-// [C-1] The value column of that same section. `u_mouse` and `u_resolution`
+// The value column of that same section. `u_mouse` and `u_resolution`
 // sit one row apart and used to disagree about coordinate space: the mouse
 // store holds canvas-framebuffer pixels, but every pass receives them
 // rescaled by `pass.width / ctx.width` (execute.ts's `bindSystemUniforms`) —
@@ -510,7 +511,7 @@ describe("Inspector — System uniform values [C-1]", () => {
     uniformValues: {},
   };
 
-  // Same 500ms sampling interval as the [C-1] block above.
+  // Same 500ms sampling interval as the System uniforms block above.
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -576,7 +577,7 @@ describe("Inspector — System uniform values [C-1]", () => {
 
   it("withholds the value of a row it marks unbound, keeping the bound row's own value", () => {
     useGraphStore.getState().addNode(mouseComputeNode);
-    // [#10] The compute pass has to actually be in the plan for u_time to be
+    // The compute pass has to actually be in the plan for u_time to be
     // bound at all — otherwise the row correctly says "no pass for this node".
     usePassPlanStore.getState().publish([computePassRow("cm1")], {}, {});
     useTimeStore.getState().setTime(1.25);
@@ -599,7 +600,7 @@ describe("Inspector — System uniform values [C-1]", () => {
   });
 });
 
-// [B-1] Mesh Inspector section — the mesh-side counterpart to the existing
+// Mesh Inspector section — the mesh-side counterpart to the existing
 // Compute "Attributes" block.
 describe("Inspector — Mesh section [B-1]", () => {
   const meshNode: MeshGraphNode = {
@@ -625,7 +626,7 @@ describe("Inspector — Mesh section [B-1]", () => {
   });
 });
 
-// [A-2, T4] Varying bridge section — the vertex↔fragment contract, sourced
+// Varying bridge section — the vertex↔fragment contract, sourced
 // from passPlanStore.varyingsByNode (never re-parsed here).
 describe("Inspector — Varying bridge section [A-2]", () => {
   const bridgeShaderNode: ShaderGraphNode = {
@@ -733,7 +734,7 @@ function findUniformRow(name: string): HTMLElement {
   return row;
 }
 
-// [L1/E-4] A uniform is also an input port — when an edge drives it,
+// A uniform is also an input port — when an edge drives it,
 // execute.ts's bindUserUniforms overwrites whatever the Inspector slider
 // would send every frame. The control must disable and explain why.
 describe("Inspector — driven uniforms (L1/E-4)", () => {
@@ -877,7 +878,7 @@ describe("Inspector — driven uniforms (L1/E-4)", () => {
   });
 });
 
-// [E-3] Texture parameters — derived from core/gl/texture.ts's
+// Texture parameters — derived from core/gl/texture.ts's
 // FBO_TEXTURE_PARAMS / IMAGE_TEXTURE_PARAMS constants, not hand-copied
 // strings, so the two sections can never silently disagree with the GL layer.
 describe("Inspector — Texture parameters [E-3]", () => {
@@ -920,7 +921,7 @@ describe("Inspector — Texture parameters [E-3]", () => {
   });
 });
 
-// [L1/E-4] Sampler inputs — same (target, targetHandle) lookup, surfaced as
+// Sampler inputs — same (target, targetHandle) lookup, surfaced as
 // connection state instead of a driven/disabled control (samplers have no
 // slider to disable).
 describe("Inspector — Sampler inputs connection state (L1/E-4)", () => {
@@ -998,7 +999,7 @@ describe("Inspector — Sampler inputs connection state (L1/E-4)", () => {
   });
 });
 
-// [#30] Under fullscreen substitution the compiler never sees this node's
+// Under fullscreen substitution the compiler never sees this node's
 // stored vertex source — `compile.ts` replaces it with `fullscreen.vert`
 // before `createProgram`, and seeds defaults from that same pair. The
 // Inspector has to parse what was compiled, or it describes a program that
@@ -1036,8 +1037,9 @@ describe("Inspector — uniform specs follow the compiled vertex source [#30]", 
   });
 
   // The substituted program does not declare a vertex-only uniform — but its
-  // row is where [C-1] explains that ("not bound (fullscreen pass)" for the
-  // view matrices), so the row stays and only loses its shadowing power.
+  // row is where the System uniforms section explains that ("not bound
+  // (fullscreen pass)" for the view matrices), so the row stays and only
+  // loses its shadowing power.
   it("still lists vertex-only uniforms, after the compiled ones", () => {
     useGraphStore.getState().addNode(shadowingNode);
     usePassPlanStore.getState().publish([], { fs1: true }, {});
@@ -1051,9 +1053,10 @@ describe("Inspector — uniform specs follow the compiled vertex source [#30]", 
     ).toEqual(["u_k", "u_vertexOnly"]);
   });
 
-  // Guards phase-36's C-1 spec: the default demo's vertex source declares the
-  // view matrices, and disconnecting the mesh must leave the `u_view` row in
-  // place (now reading "not bound (fullscreen pass)"), not delete it.
+  // Guards phase-36's system-uniforms spec: the default demo's vertex source
+  // declares the view matrices, and disconnecting the mesh must leave the
+  // `u_view` row in place (now reading "not bound (fullscreen pass)"), not
+  // delete it.
   it("keeps the system-uniform row for a matrix only the vertex source declares", () => {
     useGraphStore.getState().addNode({
       ...shadowingNode,

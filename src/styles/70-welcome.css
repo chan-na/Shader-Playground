@@ -1,11 +1,11 @@
-/* ── Welcome overlay (Welcome.dc.html L87-145, M6-U2) ──────────────
+/* ── Welcome overlay (design/Welcome.dc.html "empty canvas with welcome") ──
    NodeEditor mounts this only while the graph is empty (0 nodes), as a
    ReactFlow sibling inside .panel-body (already position:relative) — same
    slot as the selection-count-badge. No spBreathe-style looping animation on
-   the brand halo (design uses one) — CLAUDE.md's "상시 애니메이션 금지" policy
-   replaces it with a static glow.
+   the brand halo (design uses one) — design/README.md's Motion rule
+   "상시 애니메이션 금지" replaces it with a static glow.
 
-   pointer-events:auto on the root (not :none — see verifier note below): at
+   pointer-events:auto on the root (not :none): at
    the reference 1440×900 / code-dock-open layout the panel is only ~555px
    tall against .welcome-content's ~932px, so the overlay's own overflow:auto
    is load-bearing — mouse wheel has to actually scroll *this* element, not

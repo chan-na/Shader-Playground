@@ -59,7 +59,7 @@ describe("ColorField", () => {
     expect(input.getAttribute("type")).toBe("color");
   });
 
-  // [L1/E-4] Driven-uniform disable.
+  // Driven-uniform disable.
   describe("disabled", () => {
     it("marks the color input disabled and dims the wrapper", () => {
       const { container } = render(

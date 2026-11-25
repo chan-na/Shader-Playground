@@ -4,14 +4,14 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* B5-U2: 하단 트랜지언트 오버레이(.status-overlay, position:absolute)의
+  /* 하단 트랜지언트 오버레이(.status-overlay, position:absolute)의
      배치 기준 — dc는 도크 body 내부/상태바 위에 오버레이를 배치한다. */
   position: relative;
 }
-/* B4-U3: DockLayout's own root wrapper — hosts the drag-ghost/drop-preview
+/* DockLayout's own root wrapper — hosts the drag-ghost/drop-preview
    overlays (both `position:absolute`) and the .dock-root--dragging state
-   class, so it needs `position:relative` + to fill the same space
-   `.shell-content` used to give straight to the tree/.dock-empty. This
+   class, so it needs `position:relative` + to fill all of `.shell-content`
+   on behalf of the tree/.dock-empty. This
    container wraps *both* branches (tree and the tree===null empty state) —
    dragging the last docked panel makes the tree briefly null while the
    ghost/preview overlays and the window pointer listeners must stay alive. */
@@ -22,18 +22,17 @@
   min-height: 0;
   position: relative;
 }
-/* R10: cursor/selection feedback while a drag ghost is live. No layout
+/* Cursor/selection feedback while a drag ghost is live. No layout
    change — the overlays are absolutely positioned siblings. */
 .dock-root--dragging {
   user-select: none;
   cursor: grabbing;
 }
-/* B2-U1: DockLayout.tsx replaces the old shell-main/shell-right generic
-   containers with a recursive .dock-split/.dock-leaf tree. The legacy
-   shell-left/shell-right-top/shell-right-bottom/shell-code class names stay
+/* DockLayout.tsx renders a recursive .dock-split/.dock-leaf tree. The
+   legacy shell-left/shell-right-top/shell-right-bottom/shell-code names stay
    on the DOM (dockLayoutModel.legacyLeafClass) purely to preserve the
    selector contract — tests/e2e/phase-35-dock-*.spec.ts query .shell-*
-   directly — but their layout rules (flex/direction/min-*) now
+   directly — but their layout rules (flex/direction/min-*)
    live in the generic .dock-split/.dock-leaf rules below. */
 .dock-split {
   display: flex;
@@ -57,12 +56,13 @@
   min-height: 0;
 }
 
-/* R11 — 컴팩트(≤990px, C-6 임계 재사용) 고정 스택 폴백. 트리는 보존하고
+/* 컴팩트(≤990px, 뷰포트 컴팩트 트랜스포트와 같은 임계) 고정 스택 폴백.
+   트리는 보존하고
    렌더만 세로 스택으로: split은 display:contents로 투명해지고 leaf가
    루트 column flex에 직접 쌓인다. 드롭 존/스플리터/고스트는 이 모드에서
-   렌더되지 않는다(DockLayout.tsx compact 분기). 높이값은 잠정(디자인 미정,
-   dc는 1440 고정 레퍼런스뿐이라 컴팩트 시안이 없다 — temp/design-followup-
-   v1.4.md 기록). 아래 `.dock-split`/`.dock-leaf` 기본 규칙보다 뒤에 둔다 —
+   렌더되지 않는다(DockLayout.tsx compact 분기). 높이값은 잠정(dc는 1440
+   고정 레퍼런스뿐이라 컴팩트 시안이 없다). 위 `.dock-split`/`.dock-leaf`
+   기본 규칙보다 뒤에 둔다 —
    명시도가 더 높은(2~3클래스) 셀렉터를 소스 순서상 나중에 둬야
    noDescendingSpecificity(biome) 경고가 나지 않는다. */
 .dock-root--compact {
@@ -91,8 +91,9 @@
   min-height: 0;
 }
 
-/* ── 빈 도크(모든 패널 닫힘, tree=null) — Docking Prototype.dc.html L69-76.
-   R1 카피 정본. 색: #454c55=text.disabled · #2b3037=border.strong. ─── */
+/* ── 빈 도크(모든 패널 닫힘, tree=null) — design/App Shell.dc.html
+   ("No panels docked" 빈 상태). 색: #454c55=text.disabled ·
+   #2b3037=border.strong. ─── */
 .dock-empty {
   flex: 1;
   display: flex;
@@ -107,8 +108,8 @@
   width: 52px;
   height: 52px;
   /* dc 실측 12px — 신규 토큰 0 제약. '빈 상태 아이콘' 개념을 radius.
-     emptyStateIcon(16) 하나로 통일한 v1.2 선례(theme.ts L164-167 주석)를
-     따른다. pixel-perfect보다 토큰 통일 우선 — followup(designer) 기록. */
+     emptyStateIcon(16) 하나로 통일한 선례(src/theme.ts `radius.emptyStateIcon`
+     주석)를 따른다. pixel-perfect보다 토큰 통일 우선. */
   border-radius: var(--radius-empty-state-icon);
   border: 1.5px dashed var(--border-strong);
   display: flex;
@@ -119,14 +120,12 @@
 .shell-left {
   border-right: 1px solid var(--border-default);
 }
-/* v2.0 BODY reorg (design/CHANGELOG.md §v2.0 "BODY 재구성"): code moved from
-   the bottom dock to the left column, so its accent border moves from
-   border-top to border-right (it now sits beside Node Editor, not above
-   it). */
+/* Code sits in the left column beside Node Editor, so its divider border is
+   on the right edge. */
 .shell-code {
   border-right: 1px solid var(--border-default);
 }
-/* v2.0: right column is `col[Viewport / Inspector·Assets]` — Viewport (top)
+/* Right column is `col[Viewport / Inspector·Assets]` — Viewport (top)
    gets the accent border on its bottom edge, against Inspector/Assets. */
 .shell-right-top {
   border-bottom: 1px solid var(--border-default);
@@ -136,10 +135,10 @@
 /* <hr> carries an implicit ARIA role of "separator" — reset its UA
    defaults (inset border, block margin) since it's reused as a drag handle. */
 .splitter {
-  /* dc `_layout`'s D=6 (Docking Prototype.dc.html L307) is the divider
-     thickness the flex math (dockTree.DIVIDER_PX) is built around — was 5px
-     pre-B2, now aligned so DockLayout's `w - D` split math matches the
-     rendered gutter exactly. */
+  /* dc `_layout`'s D=6 (design/App Shell.dc.html) is the divider thickness
+     the flex math (src/ui/dock/geometry.ts DIVIDER_PX) is built around —
+     keep in sync so DockLayout's `w - D` split math matches the rendered
+     gutter exactly. */
   flex: 0 0 6px;
   align-self: stretch;
   margin: 0;
@@ -170,8 +169,8 @@
   display: none;
 }
 
-/* ── Dock panel header (common to all docked panels, v1.4 `Docking
-   Prototype.dc.html` L84-99): grab dots → dock 탭 → meta badge → spacer →
+/* ── Dock panel header (common to all docked panels, design/App
+   Shell.dc.html dock header): grab dots → dock 탭 → meta badge → spacer →
    collapse/maximize/close. */
 .dock-header {
   display: flex;
@@ -190,24 +189,24 @@
   letter-spacing: 1px;
   cursor: grab;
 }
-/* ── Dock 탭(v1.4 R6 — 탭 1급화, DockPanelHeader가 leaf.tabs에서 렌더) ──
+/* ── Dock 탭(DockPanelHeader가 leaf.tabs에서 렌더) ──
    탭 자체는 기존 .panel-tab 밑줄 idiom 재사용(README §M '탭은 Side Panel
-   밑줄형'). 컨테이너/dot/✕만 신설. Docking Prototype.dc.html L85-90. */
+   밑줄형'). 컨테이너/dot/✕만 신설. design/App Shell.dc.html `.sp-tabs`. */
 .dock-header-tabs {
   display: flex;
   align-items: center;
   align-self: stretch;
-  gap: 2px; /* dc L85 */
+  gap: 2px; /* dc `.sp-tabs` */
   min-width: 0;
-  overflow-x: auto; /* R8: dc L85 — 넘치면 가로 스크롤. */
-  scrollbar-width: none; /* R8: dc L23 (Firefox). */
+  overflow-x: auto; /* dc `.sp-tabs` — 넘치면 가로 스크롤. */
+  scrollbar-width: none; /* dc `.sp-tabs` (Firefox). */
 }
-/* R8: 스크롤바 숨김(웹킷) — dc L22. */
+/* 스크롤바 숨김(웹킷) — dc `.sp-tabs::-webkit-scrollbar`. */
 .dock-header-tabs::-webkit-scrollbar {
   height: 0;
   display: none;
 }
-/* R8: 탭 4개↑에서만 우측 22px 페이드 마스크 — dc L557 tabMask. mask의
+/* 탭 4개↑에서만 우측 22px 페이드 마스크 — dc `tabMask`. mask의
    black/transparent는 알파 채널 전용 키워드(디자인 색 아님 — raw hex 회피). */
 .dock-header-tabs--masked {
   mask-image: linear-gradient(
@@ -226,11 +225,11 @@
 .panel-tab-dot {
   width: 8px;
   height: 8px;
-  border-radius: 2.5px; /* dc L88 */
+  border-radius: 2.5px; /* dc 탭 dot */
   flex-shrink: 0;
 }
-/* dc L90: font 9px · #565e68 → text.muted 근사(dc 값이 text.muted #656d78와
-   text.disabled #454c55 사이의 무명 값 — 신규 토큰 0 제약, followup 기록) ·
+/* dc 탭 ✕: font 9px · #565e68 → text.muted 근사(dc 값이 text.muted #656d78와
+   text.disabled #454c55 사이의 무명 값 — 신규 토큰 0 제약) ·
    opacity .55 → hover 시 error 강조. */
 .panel-tab-close {
   background: transparent;
@@ -248,9 +247,8 @@
   color: var(--error);
   opacity: 1;
 }
-/* 배지 박스(배경+보더)가 metaAlign start/end 양쪽 정본 — v1.3 Q4에서 dc(App
-   Shell 'GLSL · ES 3.0' plain mono)가 이 구현으로 정정됨. plain 텍스트 변형
-   없음. */
+/* 배지 박스(배경+보더)가 metaAlign start/end 양쪽 정본(디자이너 확정).
+   plain 텍스트 변형 없음. */
 .dock-header-meta {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -280,24 +278,24 @@
 .dock-header-btn:hover {
   color: var(--text-bright-body);
 }
-/* 헤더 ✕(패널 전체 닫기, R6/v1.4) — dc hover color #f0555c = semantic.error.
-   Docking Prototype.dc.html L97. */
+/* 헤더 ✕(패널 전체 닫기) — dc hover color #f0555c = semantic.error
+   (design/App Shell.dc.html dock header). */
 .dock-header-btn--close:hover {
   color: var(--error);
 }
 
-/* R10: pointer*만 쓰는 드래그(마우스+터치/펜)의 네이티브 스크롤/제스처 개입
-   방지 — grab handle의 pointerdown 드래그 시작(B4-U4 배선 완료). 탭 쪽은
-   아래 `.dock-header-tabs .panel-tab`에 함께 넣는다(하나로 합치면
-   noDescendingSpecificity 린트가 걸린다: `.panel-tab`이 이보다 뒤에서
-   정의됨). */
+/* pointer*만 쓰는 드래그(마우스+터치/펜)의 네이티브 스크롤/제스처 개입
+   방지 — grab handle의 pointerdown이 드래그를 시작한다. 탭 쪽은
+   21-dock-panels.css의 `.dock-header-tabs .panel-tab`에 함께 넣는다(하나로
+   합치면 noDescendingSpecificity 린트가 걸린다: `.panel-tab`이 이보다
+   뒤에서 정의됨). */
 .dock-header-grab {
   touch-action: none;
 }
 
-/* ── 드래그 고스트 / 드롭 프리뷰 (B4-U3) — dc `onMove`/`computeDrop`/
-   `dockGhost`(Docking Prototype.dc.html L385-464, DROP PREVIEW L188-206)
-   이식. 둘 다 `.dock-root`(position:relative) 기준 절대 배치. 배경/보더의
+/* ── 드래그 고스트 / 드롭 프리뷰 — dc `onMove`/`computeDrop`/`dockGhost`
+   + DROP PREVIEW 블록(design/App Shell.dc.html) 이식. 둘 다
+   `.dock-root`(position:relative) 기준 절대 배치. 배경/보더의
    알파 파생(rgba)은 CSS 변수로 표현 못 해 DockLayout.tsx가 인라인
    style(tokens + withAlpha)로 얹는다 — 여기 규칙은 raw hex 없이 표현 가능한
    부분만 담당한다. ─────────────────────────────────────────────────── */
@@ -315,8 +313,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  /* dc 라벨색 #7dbcff = accent.bright (S26 정본) — v2.0의 accent.hover
-     근사를 정본 토큰으로 교체 [X13]. */
+  /* dc 라벨색 #7dbcff = accent.bright 정확 일치. */
   color: var(--accent-bright);
   border-radius: var(--radius-chip);
   padding: 3px 9px;

@@ -47,7 +47,7 @@ export interface RendererState {
   /**
    * True when the Viewport's GL boot effect failed to obtain a WebGL2
    * context (createGLContext threw). Drives the full-app GpuBlockScreen
-   * scrim (design/System States.dc.html gpu-unsupported, M7-U5).
+   * scrim (design/System States.dc.html gpu-unsupported).
    */
   contextUnavailable: boolean;
   /**
@@ -61,7 +61,7 @@ export interface RendererState {
    * and served by the Viewport RAF loop, which is the only place that can read
    * the drawing buffer while it is still valid (the context is created with
    * `preserveDrawingBuffer: false`). Also feeds the idle gate so a paused,
-   * static graph still draws the frame the snapshot needs. (#3)
+   * static graph still draws the frame the snapshot needs.
    */
   snapshotRequested: boolean;
   setReady: (ready: boolean) => void;
@@ -87,12 +87,12 @@ export interface RendererState {
    *
    * 1. `ready === false`: the flag has exactly one server (the Viewport RAF
    *    loop), so arming it with no loop running would leave it set until the
-   *    *next* Viewport mount, which then downloads a PNG nobody asked for. (F1)
+   *    *next* Viewport mount, which then downloads a PNG nobody asked for.
    * 2. The drawing buffer is at its 1×1 floor: `ready` only means "the loop is
    *    alive", not "the canvas is visible". A Viewport inside a collapsed rail
    *    or behind a maximised sibling is `display:none`, so `clientWidth/Height`
    *    read 0 and `resize()` clamps them to 1. The loop keeps ticking, and the
-   *    capture used to hand the user a 1×1 PNG with no warning. (F21)
+   *    capture would hand the user a 1×1 PNG with no warning.
    *
    * Callers distinguish the two by reading `ready` after a refusal — refused
    * with `ready === true` means (2). Keep that in step if a third reason is
@@ -168,7 +168,7 @@ export const useRendererStore = create<RendererState>((set, get) => ({
     // 1×1, and capturing that is strictly worse than refusing: the user gets a
     // 1×1 PNG and no indication anything went wrong. Both axes must be at the
     // floor — a real viewport is never 1×1, and requiring both keeps an
-    // extremely thin but genuinely visible panel capturable. (F21)
+    // extremely thin but genuinely visible panel capturable.
     const { width, height } = get().canvasSize;
     if (width <= 1 && height <= 1) return false;
     if (get().snapshotRequested) return true;

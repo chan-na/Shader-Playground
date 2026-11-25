@@ -25,7 +25,7 @@ function edit(testId: string, value: string) {
   fireEvent.change(screen.getByTestId(testId), { target: { value } });
 }
 
-// C-2: the Default field is pre-filled from `spec.defaultValue`, which for an
+// The Default field is pre-filled from `spec.defaultValue`, which for an
 // unannotated uniform is `defaultRangeFor`'s name-based heuristic
 // (`u_*color*` → white) rather than anything the author wrote. Since an
 // emitted `@default` is now *bound* — `withExplicitDefaults` seeds it and

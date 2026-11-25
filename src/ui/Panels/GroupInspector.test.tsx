@@ -43,7 +43,8 @@ describe("GroupInspector", () => {
     expect(updated.color).toBe("#336699");
   });
 
-  // group-label-input is intentionally absent from this surface as of [A-2].
+  // group-label-input is intentionally absent: the Inspector's common Name
+  // field renames groups.
   it("preserves the group-* testid surface (inspector, color, ungroup, cascade)", () => {
     const node = groupNode();
     useGraphStore.getState().addNode(node);

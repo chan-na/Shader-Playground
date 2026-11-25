@@ -119,7 +119,7 @@ test.describe("Phase 23 — multi-selection editing", () => {
     await selectNode(page, "s1");
     await expect(page.getByTestId("multi-select-banner")).toHaveCount(0);
 
-    // Rename s1 through the real Inspector Name field (UI path, D15) so the
+    // Rename s1 through the real Inspector Name field (UI path) so the
     // banner's "· editing <name>" fragment has a display name to assert on
     // that provably differs from the raw id.
     const nameInput = page.getByTestId("node-name-input");
@@ -136,7 +136,7 @@ test.describe("Phase 23 — multi-selection editing", () => {
     await expect(banner).toBeVisible();
     await expect(banner).toContainText("2 nodes selected");
     // Primary is the last id added to the set — shown via its display name
-    // (displayNodeName), not the raw internal id (D15 clean-up).
+    // (displayNodeName), not the raw internal id.
     await expect(banner).toContainText("Fresnel");
   });
 });

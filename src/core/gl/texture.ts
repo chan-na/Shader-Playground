@@ -8,10 +8,10 @@ export interface GLTexture {
 }
 
 /**
- * [E-3] The wrap/filter/mipmap/flip parameters a texture is created with —
- * promoted from GL-call literals to a named constant so the Inspector can
- * display exactly what `createColorTexture`/`createImageTexture` apply,
- * instead of a hand-copied string that can drift from the real GL calls.
+ * The wrap/filter/mipmap/flip parameters a texture is created with — a named
+ * constant rather than GL-call literals so the Inspector can display exactly
+ * what `createColorTexture`/`createImageTexture` apply, instead of a
+ * hand-copied string that can drift from the real GL calls.
  */
 export interface TextureParamInfo {
   wrapS: "CLAMP_TO_EDGE" | "REPEAT";
@@ -34,7 +34,7 @@ export const FBO_TEXTURE_PARAMS: TextureParamInfo = {
 };
 
 /** Applied by `createImageTexture` — user-uploaded Image node textures.
- *  Deliberately different from `FBO_TEXTURE_PARAMS` (L2): the same GLSL
+ *  Deliberately different from `FBO_TEXTURE_PARAMS`: the same GLSL
  *  sampling the same UV can produce a different result depending on which
  *  of the two a sampler is actually bound to. */
 export const IMAGE_TEXTURE_PARAMS: TextureParamInfo = {

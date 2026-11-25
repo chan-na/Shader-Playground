@@ -11,7 +11,7 @@ import { tokens, withAlpha } from "../../../theme";
 import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
-// 16:9 letterbox card (dc L306-315): 74px outer container, 52px inner frame.
+// 16:9 letterbox card (dc "Video" card): 74px outer container, 52px inner frame.
 const LETTERBOX_H = 74;
 const FRAME_H = 52;
 const POLL_MS = 200;
@@ -121,11 +121,10 @@ export function VideoNodeView({ id, data }: NodeProps) {
                   opacity: status.ready ? 1 : 0.4,
                 }}
               />
-              {/* 재생 글리프 노출 조건 = `node.playing`(그래프 상태 = 사용자 의도)이 정본 —
-                  CHANGELOG §v1.3 Q2 [C-4] 확정. `videoRef.current.paused`(DOM 실측)는
-                  로딩/버퍼링/자동 일시정지에서 갈리므로 채택하지 않는다(디바운스 규칙이
-                  따로 필요해짐). v1.2 무응답으로 잠정 유지하던 조건이 v1.3에서 현행
-                  승인됐다 — 코드 변경 0. */}
+              {/* 재생 글리프 노출 조건 = `node.playing`(그래프 상태 = 사용자 의도)이
+                  정본. `videoRef.current.paused`(DOM 실측)는 로딩/버퍼링/자동
+                  일시정지에서 갈리므로 채택하지 않는다(디바운스 규칙이 따로
+                  필요해짐). */}
               {!node.playing && (
                 <div
                   data-testid="video-play-glyph"
@@ -153,7 +152,7 @@ export function VideoNodeView({ id, data }: NodeProps) {
                   borderRadius: 1,
                   // dc의 rgba(255,255,255,0.18)이 overlay.track으로 정본화됐다 —
                   // 중립 트랙/필 표면은 순백 채널을 코드가 직접 파생하는 대신
-                  // 이 명명 토큰을 쓴다 [D9·B-4]. overlay.*는 cssVars() 방출
+                  // 이 명명 토큰을 쓴다. overlay.*는 cssVars() 방출
                   // 대상이 아니므로 TS에서 직접 참조한다.
                   background: tokens.overlay.track,
                 }}

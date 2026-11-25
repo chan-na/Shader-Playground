@@ -11,7 +11,7 @@ import unlitFrag from "../shaders/templates/unlit.frag?raw";
 import uvDebugFrag from "../shaders/templates/uvDebug.frag?raw";
 import type { NodePosition } from "./types";
 
-// F-2 (docs/learnability-plan-2026-08.md T3): every demo below now opens with
+// F-2 (docs/learnability-plan-2026-08.md T3): every demo below opens with
 // one or more purely-visual Group nodes carrying a step-by-step label — "a
 // demo you can read like a lesson" instead of just a working graph. Groups
 // never enter validate/compile/execute (see core/graph/types.ts's
@@ -21,7 +21,7 @@ import type { NodePosition } from "./types";
 // precedent, a group node MUST precede its children in the `nodes` array (RF
 // nesting requirement) — every factory below puts its group(s) first.
 //
-// Child positions are group-relative (graphStore.ts's groupSelected /
+// Child positions are group-relative (graphStoreGroups.ts's groupSelected /
 // setParent convention). The single-child groups here follow the same
 // footprint groupSelected uses for an interactively-grouped node (ABS_CARD_W
 // 200 / ABS_CARD_H 120 + GROUP_SELECTION_PADDING 32 + HEADER_OFFSET 16):
@@ -62,11 +62,11 @@ export function createDemoGraph(): Graph {
         vertexSource: basicVert,
         fragmentSource: unlitFrag,
         uniformValues: {
-          // [C-2] Demo art direction, not a generic node default: this value
+          // Demo art direction, not a generic node default: this value
           // (distinct from starter.frag's @default 0.5,0.7,1.0) is
           // intentionally stored so it wins over the GLSL default — a live
           // example of the "stored value beats @default" backward-compat
-          // path every pre-C-2 saved project relies on.
+          // path that saved projects with stored uniform values rely on.
           u_baseColor: [0.3, 0.7, 1.0],
         },
       },

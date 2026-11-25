@@ -1,6 +1,6 @@
 /**
  * Pure aggregation for the Problems tab's severity summary chips
- * (design/Side Panel.dc.html L191-195: "1 error" / "1 warning" / "1 info").
+ * (dc Problems panel: "1 error" / "1 warning" / "1 info").
  * Kept separate from ProblemsPanel so the counting logic has a unit-testable
  * surface independent of store wiring / DOM.
  */

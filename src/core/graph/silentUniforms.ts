@@ -2,7 +2,7 @@ import type { UniformSpec } from "./uniformParser";
 
 /**
  * A uniform whose declaration says one thing while the compiled/linked
- * program (or the graph's wiring) silently does another (E-1). Every case is
+ * program (or the graph's wiring) silently does another. Every case is
  * pre-existing "quiet skip" behavior in the GL layer —
  * `core/gl/uniforms.ts`'s `loc === null` early-return for an inactive
  * uniform, `execute.ts`'s `bindSamplers` only binding the *connected*
@@ -38,7 +38,7 @@ export interface SilentUniformWarning {
  *    {@link silentWarningMessage} for this kind as well.
  *  - active, a sampler, bound to an edge, but the source produces no texture
  *    at all this frame → `sampler-source-empty`. `execute.ts`'s
- *    `bindSamplers` `continue`s over such a unit (L5: an image with no asset,
+ *    `bindSamplers` `continue`s over such a unit (an image with no asset,
  *    or one whose asset never loaded, is deliberately left unbound rather
  *    than forced to black), so the uniform again keeps its link-time default
  *    0 and reads whatever unrelated texture unit 0 holds. Without this kind

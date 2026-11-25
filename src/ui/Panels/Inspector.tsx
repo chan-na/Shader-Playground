@@ -52,7 +52,7 @@ export interface InspectorProps {
 }
 
 /**
- * [L1/E-4] Resolve the display name of whatever node feeds `targetHandle` on
+ * Resolve the display name of whatever node feeds `targetHandle` on
  * `targetId` via a graph edge, or `undefined` if nothing is wired there.
  * Shared by the uniform "driven by" note and the Sampler inputs section —
  * both ask the exact same question (is there an edge into this port, and
@@ -79,8 +79,8 @@ function drivingSourceName(
 }
 
 /**
- * [#35] The node's *stored* editable title, i.e. the exact string the Name
- * field must round-trip. [A-2] A group keeps its title in `label` (that's
+ * The node's *stored* editable title, i.e. the exact string the Name
+ * field must round-trip. A group keeps its title in `label` (that's
  * where `renameNode` routes it); every other kind keeps it in `name`.
  *
  * Deliberately NOT `displayNodeName()`: that falls back to the kind's label
@@ -93,11 +93,11 @@ function titleOf(node: GraphNode): string {
 }
 
 /**
- * Common Inspector "Name" field (design/Side Panel.dc.html L75-81, D15).
+ * Common Inspector "Name" field (design/Side Panel.dc.html rename affordance).
  * Same rename source as the node card header's inline edit
  * (NodeCardHeader.tsx): `renameNode`, which writes `label` for groups and
  * `name` for everything else — so this one field renames every kind and
- * GroupInspector deliberately offers no competing Label input [A-2].
+ * GroupInspector deliberately offers no competing Label input.
  *
  * Value is a local draft, not a direct binding to the stored title —
  * committing on every keystroke would push a history entry per character.
@@ -105,7 +105,7 @@ function titleOf(node: GraphNode): string {
  * keys this component on `${node.id}:${titleOf(node)}` so an external rename
  * (card double-click edit, undo/redo) remounts it and re-syncs the draft.
  * Seed, Escape-revert and that remount key all read `titleOf` so the three
- * never disagree [#35].
+ * never disagree.
  */
 function NodeNameField({ node }: { node: GraphNode }) {
   const renameNode = useGraphStore((s) => s.renameNode);
@@ -171,7 +171,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
   const node = useGraphStore(
     (s) => s.nodes.find((n) => n.id === effectiveId) ?? null,
   );
-  // [L1/E-4] Raw graph facts for "driven by"/sampler-connection display —
+  // Raw graph facts for "driven by"/sampler-connection display —
   // no derived store, just edges/nodes read straight from graphStore. These
   // only change on real graph edits (add/remove edge, add/remove node), not
   // per-frame uniform drags: dragging a slider bumps `uniformValues` inside
@@ -189,7 +189,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
   const computeNode =
     node?.kind === "compute" ? (node as ComputeGraphNode) : null;
 
-  // [#30] A-1's fullscreen substitution, as already published by the compiler.
+  // The no-mesh fullscreen substitution, as already published by the compiler.
   // Read here (not re-derived from the graph) for the same reason
   // SystemUniformsSection reads it: the substitution rule lives in compile.ts.
   const isFullscreen = usePassPlanStore(
@@ -198,7 +198,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
 
   const specs = useMemo(() => {
     if (shaderNode) {
-      // [#30] Spec the source the compiler actually saw *first*. When no mesh
+      // Spec the source the compiler actually saw *first*. When no mesh
       // resolves, compile.ts replaces this node's vertex source with
       // fullscreen.vert (`if (meshIsFullscreen) vertexSource = fullscreenVert`)
       // and seeds `@default`s from that same pair — but `parseUniforms` keeps
@@ -214,7 +214,8 @@ export function Inspector({ embedded = false }: InspectorProps) {
         `${fullscreenVert}\n${shaderNode.fragmentSource}`,
       );
       // Uniforms only the stored vertex source declares still get a row: they
-      // are exactly what the substitution took away, and [C-1]'s "not bound
+      // are exactly what the substitution took away, and the System
+      // uniforms section's "not bound
       // (fullscreen pass)" note on `u_view`/`u_proj`/`u_model`/`u_camera` is
       // the place that says so. Dropping them would delete the explanation
       // along with the row. They come after the compiled ones, and never
@@ -299,8 +300,8 @@ export function Inspector({ embedded = false }: InspectorProps) {
         <>
           <InspectorNodeHeader node={node} />
 
-          {/* [A-1·A-2] One Name field for every kind — params and groups
-              included. Their old per-kind Label fields are gone. */}
+          {/* One Name field for every kind — params and groups included;
+              there are no per-kind Label fields. */}
           <NodeNameField key={`${node.id}:${titleOf(node)}`} node={node} />
 
           {node.kind === "group" && (
@@ -331,11 +332,11 @@ export function Inspector({ embedded = false }: InspectorProps) {
             <MeshInspectorSection node={node as MeshGraphNode} />
           )}
 
-          {/* [E-3] Image nodes upload through createImageTexture — surface
+          {/* Image nodes upload through createImageTexture — surface
               the actual wrap/filter/mipmap/flip parameters it applies
               (core/gl/texture.ts), not a hand-copied description. The note's
               parameter nouns are interpolated from the same constant as the
-              structured rows (U3: no hand-copied wrap/filter strings that
+              structured rows (no hand-copied wrap/filter strings that
               could contradict the rows if the constant ever changes). */}
           {node.kind === "image" && (
             <TextureParamsSection
@@ -439,12 +440,12 @@ export function Inspector({ embedded = false }: InspectorProps) {
             </div>
           )}
 
-          {/* [E-3] Every shader pass renders into an FBO texture created by
+          {/* Every shader pass renders into an FBO texture created by
               createColorTexture — surface its actual parameters (they differ
               from Image nodes) so "why does the same GLSL look different
               sampling this vs. an Image node" has an answer in the UI. The
               note interpolates FBO_TEXTURE_PARAMS rather than hand-copying
-              the values (U3), so it can never contradict the rows above. */}
+              the values, so it can never contradict the rows above. */}
           {shaderNode && (
             <TextureParamsSection
               title="Output texture (FBO)"
@@ -491,7 +492,8 @@ export function Inspector({ embedded = false }: InspectorProps) {
                       color: "var(--accent-hover)",
                       background: withAlpha(tokens.accent.default, 0.14),
                       border: "1px solid var(--accent-muted)",
-                      // design/Side Panel.dc.html L79: border-radius:4px — no
+                      // design/Side Panel.dc.html Uniforms AUTO badge:
+                      // border-radius:4px — no
                       // tokens.radius entry matches (iconBox is the nearest
                       // at 5), so this one-off badge keeps the literal value.
                       borderRadius: 4,
@@ -537,7 +539,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
                   </div>
                 )}
                 {filteredVisible.map((spec) => {
-                  // [#8] The open-hint-editor marker is scoped to
+                  // The open-hint-editor marker is scoped to
                   // (node, uniform), not to the bare uniform name: two nodes
                   // that both declare `u_time` are different rows, and
                   // selecting the other one used to leave its editor
@@ -546,7 +548,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
                   // `.split(":")`, since node ids come from serialized
                   // projects and may themselves contain ":".
                   const hintKey = `${uniformOwner.id}:${spec.name}`;
-                  // [L1/E-4] A uniform is also an input port (registry.ts
+                  // A uniform is also an input port (registry.ts
                   // shader/compute `inputs()`), so it can be fed by an edge —
                   // and when it is, `bindUserUniforms` (execute.ts) overwrites
                   // this control's value every frame. multi_input validation
@@ -600,7 +602,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
                           >
                             {spec.type}
                           </span>
-                          {/* [L1/E-4] Deliberately not disabled while driven:
+                          {/* Deliberately not disabled while driven:
                               the hint (range/default/label) is a source-level
                               annotation independent of the live edge value, so
                               editing it is still meaningful even though the
@@ -660,7 +662,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
                 <div className="inspector-section">
                   <div className="inspector-label">Sampler inputs</div>
                   {filteredSamplers.map((s) => {
-                    // [L1/E-4] Same (target, targetHandle) lookup as the
+                    // Same (target, targetHandle) lookup as the
                     // uniform rows above — a sampler is a texture-typed input
                     // port (registry.ts), bound by `bindSamplers`
                     // (execute.ts) from the exact same edge shape.
@@ -719,7 +721,7 @@ export function Inspector({ embedded = false }: InspectorProps) {
                 />
               )}
 
-              {/* [A-2, T4] A varying is not a uniform, so `uniformQuery`
+              {/* A varying is not a uniform, so `uniformQuery`
                   (which only filters the uniform/sampler/system rows above)
                   must never hide this section — it's rendered outside every
                   `filtered*`/`noMatches` branch, and unconditionally on

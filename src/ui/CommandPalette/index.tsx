@@ -72,7 +72,7 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // B1: 열기 경로가 둘 — ⌘K toggle과 store.setOpen(true) 직접 호출
+  // 열기 경로가 둘 — ⌘K toggle과 store.setOpen(true) 직접 호출
   // (AppToolbar Search, Welcome "Browse all presets") — 이므로 리셋은
   // open 전이 지점 한 곳에서만 수행한다.
   useEffect(() => {
@@ -108,8 +108,8 @@ export function CommandPalette() {
     setOpen(false);
   };
 
-  // D17/E6 — dc "Command Palette.dc.html" L119-124: 빈 결과일 때
-  // "Create a Shader node named …" CTA. [C-7] Uses the fullscreen-safe starter
+  // dc "Command Palette.dc.html" 빈 결과(No matches) 상태: 빈 결과일 때
+  // "Create a Shader node named …" CTA. Uses the fullscreen-safe starter
   // template, not unlit: a node created here has no mesh input, so compile.ts
   // compiles it against fullscreen.vert (v_uv only) and unlit.frag's
   // `in vec3 v_normal` would fail to link on the very first frame. Unlit stays
@@ -126,7 +126,7 @@ export function CommandPalette() {
         name,
         vertexSource: basicVert,
         fragmentSource: starterFrag,
-        // C-2: no hardcoded seed values — the initial glow color comes from
+        // No hardcoded seed values — the initial glow color comes from
         // starter.frag's `@default` hint, bound by compile.ts's
         // withExplicitDefaults at compile time.
         uniformValues: {},

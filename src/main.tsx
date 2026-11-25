@@ -43,7 +43,7 @@ import { cssVars } from "./theme";
 import { useDockStore } from "./ui/dock/dockStore";
 import { log, normalizeError } from "./utils/log";
 
-// 전역 안전망: 잡히지 않은 에러/거부를 로거에 기록 (Debugging-Plan P2).
+// 전역 안전망: 잡히지 않은 에러/거부를 로거에 기록.
 window.addEventListener("error", (e) => {
   log.error("app", "window.onerror", {
     message: e.message,
@@ -57,7 +57,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 // 디자인 토큰(src/theme.ts 단일 출처)을 :root CSS 변수로 파생 주입.
-// index.css·src/styles/*.css 및 컴포넌트 CSS는 var(--*)만 참조한다 (M0).
+// index.css·src/styles/*.css 및 컴포넌트 CSS는 var(--*)만 참조한다.
 const themeStyle = document.createElement("style");
 themeStyle.id = "sp-theme-vars";
 themeStyle.textContent = `:root {\n${cssVars()}\n}`;
@@ -69,13 +69,13 @@ document.head.appendChild(themeStyle);
 setVideoBlobResolver(getVideoBlob);
 setAudioBlobResolver(getAudioBlob);
 
-// 도킹 레이아웃 하이드레이션(R9) — createRoot 렌더 전에 동기 실행해 기본
+// 도킹 레이아웃 하이드레이션 — createRoot 렌더 전에 동기 실행해 기본
 // 트리 → 저장된 트리로 바뀌는 첫 프레임 플래시를 막는다. 그래프 세션
 // 복구(BootstrapGate의 startAutoSave)와는 별개 — 레이아웃은 recovery
 // 다이얼로그 없이 무조건 즉시 복원된다.
 startDockLayoutPersistence();
 
-// W5 — 노드 선택 → Code 자동 접기/펼침 구동(autoCode 게이트, 기본 ON).
+// 노드 선택 → Code 자동 접기/펼침 구동(autoCode 게이트, 기본 ON).
 startCodeAutoOpen();
 
 if (import.meta.env.DEV) {

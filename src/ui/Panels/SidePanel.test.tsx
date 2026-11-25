@@ -42,7 +42,7 @@ afterEach(() => {
   resetAllStores();
 });
 
-/** B2-U1: SidePanel now reads its collapsed state via `useDockLeaf()` (routed
+/** SidePanel reads its collapsed state via `useDockLeaf()` (routed
  * through `DockPanelHeader`), so every render needs a `DockLeafContext`
  * provider. `l2`/`["b","b","b"]` is the default tree's inspector/assets leaf
  * (`createDefaultDockTree()`). */
@@ -55,7 +55,7 @@ function renderSidePanel() {
 }
 
 describe("SidePanel", () => {
-  // R5 회귀 가드: problems/diagnostics는 도킹 탭이 아니다(상태바 진입
+  // 회귀 가드: problems/diagnostics는 도킹 탭이 아니다(상태바 진입
   // 오버레이, StatusOverlays/StatusBar가 렌더한다) — SidePanel에는 그
   // testid가 존재해선 안 된다.
   it("renders the two dock tabs (inspector/assets) and switches panels on click", () => {
@@ -71,7 +71,7 @@ describe("SidePanel", () => {
     expect(screen.getByTestId("asset-browser-drop")).not.toBeNull();
   });
 
-  // B2-U2: Inspector/Assets 탭 활성 상태는 dockStore leaf.active와 양방향
+  // Inspector/Assets 탭 활성 상태는 dockStore leaf.active와 양방향
   // 동기화된다 — 아래 3건이 그 계약을 고정한다.
   it("clicking the Assets tab updates the dockStore leaf's active tab", () => {
     renderSidePanel();

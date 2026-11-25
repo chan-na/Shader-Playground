@@ -11,13 +11,11 @@ import {
   getNodeAt,
 } from "./tree";
 
-/** 테스트 전용 순회 헬퍼 — 이전엔 `firstLeafPath`(무조건 첫 leaf)로 이
- * 루프들을 구동했지만, v2.0에서 그 함수는 병합 대상만 찾는
- * `firstMergeableLeafPath`로 대체됐다(S5/T1, addPanel 전용). 여기 테스트들은
- * "병합 가능 여부"와 무관하게 트리를 완전히 비울 때까지(또는 전부
- * detach할 때까지) *아무* leaf나 하나 골라 반복하면 되므로, 옛 동작을 그대로
- * 복제한 모듈-로컬 헬퍼를 둔다(프로덕션 export가 아니므로 knip 대상이
- * 아니다). */
+/** 테스트 전용 순회 헬퍼 — 프로덕션에는 병합 대상만 찾는
+ * `firstMergeableLeafPath`(addPanel 전용)뿐이다. 여기 테스트들은 "병합 가능
+ * 여부"와 무관하게 트리를 완전히 비울 때까지(또는 전부 detach할 때까지)
+ * *아무* leaf나 하나 골라 반복하면 되므로 모듈-로컬 헬퍼를 둔다(프로덕션
+ * export가 아니므로 knip 대상이 아니다). */
 function anyLeafPath(node: DockNode | null): DockPath | null {
   if (node === null) return null;
   if (node.type === "leaf") return [];
@@ -300,7 +298,7 @@ describe("addPanel", () => {
   it("re-docks a closed panel by merging into the nodeEditor leaf — T1 skips the exclusive code leaf (l4) even though it's in-order first", () => {
     useDockStore.getState().closeTab("assets");
     useDockStore.getState().addPanel("assets");
-    // root.a (l4, code) fails the T1 merge gate (assets ∪ code contains the
+    // root.a (l4, code) fails the exclusive-kind merge gate (assets ∪ code contains the
     // exclusive "code" kind and neither side is a solo match), so
     // firstMergeableLeafPath walks past it to root.b.a (l3, nodeEditor).
     expect(nodeAt(useDockStore.getState().tree, ["a"])).toEqual({
@@ -341,8 +339,9 @@ describe("addPanel", () => {
     expect(useDockStore.getState().nextLeafId).toBe(6);
   });
 
-  // 2026-07 리뷰 #22 — 재도킹된 패널이 최대화 오버레이에 가려질 때만
-  // maximized를 해제한다(정본 X3의 의도적 예외).
+  // 재도킹된 패널이 최대화 오버레이에 가려질 때만 maximized를 해제한다
+  // (디자인 규칙 "무관한 최대화 패널은 안 풀림"의 의도적 예외 — 그대로 두면
+  // 재오픈한 패널이 보이지 않아 유실처럼 보인다).
   describe("maximized interaction (#22)", () => {
     it("clears maximized when the panel merges into a leaf that is NOT the maximized one", () => {
       useDockStore.getState().toggleMaximized("l1"); // viewport leaf
@@ -539,7 +538,7 @@ describe("dockDetached", () => {
       zone: "center",
       path: ["b", "b", "b"],
     };
-    // "inspector" is a non-exclusive kind (T1 only gates viewport/code), so
+    // "inspector" is a non-exclusive kind (the merge gate only covers viewport/code), so
     // this exercises the plain tab-merge path.
     useDockStore.getState().detachForDrag({ mode: "tab", id: "inspector" });
     useDockStore.getState().dockDetached(["inspector"], "inspector", target);

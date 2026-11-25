@@ -1,11 +1,12 @@
-// [D6] Crash fallback is INTENTIONALLY token/webfont-independent: it must
+// Crash fallback is INTENTIONALLY token/webfont-independent: it must
 // render even when cssVars() injection or webfont loading failed. The neutral
 // greys + system-ui here are BY DESIGN, not a tokenization gap — see
-// design/README.md §도메인 규칙, design/System States.dc.html L427-446.
+// design/README.md "크래시 폴백(ErrorBoundary) 예외" and the crash-fallback
+// state in design/System States.dc.html.
 //
 // The two *branded* colors — the Reload CTA (accent.default) and the '!' error
-// accent (semantic.error) — reference theme.ts as JS constants [A-7]. That is
-// still D6-compliant: a JS constant is interpolated at build time and inlined
+// accent (semantic.error) — reference theme.ts as JS constants. That is
+// still within the exception: a JS constant is interpolated at build time and inlined
 // into the bundle, so it survives a cssVars() injection failure, whereas a
 // `var(--error)` would not. This keeps the screen tracking the token if
 // semantic.error ever changes, without taking a runtime dependency on it.
@@ -36,8 +37,8 @@ const CONTENT_STYLE: CSSProperties = {
   color: "#dddddd",
 };
 
-// '!' 에러 액센트는 semantic.error를 빌드타임 보간해 추적한다 [A-7] — 런타임
-// CSS var 의존은 회피(위 D6 주석 참조). 박스의 중립 그레이는 토큰 비의존 유지.
+// '!' 에러 액센트는 semantic.error를 빌드타임 보간해 추적한다 — 런타임
+// CSS var 의존은 회피(파일 머리 주석 참조). 박스의 중립 그레이는 토큰 비의존 유지.
 const ICON_BOX_STYLE: CSSProperties = {
   width: 44,
   height: 44,
@@ -86,8 +87,8 @@ const ACTIONS_STYLE: CSSProperties = {
   justifyContent: "center",
 };
 
-// Sole theme reference on this screen (README §도메인 규칙 [D6]: "액센트 버튼
-// 색만 accent.default 유지"). Radius is the dc-literal 6, not
+// Sole theme reference on this screen (design/README.md crash-fallback
+// exception: "액센트 버튼 색만 accent.default 유지"). Radius is the dc-literal 6, not
 // tokens.radius.button (7) — this screen is a documented token exception.
 const RELOAD_BUTTON_STYLE: CSSProperties = {
   height: 36,
@@ -138,7 +139,7 @@ interface ErrorBoundaryState {
 
 /**
  * 렌더 트리에서 잡히지 않은 에러를 백지 화면 대신 최소 복구 UI로 표면화한다.
- * 에러는 로거에 남겨 진단 패널/콘솔에서 추적 가능하게 한다 (Debugging-Plan P2).
+ * 에러는 로거에 남겨 진단 패널/콘솔에서 추적 가능하게 한다.
  */
 export class ErrorBoundary extends Component<
   ErrorBoundaryProps,

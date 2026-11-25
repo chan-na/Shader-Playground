@@ -125,7 +125,7 @@ describe("rendererStore", () => {
     expect(useRendererStore.getState().contextUnavailable).toBe(false);
   });
 
-  // Snapshot request (#3). The Viewport RAF loop reads `snapshotRequested` to
+  // Snapshot request. The Viewport RAF loop reads `snapshotRequested` to
   // force one draw past the idle gate, then consumes the flag right after
   // executePlan. Both halves depend on the one-shot semantics below.
   //
@@ -133,13 +133,13 @@ describe("rendererStore", () => {
   // effect (true after createGLContext succeeds, false in its cleanup), so these
   // tests arm it explicitly to stand in for a mounted Viewport. The
   // module-level beforeEach leaves it false on purpose: that is the
-  // panel-closed state, which F1's guard has to refuse.
+  // panel-closed state, which the `ready` guard has to refuse.
   describe("snapshot request", () => {
     beforeEach(() => {
       useRendererStore.getState().setReady(true);
       // A *visible* Viewport: the outer beforeEach leaves `canvasSize` at the
       // store's 1×1 default, which is also the shape `resize()` produces for a
-      // `display:none` canvas — and which the F21 guard below refuses. Every
+      // `display:none` canvas — and which the 1×1-floor guard below refuses. Every
       // case in here is about the request's lifetime, not its visibility, so
       // give them a real drawing buffer to work against.
       useRendererStore.getState().setCanvasSize({ width: 800, height: 600 });
@@ -186,7 +186,7 @@ describe("rendererStore", () => {
       expect(useRendererStore.getState()).toBe(before);
     });
 
-    // F1. `snapshotRequested` must never survive a Viewport lifetime boundary:
+    // `snapshotRequested` must never survive a Viewport lifetime boundary:
     // the flag has exactly one server, so a request that outlives the loop that
     // was meant to serve it fires on the *next* mount — an unrequested PNG
     // download. Two windows let that happen, and both are closed here.
@@ -204,7 +204,7 @@ describe("rendererStore", () => {
         expect(useRendererStore.getState()).toBe(before);
       });
 
-      // W2 — the reported bug: File ▸ Snap PNG pressed with the Viewport panel
+      // First window — the reported bug: File ▸ Snap PNG pressed with the Viewport panel
       // closed. Remounting the panel must not download anything.
       it("armed while unmounted → nothing pending for the next mount", () => {
         useRendererStore.getState().setReady(false); // panel closed
@@ -216,7 +216,7 @@ describe("rendererStore", () => {
         );
       });
 
-      // W1 — armed while mounted, then torn down before the next RAF tick could
+      // Second window — armed while mounted, then torn down before the next RAF tick could
       // serve it. The effect cleanup consumes the request (see Viewport's
       // cleanup); this pins the store half of that contract.
       it("armed then torn down → the cleanup's consume leaves nothing pending", () => {
@@ -232,7 +232,7 @@ describe("rendererStore", () => {
       });
     });
 
-    // F21. `ready` says the loop is alive, not that anything is on screen. A
+    // `ready` says the loop is alive, not that anything is on screen. A
     // collapsed rail / maximised sibling hides the Viewport with `display:none`
     // while it stays mounted, so `resize()` floors the drawing buffer at 1×1
     // and the capture yielded a 1×1 PNG — no error, no warning, just a useless

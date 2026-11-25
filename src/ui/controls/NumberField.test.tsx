@@ -11,7 +11,7 @@ afterEach(() => {
  * Stand-in for the real callers (UniformControl / ParamInspector /
  * MultiSlider): they feed the field a *formatted* string derived from the
  * value it last committed. Without that loop a local draft would look like it
- * works while the actual regression (#14) — the commit bouncing a formatted
+ * works while the actual regression — the commit bouncing a formatted
  * number back down and clobbering the in-progress text — goes untested.
  */
 function Controlled({
@@ -59,7 +59,7 @@ describe("NumberField", () => {
     expect(received).toBe(3.25);
   });
 
-  // [#14] Contract change, deliberate: this used to assert `received === 0`
+  // Contract change, deliberate: this used to assert `received === 0`
   // ("commits 0 for a non-numeric input"). That semantic was an artifact of
   // `parseFloat(x) || 0` and is exactly the defect — an in-progress entry
   // pushed 0 into the store, which came back as "0.000" and erased what was
@@ -84,7 +84,7 @@ describe("NumberField", () => {
     expect(spin().style.width).toBe("48px");
   });
 
-  // [L1/E-4] Driven-uniform disable. The real protection is the native
+  // Driven-uniform disable. The real protection is the native
   // `disabled` attribute — browsers refuse user keystrokes/drags on a
   // disabled input — so that's what this asserts; `fireEvent.change` bypasses
   // real user interaction entirely (it sets `.value` and dispatches
@@ -101,7 +101,7 @@ describe("NumberField", () => {
   });
 });
 
-// [#14] `<input type="number">` runs the HTML value-sanitization algorithm:
+// `<input type="number">` runs the HTML value-sanitization algorithm:
 // while the text is not a valid floating-point number the `value` IDL
 // attribute reads back as "". So "-" and "0." both reach the change handler
 // as "" — and the whole point of the draft is that we echo that "" back

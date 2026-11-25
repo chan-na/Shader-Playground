@@ -7,8 +7,8 @@ export interface StageTabsProps {
   fragmentHasError: boolean;
   /**
    * True when the selected node's mesh input didn't resolve and the
-   * compiler substituted fullscreen.vert for its vertex stage (A-1,
-   * passPlanStore.fullscreenByNode). Swaps the vertex tab's label to name
+   * compiler substituted fullscreen.vert for its vertex stage
+   * (passPlanStore.fullscreenByNode). Swaps the vertex tab's label to name
    * the source that's actually compiled, instead of implying a
    * `vertex.glsl` document that isn't the one running.
    */

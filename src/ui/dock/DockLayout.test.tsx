@@ -17,11 +17,11 @@ import {
   findTabLeafPath,
 } from "./tree";
 
-/** 테스트 전용 순회 헬퍼 — v2.0에서 프로덕션의 `firstLeafPath`(무조건 첫
- * leaf)는 병합 대상만 찾는 `firstMergeableLeafPath`(addPanel 전용, S5/T1)로
- * 대체됐다. 아래 "닫힐 때까지 반복" 루프는 병합 가능 여부와 무관하게 *아무*
- * leaf나 하나 골라 반복하면 충분하므로, 옛 동작을 그대로 복제한
- * 모듈-로컬 헬퍼를 둔다(프로덕션 export가 아니므로 knip 대상이 아니다). */
+/** 테스트 전용 순회 헬퍼 — 프로덕션에는 병합 대상만 찾는
+ * `firstMergeableLeafPath`(addPanel 전용)뿐이다. 아래 "닫힐 때까지 반복"
+ * 루프는 병합 가능 여부와 무관하게 *아무* leaf나 하나 골라 반복하면
+ * 충분하므로 모듈-로컬 헬퍼를 둔다(프로덕션 export가 아니므로 knip 대상이
+ * 아니다). */
 function anyLeafPath(node: DockNode | null): DockPath | null {
   if (node === null) return null;
   if (node.type === "leaf") return [];
@@ -32,7 +32,7 @@ function anyLeafPath(node: DockNode | null): DockPath | null {
 // The 4 panel components DockLayout renders are heavy (WebGL canvas,
 // CodeMirror, ReactFlow) and already covered by their own test suites —
 // stub them so this file only exercises the tree→DOM layout logic. The
-// NodeEditor stub additionally consumes `useDockDragStart` (B4-U3) to expose
+// NodeEditor stub additionally consumes `useDockDragStart` to expose
 // a `startTabDrag` trigger button — `dockDragContext` isn't the module being
 // mocked here, so importing it directly inside this factory is fine (it
 // isn't itself subject to `vi.mock` hoisting rules the way `./NodeEditor`
@@ -156,9 +156,9 @@ describe("DockLayout", () => {
 
     const empty = screen.getByTestId("dock-empty");
     expect(empty).not.toBeNull();
-    // Exact R1 copy — v1.3's "drop a floating panel here" was superseded by
-    // v1.4 R1 (floating removed entirely); a mismatch here is a regression
-    // to the stale copy, not just a wording nit.
+    // Exact design copy — floating panels don't exist, so the empty state
+    // must point at ＋ Panel; any older "drop a floating panel" wording is a
+    // regression, not just a wording nit.
     expect(
       screen.getByText("No panels docked — add one with ＋ Panel"),
     ).not.toBeNull();
@@ -173,7 +173,7 @@ describe("DockLayout", () => {
     const { rerender } = render(<DockLayout />);
 
     // Repeatedly close whatever leaf is currently first — this drives the
-    // store through the same closePanel calls the dock header ✕ (R6) will
+    // store through the same closePanel calls the dock header ✕ will
     // issue, rather than just setting tree:null directly, so it exercises
     // removePanel's tree-collapsing logic all the way to null.
     act(() => {
@@ -229,7 +229,7 @@ describe("DockLayout", () => {
   });
 });
 
-// B4-U3: drag engine (pending → ghost transition, ghost tracking, drop
+// Drag engine (pending → ghost transition, ghost tracking, drop
 // preview, release). The stub `<button data-testid="stub-drag-tab">` inside
 // the mocked NodeEditor calls `startTabDrag("nodeEditor", e)` on
 // pointerdown — every scenario below drives a real pointerdown on that
@@ -320,7 +320,7 @@ describe("DockLayout drag engine (B4-U3)", () => {
 
     expect(screen.getByTestId("dock-drag-ghost")).not.toBeNull();
     // nodeEditor is no longer hosted by any leaf — it now lives only in the
-    // transient ghost, not the tree (R1: floating is never a resting state,
+    // transient ghost, not the tree (floating is never a resting state,
     // but *while dragging* it is legitimately detached from the tree).
     expect(findTabLeafPath(useDockStore.getState().tree, "nodeEditor")).toBe(
       null,
@@ -376,13 +376,13 @@ describe("DockLayout drag engine (B4-U3)", () => {
     const codePath = findTabLeafPath(tree, "code");
     expect(nodeEditorPath).not.toBeNull();
     expect(codePath).not.toBeNull();
-    // T1 (v2.0): the fallback target's leaf is the code leaf (exclusive) —
+    // The fallback target's leaf is the code leaf (exclusive kind) —
     // nodeEditor can't merge into it (canMergeDockTabs), so
     // insertDetachedLeaf splits instead of merging. The two panels end up
     // as split siblings, not sharing a single leaf — but neither is lost.
     expect(nodeEditorPath).not.toEqual(codePath);
-    // the two are split siblings under the same parent path (T1's
-    // right-split fallback geometry) — no panel lost.
+    // the two are split siblings under the same parent path (the
+    // exclusive-merge right-split fallback geometry) — no panel lost.
     expect(nodeEditorPath?.slice(0, -1)).toEqual(codePath?.slice(0, -1));
     expect(collectPanelIds(tree)).toHaveLength(DOCK_PANEL_IDS.length);
     for (const id of DOCK_PANEL_IDS) {
@@ -391,7 +391,7 @@ describe("DockLayout drag engine (B4-U3)", () => {
   });
 });
 
-// R11: compact(≤990px, C-6 임계 재사용) 도킹 비활성 — 고정 세로 스택 폴백.
+// compact(≤990px, 뷰포트 컴팩트 임계 재사용) 도킹 비활성 — 고정 세로 스택 폴백.
 // jsdom은 `window.matchMedia`를 아예 구현하지 않는다(위 모든 테스트가 이미
 // 그 경로를 탄다 — `typeof window.matchMedia !== "function"` → snapshot
 // false, 즉 compact=false 취급). 여기서만 페이크 MediaQueryList를 심어

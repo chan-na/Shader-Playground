@@ -40,11 +40,11 @@ function overlaps(view: FlowRect, r: FlowRect): boolean {
  *
  * Every add path (AddNodePill, CommandPalette) drops its node at a fixed flow
  * coordinate near the origin. While the editor refit itself after every
- * structural edit that was invisible; since [#38] restricted the refit to
+ * structural edit that was invisible; since `graphEpoch` restricted the refit to
  * wholesale replacements, adding a node after panning away lands it outside
  * the viewport with no feedback at all. This is the visibility half of that
- * fix: the *caller* pans (never zooms — re-framing is precisely what #38
- * removed), and only when there is nothing to see otherwise.
+ * fix: the *caller* pans (never zooms — re-framing is precisely what that
+ * change removed), and only when there is nothing to see otherwise.
  *
  * Module-local: `addedPanDecision` is the one entry point the editor calls, so
  * that the decision it makes and the decision the tests make are the same code.

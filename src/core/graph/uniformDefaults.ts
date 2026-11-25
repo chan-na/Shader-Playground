@@ -1,16 +1,17 @@
 import { inspectorUniforms, parseUniforms } from "./uniformParser";
 
 /**
- * C-2: seeds a compiled pass's `uniformValues` from GLSL `@default` hints.
+ * Seeds a compiled pass's `uniformValues` from GLSL `@default` hints
+ * (`docs/learnability-plan-2026-08.md` C-2).
  *
  * Invariant (must hold for every caller): **stored value > GLSL `@default` >
  * GL zero.** A brand-new Shader/Compute node is created with
- * `uniformValues: {}` — no hardcoded seed values live in node-creation code
- * anymore (that was the actual "system secretly injects a value" bug this
- * unit removes). Its visible defaults come entirely from `@default` hints
- * declared in the shader source. An already-stored value (loaded project,
- * autosave, share URL, or a demo's intentional art direction) must keep
- * winning exactly as before — this function's `{ ...seeded, ...stored }`
+ * `uniformValues: {}` — no hardcoded seed values live in node-creation code,
+ * so the system never secretly injects a value. Its visible defaults come
+ * entirely from `@default` hints declared in the shader source. An
+ * already-stored value (loaded project, autosave, share URL, or a demo's
+ * intentional art direction) must always win — this function's
+ * `{ ...seeded, ...stored }`
  * spread order is what guarantees that.
  *
  * Two call sites, two shapes:
@@ -27,8 +28,8 @@ import { inspectorUniforms, parseUniforms } from "./uniformParser";
  * Only uniforms with `hasExplicitDefault` are seeded — the name-based
  * heuristic defaults (`defaultRangeFor`) are deliberately excluded. Binding
  * those too would silently change every existing project's unannotated
- * color-named uniforms from GL's zero default to white, which is a much
- * larger behavior change than C-2 set out to make.
+ * color-named uniforms from GL's zero default to white — a silent behavior
+ * change for existing work.
  */
 export function withExplicitDefaults(
   source: string,

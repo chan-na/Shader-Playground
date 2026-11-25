@@ -22,7 +22,7 @@ const ERROR_DASHARRAY = "5 5";
  * correct across re-renders as ports change, e.g. shader uniform edits).
  *
  * - Source node or its named output port can't be found → muted fallback
- *   (design/Node Editor.dc.html L344 레퍼런스의 "타입 정보 없음" 등가 상태).
+ *   (design/Node Editor.dc.html 레퍼런스의 "타입 정보 없음" 등가 상태).
  * - Target node/port missing, or its type doesn't match the source → the
  *   edge is invalid (most commonly a uniform deleted out from under a
  *   connected shader input) → semantic.error dashed.

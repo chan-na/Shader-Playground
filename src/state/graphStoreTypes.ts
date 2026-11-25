@@ -32,7 +32,7 @@ export interface GraphState {
    * (undo/redo). Incremental edits (add node, wire an edge, type in a shader)
    * bump `rev` but leave this alone.
    *
-   * The node editor refits its viewport on this counter [#38]: keying the
+   * The node editor refits its viewport on this counter: keying the
    * refit on `rev` re-framed and animated the canvas after *every* structural
    * edit, so the view jumped away while the user was still working. Node count
    * is not a usable proxy either — the demo graph and `trivialMeshGraph()`
@@ -55,7 +55,7 @@ export interface GraphState {
   cloneNode: (id: string) => string | null;
   removeNode: (id: string) => void;
   /**
-   * Set a node's user-facing display name [D15·A-2]. Trimmed and clamped to
+   * Set a node's user-facing display name. Trimmed and clamped to
    * `SANITIZE_LIMITS.MAX_NODE_NAME_LEN` (256). An empty result after
    * trimming removes the `name` property (falls back to the registry's
    * default display name) rather than storing `""`. No-op (no history push)
@@ -78,9 +78,9 @@ export interface GraphState {
   /**
    * Replace one or both GLSL stages of a ShaderNode.
    *
-   * `rename` is the F2 refactor's exact old→new uniform pair. Pass it whenever
-   * the patch is a rename: the node's port surface only shows "one port left,
-   * another appeared", and without the pair the reconcile falls back to
+   * `rename` is the editor F2-rename's exact old→new uniform pair. Pass it
+   * whenever the patch is a rename: the node's port surface only shows "one
+   * port left, another appeared", and without the pair the reconcile falls back to
    * inferring it from the surface (see `applyPortRename`). The pair is
    * validated against the new surface, so a hint for a non-uniform symbol is
    * simply ignored.

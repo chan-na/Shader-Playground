@@ -13,14 +13,14 @@ const DEFAULT_TINT = tokens.nodeCategory.container;
 /**
  * Editor pane for a group node. Surfaces color editing and the two destructive
  * removal modes (release vs. cascade); renaming lives in the Inspector's common
- * Name field [A-2]. Per-node delete via Backspace bypasses this panel and uses
+ * Name field. Per-node delete via Backspace bypasses this panel and uses
  * `removeNode`, which already orphans direct children without cascading.
  */
 export function GroupInspector({ node }: { node: GroupGraphNode }) {
   const setGroupColor = useGraphStore((s) => s.setGroupColor);
   const removeGroup = useGraphStore((s) => s.removeGroup);
   const select = useSelectionStore((s) => s.select);
-  // [#25] Which group the confirm box is armed for — not a bare boolean.
+  // Which group the confirm box is armed for — not a bare boolean.
   // The Inspector renders this panel unkeyed, so selecting a different group
   // reuses the same component instance and a boolean would carry the armed
   // state over: the new group's panel would open already showing "Permanently
@@ -42,7 +42,7 @@ export function GroupInspector({ node }: { node: GroupGraphNode }) {
     >
       <div className="inspector-label">Group</div>
 
-      {/* [A-2] No Group label field — the common Name field (Inspector.tsx)
+      {/* No Group label field — the common Name field (Inspector.tsx)
           renames groups too, routing into `label` via renameNode. */}
 
       <div style={{ marginBottom: 15 }}>

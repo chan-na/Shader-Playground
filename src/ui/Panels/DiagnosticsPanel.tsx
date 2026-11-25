@@ -25,13 +25,13 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 3,
 };
 
-// dc L402 표시 순서 (design/Side Panel.dc.html diagFilterDefs) — this array
+// dc 표시 순서 (design/App Shell.dc.html 진단 오버레이 헤더 필터칩) — this array
 // only drives the <option> list below; LEVEL_ORDER's cumulative filter
 // semantics are unaffected by display order.
 const LEVELS: LogLevel[] = ["info", "warn", "error", "debug"];
 
-// [R13/Q9] 누적 의미 오독 방지 — 라벨 정본은 design/Side Panel.dc.html L402
-// (All/Info+/Warn+/Error+/Debug+). 라벨·표시 순서만 dc를 따르고, option의
+// 누적 의미 오독 방지 — 라벨 정본은 design/App Shell.dc.html 진단 오버레이
+// 헤더 필터칩 (All/Info+/Warn+/Error+/Debug+). 라벨·표시 순서만 dc를 따르고, option의
 // value와 LEVEL_ORDER 필터 로직(누적)은 불변.
 const LEVEL_OPTION_LABEL: Record<LogLevel, string> = {
   info: "Info+",
@@ -50,10 +50,9 @@ const CATEGORIES: LogCategory[] = [
 ];
 
 /**
- * Level tag colors (design/Side Panel.dc.html L391-395, diagLog hex/bg/bd).
- * [A-5] The dc pixel values are canonical where they conflict with the README
- * §E D1 rule ("level color = semantic + text.muted") — v1.2 resolved the one
- * README-vs-dc contradiction in favor of the dc and restated the rule as:
+ * Level tag colors (the dc diagnostics log's per-level hex/bg/bd).
+ * The dc pixel values are canonical where they conflict with design/README.md
+ * §E's "level color = semantic + text.muted" rule; the resolved rule is
  * INFO = accent.hover · WARN = warning · ERROR = error · DEBUG = text.secondary.
  * So INFO/DEBUG intentionally do NOT use semantic.info/text.muted here.
  */
@@ -72,16 +71,16 @@ const LEVEL_STYLE: Record<
     borderColor: withAlpha(tokens.semantic.warning, 0.3),
   },
   info: {
-    // dc fg (L391) = accent.hover, canonical over the semantic.info rule [A-5].
+    // dc INFO fg = accent.hover, canonical over the semantic.info rule.
     color: "var(--accent-hover)",
     background: withAlpha(tokens.semantic.info, 0.1),
-    // dc bd (L391) matches tokens.accent.muted exactly.
+    // dc INFO bd matches tokens.accent.muted exactly.
     borderColor: tokens.accent.muted,
   },
   debug: {
-    // dc fg (L395) = text.secondary, canonical over the text.muted rule [A-5].
+    // dc DEBUG fg = text.secondary, canonical over the text.muted rule.
     color: "var(--text-secondary)",
-    // dc bg (L395, #0e1013) has no matching token — surface.app 근사 승인 [B-8].
+    // dc DEBUG bg (#0e1013) has no matching token — surface.app 근사(승인됨).
     background: "var(--surface-app)",
     borderColor: "var(--border-default)",
   },
@@ -119,8 +118,8 @@ async function copyDiagnostics(): Promise<void> {
   }
 }
 
-// X12(§v2.1): 2×2 메트릭 카드 제거 — 메트릭은 오버레이의 DiagnosticsMetricStrip이
-// 유일 경로. 이 패널은 상태바 오버레이 전용(런타임 로그 + 필터 툴바).
+// 메트릭은 오버레이의 DiagnosticsMetricStrip이 유일 경로(이 패널엔 메트릭
+// 카드가 없다). 이 패널은 상태바 오버레이 전용(런타임 로그 + 필터 툴바).
 export function DiagnosticsPanel() {
   const setOpen = useDebugUiStore((s) => s.setOpen);
   const levelFilter = useDebugUiStore((s) => s.levelFilter);
@@ -271,8 +270,8 @@ export function DiagnosticsPanel() {
                     fontWeight: 600,
                     color: levelStyle.color,
                     background: levelStyle.background,
-                    // dc L232 radius 4 — no exact token; approximated with
-                    // iconBox (5), same D11 precedent. Followup logged.
+                    // dc level-tag radius 4 — no exact token; approximated
+                    // with iconBox (5), the nearest radius token.
                     borderRadius: tokens.radius.iconBox,
                     border: `1px solid ${levelStyle.borderColor}`,
                     padding: "1px 5px",
@@ -294,8 +293,8 @@ export function DiagnosticsPanel() {
                     whiteSpace: "pre-wrap",
                   }}
                 >
-                  {/* 카테고리 접두(gl/shader/mem)가 v1.2에서 dc에 정식 추가됐다
-                      — text.muted 색도 dc와 일치 [C-9]. */}
+                  {/* 카테고리 접두(gl/shader/mem)는 dc 정본 — text.muted 색도
+                      dc와 일치. */}
                   <span style={{ color: "var(--text-muted)" }}>
                     {e.category}
                   </span>
@@ -305,8 +304,8 @@ export function DiagnosticsPanel() {
                   style={{
                     fontFamily: "var(--font-mono)",
                     fontSize: 9,
-                    // dc time column fg (L391-395, #565e68)에 대응 토큰이 없어
-                    // text.muted로 근사 — 근사 5건 일괄 승인 [B-8].
+                    // dc time column fg (#565e68)에 대응 토큰이 없어
+                    // text.muted로 근사(승인됨).
                     color: "var(--text-muted)",
                     flexShrink: 0,
                   }}

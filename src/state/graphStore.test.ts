@@ -831,7 +831,7 @@ void main(){}`,
       expect(useHistoryStore.getState().past.length).toBe(pastLength);
     });
 
-    // [A-2] Groups now rename through this same path (the Inspector shows one
+    // Groups rename through this same path (the Inspector shows one
     // common Name field for every kind) — but the value lands in `label`, the
     // group's single source, never in a competing `name`.
     it("routes a group rename into label, leaving name unset", () => {
@@ -1502,7 +1502,7 @@ void main(){}`,
     });
   });
 
-  // [#38] The node editor refits its viewport on `graphEpoch`. The counter is
+  // The node editor refits its viewport on `graphEpoch`. The counter is
   // only useful if it separates "a different graph is now loaded" from "the
   // user edited the graph they are looking at" — every assertion below pins
   // one side of that split.

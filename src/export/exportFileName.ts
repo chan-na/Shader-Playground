@@ -1,15 +1,16 @@
 /**
- * Export 파일명 규칙 [D16] — design/README.md §H · Export & Share.dc.html L548-552.
+ * Export 파일명 규칙 — design/README.md §H · Export & Share.dc.html
+ * (`renderVals()`의 done 상태 `projectSlug`/`stamp` 파일명 조립).
  * `{projectTitle-slug}-{YYYYMMDD-HHMM}.{ext}` — 다운로드가 서로 덮어쓰지 않고,
  * 완료 카드/토스트 표시명 = 실제 저장명이 보장되도록 이름 생성을 한 곳으로 모은다.
  */
-export const DEFAULT_EXPORT_BASE = "untitled-project"; // dc L549
+export const DEFAULT_EXPORT_BASE = "untitled-project"; // dc `projectSlug` 폴백
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-/** dc L550의 "20260714-1532" 포맷 — 로컬 시간 YYYYMMDD-HHMM. */
+/** dc `stamp`의 "20260714-1532" 포맷 — 로컬 시간 YYYYMMDD-HHMM. */
 function formatExportTimestamp(date: Date): string {
   return `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}-${pad2(date.getHours())}${pad2(date.getMinutes())}`;
 }

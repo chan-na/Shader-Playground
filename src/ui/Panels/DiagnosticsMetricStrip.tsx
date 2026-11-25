@@ -4,13 +4,12 @@ import { useRendererStore } from "../../state/rendererStore";
 import { diagnosticsMetricValues } from "./diagnosticsTab";
 
 /**
- * 진단 오버레이 전용 단일 행 메트릭 스트립 (S7 · T3/T4,
- * design/App Shell.dc.html L419-424). 값은 diagnosticsMetricValues
- * 단일 출처 — X12(§v2.1)로 2×2 카드가 제거되어 이 스트립이 유일한 메트릭
- * 표면이다. 별도 컴포넌트인 이유: stats 틱 구독 리렌더를 스트립에 격리
+ * 진단 오버레이 전용 단일 행 메트릭 스트립 (design/App Shell.dc.html
+ * "DIAGNOSTICS / PROBLEMS OVERLAY"의 26px 메트릭 행). 값은
+ * diagnosticsMetricValues 단일 출처이며 이 스트립이 유일한 메트릭 표면이다.
+ * 별도 컴포넌트인 이유: stats 틱 구독 리렌더를 스트립에 격리
  * (StatusOverlays 전체 리렌더 방지).
- * dc 값 표기와의 의도적 차이(GPU=renderer 문자열, Frame=ms·fps 병기)는
- * temp/design-followup-v2.0.md 기록.
+ * dc 값 표기와의 의도적 차이: GPU=renderer 문자열, Frame=ms·fps 병기.
  */
 export function DiagnosticsMetricStrip() {
   const glInfo = useRendererStore((s) => s.glInfo);

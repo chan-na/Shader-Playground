@@ -72,7 +72,7 @@ describe("NODE_CATEGORY_OF / categoryHexFor", () => {
 });
 
 /** 13종 GraphNodeKind 전수 → 헤더 아이콘 박스 글리프. design/Node Editor.dc.html
- * L371-382 renderVals()의 cats[].nodes[].glyph 전수. */
+ * renderVals()의 cats[].nodes[].glyph 전수. */
 describe("NODE_GLYPH", () => {
   const kinds = Object.keys(EXPECTED_CATEGORY) as GraphNodeKind[];
 

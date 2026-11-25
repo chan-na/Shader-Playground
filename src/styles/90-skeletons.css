@@ -1,5 +1,6 @@
 /* ── Bootstrap loading skeletons (design/System States.dc.html "loading"
-   state, M7-U1) — graph-skeleton (L122-133) + panel-skeleton (L332-341).
+   state) — graph-skeleton ("graph: SKELETON") + panel-skeleton ("panel:
+   SKELETON").
    These are the one exception to "no looping animation" outside recording/
    error/selection/compile states (see WelcomeOverlay.tsx's welcome-glow
    comment): sp-shimmer/sp-spin only ever run while GraphSkeleton/
@@ -7,11 +8,10 @@
    app boot and BootstrapGate resolving the graph (phase "init"/"prompt") —
    never once phase is "done". That's a real, bounded loading transition,
    the same category as the recording pulse (es-rec-pulse) and encode spinner
-   already in this file, not a decorative idle animation.
-   [v1.1 D4] .graph-skeleton-status is a canvas-center floating pill, not
-   bottom-left — bottom-left is the zoom controls' (− % + fit) permanent
-   spot and would collide (dc System States.dc.html L131, CHANGELOG v1.1
-   D4). */
+   in 80-export-share.css, not a decorative idle animation.
+   .graph-skeleton-status is a canvas-center floating pill, not bottom-left —
+   bottom-left is the zoom controls' (− % + fit) permanent spot and would
+   collide (dc System States.dc.html "graph: SKELETON"). */
 @keyframes sp-shimmer {
   0% {
     background-position: -420px 0;
@@ -75,17 +75,18 @@
   align-items: center;
   gap: 9px;
   /* dc rgba(11,12,14,0.82) == tokens.surface.app (#0b0c0e) at 82% alpha;
-     color-mix pattern follows the existing .cmdk-overlay convention above. */
+     color-mix pattern follows the .cmdk-overlay convention
+     (40-command-palette.css). */
   background: color-mix(in srgb, var(--surface-app) 82%, transparent);
   border: 1px solid var(--border-default);
-  /* dc 실측 10px이 radius.floatingPill로 정본화 — radius.overlay(9) 근사를
-     대체 [B-6·X14]. */
+  /* dc 실측 10px = radius.floatingPill. */
   border-radius: var(--radius-floating-pill);
   padding: 9px 14px;
-  /* literal blur, matches .modal-scrim (L3181) — blur isn't tokenized. */
+  /* literal blur, matches .modal-scrim (93-modals.css) — blur isn't
+     tokenized. */
   backdrop-filter: blur(6px);
-  /* dc 실측 blur 24가 shadow.floatingPill로 정본화 — shadow.nodeCard(blur 20)
-     근사를 대체. nodeCard와 같은 offset/alpha 패밀리 [B-6·X14]. */
+  /* dc 실측 blur 24 = shadow.floatingPill (nodeCard와 같은 offset/alpha
+     패밀리). */
   box-shadow: var(--shadow-floating-pill);
   font-family: var(--font-mono);
   font-size: 11px;

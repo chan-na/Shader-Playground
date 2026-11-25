@@ -205,7 +205,7 @@ describe("PortHandle — shape recipe (todo D1)", () => {
 });
 
 /**
- * [C-3] Multi-port vertical rhythm. The property that matters is containment:
+ * Multi-port vertical rhythm. The property that matters is containment:
  * a uniform-driven card gains one port per uniform, and no port may fall
  * outside the card — that overflow (4th port escaping the fixed 144px card) is
  * exactly what this rule was raised to fix.
@@ -239,9 +239,9 @@ describe("multi-port card geometry [C-3]", () => {
   });
 
   it("regression: a 5-port shader no longer overflows the old fixed 144px card", () => {
-    // Pre-C-3 the card was header+pad+96+pad = 144 regardless of port count.
-    // The request doc says overflow starts at the 4th port, but that figure is
-    // in the dc's geometry (port 0 at top:64). In this implementation port 0
+    // Previously the card was header+pad+96+pad = 144 regardless of port
+    // count. The design request placed the overflow at the 4th port, but that
+    // figure is in the dc's geometry (port 0 at top:64). In this implementation port 0
     // sits at PORT_TOP_PAD(38), so 4 ports still fit (139 <= 144) and the 5th
     // is the first to escape — hence 5, not 4, is the regression case here.
     expect(lastPortBottom(4)).toBeLessThanOrEqual(144);

@@ -26,14 +26,14 @@ import type { ComputeGraphNode, Graph, ShaderGraphNode } from "./types";
 // objects); every draw/state call is a no-op we can spy on. This exercises the
 // ping-pong swap, compute-mesh VAO selection, sampler binding, composite vs
 // placeholder branch, and dispose — none of which had unit coverage before (the
-// full pipeline is otherwise only covered by Playwright + SwiftShader). (L35)
+// full pipeline is otherwise only covered by Playwright + SwiftShader).
 
 function makeGl(): WebGL2RenderingContext {
   // The fullscreen quad needs `a_position`; compute passes read `a_pos`. All
   // sampler/system uniforms the tests touch must be "active" so getUniformLocation
   // resolves them.
   // `u_mouse` must be listed or getUniformLocation never resolves it and the
-  // pass-space transform assertions below would silently check nothing (#19).
+  // pass-space transform assertions below would silently check nothing.
   return createFakeGl({
     attributes: ["a_position", "a_pos"],
     uniforms: ["u_time", "u_resolution", "u_src", "u_mouse"],
@@ -527,7 +527,7 @@ describe("executePlan — render state (E-2)", () => {
     const disable = vi.spyOn(gl, "disable");
     executePlan(gl, plan, frameCtx(graph), 32, 32);
 
-    // L4: blend/cull are always off — neither is exposed as a node/port yet.
+    // Blend/cull are always off — neither is exposed as a node/port yet.
     // One disable(BLEND)/disable(CULL_FACE) call per shader pass (2 passes).
     expect(disable.mock.calls.filter((c) => c[0] === gl.BLEND)).toHaveLength(2);
     expect(
@@ -544,7 +544,7 @@ describe("executePlan — render state (E-2)", () => {
   });
 });
 
-// C-1 cross-check. `ui/Panels/systemUniformStatus.ts` re-declares this file's
+// Cross-check: `ui/Panels/systemUniformStatus.ts` re-declares this file's
 // binding rules (VIEW_DEPENDENT / COMPUTE_BOUND) so the Inspector can tell the
 // user which system uniforms *this* frame's draw actually sets. Nothing joined
 // the two copies: every other test here activates only u_time/u_resolution/
@@ -672,7 +672,7 @@ describe("executePlan — system uniforms match the Inspector table (C-1)", () =
   });
 });
 
-// C-2 regression guard: the Viewport hot-patches
+// Regression guard: the Viewport hot-patches
 // `pass.uniformValues = node.uniformValues` on every RAF tick, *before* the
 // first executePlan. When compile.ts merged `@default` seeds directly into
 // `pass.uniformValues`, that assignment clobbered them — the seed never

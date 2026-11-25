@@ -1,12 +1,13 @@
-/* ── Empty-graph onboarding (design/System States.dc.html L104-119,
-   "graph: EMPTY" state, M7-U2) — GraphEmptyState.tsx. Sits in the same
+/* ── Empty-graph onboarding (design/System States.dc.html
+   "graph: EMPTY" state) — GraphEmptyState.tsx. Sits in the same
    NodeEditor .panel-body slot as .graph-skeleton/.welcome-overlay, once
    WelcomeOverlay's "Start blank" has been clicked. Root is pointer-events:
    none (only .graph-empty-content re-enables it for the two buttons) so
    canvas pan/zoom still passes through everywhere else — the opposite of
    .welcome-overlay, which has nothing behind it worth reaching. No looping
-   animation on the icon halo (dc's ssBreathe) per CLAUDE.md's "상시 애니메이션
-   금지" policy — same reasoning as .welcome-brand-halo above. */
+   animation on the icon halo (dc's ssBreathe) per design/README.md's Motion
+   rule "상시 애니메이션 금지" — same reasoning as .welcome-brand-halo
+   (70-welcome.css). */
 .graph-empty-state {
   position: absolute;
   inset: 0;

@@ -12,7 +12,7 @@ import {
  * `createImageTexture` (REPEAT + mipmap + flip-Y), while every Shader node's
  * FBO output texture is created by `createColorTexture`
  * (CLAMP_TO_EDGE, no mipmap, no flip) — the same GLSL sampling one vs. the
- * other can produce a different result (L2). This spec pins that both facts
+ * other can produce a different result. This spec pins that both facts
  * are readable in the Inspector, derived from `core/gl/texture.ts`'s
  * constants rather than a hand-copied string.
  */

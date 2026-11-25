@@ -292,8 +292,8 @@ describe("CodeEditor document switch (#1a)", () => {
 });
 
 /**
- * F22 — a project imported with CRLF line endings used to make the graph redo
- * stack unreachable.
+ * A project imported with CRLF line endings used to make the graph redo stack
+ * unreachable.
  *
  * The store carried CRLF verbatim while CodeMirror normalises every document it
  * holds to LF, so the two could never compare equal. Undoing back across the
@@ -408,7 +408,7 @@ describe("CodeEditor F2 rename target (#10)", () => {
     expect(node("shader1").fragmentSource).toBe(renamed(FRAG_U));
     expect(node("shader1").vertexSource).toBe(renamed(VERT_U));
     // The visible doc was rewritten in the same turn, so the reload effect's
-    // M11 guard leaves the cursor alone instead of re-loading from the store.
+    // same-document guard leaves the cursor alone instead of re-loading from the store.
     expect(view().state.doc.toString()).toBe(renamed(FRAG_U));
   });
 
@@ -442,7 +442,7 @@ describe("CodeEditor F2 rename target (#10)", () => {
 });
 
 /**
- * A-1 — the vertex tab shows fullscreen.vert verbatim and is read-only for
+ * Auto-vertex — the vertex tab shows fullscreen.vert verbatim and is read-only for
  * any node `passPlanStore.fullscreenByNode` marks fullscreen (the mesh
  * input didn't resolve, so the compiler substituted it), and reverts the
  * instant that record says otherwise — no reselection required.
@@ -497,8 +497,8 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
     expect(applied).toBe(true);
     await settle();
     // The fullscreen.vert text the tab showed a moment ago must never have
-    // reached the store as this node's "real" vertexSource (A-1 commit
-    // guard) — only the just-typed edit did.
+    // reached the store as this node's "real" vertexSource (auto-vertex
+    // commit guard) — only the just-typed edit did.
     expect(node("shader1").vertexSource.includes(fullscreenVert)).toBe(false);
   });
 
@@ -564,7 +564,7 @@ describe("CodeEditor — A-1 auto-vertex readOnly", () => {
     // Cmd+Z: both swaps were dispatched with addToHistory(false), so there
     // is nothing to undo. Without that annotation this pops the
     // fullscreen.vert→VERT replacement, and the 50ms commit then passes the
-    // A-1 guard (the plan already says "not fullscreen") and writes
+    // auto-vertex guard (the plan already says "not fullscreen") and writes
     // fullscreen.vert into the store as shader1's real vertexSource.
     let applied = true;
     act(() => {

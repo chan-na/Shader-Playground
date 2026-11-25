@@ -42,9 +42,7 @@ export interface FrameContext {
   /**
    * Full graph snapshot. This is the *only* source for upstream value
    * resolution: math/swizzle/combine utility nodes depend on their inbound
-   * edges, so a per-node value map keyed by id could never describe them. A
-   * `params` field that carried exactly that map used to sit alongside this
-   * one; nothing ever read it, so it is gone. (#39)
+   * edges, so a per-node value map keyed by id could never describe them.
    */
   graph?: Graph;
 }
@@ -64,7 +62,7 @@ const _mouse: [number, number, number, number] = [0, 0, 0, 0];
  * allow-list and *not* "anything that isn't GL_FLOAT": SAMPLER_2D (0x8B5E) is
  * also non-float but is uploaded by `bindSamplers` as a texture unit, and BOOL
  * (0x8B56) legally accepts a float upload in GLES3 — routing either through the
- * integer entry points would break working shaders. (#11)
+ * integer entry points would break working shaders.
  */
 const INT_UNIFORM_TYPES = new Set([0x1404, 0x8b53, 0x8b54, 0x8b55]);
 
@@ -80,7 +78,7 @@ function roundAt(v: number[] | Float32Array, i: number): number {
  * uniforms and user uniforms all land here. Resolves the location *and* the
  * program's reflected GLSL type by name, so a shader that declares
  * `uniform int u_frame;` (or an `ivec2` user uniform) gets `uniform*i` instead
- * of a silent INVALID_OPERATION from `uniform*f`. (#11)
+ * of a silent INVALID_OPERATION from `uniform*f`.
  */
 function setTypedUniform(
   gl: WebGL2RenderingContext,
@@ -149,8 +147,8 @@ function bindSystemUniforms(
   // `ctx.mouse` is in canvas/plan framebuffer pixels, but `u_resolution` is the
   // *pass* size — a pass rendering at resolutionScale < 1 would otherwise see a
   // pointer far outside its own frame, so `u_mouse.xy / u_resolution` (the
-  // Shadertoy idiom) blew past 1.0. Rescale per axis; x/z ride the width ratio,
-  // y/w the height ratio. Scales are 1 for full-resolution passes. (#19)
+  // Shadertoy idiom) would blow past 1.0. Rescale per axis; x/z ride the width
+  // ratio, y/w the height ratio. Scales are 1 for full-resolution passes.
   const m: [number, number, number, number] = ctx.mouse ?? [0, 0, 0, 0];
   const mx = pass.width / Math.max(1, ctx.width);
   const my = pass.height / Math.max(1, ctx.height);
@@ -192,12 +190,12 @@ function bindUserUniforms(
   ctx: FrameContext,
   resolveCache: Map<string, Value>,
 ) {
-  // Build an effective uniform map. The spread order encodes the C-2
-  // invariant **stored value > GLSL `@default` > GL zero** (param edges then
-  // override both, below): `seededDefaults` is a separate pass field
-  // precisely because the Viewport hot-patches
-  // `pass.uniformValues = node.uniformValues` every frame — a seed merged
-  // into `uniformValues` at compile time never survived to the first draw.
+  // Build an effective uniform map. The spread order encodes the invariant
+  // **stored value > GLSL `@default` > GL zero** (param edges then override
+  // both, below): `seededDefaults` is a separate pass field precisely
+  // because the Viewport hot-patches `pass.uniformValues = node.uniformValues`
+  // every frame — a seed merged into `uniformValues` at compile time would
+  // never survive to the first draw.
   const effective: Record<string, UniformValue> = {
     ...pass.seededDefaults,
     ...pass.uniformValues,
@@ -258,7 +256,7 @@ function bindSamplers(
       // draw left bound (a stale-texture ghost). External sources mid-
       // acquisition (webcam/video/audio) and not-yet-loaded images are left
       // unbound instead: forcing black for the frame or two before their first
-      // upload would be a more visible artifact than a brief stale frame. (L5)
+      // upload would be a more visible artifact than a brief stale frame.
       const srcNode = ctx.graph?.nodes.find((n) => n.id === s.sourceNodeId);
       if (
         srcNode &&
@@ -327,8 +325,8 @@ export function executePlan(
   canvasHeight: number,
   gpuTimer?: GpuTimerPool | null,
 ) {
-  // Node lookups are cached on the plan at compile time (L23) — rebuilding them
-  // every frame was pure allocation on the RAF hot path.
+  // Node lookups are cached on the plan at compile time — rebuilding them
+  // every frame would be pure allocation on the RAF hot path.
   const { passByNode, shaderPassByNode } = plan;
 
   // One resolver cache per frame so fan-out utility nodes are evaluated once.
@@ -350,18 +348,10 @@ export function executePlan(
     gl.viewport(0, 0, pass.width, pass.height);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    // Render state (blend/cull/depth) is centralized in renderState.ts (E-2)
-    // so this loop and the Pass Inspector's `State` column read the same
-    // function instead of the UI hand-copying this branch as a string. A
-    // BLEND-disabling call now runs explicitly every pass — no behavior
-    // change (blending has never been turned on anywhere in this codebase),
-    // just an explicit state write in place of relying on the WebGL default.
-    // Note blend-off does NOT mean `outColor.a` is discarded: the alpha is
-    // written into this pass's FBO (downstream samplers read it back), and
-    // the composite below carries it to the default framebuffer, where the
-    // canvas context (`alpha:true` default, premultipliedAlpha:false — see
-    // core/gl/context.ts) hands it to the browser's page compositor. See
-    // renderState.ts's module doc for the measured behavior.
+    // Render state (blend/cull/depth) comes from renderState.ts so this loop
+    // and the Pass Inspector's `State` column read the same function. Blend
+    // is always off, but `outColor.a` is NOT discarded — the alpha reaches
+    // the page compositor; see renderState.ts's module doc.
     applyRenderState(gl, renderStateFor(pass.meshIsFullscreen));
     gl.useProgram(pass.program.program);
     bindSystemUniforms(gl, pass, ctx);
@@ -451,7 +441,7 @@ interface CompositeState {
 let _composite: CompositeState | null = null;
 
 // A 1×1 opaque-black texture bound in place of a sampler source whose
-// shader/compute pass failed to compile (L5). Module-cached like the composite
+// shader/compute pass failed to compile. Module-cached like the composite
 // pipeline and invalidated on context loss via resetComposite.
 let _blankTexture: WebGLTexture | null = null;
 
@@ -481,7 +471,7 @@ export function resetComposite(gl: WebGL2RenderingContext | null): void {
 /**
  * Lazily build (and cache) a 1×1 opaque-black texture. Bound to a sampler unit
  * whose source render node failed to compile so the unit shows black instead of
- * ghosting whatever texture the previous draw left bound there. (L5)
+ * ghosting whatever texture the previous draw left bound there.
  */
 function ensureBlankTexture(gl: WebGL2RenderingContext): WebGLTexture {
   if (_blankTexture) return _blankTexture;

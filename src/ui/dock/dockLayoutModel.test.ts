@@ -225,11 +225,10 @@ describe("collapsesToRail", () => {
   });
 });
 
-// req1 (dc `_buildPanel`'s `collapseIcon`, App Shell.dc.html L800-801,
-// 821-823): the collapse chevron is decided by *position* (parent split
-// dir + a/b side), not panel kind. All 8 combinations, exercised on the
-// v2.0 default tree where possible (code=row-a, nodeEditor=row-a,
-// viewport=col-a, sidePanel=col-b) plus a custom row split for the row-b
+// dc `_buildPanel`'s `collapseIcon` (App Shell.dc.html): the collapse
+// chevron is decided by *position* (parent split dir + a/b side), not panel
+// kind. All 8 combinations, exercised on the default tree where possible
+// (code=row-a, nodeEditor=row-a, viewport=col-a, sidePanel=col-b) plus a custom row split for the row-b
 // cases the default tree has no leaf at.
 describe("collapseChevron", () => {
   const rowSplit: DockSplit = {
@@ -304,7 +303,7 @@ describe("splitterLabel", () => {
   });
 });
 
-// B4-U3: dc `onMove`'s pending-drag ghost-size clamp (L398-406) — leaf mode
+// dc `onMove`'s pending-drag ghost-size clamp — leaf mode
 // clamps 92% of the source region to 320~540 × 220~440, tab mode clamps 85%
 // to 300~460 × 200~360; a null region (defensive — no source region found)
 // falls back to a fixed size per mode.

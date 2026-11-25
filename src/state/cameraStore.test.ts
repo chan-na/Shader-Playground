@@ -26,7 +26,7 @@ describe("cameraStore", () => {
   });
 
   // The Viewport GL boot effect mirrors external camera writes back into the
-  // CameraController through exactly this call shape (#6). zustand 5 dropped
+  // CameraController through exactly this call shape. zustand 5 dropped
   // the `subscribe(selector, listener)` overload, so a two-argument call would
   // silently treat the selector as the listener and never deliver the state.
   it("subscribe delivers the whole state to a single listener argument", () => {

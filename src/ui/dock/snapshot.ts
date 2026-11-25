@@ -7,17 +7,17 @@ import {
 } from "./tree";
 
 // ============================================================
-// 레이아웃 스냅샷 영속화 검증 (R9, B6-U1)
-// 정본: `design/CHANGELOG.md` §v1.4 R9 — "레이아웃 = 사용자 작업 환경 →
-// localStorage에 저장, 프로젝트 `.json`은 미포함(마이그레이션 회피)". 이
-// 절의 `sanitizeDockLayoutSnapshot`은 dc 이식이 아니라 그 결정을 뒷받침하는
+// 레이아웃 스냅샷 영속화 검증
+// 디자인 결정: 레이아웃 = 사용자 작업 환경 → localStorage에 저장, 프로젝트
+// `.json`에는 미포함(마이그레이션 회피). 이 절의
+// `sanitizeDockLayoutSnapshot`은 dc 이식이 아니라 그 결정을 뒷받침하는
 // 구현 전용 방어 계층이다 — localStorage는 손상/구버전/수동 편집을 허용하는
 // 신뢰 불가 입력이므로, 하이드레이션 전 반드시 이 함수를 거친다.
 // ============================================================
 
-/** localStorage에 저장/복원되는 도킹 레이아웃 스냅샷(R9). `tree: null`도
+/** localStorage에 저장/복원되는 도킹 레이아웃 스냅샷. `tree: null`도
  * 유효한 사용자 상태다 — 모든 패널을 닫은 empty state 역시 보존 대상인
- * "사용자 작업 환경"이기 때문(위 절 머리의 R9 주석 참조). `autoSave.ts`의
+ * "사용자 작업 환경"이기 때문(위 절 머리 주석 참조). `autoSave.ts`의
  * `loadDockLayout`/`saveDockLayout`이 이 형태로 직렬화한다. */
 export interface DockLayoutSnapshot {
   version: 2;
@@ -37,7 +37,7 @@ function isDockPanelId(v: unknown): v is DockPanelId {
 /** 트리 전체에서 `l<숫자>` 패턴 leaf id의 최대 접미사를 찾는다(없으면 0).
  * `sanitizeDockLayoutSnapshot`의 `nextLeafId` 정규화가 재로드 후
  * `dockDetached`가 발급할 `l${nextLeafId}`이 기존 leaf id와 충돌하지 않도록
- * 이 값 + 1을 하한으로 쓴다(`dockStore.ts`의 `DockState.nextLeafId` 주석의 R9 준비 사항). */
+ * 이 값 + 1을 하한으로 쓴다(`dockStore.ts`의 `DockState.nextLeafId` 주석 참조). */
 function maxLeafIdSuffix(node: DockNode | null): number {
   if (node === null) return 0;
   if (node.type === "leaf") {
@@ -118,12 +118,12 @@ function sanitizeDockNode(
 
 /**
  * localStorage에서 읽은 원시값을 `DockLayoutSnapshot`으로 검증·정규화한다.
- * 정본: `design/CHANGELOG.md` §v1.4 R9. **하나라도 어긋나면 `null`** —
+ * **하나라도 어긋나면 `null`** —
  * 호출측(`autoSave.ts`의 `loadDockLayout`)이 조용히 기본 트리로 폴백한다.
  *
- * V4(v2.0, 조용한 폴백): `version`이 `2`로 범프됐다 — 옛 `version:1`
- * 스냅샷(v1.x 트리 형태)은 이 게이트에서 즉시 `null`이 되어, 배너/경고 없이
- * `createDefaultDockTree()`(v2.0 트리)로 조용히 대체된다(CHANGELOG §v2.0 V4).
+ * 조용한 폴백: 기본 레이아웃 재설계 때 `version`을 `2`로 범프했다 — 옛
+ * `version:1` 스냅샷(구 트리 형태)은 이 게이트에서 즉시 `null`이 되어,
+ * 배너/경고 없이 `createDefaultDockTree()`로 조용히 대체된다.
  *
  * 검증 순서:
  * 1. `raw`가 non-null object(배열 아님)이고 `version === 2`.

@@ -13,8 +13,8 @@ export interface SelectFieldProps {
 }
 
 /**
- * Native `<select>` skinned per design/Side Panel.dc.html L115 (u_blendMode)
- * / L138 (webcam device) / L167 (output resolution). Kept as a real
+ * Native `<select>` skinned per design/Side Panel.dc.html's selects
+ * (u_blendMode, webcam Device, output Resolution). Kept as a real
  * `<select>` — not a custom listbox — so Playwright's `selectOption()` keeps
  * working against `data-testid="resolution-scale"` (phase-17).
  */

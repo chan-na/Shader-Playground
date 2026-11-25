@@ -17,10 +17,10 @@ export interface SliderProps {
   step: number;
   onChange: (v: number) => void;
   /** Renders the min/max caption row below the track (design/Side
-   * Panel.dc.html L86). */
+   * Panel.dc.html "float slider"). */
   showRange?: boolean;
-  /** "sm" switches the track to the 5px multi-axis height (L107-108)
-   * instead of the primary 6px slider (L85). */
+  /** "sm" switches the track to the 5px multi-axis height (dc "vec2
+   * multi-axis") instead of the primary 6px slider (dc "float slider"). */
   size?: "md" | "sm";
   /** Per-axis fill color override (MultiSlider's AXIS_META). Falls back
    * to var(--accent-default) via the CSS custom property default. */

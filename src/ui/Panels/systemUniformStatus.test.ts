@@ -67,7 +67,7 @@ describe("systemUniformBinding", () => {
     });
   });
 
-  // [#10] A node whose program failed to build is dropped from the plan's
+  // A node whose program failed to build is dropped from the plan's
   // passes (compile.ts `continue`s before `passes.push`) but keeps its
   // `fullscreenByNode` entry — and a shader error is not fatal validation, so
   // the rest of the plan is still published. Nothing runs for that node, so
@@ -93,8 +93,8 @@ describe("systemUniformBinding", () => {
     // Both reasons are true at once when a fullscreen-substituted program
     // fails to link (the default demo's unlit.frag does exactly that: it reads
     // a varying fullscreen.vert never emits). The substitution is the
-    // actionable one, so it keeps the note — phase-36's C-1 spec asserts that
-    // exact string after disconnecting the mesh.
+    // actionable one, so it keeps the note — phase-36's system-uniforms spec
+    // asserts that exact string after disconnecting the mesh.
     it("keeps the fullscreen note for view-dependent names", () => {
       expect(systemUniformBinding("u_view", "shader", true, false)).toEqual({
         bound: false,

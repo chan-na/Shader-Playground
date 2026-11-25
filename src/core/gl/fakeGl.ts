@@ -15,7 +15,7 @@ interface FakeGlOptions {
   /**
    * GLSL type enum reported by getActiveUniform, keyed by the same name as it
    * appears in `uniforms`. Purely additive — names not listed here keep
-   * reporting FLOAT, so existing `uniforms`-only callers are unaffected. (#11)
+   * reporting FLOAT, so existing `uniforms`-only callers are unaffected.
    */
   uniformTypes?: Record<string, number>;
   /** Force linkProgram to report failure. */
@@ -83,10 +83,9 @@ const CONSTANTS = {
   TRANSFORM_FEEDBACK_BUFFER: 35982,
   SEPARATE_ATTRIBS: 35981,
   RASTERIZER_DISCARD: 35977,
-  // Render-state enums (E-2): previously absent, so `gl.enable`/`gl.disable`
-  // calls using them received `undefined` — harmless against the `noop`
-  // implementations here, but it meant `vi.spyOn(gl, "enable")` assertions
-  // couldn't distinguish "which state" was toggled.
+  // Render-state enums: without them `gl.enable`/`gl.disable` calls receive
+  // `undefined`, so `vi.spyOn(gl, "enable")` assertions couldn't distinguish
+  // which state was toggled.
   DEPTH_TEST: 2929,
   CULL_FACE: 2884,
   BLEND: 3042,

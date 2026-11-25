@@ -330,7 +330,7 @@ describe("video specs", () => {
     expect(getExternalTexture("v1")).toBeNull();
   });
 
-  // --- #26: 'loadeddata' must honour the live spec, not the acquire-time one.
+  // --- 'loadeddata' must honour the live spec, not the acquire-time one.
   // Decoding takes long enough that the user can pause or scrub while the file
   // is still loading; the deferred onReady used to replay the stale snapshot
   // and undo them.

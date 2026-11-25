@@ -56,11 +56,9 @@ test.describe("Phase 12 — resilience & expressiveness", () => {
       )
       .toBeGreaterThan(0);
 
-    // R5: problems is a status-bar-triggered bottom overlay, not a Side
-    // Panel tab — `tab-problems` no longer exists (SidePanel/
-    // DockPanelHeader legacy problems/diagnostics tabs were removed). Assert
-    // the status bar surfaces the count (new-path signal) before opening,
-    // then confirm the overlay itself mounts on click.
+    // Problems is a status-bar-triggered bottom overlay, not a Side Panel
+    // tab. Assert the status bar surfaces the count before opening, then
+    // confirm the overlay itself mounts on click.
     await expect(page.getByTestId("status-problems")).toHaveText(
       /\d+ problems?/,
     );

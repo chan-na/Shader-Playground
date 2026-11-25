@@ -1,20 +1,18 @@
-/* ── Width-collapsed rail (M1-U2 fix, B3-U1 derivation update) ────────────
+/* ── Width-collapsed rail ─────────────────────────────────────────────────
    A leaf collapses to a 34px *width* strip (instead of a 34px *height*
-   strip) whenever its direct parent split runs row-direction — in the v2.0
-   default tree that's `.shell-code` (root row's left child), not
-   `.shell-left`/Node Editor as it was pre-v2.0. Left as a horizontal row,
-   the header's spacer + maximize/collapse/close buttons would be pushed
+   strip) whenever its direct parent split runs row-direction — in the
+   default tree that's `.shell-code` (root row's left child). Left as a
+   horizontal row, the header's spacer + maximize/collapse/close buttons
+   would be pushed
    past the 34px strip and clipped by the panel's overflow:hidden —
    unclickable by a real pointer even though the DOM node is technically
    present. Stack the header vertically instead so the restore button stays
    inside the strip's own bounds. Whether a given collapsed leaf gets this
-   class is no longer a `collapsedRail` prop — it's derived from the tree
-   (`dockLayoutModel.collapsesToRail`, B3-U1), so it keeps tracking whichever
-   leaf sits under a row-direction parent, position not panel kind, with V2:
-   zero new logic needed here. X17-b (v2.1): the rail was v2.0 chrome-only
-   (grip only) — promoted here to the dc-specified full interior (panel dot +
-   vertical title·meta label + error dot when applicable), App
-   Shell.dc.html L109-117. */
+   class is derived from the tree (`dockLayoutModel.collapsesToRail`), so it
+   tracks whichever leaf sits under a row-direction parent — position, not
+   panel kind. Interior per dc: panel dot + vertical title·meta label +
+   error dot when applicable (design/App Shell.dc.html "collapsed vertical
+   rail"). */
 .dock-header--rail {
   flex-direction: column;
   flex: 1 1 auto;
@@ -23,7 +21,7 @@
   gap: 10px;
 }
 
-/* X17-b 세로 라벨 — App Shell.dc.html L114 정본. writing-mode vertical-rl
+/* 레일 세로 라벨 — App Shell.dc.html `p.railLabel` 정본. writing-mode vertical-rl
    + rotate(180deg)로 아래→위 읽기. #9aa2ac = text.secondary 정확 일치. */
 .dock-rail-label {
   flex: 1;
@@ -40,7 +38,7 @@
   letter-spacing: 0.4px;
   white-space: nowrap;
 }
-/* X17-b code 컴파일 에러 dot — App Shell.dc.html L115 정본.
+/* 레일 code 컴파일 에러 dot — App Shell.dc.html `p.railErr` 정본.
    #f0555c = semantic.error 정확 일치(글로우 포함). */
 .dock-rail-error-dot {
   width: 7px;
@@ -52,7 +50,7 @@
 }
 
 .inspector-section {
-  /* design/Side Panel.dc.html L78 (Uniforms hero section padding). */
+  /* design/Side Panel.dc.html (Inspector section padding). */
   padding: 13px 14px;
   border-bottom: 1px solid var(--border-header-divider);
 }
@@ -75,13 +73,9 @@
   margin: 6px 0;
 }
 
-/* Note: .inspector-row previously carried raw `input[type="range"|"number"|
- * "color"]` child skins for the inspectors' pre-M5 native inputs. M5-U1/U2/U3
- * moved every one of those onto the shared controls library (Slider /
- * NumberField / ColorField, controls.css), which ships its own `.ctl-*`
- * classes one level further in (wrapped in the control's own root element,
- * no longer a direct child of `.inspector-row`) — so those rules were
- * removed rather than left dead. */
+/* Note: inspector inputs are skinned by the shared controls library
+ * (Slider / NumberField / ColorField, src/ui/controls/controls.css `.ctl-*`),
+ * not by `.inspector-row` child selectors. */
 
 .inspector-empty {
   color: var(--text-muted);
@@ -145,7 +139,7 @@
 }
 
 /* ── Side-panel tabs (rendered inside DockPanelHeader's children slot,
-   Side Panel.dc.html L47-49, M5-U5 reskin) ──────────────────────────── */
+   design/Side Panel.dc.html dock header tabs) ───────────────────────── */
 .panel-tab {
   background: transparent;
   border: none;
@@ -163,18 +157,18 @@
 .panel-tab:hover {
   color: var(--text-bright-body);
 }
-/* R8: dc tabStyle(L536) flex-shrink:0 + title span white-space:nowrap(L87)
-   이식 — 없으면 flexbox가 스크롤 대신 탭을 찌그러뜨리거나 줄바꿈해 34px
+/* dc `tabStyle` flex-shrink:0 + title span white-space:nowrap(App Shell
+   dock 탭) 이식 — 없으면 flexbox가 스크롤 대신 탭을 찌그러뜨리거나 줄바꿈해 34px
    높이가 깨진다. `.dock-header-tabs` 안쪽으로 스코프해 SidePanel의
    problems/diagnostics `children` 탭(DockPanelHeader.tsx가 그리는
    `.dock-header-tabs` 밖, `children` 슬롯에 렌더됨)에는 영향 없음. */
 .dock-header-tabs .panel-tab {
   flex-shrink: 0;
   white-space: nowrap;
-  /* R10: pointer*만 쓰는 드래그(마우스+터치/펜)의 네이티브 스크롤/제스처
+  /* pointer*만 쓰는 드래그(마우스+터치/펜)의 네이티브 스크롤/제스처
      개입 방지 — 탭 드래그 시작 후보(pointerdown)다. */
   touch-action: none;
-  /* dc L535 tabStyle cursor:grab(B4-U4 배선 완료) — SidePanel의 레거시
+  /* dc `tabStyle` cursor:grab — SidePanel의 레거시
      오버레이 탭(`children` 슬롯, `.dock-header-tabs` 밖)에는 영향 없도록
      이 스코프로 한정. */
   cursor: grab;
@@ -188,7 +182,7 @@
   font-family: var(--font-mono);
   background: var(--surface-hover);
   color: var(--text-primary);
-  /* design/Side Panel.dc.html L49: border-radius:8px — no tokens.radius
+  /* design/Side Panel.dc.html tab badge: border-radius:8px — no tokens.radius
      entry matches (chip is the nearest at 6); same one-off precedent as
      AssetBrowser.tsx's asset tag / Inspector.tsx's AUTO badge. */
   border-radius: 8px;
@@ -206,7 +200,7 @@
   color: var(--text-primary);
 }
 /* Red badge specifically for the problems tab when it has issues.
-   design/Side Panel.dc.html L49 uses #fff for this badge's text, but the
+   design/Side Panel.dc.html uses #fff for this badge's text, but the
    design's own text scale only defines text.primary/brightBody/secondary/
    muted/disabled — text.primary (#e7eaee) is the closest in-system token,
    so the badge foreground is derived from it rather than a raw #fff. */
@@ -216,28 +210,18 @@
   color: var(--text-primary);
 }
 
-/* ── Code editor stage-tab sub-strip (v2.0 — moved out of DockPanelHeader's
-   children slot into the Code panel's own body, `CodeEditor/index.tsx`,
-   design/CHANGELOG.md §v2.0 Changed: "vertex/fragment 스테이지 탭을 본문
-   하위 스트립으로 이동"). At the v2.0 25%-width Code column the dock
-   header alone (grab + `[● Code ✕]` tab + `GLSL · ES 3.0` meta +
-   collapse/maximize/close, ~359px available) already fills the row — the
-   stage tabs + node breadcrumb chip used to share that same row and pushed
-   the trailing icon buttons past the panel's right edge, clipped by
-   `.panel`'s `overflow: hidden` (unreachable by a real pointer even though
-   the DOM node was technically present). A direct `.panel` child, so the
-   existing collapsed-rail rule (`.shell-slot--collapsed .panel > :not(.dock-
-   header)` above) hides it along with the editor body automatically.
-   Z2(§v2.2/X15): padding restored to the docking-header canonical 0 12px for
-   visual continuity with `.dock-header` above. An earlier M3 fix had tightened
-   this to 0 8px because at 1440×900 the toggle clipped ~29px (toggle right edge
-   387.6px vs strip right edge 358.25px, the longer "Auto-open: OFF" label
-   clipping further). That clip is now recovered two independent ways: X2
-   shortened the label `Auto-open:`→`Auto:` (~6 chars ≈ the 29px), and Z1's
-   two-stage shrink (`.code-stage-strip-meta` flex-shrink:100000 yields to 0
-   first, then the toggle's flex-shrink:1 + min-width:0 with an ellipsis label)
-   makes a hard clip structurally impossible at any width. Height stays 34px
-   (dc's 30px would also need `.stage-tab`'s height shrunk, out of scope). */
+/* ── Code editor stage-tab sub-strip (Code panel body, `CodeEditor/
+   index.tsx`) ── Lives in the body, not the dock header: at the default
+   25%-width Code column the dock header alone (~359px) is already full, and
+   sharing the row pushed the trailing icon buttons past `.panel`'s
+   `overflow: hidden` (present in the DOM but unclickable). As a direct
+   `.panel` child, the collapsed-slot rule (`.shell-slot--collapsed .panel >
+   :not(.dock-header)`, 20-dock-shell.css) hides it with the editor body.
+   Padding 0 12px matches `.dock-header` for visual continuity; the short
+   `Auto:` label plus the two-stage shrink (`.code-stage-strip-meta` yields
+   to 0 first, then the toggle ellipsizes) make a hard clip impossible at any
+   width. Height stays 34px (dc's 30px would also need `.stage-tab`'s height
+   shrunk). */
 .code-stage-strip {
   display: flex;
   align-items: center;
@@ -284,10 +268,9 @@
   box-shadow: 0 0 6px var(--error);
 }
 
-/* M3 regression fix — wraps the divider + NodeBreadcrumb pair (CodeEditor/
-   index.tsx) as a single flex item of `.code-stage-strip`, replacing the
-   bare `<>...</>` fragment they used to render as (2 direct strip children).
-   `.stage-tabs` hits its own min-content floor (two single-token labels,
+/* Wraps the divider + NodeBreadcrumb pair (CodeEditor/index.tsx) as a
+   single flex item of `.code-stage-strip`. `.stage-tabs` hits its own
+   min-content floor (two single-token labels,
    "vertex.glsl"/"fragment.glsl", can't wrap) well before the strip runs out
    of room, so this pair is the primary remaining slack in the row. Giving
    *this wrapper* (not just the breadcrumb chip inside it) `min-width:0`
@@ -295,10 +278,9 @@
    floor-ing at the divider's 1px + the chip's own padding/border (~19px) —
    and `overflow:hidden` clips whatever of the divider/chip's content still
    wants to render at that point cleanly (no stray icon/text spilling into
-   the toggle's space). Un-wrapped, this pair used to survive at a fixed
-   ~19-30px even when there was no room left for it, which was exactly the
-   slack the toggle needed back.
-   X2 — `flex-shrink:100000;` (below) makes this wrapper shrink far more
+   the toggle's space). Un-wrapped, the pair would survive at a fixed
+   ~19-30px even with no room left — exactly the slack the toggle needs.
+   `flex-shrink:100000;` (below) makes this wrapper shrink far more
    aggressively than `.code-auto-toggle` (shrink:1): meta is squeezed to 0
    *first*, and only once that slack is exhausted does the toggle (and its
    label) start giving up width. */
@@ -308,18 +290,18 @@
   gap: 10px;
   min-width: 0;
   overflow: hidden;
-  /* X2 — 토글(shrink:1)보다 압도적 우선으로 양보: meta가 0까지 소진된
+  /* 토글(shrink:1)보다 압도적 우선으로 양보: meta가 0까지 소진된
      극한 폭에서만 토글 라벨이 ellipsis 된다. */
   flex-shrink: 100000;
 }
 
-/* W5 — Code 헤더 Auto-open 토글 (App Shell.dc.html L959-962). dc hex →
-   토큰 매핑: #2b6fe0=accent-active · #1c3452=accent-muted · #7dbcff=
-   accent-bright(S26) · #20242a=border-default · #1a1d22=surface-card ·
-   #9aa2ac=text-secondary · dot #3d9bff=accent-default · #454c55=
-   text-disabled. glow rgba(61,155,255,.6)는 color-mix 60% 근사(기존
-   L1091+ 관례). radius 6 = var(--radius-chip).
-   [X2] 라벨 'Auto-open: ON/OFF' → 'Auto: ON/OFF' 단축(CHANGELOG §v2.1). */
+/* Code 스트립 Auto-open 토글 (App Shell.dc.html `autoCodeHdrStyle`/
+   `autoCodeDot`). dc hex → 토큰 매핑: #2b6fe0=accent-active ·
+   #1c3452=accent-muted · #7dbcff=accent-bright · #20242a=border-default ·
+   #1a1d22=surface-card · #9aa2ac=text-secondary · dot #3d9bff=
+   accent-default · #454c55=text-disabled. glow rgba(61,155,255,.6)는
+   color-mix 60% 근사(기존 관례). radius 6 = var(--radius-chip).
+   라벨은 좁은 스트립에 맞춰 'Auto: ON/OFF'로 짧게 쓴다. */
 .code-auto-toggle {
   margin-left: auto;
   display: flex;
@@ -336,7 +318,7 @@
   border: 1px solid var(--border-default);
   background: var(--surface-card);
   color: var(--text-secondary);
-  /* X2 — 정상 상태는 단축 라벨('Auto: ON/OFF')+nowrap으로 완전 해소
+  /* 정상 상태는 단축 라벨('Auto: ON/OFF')+nowrap으로 완전 해소
      (34px·0 12px 스트립에서 안 넘침). 극한 폭(스테이지 탭에 에러 dot
      2개, vertex+fragment 동시 에러)에서는 `.code-stage-strip-meta`가
      먼저 0까지 양보(위 flex-shrink 우선순위)한 뒤에야 이 버튼이 줄고,
@@ -350,7 +332,7 @@
   min-width: 0;
   white-space: nowrap;
 }
-/* X2 — 극한 폭에서만 잘리는 라벨. white-space:nowrap은 버튼에서 상속. */
+/* 극한 폭에서만 잘리는 라벨. white-space:nowrap은 버튼에서 상속. */
 .code-auto-toggle-label {
   min-width: 0;
   overflow: hidden;

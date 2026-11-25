@@ -108,7 +108,7 @@ export function AudioNodeView({ id, data }: NodeProps) {
                 display: isBlocked ? "none" : "block",
                 // No background — canvas stays transparent so the card's
                 // header gradient shows through underneath (design/Node
-                // Editor.dc.html L96-104 draws no fill behind the bars) [D7].
+                // Editor.dc.html "Audio" card draws no fill behind the bars).
                 borderRadius: 3,
                 opacity: status.ready && !silent ? 1 : 0.4,
               }}
@@ -171,14 +171,14 @@ function drawSpectrum(
   const w = canvas.width;
   const h = canvas.height;
   // Transparent background so the node card's gradient shows through
-  // (design/Node Editor.dc.html L96-104 draws no fill behind the bars) [D7].
+  // (design/Node Editor.dc.html "Audio" card draws no fill behind the bars).
   ctx.clearRect(0, 0, w, h);
   if (!bins?.length) return;
   // canvas 2D can't read CSS variables, so tokens.* is imported directly
-  // here instead of going through var(--*) like the rest of the UI [D7].
+  // here instead of going through var(--*) like the rest of the UI.
   ctx.fillStyle = tokens.nodeCategory.source;
-  // FFT bin 연속 바가 정본 — CHANGELOG §v1.3 Q3 [C-5] 확정(정보량 최대). dc
-  // (design/Node Editor.dc.html L96-104)의 청키한 6바는 정적 데모일 뿐 스펙이
+  // FFT bin 연속 바가 정본(정보량 최대). dc
+  // (design/Node Editor.dc.html "Audio" 카드)의 청키한 6바는 정적 데모일 뿐 스펙이
   // 아니다 — 다운샘플/radius 매칭을 하지 않는다. dc는 bar에 border-radius:1px을
   // 쓰지만, 이 스케일에서는 바 폭이 종종 ~1px라 radius가 flat rect와 시각적으로
   // 구분되지 않으므로 fillRect(무 radius)로도 정본과 등가다.

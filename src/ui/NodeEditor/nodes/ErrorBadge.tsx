@@ -6,7 +6,7 @@ import {
 /**
  * vertex + fragment + link diagnostics counted as one number — the badge
  * doesn't distinguish stage, only "is this node broken and by how much"
- * (design/Node Editor.dc.html L201's "✕ 2"). `undefined` (no diagnostics ever
+ * (design/Node Editor.dc.html Blend (ERROR) card's "✕ 2"). `undefined` (no diagnostics ever
  * recorded for this node) counts as 0.
  */
 export function countNodeDiagnostics(nd: NodeDiagnostics | undefined): number {
@@ -16,8 +16,8 @@ export function countNodeDiagnostics(nd: NodeDiagnostics | undefined): number {
 
 /**
  * Header meta-slot replacement for `GpuTimerChip` when a shader/compute node
- * has compile diagnostics — design/Node Editor.dc.html L197-212 (Blend,
- * ERROR state): a small red "✕ N" pill instead of the ms timer. Renders
+ * has compile diagnostics — design/Node Editor.dc.html "Blend shader
+ * (ERROR)": a small red "✕ N" pill instead of the ms timer. Renders
  * nothing while the node has zero diagnostics so the header falls back to
  * the timer chip (see ShaderNodeView/ComputeNodeView).
  */

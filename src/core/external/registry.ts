@@ -201,7 +201,7 @@ export function updateExternalSources(gl: WebGL2RenderingContext) {
  * delete — this only clears the stale JS handles. Without it `uploadFrame`
  * keeps taking the `texSubImage2D` fast path against a dead texture and the
  * source appears permanently frozen once the context is restored; nulling the
- * reference forces the next tick back through `createTexture`. (#13)
+ * reference forces the next tick back through `createTexture`.
  *
  * Deliberately does NOT take a `gl` and does NOT call `deleteTexture`: the
  * objects are already gone, and the media sources (stream / video element /

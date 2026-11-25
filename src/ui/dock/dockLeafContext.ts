@@ -1,5 +1,5 @@
 /**
- * 도킹 leaf 라우팅 컨텍스트 — B2-U1. `DockLayout`이 재귀 렌더링 중 각 leaf의
+ * 도킹 leaf 라우팅 컨텍스트. `DockLayout`이 재귀 렌더링 중 각 leaf의
  * `{ leafId, path }`를 트리 위치에 실어 내려보내는 순수 라우팅 정보만 담는다.
  *
  * ⚠ leaf의 실제 데이터(collapsed/active 등)는 여기 담지 않는다 — 소비자

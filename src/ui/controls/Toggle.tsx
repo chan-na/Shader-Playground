@@ -8,7 +8,8 @@ export interface ToggleProps {
   dataTestId?: string;
 }
 
-/** Pill switch (design/Side Panel.dc.html L121 off / L232 on). A native
+/** Pill switch (design/Side Panel.dc.html "bool toggle" off / "Segmented ·
+ * toggle" on). A native
  * `role="switch"` button rather than a checkbox so `aria-checked` alone
  * drives both the accessible state and the CSS knob position/color. */
 export function Toggle({

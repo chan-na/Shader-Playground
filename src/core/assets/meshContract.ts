@@ -5,9 +5,9 @@ import { makePrimitive } from "./primitives";
 import type { GeometryHandle } from "./types";
 
 /**
- * [B-1] Static description of a mesh's vertex-attribute contract — the exact
+ * Static description of a mesh's vertex-attribute contract — the exact
  * shape every loader in this app produces (`primitives.ts`'s five generators
- * and `objLoader.ts:76-82`'s OBJ→GeometryHandle conversion all emit
+ * and `objLoader.ts`'s `toGeometryHandle` OBJ conversion all emit
  * `a_position(3)·a_normal(3)·a_uv(2)`; glTF is normalized to the same shape
  * by `gltfLoader.ts` reusing `toGeometryHandle`). Surfaced so the `mesh` port
  * stops being an opaque type name and shows what actually flows through it.
@@ -27,7 +27,7 @@ function contractFromData(
   return {
     attributes: data.attributes.map((a) => ({ name: a.name, size: a.size })),
     vertexCount: data.vertexCount,
-    // gl.TRIANGLES (4) is uploadMesh's own fallback (core/gl/mesh.ts:70) when
+    // gl.TRIANGLES (4) is `uploadMesh`'s own fallback (core/gl/mesh.ts) when
     // MeshData.primitive is unset — every built-in primitive and loader
     // leaves it unset, so this stays in sync with what actually draws.
     indexCount: data.indices?.length ?? 0,

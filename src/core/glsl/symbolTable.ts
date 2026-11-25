@@ -36,7 +36,7 @@ import { IDENT_RE } from "./ident";
 import { maskComments } from "./stripComments";
 
 // One union literal kept inline on `GlslSymbol.kind` — exporting it as a named
-// alias used to land in knip's "unused export" report (consumers always read
+// alias lands in knip's "unused export" report (consumers always read
 // the field through `GlslSymbol`, never the alias).
 type GlslSymbolKind =
   | "uniform"
@@ -237,9 +237,9 @@ function parseSymbolTable(source: string): SymbolTable {
       // const), scanned REPEATEDLY across the line rather than once. A line
       // may carry more than one `;`-terminated declaration — `out vec2 v_uv;
       // out vec3 v_n;`, or one trailing a single-line `struct L { vec3 c; };`
-      // / `precision highp float;` — and stopping at the first used to drop
-      // every later name from the table. `computeVaryingContract` then
-      // reported the fragment's input as a *confident* "vertex가 제공하지
+      // / `precision highp float;` — and stopping at the first would drop
+      // every later name from the table. `computeVaryingContract` would then
+      // report the fragment's input as a *confident* "vertex가 제공하지
       // 않음" warning for a program that links fine (mirror direction: a
       // consumed varying rendered as a confident "unused" row). Restarts are
       // only attempted where the line's brackets are balanced (`lineDepth`),
@@ -346,7 +346,7 @@ function parseSymbolTable(source: string): SymbolTable {
                 });
                 // Parameters belong inside the function body; they are
                 // recorded on the header's line at their own column. Two
-                // anchors keep that column honest (L32): a running cursor so
+                // anchors keep that column honest: a running cursor so
                 // parameter N is searched after parameter N-1's name, and each
                 // parameter's own type token so the search starts *after* the
                 // type. Without them a bare `indexOf(name, afterParen)`

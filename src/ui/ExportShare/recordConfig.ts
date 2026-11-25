@@ -1,6 +1,6 @@
 /**
  * Pure helpers, option lists and types for the Export & Share dialog's Record
- * (GIF/WebM) flow (M6-U4). Deliberately store/React-free so they're trivial
+ * (GIF/WebM) flow. Deliberately store/React-free so they're trivial
  * to unit test — only the ExportShare dialog modules import this.
  */
 
@@ -12,7 +12,8 @@ const GIF_ESTIMATE_REFERENCE_SECONDS = 4;
 
 /**
  * Heuristic output size estimate for the GIF configure panel's "est." chip
- * (design/Export & Share.dc.html L440-443's formula, reparameterized around
+ * (design/Export & Share.dc.html "size estimate" `estMB` formula,
+ * reparameterized around
  * this app's longEdge/fps/duration controls instead of the mock's
  * resolution-preset + fixed-duration version). Size scales with the frame
  * area (longEdge²) and linearly with fps/duration.
@@ -74,7 +75,7 @@ export interface RecordDoneInfo {
 }
 
 /**
- * 녹화 산출물 크기 표기 [D16]. 완료 카드 metaLine과 저장 토스트가 같은 값을
+ * 녹화 산출물 크기 표기. 완료 카드 metaLine과 저장 토스트가 같은 값을
  * 쓰도록 한 곳에 모아 둔다 — HTML은 KB, 녹화는 MB로 각 완료 카드의 단위를
  * 따르되 토스트 형태는 `Exported {name} · {size}`로 공통.
  */

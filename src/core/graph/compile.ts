@@ -67,7 +67,7 @@ interface ParamBinding {
 
 /**
  * Per-attribute record of whether a mesh's vertex data was actually consumed
- * by the compiled program (B-2). Mirrors `core/gl/mesh.ts`'s `uploadMesh`
+ * by the compiled program. Mirrors `core/gl/mesh.ts`'s `uploadMesh`
  * skip condition (`loc === undefined || loc < 0`) so this can never drift
  * from what the GPU actually bound. Left empty for fullscreen-substituted or
  * compute-driven passes (see `meshAttributeUse` below) — those aren't a mesh
@@ -99,12 +99,12 @@ export interface ShaderPass {
   paramBindings: ParamBinding[];
   uniformValues: Record<string, number | number[]>;
   /**
-   * C-2: `@default` seeds parsed from the *compiled* sources at compile time,
+   * `@default` seeds parsed from the *compiled* sources at compile time,
    * kept in their own field rather than merged into `uniformValues`. The
    * Viewport hot-patches `pass.uniformValues = node.uniformValues` on every
    * RAF tick — before the first draw included — so a seed merged into
-   * `uniformValues` would be clobbered before it ever reached the GPU (the
-   * original C-2 regression). `bindUserUniforms` composes
+   * `uniformValues` would be clobbered before it ever reached the GPU.
+   * `bindUserUniforms` composes
    * `{...seededDefaults, ...uniformValues}` (then param bindings) per frame,
    * which is what actually enforces **stored value > `@default` > GL zero**.
    */
@@ -113,7 +113,7 @@ export interface ShaderPass {
   width: number;
   height: number;
   /**
-   * Which of the mesh's attributes the linked program actually bound (B-2).
+   * Which of the mesh's attributes the linked program actually bound.
    * `[]` when the mesh is the fullscreen-quad substitution or compute-driven
    * — both are automated stand-ins, not a mesh the user connected, so there
    * is nothing to warn about.
@@ -148,7 +148,7 @@ export interface ComputePass {
   primitive: number;
   paramBindings: ParamBinding[];
   uniformValues: Record<string, number | number[]>;
-  /** C-2 `@default` seeds — see {@link ShaderPass.seededDefaults} for why
+  /** `@default` seeds — see {@link ShaderPass.seededDefaults} for why
    * this is a separate field instead of a merge into `uniformValues`. */
   seededDefaults: Record<string, number | number[]>;
   /** Which side currently holds the freshest captured data (= next input). */
@@ -167,7 +167,7 @@ export interface ExecutionPlan {
   /**
    * Node-id → pass lookups, built once at compile time so the per-frame
    * executor never rebuilds them on the RAF hot path. Stable for the plan's
-   * lifetime — a recompile yields a new plan with fresh maps. (L23)
+   * lifetime — a recompile yields a new plan with fresh maps.
    */
   passByNode: Map<string, Pass>;
   shaderPassByNode: Map<string, ShaderPass>;
@@ -207,7 +207,7 @@ export interface ExecutionPlan {
    * idle gate does *not* consult it (compute passes are driven by the same
    * store revs as everything else, and a paused static compute graph is
    * correctly allowed to stay idle). Kept as part of the plan's public shape:
-   * compile.test and e2e phase-13 assert it. (#39)
+   * compile.test and e2e phase-13 assert it.
    */
   hasCompute: boolean;
   /**
@@ -295,7 +295,7 @@ function glPrimitiveOf(
  * Build a VAO that reads each attribute slot from its `side` VBO (A or B).
  * Shared by the ComputePass ping-pong VAOs and the shader-side VAOs that draw a
  * compute pass's captured output — the two only differ in where the slots come
- * from. Returns null if the VAO can't be allocated. (L44)
+ * from. Returns null if the VAO can't be allocated.
  */
 function buildVaoFromSlots(
   gl: WebGL2RenderingContext,
@@ -461,7 +461,7 @@ function buildComputePass(
     primitive: glPrimitiveOf(gl, node.primitive),
     paramBindings,
     uniformValues: node.uniformValues,
-    // C-2: seed from the vertex source's `@default` hints. Kept apart from
+    // Seed from the vertex source's `@default` hints. Kept apart from
     // `uniformValues` so the Viewport's per-frame hot-patch can't clobber the
     // seeds — see ShaderPass.seededDefaults. Stored values still win: the
     // effective-map spread order in `bindUserUniforms` guarantees it.
@@ -678,7 +678,7 @@ export function compileGraph(
       // narrowing (`built.program`) into a nested arrow function.
       const program = built.program;
       mesh = uploadMesh(gl, meshData, program.attributes);
-      // Fullscreen substitution is the app's own automatic fallback (A-1),
+      // Fullscreen substitution is the app's own automatic fallback,
       // not a mesh the user wired in — no consumption warning applies there.
       meshAttributeUse = meshIsFullscreen
         ? []
@@ -733,15 +733,15 @@ export function compileGraph(
       samplers,
       paramBindings,
       uniformValues: sn.uniformValues,
-      // C-2: seed from the compiled-vertex+fragment source's `@default`
+      // Seed from the compiled-vertex+fragment source's `@default`
       // hints. `vertexSource` here is already the *compiled* source
       // (fullscreen.vert substitution already applied above) — matches what
       // the GL compiler actually saw, same reasoning as
       // `compiledVertexSource`. Kept apart from `uniformValues` so the
       // Viewport's per-frame `pass.uniformValues = node.uniformValues`
-      // hot-patch can't clobber the seeds before the first draw (the
-      // original C-2 regression); stored values still win via the
-      // effective-map spread order in `bindUserUniforms`.
+      // hot-patch can't clobber the seeds before the first draw; stored
+      // values still win via the effective-map spread order in
+      // `bindUserUniforms`.
       seededDefaults: withExplicitDefaults(
         `${vertexSource}\n${sn.fragmentSource}`,
         {},
@@ -771,7 +771,7 @@ export function compileGraph(
     return { outputNodeId: o.id, sourceNodeId: edge?.source ?? null };
   });
 
-  // Cache the executor's per-frame lookups once (L23). `passByNode` already
+  // Cache the executor's per-frame lookups once. `passByNode` already
   // holds every pass from the build loop above; the shader-only view is derived.
   const shaderPassByNode = new Map<string, ShaderPass>();
   for (const p of passes) {

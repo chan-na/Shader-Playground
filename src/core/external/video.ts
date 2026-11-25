@@ -61,7 +61,7 @@ export function acquireVideo(spec: VideoExternalSpec): VideoHandle {
     // `spec` is the acquire-time snapshot. Decoding metadata takes a few frames,
     // and `applyInPlace`/`applyVideoSpec` may have swapped in a newer spec while
     // we waited — pausing, seeking, or muting. Honour the *live* spec so a pause
-    // issued during load isn't undone by a stale autoplay. (#26)
+    // issued during load isn't undone by a stale autoplay.
     const live = handle.spec;
     if (typeof live.currentTime === "number") {
       try {

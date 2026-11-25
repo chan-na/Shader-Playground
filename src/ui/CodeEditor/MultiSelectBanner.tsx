@@ -12,7 +12,7 @@ export interface MultiSelectBannerProps {
 }
 
 /**
- * Code Editor.dc.html L56-72 — multi-select state. Swapped in for the
+ * Code Editor.dc.html (multi-select state) — multi-select banner. Swapped in for the
  * CodeMirror container (which stays mounted, just `display: none`) whenever
  * 2+ nodes are selected, since editing GLSL only makes sense for one node
  * at a time. Presentation-only — no actions (Recompile all / Group nodes

@@ -13,8 +13,8 @@ import { glslValidator } from "../../core/glsl/glslValidator";
 import type { GLSLDiagnostic } from "../../core/graph/diagnostics";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { displayNodeName } from "../../core/nodes/registry";
-// The exact raw string compile.ts:1 imports and hands to `createProgram`
-// whenever a shader node's mesh input doesn't resolve (A-1). Importing the
+// The exact raw string compile.ts imports and hands to `createProgram`
+// whenever a shader node's mesh input doesn't resolve. Importing the
 // same `?raw` module here — not a copy — is what lets the vertex tab claim
 // "보이는 것 = 도는 것": this is byte-identical to the compiled source, not a
 // hand-maintained echo of it.
@@ -37,25 +37,21 @@ import { toCMDiagnostics } from "./lintAdapter";
 import { MultiSelectBanner } from "./MultiSelectBanner";
 import { StageTabs } from "./StageTabs";
 
-/** Node breadcrumb chip (Code Editor.dc.html L39-43) — accent-tinted pill
- * showing the currently-edited node's category glyph, display name, and
+/** Node breadcrumb chip (Code Editor.dc.html node breadcrumb) — accent-tinted
+ * pill showing the currently-edited node's category glyph, display name, and
  * kind. Rendered in the Code body's own stage-tab sub-strip (`.code-stage-
- * strip`, below `DockPanelHeader`), right after the stage tabs — **not**
- * the dock header's `children` slot anymore (design/CHANGELOG.md §v2.0
- * Changed: "Code는 [● Code] 탭 + GLSL 배지 헤더 + vertex/fragment 스테이지
- * 탭을 본문 하위 스트립으로 이동"). At the v2.0 25%-width Code column, the
- * dock header alone (grab + `[● Code ✕]` tab + `GLSL · ES 3.0` meta +
- * collapse/maximize/close) already fills the ~359px panel; keeping the
- * stage tabs + this chip in that same row pushed the trailing buttons past
- * the panel's right edge (clipped by `.panel`'s `overflow:hidden`, real
- * pointer unreachable even though the DOM node was technically present).
- * M3 regression fix: this chip (plus its leading divider) now renders
- * inside a `.code-stage-strip-meta` wrapper (src/styles/21-dock-panels.css) instead of as two
- * bare fragment children of `.code-stage-strip` — the wrapper is what
- * actually collapses to 0 width under squeeze (see its stylesheet comment);
- * this component's own `minWidth: 0` below is only the inner half of that
- * — it lets the chip shrink *within* the wrapper before the wrapper itself
- * has to clip it entirely. */
+ * strip`, below `DockPanelHeader`), right after the stage tabs — **not** in
+ * the dock header: at the default 25%-width Code column the header alone
+ * (grab + `[● Code ✕]` tab + `GLSL · ES 3.0` meta + collapse/maximize/close)
+ * already fills the ~359px panel, so tabs + chip there pushed the trailing
+ * buttons past `.panel`'s `overflow:hidden` edge (present in the DOM but
+ * unreachable by a real pointer).
+ * The chip (plus its leading divider) renders inside a
+ * `.code-stage-strip-meta` wrapper (src/styles/21-dock-panels.css) — the
+ * wrapper is what actually collapses to 0 width under squeeze (see its
+ * stylesheet comment); this component's own `minWidth: 0` below is only the
+ * inner half — it lets the chip shrink *within* the wrapper before the
+ * wrapper itself has to clip it entirely. */
 const BREADCRUMB_CONTAINER_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -83,7 +79,7 @@ const BREADCRUMB_NAME_STYLE: CSSProperties = {
   fontSize: 11.5,
   fontWeight: 600,
   color: tokens.text.primary,
-  // M3 regression fix: the node display name is the one part of the
+  // The node display name is the one part of the
   // breadcrumb with unbounded length, so it's the part that truncates
   // when `.code-stage-strip` is too narrow (icon and kind stay fixed).
   // `minWidth: 0` overrides the flex-item default (min-content size),
@@ -103,7 +99,7 @@ const BREADCRUMB_KIND_STYLE: CSSProperties = {
  * height is reduced by exactly this much (via `calc()`) so the note sits
  * above the document without overlapping it (`.panel-body` isn't a flex
  * container, so this can't be a `flex: 1` sibling without a stylesheet
- * change — see A-1's design-noninvasive note). */
+ * change, which the design-noninvasive rule rules out). */
 const AUTO_VERTEX_NOTE_HEIGHT = 22;
 /** The text is ~44 CJK-ish characters, so in a narrow Code panel it wrapped
  *  to a second line that the fixed 22px height then clipped — the note about
@@ -147,7 +143,7 @@ function NodeBreadcrumb({
 }
 
 /** Debounced source-commit; carries the edit's (node, stage) target so a later
- * node/stage switch cannot misroute or drop the trailing call (L17). */
+ * node/stage switch cannot misroute or drop the trailing call. */
 type CommitTarget = { id: string | null; stage: "vertex" | "fragment" };
 type CommitFn = ((value: string, target: CommitTarget) => void) & {
   cancel: () => void;
@@ -187,12 +183,13 @@ export function CodeEditor() {
     stage: "fragment",
   });
   // Holds the mount-time debounced commit so the reload effect can flush any
-  // pending edit before it replaces the doc on a node/stage switch (L17).
+  // pending edit before it replaces the doc on a node/stage switch.
   const commitRef = useRef<CommitFn | null>(null);
   // The exact extension array the mounted EditorState was built from. Every
-  // `setState` MUST reuse this identical array — see the reload effect (#1a).
+  // `setState` MUST reuse this identical array — see the reload effect.
   const extRef = useRef<Extension[] | null>(null);
-  // The readOnly Compartment living inside `extRef`'s array (A-1). Mutated
+  // The readOnly Compartment living inside `extRef`'s array (auto-vertex
+  // read-only lock). Mutated
   // via `.reconfigure` rather than replaced, from two places: the dedicated
   // `[isAutoVertex]` effect (same document, flag flips) and the reload
   // effect's compensating dispatch (document switch, since `setState` resets
@@ -211,7 +208,7 @@ export function CodeEditor() {
   const jumpRequest = useEditorStore((s) => s.jumpRequest);
   const clearJump = useEditorStore((s) => s.clearJump);
 
-  // Which node this editor edits — `pickEditorNodeId` is the shared rule (#10),
+  // Which node this editor edits — `pickEditorNodeId` is the shared rule,
   // called *inside* the selector so the component stays reactive to both the
   // selection and the node list. `rename.ts` reads the same rule through
   // `currentEditorNodeId()`, so F2's cross-stage context can never disagree
@@ -229,7 +226,7 @@ export function CodeEditor() {
   );
   const isCompute = node?.kind === "compute";
 
-  // A-1: this node's mesh input didn't resolve, so the compiler substituted
+  // This node's mesh input didn't resolve, so the compiler substituted
   // fullscreen.vert for its vertex stage (passPlanStore.fullscreenByNode is
   // the ExecutionPlan's per-node record — see compile.ts's `fullscreenByNode`
   // doc comment). Primitive selector: reads one boolean out of the record
@@ -244,7 +241,7 @@ export function CodeEditor() {
   // gating the label on `stage === "vertex"` made the most common state
   // lie: the node card shows FULLSCREEN while the vertex tab still
   // advertises a `vertex.glsl` document that isn't the one running — the
-  // exact misinformation A-1 exists to remove.
+  // exact misinformation the auto-vertex label exists to remove.
   const isAutoVertexDoc =
     !isMulti && node?.kind === "shader" && isFullscreenPass;
   // Stage-SCOPED half: the document currently ON SCREEN is that auto vertex
@@ -275,7 +272,8 @@ export function CodeEditor() {
   const diagsRef = useRef<NodeDiagnostics | undefined>(undefined);
   diagsRef.current = diags;
 
-  // Multi-select banner (Code Editor.dc.html L56-72) — subscribe to the raw
+  // Multi-select banner (Code Editor.dc.html multi-select state) — subscribe
+  // to the raw
   // slices (whole nodes array / whole diagnostics map) rather than deriving a
   // fresh array inside the selector itself (zustand's default selector
   // equality is referential, so a selector-created array would never be
@@ -334,8 +332,8 @@ export function CodeEditor() {
       if (cur.kind !== "shader") return;
       const sn = cur as ShaderGraphNode;
       if (st === "vertex") {
-        // A-1 guard: never let the fullscreen.vert substitution land in the
-        // store as this node's real vertexSource. Real typing can't reach
+        // Auto-vertex guard: never let the fullscreen.vert substitution land in
+        // the store as this node's real vertexSource. Real typing can't reach
         // here in the first place — CodeMirror's readOnly facet rejects the
         // DOM input before a transaction is even produced — but the reload
         // effect's own doc-swap dispatch (mesh connects/disconnects while
@@ -393,7 +391,7 @@ export function CodeEditor() {
       }
     });
 
-    // Mount-time-only Compartment (A-1): always created with `false` here —
+    // Mount-time-only readOnly Compartment: always created with `false` here —
     // whatever `isAutoVertex` actually is for the node/stage that ends up
     // loaded gets applied by the `[isAutoVertex]` effect right after mount,
     // same as any other post-mount derived state.
@@ -404,7 +402,7 @@ export function CodeEditor() {
     // reload effect. Rebuilding it there as `glslExtensions()` alone would drop
     // `updateListener` from the swapped-in state, and from that moment on every
     // keystroke would stop reaching the store — a silent data-loss regression
-    // that typecheck / lint / knip cannot see (#1a).
+    // that typecheck / lint / knip cannot see.
     const extensions: Extension[] = [
       ...glslExtensions(),
       updateListener,
@@ -447,9 +445,10 @@ export function CodeEditor() {
   // A change transaction keeps one undo timeline across all of them, so Cmd+Z
   // right after a switch pops the document-load transaction and pours the
   // previous document into the current stage — which the 50ms commit debounce
-  // then writes to the store, destroying the real source (#1a).
+  // then writes to the store, destroying the real source.
   //
-  // What `setState` resets, extension by extension (glslSetup.ts:26-48) — #1e:
+  // What `setState` resets, extension by extension (glslSetup.ts
+  // `glslExtensions()`):
   //   • `history()`            → undo/redo stack. THE POINT: per-document
   //                              timelines. (`historyCompartment.reconfigure`
   //                              cannot do this — @codemirror/commands keeps the
@@ -489,7 +488,7 @@ export function CodeEditor() {
     // type-time, so it lands on the correct node even though ctxRef has already
     // advanced to the incoming document. Without this, the reload dispatch
     // below re-triggers the commit debounce with the incoming text and clears
-    // the pending one, silently dropping those edits. (L17)
+    // the pending one, silently dropping those edits.
     if (switching) commitRef.current?.flush();
     loadedKeyRef.current = key;
     lastCommittedRef.current = source;
@@ -505,8 +504,8 @@ export function CodeEditor() {
     if (switching && extensions) {
       view.setState(EditorState.create({ doc: source, extensions }));
       // Two compensating dispatches, because `setState` is not a transaction:
-      // (1) reinstall + repopulate lint for the incoming document, AND (A-1)
-      //     reconfigure the readOnly compartment for the incoming node/stage
+      // (1) reinstall + repopulate lint for the incoming document, AND
+      //     reconfigure the auto-vertex readOnly compartment for the incoming node/stage
       //     — merged into one `view.dispatch(specA, specB)` call (CM6 merges
       //     multiple TransactionSpecs passed to one `dispatch`/`update` call
       //     into a single transaction; their `effects` concatenate).
@@ -555,28 +554,28 @@ export function CodeEditor() {
     // dispatch *and* committed to the store in the same turn): skip the full
     // replace. A {from:0,to:len} dispatch carries no selection, so it would
     // otherwise collapse the cursor to offset 0. On a real document switch we
-    // always reload (cursor reset there is expected). (M11)
+    // always reload (cursor reset there is expected).
     if (!switching && source === view.state.doc.toString()) return;
     // Non-switching full replace: the text comes from OUTSIDE the editor —
     // either a store external change (graph undo/redo, import/reset) or the
-    // A-1 auto flip swapping fullscreen.vert in/out while this node's vertex
+    // auto-vertex flip swapping fullscreen.vert in/out while this node's vertex
     // tab stays open. Kept OUT of CM's undo history (`addToHistory(false)`):
     // recording it would let a focused Cmd+Z pop the replacement back — e.g.
     // after a user-speed mesh disconnect→reconnect (>500ms apart, so CM's
     // newGroupDelay never merges the two swaps) the latest history event is
     // the fullscreen.vert→user-source replacement, so one undo would turn
     // the now-editable document back into fullscreen.vert, and the 50ms
-    // commit would pass the A-1 guard (the plan already says "not
+    // commit would pass the auto-vertex guard (the plan already says "not
     // fullscreen") and write fullscreen.vert into the store as the node's
     // real vertexSource — the same resurrect-then-commit data loss the
-    // `setState` switch path (#1a) exists to prevent.
+    // `setState` switch path exists to prevent.
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: source },
       annotations: Transaction.addToHistory.of(false),
     });
   }, [effectiveId, stage, source]);
 
-  // A-1: reconfigure the readOnly compartment when `isAutoVertex` flips
+  // Reconfigure the auto-vertex readOnly compartment when `isAutoVertex` flips
   // *without* a node/stage switch — e.g. connecting/disconnecting this same
   // node's mesh input while its vertex tab is open. The reload effect above
   // only reconfigures `ro` on its `switching` branch (a real document
@@ -639,7 +638,7 @@ export function CodeEditor() {
   return (
     <div className="panel panel--code">
       <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end" />
-      {/* Stage-tab sub-strip (design/CHANGELOG.md §v2.0 Changed) — a direct
+      {/* Stage-tab sub-strip (see the breadcrumb chip doc above) — a direct
           `.panel` child, so the existing collapsed-rail rule
           (`.shell-slot--collapsed .panel > :not(.dock-header)`, 20-dock-shell.css)
           hides it automatically along with the editor body; no extra

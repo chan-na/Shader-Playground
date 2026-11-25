@@ -116,7 +116,7 @@ export function NodeEditor() {
 
   // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear,
   // import, share restore, undo/redo) so small graph panels still show every
-  // node. `graphEpoch` moves only on those replacements [#38] — keying this on
+  // node. `graphEpoch` moves only on those replacements — keying this on
   // `rev` re-framed the canvas after every structural edit (adding one node,
   // wiring one edge, each shader recompile), animating the view out from under
   // the user mid-work.
@@ -140,7 +140,7 @@ export function NodeEditor() {
   // Visibility net for the refit removed above: node adds use fixed flow
   // coordinates (AddNodePill / CommandPalette), so with the canvas panned away
   // a new node now lands off-screen and the menu looks like it did nothing.
-  // Pan — never zoom, that is what #38 removed — and only when the node really
+  // Pan — never zoom, re-framing is what the epoch gate removed — and only when the node really
   // is outside the visible area, so an add in plain sight leaves the viewport
   // untouched. See addedPanDecision for the framing rules.
   //
@@ -558,7 +558,7 @@ export function NodeEditor() {
 
   /**
    * Records the source port's side/type into connectionUiStore the moment a
-   * drag starts, so fanout-highlight consumers (U3/U4) know what "compatible"
+   * drag starts, so fanout-highlight consumers (PortHandle) know what "compatible"
    * means for this drag. Looked up against the graph store (same pattern as
    * ConnectionLine's strokeForHandle) rather than React Flow's internal node
    * data.

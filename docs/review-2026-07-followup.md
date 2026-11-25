@@ -112,7 +112,7 @@ F1/F3 자체는 해소됐다. 아래는 그 과정에서 **실증까지 끝났�
 
 로컬 Node 26은 zlib **1.2.12**, CI가 `.nvmrc`로 고정하는 Node 22는 zlib **1.3.1**이다. 같은 dist·같은 level 9에서 **약 1.8 KiB** 벌어진다 — 로컬 PASS는 CI green의 근거가 아니다. 이번 라운드에서 "여유 4 KiB"로 알던 값이 실제로는 1.02 KiB였고, 이전 라운드들의 "measured … locally" 수치도 전부 같은 오류였다.
 
-`scripts/check-bundle-size.mjs`가 실행 Node major와 `.nvmrc` 불일치를 경고하도록 고쳐 뒀다. 한도 상향 이력과 사유도 그 파일 헤더에 있다.
+`scripts/check-bundle-size.mjs`가 실행 Node major와 `.nvmrc` 불일치를 경고하도록 고쳐 뒀다. 한도 상향 이력과 사유는 `docs/archive/bundle-budget-history.md`로 옮겼다.
 
 측정 절차(스크립트 헤더에도 있음): `npm i --prefix <tmp> node@22` → 그 바이너리로 이미 빌드된 dist에 대해 스크립트를 돌린다.
 

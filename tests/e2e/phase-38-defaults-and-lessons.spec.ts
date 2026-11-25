@@ -4,10 +4,9 @@ import { bootApp, loadChainDemo } from "./helpers/fixtures";
 import { readSp, withSp } from "./helpers/sp";
 
 /**
- * Phase 38 — mental model correction (docs/learnability-plan-2026-08.md T3),
- * unit U1's slice: C-2 (`uniformValues` hardcoding → GLSL `@default`) + F-2
- * (demo lesson groups). E-2/E-3/F-1 are covered by the parallel units' own
- * specs.
+ * Phase 38 — mental model correction (docs/learnability-plan-2026-08.md T3):
+ * C-2 (`uniformValues` hardcoding → GLSL `@default`) + F-2 (demo lesson
+ * groups). E-2/E-3/F-1 are covered by the other phase-38-* specs.
  *
  * C-2's invariant under test: a brand-new Shader node is created with
  * `uniformValues: {}` (no hardcoded seed value survives in TS anywhere) yet

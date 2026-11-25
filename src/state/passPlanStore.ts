@@ -114,8 +114,8 @@ export interface PassPlanState {
    * `varyingsByNode` / each row's `silentWarnings` answer "what is this graph
    * *like*" — A-1's substitution, the varying contract, an unconnected
    * sampler — and those facts do not stop being true because a panel closed.
-   * Erasing them was how closing the Viewport made the StatusBar claim "no
-   * problems" and flipped every A-1 surface to its opposite (badge gone,
+   * Erasing them would let closing the Viewport make the StatusBar claim "no
+   * problems" and flip every A-1 surface to its opposite (badge gone,
    * vertex tab editable again).
    */
   published: boolean;

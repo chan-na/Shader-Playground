@@ -201,9 +201,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* [Q1] ⚠ needs Mesh 앰버 배지 — dc Command Palette.dc.html L105.
+/* ⚠ needs Mesh 앰버 배지 — dc Command Palette.dc.html 결과 행 `warn`.
    warning 패밀리 알파(bg 0.12 / border 0.35). dc 글자색 #f5c778은 무토큰이라
-   var(--warning)로 근사(신규 토큰 0 — v1.3 규칙, followup designer 기록). */
+   var(--warning)로 근사(신규 토큰 0 규칙). */
 .cmdk-warn-badge {
   flex-shrink: 0;
   display: inline-flex;
@@ -284,7 +284,7 @@
   color: var(--text-primary);
   font-weight: 400;
 }
-/* D17/E6 — dc "Command Palette.dc.html" L119-124 빈 결과 CTA 행.
+/* dc "Command Palette.dc.html" empty 블록의 빈 결과 CTA 행.
    raw hex(rgba(61,155,255,·) / #c4cad2 / #7dbcff / radius 9)를
    accent.default 알파 파생 · text.brightBody · 기존 cmdk-enter-glyph가
    쓰는 accent-hover · radius-overlay로 매핑. */

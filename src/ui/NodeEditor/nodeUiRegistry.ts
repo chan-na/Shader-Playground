@@ -30,7 +30,7 @@ const FALLBACK_MINIMAP_COLOR = tokens.text.muted;
  * UI-side registry per GraphNodeKind. Adding a new node kind surfaces here
  * as a compile error because the map is typed as exhaustive Record.
  * minimapColor is derived from the node's category (design/Node Editor.dc.html
- * L280-293 미니맵 블록이 카테고리 5색만 사용) via categoryHexFor.
+ * "minimap" 블록이 카테고리 5색만 사용) via categoryHexFor.
  */
 export const NODE_UI: Record<GraphNodeKind, NodeUiSpec> = {
   mesh: { view: MeshNodeView, minimapColor: categoryHexFor("mesh") },

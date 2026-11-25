@@ -23,7 +23,7 @@ interface RailItem {
   glyph: string;
 }
 
-/** design/Export & Share.dc.html L412-424 — Record/Export/Share groups.
+/** design/Export & Share.dc.html `groups` — Record/Export/Share groups.
  * MP4/Code snippet/visibility items from the same mock are intentionally
  * omitted (out of scope for this app). */
 const RAIL_GROUPS: Array<{ label: string; items: RailItem[] }> = [
@@ -151,7 +151,7 @@ export function ConfigureFooter({
 }
 
 /** Footer while a recording is in flight — a single "Stop" action, no
- * hint/cancel (design/Export & Share.dc.html L300-305). */
+ * hint/cancel (design/Export & Share.dc.html recording-phase footer). */
 export function BusyFooter({
   label,
   onStop,
@@ -195,13 +195,14 @@ export function HtmlConfigurePanel({
           HTML
         </div>
         <div className="es-file-card-main">
-          {/* [C-10] The editable base is kept (it is the only way to name an
-              HTML export — the app has no projectTitle state, see C-11a), and
+          {/* The editable base is kept (it is the only way to name an
+              HTML export — the app has no projectTitle state), and
               the dc's completed-filename display is reconciled with it as a
               static `-{timestamp}.html` suffix inside the same field. The
               timestamp itself is only fixed at download time, so it stays a
               placeholder rather than a live preview that would drift from the
-              real name. design/Export & Share.dc.html L167-172. */}
+              real name. design/Export & Share.dc.html (HTML "File name"
+              field). */}
           <div className="es-field-label">File name</div>
           <div className="es-filename-field">
             <TextField
@@ -359,8 +360,8 @@ export function WebmConfigurePanel({
 }
 
 /** Recording panel shared by GIF/WebM (design/Export & Share.dc.html
- * L214-234). The preview is a 16/9 placeholder, not a mirrored canvas — the
- * real render is already visible behind the scrim/modal. GIF shows a
+ * `isRecording` block). The preview is a 16/9 placeholder, not a mirrored
+ * canvas — the real render is already visible behind the scrim/modal. GIF shows a
  * duration progress bar; WebM (no fixed length, manual stop) shows only the
  * elapsed counter up top. */
 export function RecordingPanel({
@@ -408,7 +409,8 @@ export function RecordingPanel({
   );
 }
 
-/** Encoding panel (design/Export & Share.dc.html L238-251) — GIF-only,
+/** Encoding panel (design/Export & Share.dc.html `isEncoding` block) —
+ * GIF-only,
  * since WebM's stop() already yields the final blob with no separate encode
  * step. There's no cancel-mid-encode API on the GIF store, so the busy
  * footer is a plain note instead of a button (see the encoding footer in

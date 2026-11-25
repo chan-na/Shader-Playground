@@ -34,11 +34,11 @@ const textStyle: CSSProperties = {
 /**
  * Inspector warning banner for a Webcam/Audio source whose permission is
  * "pending" (awaiting the browser prompt) or "denied" (user/browser blocked
- * it) — design/System States.dc.html L344-363 (inspector panel warning row)
- * for pending, L262-267 (viewport onboarding copy's retry button + caption)
- * for the denied retry affordance. The center-viewport permission overlay
- * itself is intentionally not implemented (M7-U3 notes deviation 1) — this
- * banner is the only surfaced permission UI in the reimplementation.
+ * it) — design/System States.dc.html "panel: INSPECTOR (permission
+ * context)" warning row for pending, "viewport: WEBCAM PERMISSION" (retry
+ * button + caption) for the denied retry affordance. The center-viewport
+ * permission overlay itself is intentionally not implemented — this banner
+ * is the only surfaced permission UI.
  */
 export function PermissionBanner({
   device,

@@ -181,7 +181,7 @@ test.describe("Phase 10 — parameters & multi-output", () => {
     await expectCanvasRendered(canvas, { ratio: 0.05 });
 
     // Sample each split-view cell independently instead of a single global
-    // ratio. The App Shell's 48px AppToolbar (M1-U3) shrank the viewport's
+    // ratio. The App Shell's 48px AppToolbar shrinks the viewport's
     // available height, which lowers a whole-canvas ratio for every 3-way
     // split render — a global ratio only weakly signals a regression, since
     // dropping one cell entirely out of 3 just nudges the aggregate down

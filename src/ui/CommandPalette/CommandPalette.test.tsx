@@ -121,7 +121,7 @@ describe("CommandPalette", () => {
     expect(useSelectionStore.getState().selectedNodeId).toBe(created?.id);
     expect(useCommandPaletteStore.getState().open).toBe(false);
 
-    // [C-7] The node is born with no mesh input, so compile.ts compiles it
+    // The node is born with no mesh input, so compile.ts compiles it
     // against fullscreen.vert (which emits v_uv only). A template reading
     // v_normal (unlit.frag) could never link on the first frame — exactly the
     // "new node is instantly in an error state" defect. Pin the CTA to a
@@ -182,7 +182,8 @@ describe("CommandPalette", () => {
     expect(screen.getByText("Presets")).not.toBeNull();
   });
 
-  // [Q1] Palette starter item — dc Command Palette L202.
+  // Palette starter item — dc Command Palette `data()` node list
+  // ("Shader" · "starter · links with or without a mesh").
   it("starter 'Add Shader' item renders with its sub text and runs starter.frag", () => {
     openPalette();
     render(<CommandPalette />);
@@ -203,7 +204,8 @@ describe("CommandPalette", () => {
     expect(useCommandPaletteStore.getState().open).toBe(false);
   });
 
-  // [Q1] Unlit-only ⚠ needs Mesh amber badge — dc Command Palette L105.
+  // Unlit-only ⚠ needs Mesh amber badge — dc Command Palette row `it.warn`
+  // pill.
   it("only the Unlit row shows the ⚠ needs Mesh amber badge", () => {
     openPalette();
     const { container } = render(<CommandPalette />);
@@ -227,7 +229,8 @@ describe("CommandPalette", () => {
     expect(starterRow?.querySelector(".cmdk-warn-badge")).toBeNull();
   });
 
-  // [X2] dc Command Palette L224 — palette reachability for the Auto-open
+  // dc Command Palette "Toggle Code auto-open" command — palette
+  // reachability for the Auto-open
   // toggle even when the Code rail is collapsed (34px, no inline toggle).
   it("Toggle Code auto-open command flips editorStore.autoCode and closes the palette", () => {
     openPalette();

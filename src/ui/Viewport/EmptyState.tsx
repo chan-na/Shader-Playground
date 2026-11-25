@@ -6,7 +6,7 @@ import { tokens, withAlpha } from "../../theme";
 import { firstCompileError } from "./compileErrorInfo";
 
 /**
- * Onboarding hint rows (design/Viewport.dc.html L57-61). Kept as an internal
+ * Onboarding hint rows (design/Viewport.dc.html "EMPTY STATE"). Kept as an internal
  * constant — not exported — since only this component ever renders them
  * (a module-level export here with no other importer would trip Knip).
  */
@@ -22,14 +22,15 @@ const HINT_ROWS: ReadonlyArray<{ n: number; content: ReactNode }> = [
   { n: 2, content: "Drag a shader’s output into its input" },
   {
     n: 3,
-    // dc L60 links to a "preset" anchor (href="#") — replaced with plain text
-    // to avoid a dead link in the real app (approved deviation, see task notes).
+    // The dc links to a "preset" anchor (href="#") — replaced with plain text
+    // to avoid a dead link in the real app (approved deviation).
     content: "Or load a preset from the toolbar to start rolling",
   },
 ];
 
 /**
- * Viewport empty-state overlay (design/Viewport.dc.html L49-63): shown when
+ * Viewport empty-state overlay (design/Viewport.dc.html "EMPTY STATE"):
+ * shown when
  * the compiled plan has zero drawable Output panes (no Output node, or one
  * with nothing wired into its source). Purely a DOM overlay above the
  * WebGL canvas — `pointer-events: none` throughout so camera drag and the

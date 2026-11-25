@@ -87,7 +87,7 @@ test.describe("Phase 9 — editor UX", () => {
     await expect
       .poll(() => readSp(page, (sp) => sp.graph.getState().nodes.length))
       .toBe(startCount + 1);
-    // The node now present is exactly the one we asked for (C1).
+    // The node now present is exactly the one we asked for.
     expect(
       await readSp(page, (sp) =>
         sp.graph.getState().nodes.some((n) => n.id === "undo_target"),
@@ -102,7 +102,7 @@ test.describe("Phase 9 — editor UX", () => {
       .poll(() => readSp(page, (sp) => sp.graph.getState().nodes.length))
       .toBe(startCount);
     // Undo removed exactly that node and restored the original id set — a
-    // length-only check would still pass if undo dropped the wrong node. (C1)
+    // length-only check would still pass if undo dropped the wrong node.
     await expect
       .poll(() =>
         readSp(page, (sp) =>

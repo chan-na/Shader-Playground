@@ -60,8 +60,8 @@ describe("StatusOverlays", () => {
     );
   });
 
-  // T1/D-1: passesOpen is the third mutually-exclusive slot (see
-  // debugUiStore.ts's 3-way exclusion / design-request v2.3 AA1 note).
+  // passesOpen is the third mutually-exclusive slot (see debugUiStore.ts's
+  // 3-way exclusion note).
   it("shows the passes overlay with the Pass Inspector when passesOpen", () => {
     render(<StatusOverlays />);
 
@@ -122,9 +122,9 @@ describe("StatusOverlays", () => {
     expect(useDebugUiStore.getState().open).toBe(false);
   });
 
-  // T3/T4 (§v1.6, design/App Shell.dc.html L403-433): diagnostics gets the
-  // 26px metric strip; problems never gets the strip. (X12 §v2.1 removed the
-  // 2x2 metric cards entirely, so there is no longer a suppression to assert.)
+  // design/App Shell.dc.html "DIAGNOSTICS / PROBLEMS OVERLAY": diagnostics
+  // gets the 26px metric strip; problems never gets the strip. There are no
+  // metric cards, so there is no suppression to assert.
   it("shows the metric strip when diagnostics is open (T3)", () => {
     render(<StatusOverlays />);
 

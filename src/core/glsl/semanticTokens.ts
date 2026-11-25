@@ -135,8 +135,8 @@ export function classifySemanticTokens(source: string): SemanticToken[] {
   // under-advance by one character per preceding line. The only production
   // caller is `semanticHighlight.ts`, which feeds `view.state.doc.toString()`
   // and CodeMirror normalises CRLF to LF on doc construction — so this walk is
-  // not reachable with `\r` today. It is kept exact anyway: the defect is the
-  // same one that corrupted CRLF renames, and `main.tsx` exposes `classify`
+  // not reachable with `\r` today. It is kept exact anyway: the defect would be
+  // the same one that corrupts CRLF renames, and `main.tsx` exposes `classify`
   // as a dev hook that takes an arbitrary string.
   const lines = maskComments(source).split("\n");
 
@@ -159,7 +159,7 @@ export function classifySemanticTokens(source: string): SemanticToken[] {
     // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
     while ((m = identRe.exec(line)) !== null) {
       // `v.xyz` / `light.color` name a member, not the same-named global —
-      // painting them with the global's colour is a lie (L5).
+      // painting them with the global's colour is a lie.
       if (precededByDot(line, m.index)) continue;
       const name = m[0];
       const kind = classifyIdentifier(table, name, lineNo);

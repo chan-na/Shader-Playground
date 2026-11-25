@@ -25,7 +25,7 @@ const dotStyle: CSSProperties = {
 };
 
 /**
- * Inline live-status readout (design/Side Panel.dc.html L141's "Stream
+ * Inline live-status readout (design/Side Panel.dc.html WEBCAM's "Stream
  * active · 1280×720 @ 30fps" pill) shared by the Webcam/Video/Audio
  * inspectors' status rows. `muted` has no matching mock — idle/no-asset
  * copy is presentation-only for this refactor — so it borrows the

@@ -259,7 +259,7 @@ describe("encodeGif", () => {
     expect(gif.images[0]?.delayCs).toBe(2);
   });
 
-  // #31 — the GCE delay field is u16. A caller handing over an absurd delay
+  // The GCE delay field is u16. A caller handing over an absurd delay
   // (a stalled RAF loop, a hand-built frame list) must saturate rather than
   // wrap: 0x10000 cs would truncate to 0 and play "as fast as possible".
   it("saturates an out-of-range delay at the u16 maximum instead of wrapping", () => {

@@ -309,7 +309,7 @@ void main() {
   });
 });
 
-// CRLF sources (F3). The line walk here shares its offset arithmetic with
+// CRLF sources. The line walk here shares its offset arithmetic with
 // `references.ts`, where a `\r` stripped by `split(/\r?\n/)` made every offset
 // after line 1 drift by one character per preceding line. The only production
 // caller feeds `view.state.doc.toString()`, which CodeMirror has already

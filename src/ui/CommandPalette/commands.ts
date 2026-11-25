@@ -563,8 +563,8 @@ export function buildCommands(): Command[] {
       run: () => reset(),
     },
     // Auto-open 도달성 — Code가 34px 레일로 접히면 인라인 토글이 숨으므로
-    // 팔레트에서 접힘과 무관하게 토글한다 (dc Command Palette.dc.html,
-    // design/CHANGELOG.md §v2.1). AutoOpenToggle.tsx와 동일하게 editorStore의
+    // 팔레트에서 접힘과 무관하게 토글한다 (dc Command Palette.dc.html
+    // "Toggle Code auto-open"). AutoOpenToggle.tsx와 동일하게 editorStore의
     // setAutoCode를 재사용 — 상태는 run() 시점에 읽는다(빌드 시 캡처 금지).
     {
       id: "toggle-code-auto-open",

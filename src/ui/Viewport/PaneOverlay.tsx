@@ -9,7 +9,7 @@ import { bottomRowFlags, dividerCssRects, paneCssRects } from "./paneLayout";
 /**
  * DOM overlay for the Output pane composite grid: 1px divider seams +
  * per-pane label / GPU-ms badge / resolution caption (design/Viewport.dc.html
- * L65-87). Geometry is derived from `paneLayout.ts`, which shares the exact
+ * "RENDER GRID"). Geometry is derived from `paneLayout.ts`, which shares the exact
  * `splitLayout` split the GL composite pass draws into, so this layer can
  * never drift from the WebGL canvas beneath it.
  *
@@ -41,11 +41,10 @@ export function PaneOverlay() {
         const ms = byNode[pane.sourceNodeId];
         const outputNode = nodes.find((n) => n.id === pane.outputNodeId);
         const display = outputNode ? displayNodeName(outputNode) : null;
-        // [D15] dc L247 "Output · main" — 사용자 지정 이름만 접미로 노출한다.
+        // dc 렌더 그리드의 "Output · main" — 사용자 지정 이름만 접미로 노출한다.
         // displayNodeName의 폴백(NODE_META.output.label "Output")이 그대로
         // 오면 접미를 생략해 "Output · Output" 중복을 피한다 (미지정 노드
-        // 폴백 표기: "Output" 단독 — A/B/C/D 칩이 이미 pane을 구분한다.
-        // 잠정 결정, followup 참조).
+        // 폴백 표기: "Output" 단독 — A/B/C/D 칩이 이미 pane을 구분한다).
         const paneName =
           display && display !== NODE_META.output.label
             ? `Output · ${display}`

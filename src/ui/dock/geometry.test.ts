@@ -296,7 +296,7 @@ describe("clampDividerRatio — R7", () => {
   it("returns hi when the span is too narrow for both pixel minimums (lo > hi) — dc 수식 동치, 가드 아님", () => {
     // span = 480 - 6 = 474; minFrac = 240/474 ≈ 0.50633 → lo ≈ 0.50633, hi ≈ 0.49367.
     // lo > hi이므로 Math.max(lo, ratio) >= lo > hi가 항상 성립해 hi가 이긴다 — dc onMove
-    // 원본 수식(L420-424) 그대로, 이 함수가 임의로 추가한 가드가 아니다.
+    // divider 분기 원본 수식 그대로, 이 함수가 임의로 추가한 가드가 아니다.
     const result = clampDividerRatio("row", 480, 826, 0.5);
     expect(result).toBeCloseTo(0.49367, 5);
     // ratio 입력값에 무관하게 항상 hi로 수렴함을 함께 확인.

@@ -29,10 +29,11 @@
  * 드래그 엔진 + 고스트/프리뷰 오버레이: `DockLayout` 루트가 드래그
  * 오케스트레이션 전체(pending → 고스트 전환 임계값, 고스트 추적, 드롭
  * 판정, release 처리)를 소유한다 — dc `onMove`/`onUp` 이식. **`pointer*`
- * 이벤트만 사용한다(mouse 계열/키보드 DnD 금지 — 디자인 결정)**. 트리
- * 변형(분리/재도킹) 자체는 `dockStore.detachForDrag`/`dockDetached`에
- * 위임 — 이 컴포넌트는 (1) 임계값/좌표/드롭 판정, (2) 트랜지언트 고스트·
- * 프리뷰의 렌더링만 담당한다. 드래그 시작 트리거(`startLeafDrag`/
+ * 이벤트만 사용한다(mouse 계열 금지, 키보드 DnD 미도입 — 번들 예산.
+ * design/CHANGELOG.md R10 "접근성/입력")**. 트리 변형(분리/재도킹)
+ * 자체는 `dockStore.detachForDrag`/`dockDetached`에 위임 — 이 컴포넌트는
+ * (1) 임계값/좌표/드롭 판정, (2) 트랜지언트 고스트·프리뷰의 렌더링만
+ * 담당한다. 드래그 시작 트리거(`startLeafDrag`/
  * `startTabDrag`)는 `DockDragContext`로 서브트리 전체에 내려보내고, leaf
  * 헤더(`DockPanelHeader`의 grab handle/탭)가 이를 배선한다.
  */

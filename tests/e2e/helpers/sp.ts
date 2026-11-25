@@ -243,66 +243,6 @@ export interface SpStores {
     >;
     dispose: () => void;
   };
-  glslSymbols: {
-    build: (source: string) => {
-      symbols: Array<{
-        name: string;
-        type: string;
-        kind: string;
-        line: number;
-        column: number;
-        scope: string | null;
-        parameters?: string;
-      }>;
-    };
-    visibleAt: (
-      table: { symbols: unknown[] },
-      line: number,
-    ) => Array<{
-      name: string;
-      type: string;
-      kind: string;
-      line: number;
-      column: number;
-      scope: string | null;
-    }>;
-    resolve: (
-      table: { symbols: unknown[] },
-      name: string,
-      line: number,
-    ) => {
-      name: string;
-      type: string;
-      kind: string;
-      line: number;
-      scope: string | null;
-    } | null;
-    builtins: Record<string, { signatures: string[]; description: string }>;
-    keywords: Record<string, string>;
-    findReferences: (
-      source: string,
-      name: string,
-      atLine: number,
-    ) => Array<{
-      from: number;
-      to: number;
-      line: number;
-      column: number;
-      isDefinition: boolean;
-    }>;
-  };
-  glslSemanticTokens: {
-    classify: (source: string) => Array<{
-      from: number;
-      to: number;
-      kind: string;
-    }>;
-    classifyIdentifier: (
-      table: { symbols: unknown[] },
-      name: string,
-      line: number,
-    ) => string | null;
-  };
   codeEditor: {
     getCursorLine: () => number | null;
     focus: () => void;

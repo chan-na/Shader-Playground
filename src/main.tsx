@@ -12,15 +12,7 @@ import {
   setAudioBlobResolver,
   setVideoBlobResolver,
 } from "./core/external/resolvers";
-import { BUILTIN_FUNCTIONS, KEYWORD_DESCRIPTIONS } from "./core/glsl/builtins";
 import { glslValidator } from "./core/glsl/glslValidator";
-import { findReferences } from "./core/glsl/references";
-import {
-  classifyIdentifier,
-  classifySemanticTokens,
-} from "./core/glsl/semanticTokens";
-import { resolveSymbol, symbolsVisibleAt } from "./core/glsl/symbolScope";
-import { buildSymbolTable } from "./core/glsl/symbolTable";
 import { getCurrentView, getCursorLine } from "./ui/CodeEditor/currentView";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
@@ -100,28 +92,9 @@ if (import.meta.env.DEV) {
     // capture via the RAF loop, stops, and validates the produced blob.
     gifRecorder: useGifRecorderStore,
     glslValidator,
-    // Phase 25 — LSP helpers exposed for E2E. Tests build a symbol table
-    // from a source string and resolve identifiers without round-tripping
-    // through CodeMirror.
-    glslSymbols: {
-      build: buildSymbolTable,
-      visibleAt: symbolsVisibleAt,
-      resolve: resolveSymbol,
-      builtins: BUILTIN_FUNCTIONS,
-      keywords: KEYWORD_DESCRIPTIONS,
-      // Phase 27 — reference finder. E2E can ask for every occurrence of a
-      // symbol at a given line without round-tripping through CodeMirror.
-      findReferences,
-    },
-    // Phase 26 — semantic token classifier exposed for E2E. Tests can drive
-    // `classify(source)` without going through the CodeMirror ViewPlugin to
-    // verify token kinds and offsets directly.
-    glslSemanticTokens: {
-      classify: classifySemanticTokens,
-      classifyIdentifier,
-    },
-    // Phase 27 — CodeMirror observation hook. Tests read cursor state /
-    // dispatch focus on the active editor without owning the React ref.
+    // CodeMirror observation hook used by phase-27 E2E (`sp.codeEditor`):
+    // tests read cursor state / dispatch focus on the active editor without
+    // owning the React ref.
     codeEditor: {
       getCursorLine,
       focus: () => {

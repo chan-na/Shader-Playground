@@ -657,8 +657,8 @@ state/gifRecorder.ts    # 캡처 오케스트레이션 (recorder.ts 와 형제)
 
 **테스트 전용 헬퍼** (프로덕션에서 import 하지 않는다):
 
-- `src/state/testStores.ts`: `resetAllStores()`. 도킹 스토어를 포함한 모든 스토어를 생성 시점 상태로 되돌린다
-- `src/core/graph/testNodes.ts`: 노드 종류별 최소 유효 노드 팩토리
+- `src/state/testStores.ts`: `resetAllStores()`. 그래프·선택·에디터·진단·도킹 등 15개 스토어를 생성 시점 상태로 되돌린다(camera·viewport·toast·commandPalette·connectionUi·exportShare·recorder·gifRecorder는 제외 — 이 스토어를 쓰는 테스트는 직접 리셋한다)
+- `src/core/graph/testNodes.ts`: shader·compute·mesh·param·output 노드의 최소 유효 팩토리 (다른 종류는 테스트에서 직접 구성)
 - `src/ui/NodeEditor/testFlow.tsx`: `ReactFlowProvider` 로 감싼 렌더와 `nodeProps`
 - `src/ui/dock/testDockTree.ts`: `asSplit` narrowing
 - `src/core/gl/fakeGl.ts`: `createFakeGl()` 가짜 WebGL2 컨텍스트
@@ -680,7 +680,7 @@ state/gifRecorder.ts    # 캡처 오케스트레이션 (recorder.ts 와 형제)
 - `createDefaultDockTree()` 의 구조는 `row 0.25 [ code(l4) | row 0.6 [ nodeEditor(l3) | col 0.52 [ viewport(l1) | inspector+assets(l2) ] ] ]` 이다.
 - 불변 갱신 헬퍼로 `getNodeAt` · `setNodeAt` · `removePanel` · `findLeafPath` · `findTabLeafPath` · `collectPanelIds` · `firstMergeableLeafPath` 가 있다. leaf 가 비어 소멸하면 부모 split 은 형제 노드로 축약된다.
 - `canMergeDockTabs`: `viewport`·`code` 는 이종 leaf 에 병합되지 않는다. WebGL 컨텍스트와 CodeMirror 재마운트를 막기 위해서다.
-- 형제 모듈은 `tree.ts` 만 바라보는 단방향 구조다.
+- `tree.ts` 는 형제 모듈을 import 하지 않는 leaf 다. 의존은 단방향(비순환)이다: geometry → tree, drop → geometry·tree, dockLayoutModel → geometry·tree, dockStore → drop·geometry·tree, snapshot → tree.
 
 ### 13.2 기하 배치 (`geometry.ts`)
 

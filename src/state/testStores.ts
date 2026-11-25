@@ -1,7 +1,9 @@
-// Test-only: put every app store back to its creation-time state. The stores
-// are module singletons, so panel/overlay tests that mount components reading
-// several of them reset all of them between cases instead of each file
-// keeping its own list (and silently leaking whichever store it forgot).
+// Test-only: put the listed app stores back to their creation-time state
+// (camera, viewport, toast, commandPalette, connectionUi, exportShare,
+// recorder and gifRecorder are not covered). The stores are module
+// singletons, so panel/overlay tests that mount components reading several of
+// them reset all of them between cases instead of each file keeping its own
+// list (and silently leaking whichever store it forgot).
 //
 // `getInitialState()` is zustand's snapshot of the state the store was created
 // with; replacing (`true`) rather than merging also drops any keys a test

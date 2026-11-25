@@ -138,9 +138,10 @@ function escapeHtml(s: string): string {
 
 /**
  * Downloads the standalone export and returns the file name it was actually
- * saved under — callers (the Export & Share done card/toast) must
- * display this return value rather than re-deriving a name themselves, so
- * displayed name and saved name can never drift apart.
+ * saved under (design/README.md "파일명 규칙") — callers (the Export &
+ * Share done card/toast) must display this return value rather than
+ * re-deriving a name themselves, so displayed name and saved name can never
+ * drift apart.
  */
 export function downloadExportedHtml(
   graph: Graph,

@@ -1,7 +1,8 @@
 /** 노드 선택 → Code 패널 자동 접기/펼침 배선.
- * 정본: design/CHANGELOG.md "Code 자동 접기" 항목 + design/App Shell.dc.html
- * `selectNode`. 상태머신: 빈 선택=현상 유지 · 선택에 code-editable
- * kind(shader|compute) 포함=펼침 · 미포함=접힘 · autoCode OFF=no-op.
+ * 정본: design/CHANGELOG.md §v2.0 W5 "U2 Code 자동 접기" 항목 +
+ * design/App Shell.dc.html `selectNode`. 상태머신: 빈 선택=현상 유지 ·
+ * 선택에 code-editable kind(shader|compute) 포함=펼침 · 미포함=접힘 ·
+ * autoCode OFF=no-op.
  * compute 포함은 dc(shader만 존재)에 없는 구현 확장 — CodeEditor가 compute
  * 소스를 편집하므로(CodeEditor/index.tsx effectiveId 판정과 동일 집합)
  * 접으면 편집 대상이 숨는 모순을 피한다. */

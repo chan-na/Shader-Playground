@@ -61,7 +61,7 @@ Vitest 4 + jsdom, 테스트는 대상 모듈 옆 `src/**/*.test.{ts,tsx}`. 커�
 
 ### 1-6. Playwright E2E (`npm run test:e2e`)
 
-SwiftShader WebGL, chromium 단일, 직렬(`workers: 1`). 파일명은 `tests/e2e/phase-N-*.spec.ts`로 SPEC의 Phase 번호와 1:1 대응한다 (Phase 35 = 도킹 `phase-35-dock-*`).
+SwiftShader WebGL, chromium 단일, 직렬(`workers: 1`). 파일명은 `tests/e2e/phase-N-*.spec.ts`로 SPEC Phase 번호를 접두사로 쓴다. 한 파일이 여러 Phase를 덮거나(`phase-1-2-*`), 한 Phase가 여러 파일이거나(35·37·38), 전용 스펙이 없는 Phase(0·22·32)도 있으므로 정확한 매핑은 SPEC.md §4 표를 본다 (Phase 35 = `phase-35-*`: dock-chrome/drag/persistence + code-auto-open).
 
 - 앱 상태는 `src/main.tsx`가 노출하는 `window.__sp` 테스트 훅으로 다룬다. 헬퍼는 `tests/e2e/helpers/`(`sp.ts`의 `withSp`/`readSp`, `dom.ts`의 `boxOf`, `editor.ts`, `render.ts`, `fixtures.ts`) — 스펙 안에서 재구현하지 말 것.
 - UI/상호작용/렌더 파이프라인 변경은 관련 Phase 스펙을 통과해야 한다. 실패 시 회귀를 먼저 의심하고, 의도된 동작 변경이면 **사용자 합의 후** 스펙을 갱신한다. expectation 약화 금지.
@@ -108,7 +108,7 @@ SwiftShader WebGL, chromium 단일, 직렬(`workers: 1`). 파일명은 `tests/e2
 주석은 다음 에이전트가 읽는 컨텍스트다. 썩지 않게 쓴다.
 
 - **줄번호를 인용하지 않는다** (`L123`, `~L45`, `file.ts:80`). 심볼·셀렉터·함수명·섹션 제목으로 가리킨다: `design/Side Panel.dc.html (AUTO badge)`, `` dc `computeDrop` ``, `.dock-header-tabs`.
-- **리뷰/라운드 ID(F22, X12, v2.1, M1-U3 …)와 변경 이력을 코드 주석에 쓰지 않는다.** 현재 동작과 그 이유(WHY)만 남긴다. 이력은 git과 `design/CHANGELOG.md`에 있다. `Phase N`과 저장소에 실재하는 문서의 결정 ID 인용은 허용.
+- **리뷰/라운드 ID(F22, M1-U3, B6-U1, L23 …)·버전 태그(v2.1)·변경 이력을 코드 주석에 쓰지 않는다.** 현재 동작과 그 이유(WHY)만 남긴다. 이력은 git과 `design/CHANGELOG.md`에 있다. 예외: `Phase N`, 그리고 `design/CHANGELOG.md`·`design/README.md`에 정의된 디자인 결정 ID(R*/S*/T*/V*/W*/X*/Y*/Z*/Q*, [Dn]/[C-n]/[B-n])는 근거·의도적 이탈을 가리키는 앵커로 인용해도 된다. 이때는 문서 경로와 함께 쓴다(예: `design/CHANGELOG.md §v1.4 R9`). `temp/`나 닫힌 리뷰 라운드에서만 풀리는 ID는 금지.
 - 파일을 옮기거나 쪼개면 그 경로를 인용하는 주석·문서도 같이 고친다 (`grep -rn <옛 경로>`).
 - 진짜 근거·불변식·함정·우회 사유는 지우지 않는다 — 가장 가치 있는 주석이다.
 

@@ -92,7 +92,6 @@ CM pointer (hover)
 - 사용자가 GLSL 의 nested function 처럼 보이는 lambda 등을 적으면 헤더 매칭이 어긋날 수 있으나, GLSL ES 는 nested function decl 자체가 없어서 실제 셰이더에서는 발생하지 않음.
 - `for` 안의 동일 라인에 일반 decl 이 함께 있으면 dupe 회피 가드가 두 번째 등록을 막음.
 
-**DEV bridge** — `window.__sp.glslSymbols = { build, visibleAt, resolve, builtins, keywords }` (다른 store 와 동형, DEV 빌드 한정). E2E 가 CM 와이어링 없이 심볼 파싱 정확도를 직접 검증할 때 사용.
 
 ### 8.6 시맨틱 토큰 하이라이트 (Phase 26)
 
@@ -123,9 +122,8 @@ buildSemanticDecorations(view)
 - **11 종 토큰 kind**: `uniform / system-uniform / in / out / attribute / varying / const / parameter / struct-type / function-user / function-builtin`. local 은 의도적으로 미분류 → 에디터 기본 색.
 - **우선순위**: in-scope 심볼 테이블이 1순위 → 사용자가 `float sin(...)` 으로 빌트인 이름을 재정의하면 `function-user` 가 이긴다. 이미 사용자 uniform 이름이 `u_*` 라도 SYSTEM_UNIFORMS 셋에 없으면 `uniform` 으로 분류된다.
 - **CSS 매핑**: 각 kind 는 `cm-glsl-token-<kind>` 클래스 → `glslSetup.ts` 의 dark theme 에서 색 지정 (VS Code Dark+ 관례).
-- **cost 통제**: 정규식 스캔은 라인당 1 회지만 **심볼 테이블 lookup 은 식별자마다** 일어난다 (`classifyIdentifier` → `resolveSymbol` → `symbolsVisibleAt`). 그래서 `symbolsVisibleAt` 이 `WeakMap<SymbolTable, Map<line, GlslSymbol[]>>` 로 메모이즈되어 있고(테이블 **아이덴티티** 키 — cross-stage rename 이 한 호출에서 두 테이블을 쓴다), 같은 라인의 N 개 식별자는 계산을 1 회만 공유한다. 메모는 캐시 배열을 그대로 주지 않고 `slice()` 사본을 돌려준다 — `main.tsx` 의 DEV `__sp.glslSymbols.visibleAt` 브리지로 E2E 페이지 코드가 그 배열을 쥐기 때문. viewport 외 토큰은 RangeSetBuilder 에 추가하지 않으므로 큰 문서에서도 O(visible-lines) decoration 만 보유.
+- **cost 통제**: 정규식 스캔은 라인당 1 회지만 **심볼 테이블 lookup 은 식별자마다** 일어난다 (`classifyIdentifier` → `resolveSymbol` → `symbolsVisibleAt`). 그래서 `symbolsVisibleAt` 이 `WeakMap<SymbolTable, Map<line, GlslSymbol[]>>` 로 메모이즈되어 있고(테이블 **아이덴티티** 키 — cross-stage rename 이 한 호출에서 두 테이블을 쓴다), 같은 라인의 N 개 식별자는 계산을 1 회만 공유한다. 메모는 캐시 배열을 그대로 주지 않고 `slice()` 사본을 돌려준다 — 호출자가 결과를 자유롭게 정렬·splice 해도 캐시가 오염되지 않도록. viewport 외 토큰은 RangeSetBuilder 에 추가하지 않으므로 큰 문서에서도 O(visible-lines) decoration 만 보유.
 - **주석 마스킹 단일화 (`core/glsl/stripComments.ts`)**: import 0 건 leaf. `maskComments`(블록+라인) / `maskBlockComments`(블록만) 두 진입점을 한 스캐너가 처리한다. symbolTable · references · semanticTokens 는 combined 를, `parseUniforms` / `writeUniformHints` 는 **block-only** 를 쓴다 — 후자는 `//` 뒤의 `@range` / `@label` 을 *읽어야* 하므로 combined 를 쓰면 앱 전체의 uniform 힌트가 사라진다. 두 진입점 모두 **길이 보존**이 계약이다(라인 길이로 doc offset 을 전진시켜 rename 편집 범위를 만든다). 미종료 `/*` 처리는 두 진입점이 **의도적으로 갈린다** — `maskComments` 는 GLSL 렉서처럼 EOF 까지 마스킹하고(소비자는 심볼/하이라이트/참조 같은 에디터 보조 기능뿐), `maskBlockComments` 는 평문으로 남긴다. 후자의 소비자는 노드의 **포트 표면**(`parseUniforms` → `nodeInputPorts`)을 만들고 스토어는 사라진 포트의 엣지를 프룬하므로, EOF 마스킹이면 사용자가 `/*` 를 치는 순간 50ms 디바운스가 그 노드의 입력 엣지를 전부 지운다 — 닫는 `*/` 를 쳐도 포트만 돌아오고 배선은 돌아오지 않는다. 잠정적·구문 미완성 편집이 그래프 상태를 파괴해서는 안 된다.
-- **DEV bridge**: `window.__sp.glslSemanticTokens = { classify, classifyIdentifier }` (다른 store/glsl 모듈과 동형, DEV 빌드 한정). E2E 가 CM 와이어링 없이 분류 정확도와 정렬 계약을 직접 검증.
 
 ### 8.7 Goto / References / Rename (Phase 27 + Phase 28 cross-stage)
 
@@ -156,7 +154,7 @@ CodeMirror 와이어링 (glslSetup.ts)
 - **Rename UX**: 기본 prompt 는 `window.prompt` (가장 마찰 적은 경로). 검증은 `^[A-Za-z_][A-Za-z0-9_]*$` + `GLSL_KEYWORDS ∪ GLSL_TYPES` 예약어 set. 결과는 `RenameResult` discriminated union — `applied: true` 면 `{ sites, otherStageSites, newName }`(`otherStageSites` = 다른 stage 에서 교체된 site 수, single-document rename 은 0), false 면 `{ reason }` 로 5 종 skip 사유(`not-on-identifier` / `no-binding` / `prompt-cancelled` / `unchanged` / `invalid-name`).
 - **Active highlight**: 단일 site(decl 만 존재)면 `Decoration.none` — 노이즈 회피. 비용은 cursor 이동마다 `buildSymbolTable + findReferences` 한 번이지만 playground 규모에서 < 1ms 추정이라 debounce 없음.
 - **CodeEditor observation bridge (`ui/CodeEditor/currentView.ts`)**: `ui/CodeEditor/index.tsx` 가 mount/unmount 시 `setCurrentView(view)` / `setCurrentView(null)` 로 module-level ref 갱신. 프로덕션 코드는 의존하지 않고, `__sp.codeEditor = { getCursorLine, focus }` (DEV 한정) 으로 E2E 가 cursor 위치를 직접 읽는다 — F12 점프 결과 검증을 CM DOM 추측 없이 line number 비교로 처리.
-- **DEV bridge 추가**: `window.__sp.glslSymbols.findReferences` (references finder), `window.__sp.codeEditor` (cursor introspection). 기존 Phase 25 의 `glslSymbols` 객체에 한 함수만 더해 형태가 일관된다.
+- **DEV bridge 추가**: `window.__sp.codeEditor` (cursor introspection).
 
 #### 8.7.1 Cross-stage rename (Phase 28)
 

@@ -1196,14 +1196,21 @@ void main(){}`,
         { id: "b", kind: "mesh", primitive: "sphere" },
         { x: 200, y: 150 },
       );
+      s.addNode(
+        { id: "c", kind: "mesh", primitive: "plane" },
+        { x: 400, y: 300 },
+      );
       s.setParent("a", outer);
       s.setParent("b", outer);
+      s.setParent("c", outer);
 
       const inner = useGraphStore.getState().groupSelected(["a", "b"]);
       const next = useGraphStore.getState();
       expect(next.parents[inner!]).toBe(outer);
       expect(next.parents.a).toBe(inner);
       expect(next.parents.b).toBe(inner);
+      // Unselected sibling stays in the outer group, not pulled into inner.
+      expect(next.parents.c).toBe(outer);
     });
 
     it("groupSelected falls back to top-level when selection has mixed parents", () => {

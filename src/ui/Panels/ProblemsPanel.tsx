@@ -38,9 +38,10 @@ interface VaryingEntry {
 
 type Severity = GLSLDiagnostic["severity"];
 
-// dc Problems panel (design/System States.dc.html "panel: PROBLEMS"):
-// ✕/⚠/ⓘ paired with
-// semantic.error/warning/info — the panel's only severity → glyph/color map.
+// ✕/⚠/ⓘ paired with semantic.error/warning/info come from the former
+// Side Panel Problems tab (design ≤v2.0; tab removed by design/CHANGELOG
+// Y1). No current dc defines ⓘ. System States "panel: PROBLEMS" uses ✕/!.
+// This is the panel's only severity → glyph/color map.
 const SEVERITY_ICON: Record<Severity, string> = {
   error: "✕",
   warning: "⚠",
@@ -109,7 +110,8 @@ export function ProblemsPanel() {
     return out;
   }, [varyingsByNode]);
 
-  // dc Problems panel: severity summary chips, one per
+  // Severity summary chips (from the former Side Panel Problems tab, design
+  // ≤v2.0, removed in CHANGELOG Y1; no current dc defines them), one per
   // severity present (>0 count) above the diagnostic/runtime-error list.
   // Silent warnings and varying-bridge warnings both fold into the
   // "warning" bucket alongside any diagnostic of severity "warning" —

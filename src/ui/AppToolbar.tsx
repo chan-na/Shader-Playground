@@ -19,6 +19,7 @@ import {
 import { useExportShareStore } from "../state/exportShareStore";
 import { useGifRecorderStore } from "../state/gifRecorder";
 import { redoGraph, undoGraph, useGraphStore } from "../state/graphStore";
+import { useHelpModalStore } from "../state/helpModalStore";
 import { useHistoryStore } from "../state/historyStore";
 import { useRecorderStore } from "../state/recorder";
 import { useRendererStore } from "../state/rendererStore";
@@ -29,7 +30,6 @@ import { downloadBlob } from "../utils/downloadBlob";
 import { PANEL_DOTS, PANEL_TITLES } from "./dock/dockLayoutModel";
 import { useDockStore } from "./dock/dockStore";
 import { collectPanelIds, DOCK_PANEL_IDS } from "./dock/tree";
-import { useHelpModalStore } from "./NodeEditor/HelpModal";
 import { getViewportCanvas } from "./Viewport/viewportCanvas";
 
 const isMac =

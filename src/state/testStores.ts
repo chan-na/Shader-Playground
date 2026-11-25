@@ -17,6 +17,7 @@ import { useDiagnosticsStore } from "./diagnosticsStore";
 import { useEditorStore } from "./editorStore";
 import { useGpuTimerStore } from "./gpuTimerStore";
 import { useGraphStore } from "./graphStore";
+import { useHelpModalStore } from "./helpModalStore";
 import { useHistoryStore } from "./historyStore";
 import { useMouseStore } from "./mouseStore";
 import { usePassPlanStore } from "./passPlanStore";
@@ -37,6 +38,7 @@ export function resetAllStores(): void {
   resetToInitial(useEditorStore);
   resetToInitial(useGpuTimerStore);
   resetToInitial(useGraphStore);
+  resetToInitial(useHelpModalStore);
   resetToInitial(useHistoryStore);
   resetToInitial(useMouseStore);
   resetToInitial(usePassPlanStore);

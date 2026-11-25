@@ -1,17 +1,5 @@
 import { useEffect } from "react";
-import { create } from "zustand";
-
-interface HelpModalState {
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  toggle: () => void;
-}
-
-export const useHelpModalStore = create<HelpModalState>((set) => ({
-  open: false,
-  setOpen: (open) => set({ open }),
-  toggle: () => set((s) => ({ open: !s.open })),
-}));
+import { useHelpModalStore } from "../../state/helpModalStore";
 
 interface ShortcutRow {
   keys: string;

@@ -750,6 +750,7 @@ ShaderPlayground/
    │  ├─ thumbnailScheduler.ts       # core/thumbnail/scheduler 싱글톤 (+ test)
    │  ├─ gpuTimerStore.ts            # Phase 15 — byNode EMA ms + totalMs + supported/enabled (+ test)
    │  ├─ toastStore.ts               # 사용자 토스트 큐 (info/success/warning/error) (+ test)
+   │  ├─ helpModalStore.ts           # 단축키 도움말 모달 open/toggle (+ test)
    │  └─ debugUiStore.ts             # 진단 패널 open + level/category 필터 (leaf store — log 타입만 의존) (+ test)
    │
    ├─ ui/                            # ── React 컴포넌트 ────────────────
@@ -765,7 +766,7 @@ ShaderPlayground/
    │  │  ├─ Toolbar.tsx              # 노드 팔레트 / 저장 / Share / Record / Export HTML
    │  │  ├─ NodeThumbnail.tsx        # 카드 <canvas> + IntersectionObserver
    │  │  ├─ nodeUiRegistry.ts        # GraphNodeKind → NodeView 컴포넌트 매핑 (+ test)
-   │  │  ├─ HelpModal.tsx            # 단축키/도움말 모달 (+ test)
+   │  │  ├─ HelpModal.tsx            # 단축키/도움말 모달 (helpModalStore 구독) (+ test)
    │  │  ├─ nodeCard.css
    │  │  └─ nodes/
    │  │     ├─ MeshNodeView.tsx
@@ -802,7 +803,8 @@ ShaderPlayground/
    │  │  └─ index.tsx                # <canvas> + RAF + asyncReadback 펌프 + cameraCtl
    │  │
    │  ├─ CommandPalette/
-   │  │  ├─ index.tsx                # Cmd+K — 노드/프리셋/Math/Swizzle/Combine 추가
+   │  │  ├─ index.tsx                # Cmd+K 팔레트 컴포넌트 — 검색·랭킹·그룹 렌더 (+ test)
+   │  │  ├─ commands.ts              # buildCommands — 노드/프리셋/Math/Swizzle/Combine/앱 커맨드 카탈로그
    │  │  └─ helpers.ts               # fuzzyMatch 등 검색 스코어링 (+ test)
    │  │
    │  └─ Panels/

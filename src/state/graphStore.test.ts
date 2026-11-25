@@ -1053,6 +1053,7 @@ void main(){}`,
       const id = useGraphStore
         .getState()
         .addGroup("Effects", { x: 100, y: 100 }, { width: 200, height: 150 });
+      expect(id).toMatch(/^group/);
       const s = useGraphStore.getState();
       const group = s.nodes.find((n) => n.id === id);
       expect(group?.kind).toBe("group");
@@ -1100,6 +1101,10 @@ void main(){}`,
       s.setParent(g2, g1);
       const ok = useGraphStore.getState().setParent(g1, g2);
       expect(ok).toBe(false);
+      // The rejected call leaves the parents map as it was.
+      const { parents } = useGraphStore.getState();
+      expect(parents[g2]).toBe(g1);
+      expect(parents[g1]).toBeUndefined();
     });
 
     it("setParent on undefined newParent releases to top-level and preserves abs pos", () => {
@@ -1167,6 +1172,13 @@ void main(){}`,
       const groupAbs = next.positions[gid!]!;
       expect(groupAbs.x).toBeLessThanOrEqual(100);
       expect(groupAbs.y).toBeLessThanOrEqual(100);
+      // Children's stored positions become offsets from the group's origin.
+      const aRel = next.positions.a;
+      const bRel = next.positions.b;
+      expect(aRel).toEqual({ x: 100 - groupAbs.x, y: 100 - groupAbs.y });
+      expect(bRel).toEqual({ x: 300 - groupAbs.x, y: 200 - groupAbs.y });
+      expect(aRel?.x).toBeGreaterThan(0);
+      expect(bRel?.x).toBeGreaterThan(aRel?.x ?? Number.POSITIVE_INFINITY);
     });
 
     it("groupSelected inherits the common parent (nested groups)", () => {
@@ -1238,6 +1250,7 @@ void main(){}`,
       const s = useGraphStore.getState();
       s.addNode({ id: "a", kind: "mesh", primitive: "cube" });
       s.addNode({ id: "b", kind: "mesh", primitive: "sphere" });
+      s.addNode({ id: "outside", kind: "mesh", primitive: "plane" });
       s.addEdge({
         id: "e1",
         source: "a",
@@ -1265,6 +1278,8 @@ void main(){}`,
       expect(next.nodes.some((n) => n.id === inner)).toBe(false);
       expect(next.nodes.some((n) => n.id === "a")).toBe(false);
       expect(next.nodes.some((n) => n.id === "b")).toBe(false);
+      // A node outside the removed group survives the cascade.
+      expect(next.nodes.some((n) => n.id === "outside")).toBe(true);
       expect(next.edges).toEqual([]);
     });
 

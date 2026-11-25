@@ -28,6 +28,10 @@ describe("BUILTIN_FUNCTIONS", () => {
       expect(spec.description.length, name).toBeGreaterThan(0);
     }
   });
+
+  it("the texture signature takes a sampler2D", () => {
+    expect(BUILTIN_FUNCTIONS.texture?.signatures[0]).toContain("sampler2D");
+  });
 });
 
 describe("KEYWORD_DESCRIPTIONS", () => {

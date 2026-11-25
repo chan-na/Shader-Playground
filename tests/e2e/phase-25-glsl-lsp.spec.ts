@@ -2,14 +2,14 @@ import { expect, test } from "@playwright/test";
 import { boxOf } from "./helpers/dom";
 import { openStageEditor, seedShaderAndSelect } from "./helpers/editor";
 import { bootApp } from "./helpers/fixtures";
-import { withSp } from "./helpers/sp";
 
 // Phase 25 — LSP-like editor features layered onto CodeMirror 6: a
 // scope-aware symbol table (unit-tested in src/core/glsl/symbolTable.test.ts
 // and symbolScope.test.ts) and a hover tooltip that reads symbols, builtin signatures and system
 // uniforms. The hover wiring is exercised by loading a fragment into the
 // editor and asserting the CodeMirror tooltip DOM appears with the right
-// content.
+// content. The builtin catalogue (signatures, descriptions) is covered by
+// src/core/glsl/builtins.test.ts and hover.test.ts.
 
 const FRAG_WITH_HELPER = `#version 300 es
 precision highp float;
@@ -61,43 +61,5 @@ test.describe("Phase 25 — GLSL LSP (symbol table + hover)", () => {
     // The system-uniform Korean description includes "시간" — see
     // SYSTEM_UNIFORM_DESCRIPTIONS in uniformParser.ts.
     await expect(tooltip).toContainText(/시간|time/i);
-  });
-
-  test("builtin signatures + descriptions are exposed via __sp.glslSymbols.builtins", async ({
-    page,
-  }) => {
-    // The CM-driven hover test above proves the wiring end-to-end. For the
-    // builtin fallback path inside `lookupHover` we lean on the unit tests
-    // (hover.test.ts) and only verify here that the catalogue itself is
-    // exposed on the DEV bridge with the shape the hover renderer reads —
-    // signatures[] non-empty plus a description string. (The `texture`
-    // sampler2D signature check is not yet mirrored in builtins.test.ts.)
-    const result = await withSp(
-      page,
-      (sp, args: { names: string[] }) => {
-        const out: Record<string, { sig0: string; desc: string }> = {};
-        for (const name of args.names) {
-          const spec = sp.glslSymbols.builtins[name];
-          if (spec)
-            out[name] = {
-              sig0: spec.signatures[0] ?? "",
-              desc: spec.description,
-            };
-        }
-        return out;
-      },
-      { names: ["mix", "smoothstep", "length", "texture", "normalize"] },
-    );
-    expect(Object.keys(result).sort()).toEqual([
-      "length",
-      "mix",
-      "normalize",
-      "smoothstep",
-      "texture",
-    ]);
-    expect(result.mix?.sig0).toContain("mix(");
-    expect(result.mix?.desc).toMatch(/interpolat/i);
-    expect(result.length?.sig0).toContain("length(");
-    expect(result.texture?.sig0).toContain("sampler2D");
   });
 });

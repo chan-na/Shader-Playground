@@ -724,7 +724,11 @@ ShaderPlayground/
    │
    ├─ state/                         # ── Zustand 스토어 ────────────────
    │  ├─ types.ts                    # 공유 상태 타입 (NodePosition 등)
-   │  ├─ graphStore.ts               # nodes/edges/positions + rev/uniformRev (+ test)
+   │  ├─ graphStore.ts               # nodes/edges/positions + rev/uniformRev — 슬라이스 조립 + 코어/소스 액션 (+ test)
+   │  ├─ graphStoreTypes.ts          # GraphState (스토어 공개 형태, 슬라이스가 공유하는 리프 모듈)
+   │  ├─ graphStoreHelpers.ts        # pushHistory · reconciled(포트 재조정) · 다중 nudge 조상 판정
+   │  ├─ graphStoreGroups.ts         # 그룹 슬라이스 (addGroup/groupSelected/setParent/removeGroup/접기 …)
+   │  ├─ graphStoreNodeConfig.ts     # 노드 종류별 설정 setter 슬라이스 (math/combine/compute/video/audio …)
    │  ├─ assetStore.ts               # 메시/이미지 카탈로그 (런타임 핸들) (+ test)
    │  ├─ assetActions.ts             # import + IndexedDB hydrate (+ test)
    │  ├─ selectionStore.ts           # selectedNodeIds[] + primary selectedNodeId (+ test)

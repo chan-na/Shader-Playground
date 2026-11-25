@@ -38,6 +38,7 @@ import { thumbnailScheduler } from "../../state/thumbnailScheduler";
 import { useTimeStore } from "../../state/timeStore";
 import { toast } from "../../state/toastStore";
 import { useViewportStore } from "../../state/viewportStore";
+import { downloadBlob } from "../../utils/downloadBlob";
 import { log, normalizeError } from "../../utils/log";
 import { DockPanelHeader } from "../dock/DockPanelHeader";
 import { CompileErrorOverlay } from "./CompileErrorOverlay";
@@ -45,6 +46,7 @@ import { EmptyState } from "./EmptyState";
 import { PaneOverlay } from "./PaneOverlay";
 import { buildPassRows, buildVaryingContracts } from "./passPlanPublish";
 import { TransportBar } from "./TransportBar";
+import { VIEWPORT_CANVAS_CLASS } from "./viewportCanvas";
 
 /** Output 노드 개수 → Viewport 헤더 메타 배지 텍스트("1 · single" 등, App
  *  Shell.dc.html L215). 분할 구현 전이라도 배지는 현재 그래프 상태를 반영한다. */
@@ -68,12 +70,7 @@ function downloadCanvasPng(canvas: HTMLCanvasElement) {
       toast.error("스냅샷 저장 실패 — 캔버스를 읽지 못했습니다.");
       return;
     }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = exportFileName(DEFAULT_EXPORT_BASE, "png");
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, exportFileName(DEFAULT_EXPORT_BASE, "png"));
   }, "image/png");
 }
 
@@ -716,7 +713,7 @@ export function Viewport() {
       <div className="panel-body">
         <canvas
           ref={canvasRef}
-          className="viewport-canvas"
+          className={VIEWPORT_CANVAS_CLASS}
           data-testid="viewport-canvas"
         />
         <EmptyState />

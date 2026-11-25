@@ -25,10 +25,12 @@ import { useRendererStore } from "../state/rendererStore";
 import { deserializeProject, serializeProject } from "../state/serialization";
 import { toast } from "../state/toastStore";
 import { tokens, withAlpha } from "../theme";
+import { downloadBlob } from "../utils/downloadBlob";
 import { PANEL_DOTS, PANEL_TITLES } from "./dock/dockLayoutModel";
 import { useDockStore } from "./dock/dockStore";
 import { collectPanelIds, DOCK_PANEL_IDS } from "./dock/tree";
 import { useHelpModalStore } from "./NodeEditor/HelpModal";
+import { getViewportCanvas } from "./Viewport/viewportCanvas";
 
 const isMac =
   typeof navigator !== "undefined" &&
@@ -139,12 +141,7 @@ export function AppToolbar() {
     const blob = new Blob([JSON.stringify(project, null, 2)], {
       type: "application/json",
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = exportFileName(DEFAULT_EXPORT_BASE, "json");
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, exportFileName(DEFAULT_EXPORT_BASE, "json"));
   };
 
   const onPickProject = () => projectInputRef.current?.click();
@@ -198,21 +195,14 @@ export function AppToolbar() {
 
   const toggleRecord = async () => {
     const r = useRecorderStore.getState();
-    const canvas = document.querySelector(
-      ".viewport-canvas",
-    ) as HTMLCanvasElement | null;
+    const canvas = getViewportCanvas();
     if (!canvas) return;
     if (r.status === "idle") {
       await r.start(canvas, 30);
     } else {
       const blob = await r.stop();
       if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = exportFileName(DEFAULT_EXPORT_BASE, "webm");
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        downloadBlob(blob, exportFileName(DEFAULT_EXPORT_BASE, "webm"));
       }
     }
   };
@@ -221,21 +211,14 @@ export function AppToolbar() {
   const gifEncodeProgress = useGifRecorderStore((r) => r.encodeProgress);
   const toggleGif = async () => {
     const g = useGifRecorderStore.getState();
-    const canvas = document.querySelector(
-      ".viewport-canvas",
-    ) as HTMLCanvasElement | null;
+    const canvas = getViewportCanvas();
     if (!canvas) return;
     if (g.status === "idle") {
       g.start();
     } else if (g.status === "recording") {
       const blob = await g.stop();
       if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = exportFileName(DEFAULT_EXPORT_BASE, "gif");
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        downloadBlob(blob, exportFileName(DEFAULT_EXPORT_BASE, "gif"));
       }
     }
   };

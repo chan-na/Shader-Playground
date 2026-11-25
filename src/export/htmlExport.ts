@@ -3,6 +3,7 @@ import { withExplicitDefaults } from "../core/graph/uniformDefaults";
 import { serializeProject } from "../state/serialization";
 import type { NodePosition } from "../state/types";
 import { tokens } from "../theme";
+import { downloadBlob } from "../utils/downloadBlob";
 import { DEFAULT_EXPORT_BASE, exportFileName } from "./exportFileName";
 import standalonePlayer from "./standalonePlayer.js?raw";
 
@@ -155,12 +156,7 @@ export function downloadExportedHtml(
     ...(parents !== undefined && { parents }),
   });
   const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
   const finalName = exportFileName(baseName, "html");
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = finalName;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(blob, finalName);
   return finalName;
 }

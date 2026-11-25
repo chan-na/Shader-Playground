@@ -4,7 +4,8 @@ import {
   findReferencesAcrossStages,
   findReferencesOf,
 } from "./references";
-import { buildSymbolTable, resolveSymbol } from "./symbolTable";
+import { resolveSymbol } from "./symbolScope";
+import { buildSymbolTable } from "./symbolTable";
 
 const FRAG = `#version 300 es
 precision highp float;

@@ -14,11 +14,9 @@
 
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import {
-  buildSymbolTable,
-  precededByDot,
-  resolveSymbol,
-} from "../../core/glsl/symbolTable";
+import { precededByDot } from "../../core/glsl/glslDecl";
+import { resolveSymbol } from "../../core/glsl/symbolScope";
+import { buildSymbolTable } from "../../core/glsl/symbolTable";
 import { identifierAt } from "./hover";
 
 export interface DefinitionTarget {

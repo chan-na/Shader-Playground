@@ -19,11 +19,8 @@ import {
   classifyIdentifier,
   classifySemanticTokens,
 } from "./core/glsl/semanticTokens";
-import {
-  buildSymbolTable,
-  resolveSymbol,
-  symbolsVisibleAt,
-} from "./core/glsl/symbolTable";
+import { resolveSymbol, symbolsVisibleAt } from "./core/glsl/symbolScope";
+import { buildSymbolTable } from "./core/glsl/symbolTable";
 import { getCurrentView, getCursorLine } from "./ui/CodeEditor/currentView";
 import "./index.css";
 import * as assetActions from "./state/assetActions";

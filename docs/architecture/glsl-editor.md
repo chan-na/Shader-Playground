@@ -82,7 +82,8 @@ CM pointer (hover)
 - `depth ≥ 1` 안에서: 로컬 변수 decl(쉼표 멀티 — `float a, b = 1.0;` 두 번째 패스로 수집), `for (int i = ...)` 인덕션 변수.
 - `if/for/while/return/case/switch` 키워드는 `NOT_A_FUNCTION` 화이트리스트로 함수 헤더 매칭에서 제외.
 - 출력 `GlslSymbol` 은 `{name, type, kind, line, column, scope, parameters?}`. `scope` 는 함수 이름 또는 `null`(top-level).
-- `symbolsVisibleAt(table, line)` — 라인의 enclosing 함수를 *해당 라인 이전의 마지막 함수 헤더* 로 근사(body 의 정확한 끝을 추적하지 않아도 sequential function 정의에서는 정확). 출력 순서: 로컬(decl ≤ line) → 파라미터 → 글로벌, 이름 중복은 처음 등장한 것만 유지(local shadow 글로벌이 우선).
+- 선언자 분할(`bracketDepth` / `splitTopLevelDeclarators`)·파라미터 리스트 파서·struct 멤버 이름 오프셋·`precededByDot` 은 `core/glsl/glslDecl.ts`, 식별자 정규식은 `core/glsl/ident.ts` 한 곳에 둔다.
+- `symbolsVisibleAt(table, line)` (`core/glsl/symbolScope.ts`, `resolveSymbol` 도 여기) — 라인의 enclosing 함수를 *해당 라인 이전의 마지막 함수 헤더* 로 근사(body 의 정확한 끝을 추적하지 않아도 sequential function 정의에서는 정확). 출력 순서: 로컬(decl ≤ line) → 파라미터 → 글로벌, 이름 중복은 처음 등장한 것만 유지(local shadow 글로벌이 우선).
 
 **빌트인 카탈로그 (`core/glsl/builtins.ts`)** — `BUILTIN_FUNCTIONS: Record<name, {signatures[], description}>` + `KEYWORD_DESCRIPTIONS`. `GLSL_FUNCTIONS` 와 양방향 일치(단위 테스트가 강제).
 

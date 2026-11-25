@@ -32,14 +32,14 @@
 
 // biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + length-guarded regex captures
 
+import { precededByDot, structMemberNameOffsets } from "./glslDecl";
+import { identScanner } from "./ident";
 import { maskComments } from "./stripComments";
+import { resolveSymbol } from "./symbolScope";
 import {
   buildSymbolTable,
   type GlslSymbol,
-  precededByDot,
-  resolveSymbol,
   type SymbolTable,
-  structMemberNameOffsets,
 } from "./symbolTable";
 
 export interface ReferenceSite {
@@ -89,8 +89,6 @@ const CROSS_STAGE_KINDS = new Set([
   "struct",
 ]);
 
-const IDENT_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
-
 /**
  * Find references to the declaration that binds `name` at `atLine`. Returns
  * an empty array when no declaration is in scope (the cursor is on a builtin,
@@ -128,23 +126,24 @@ export function findReferencesOf(
   // `symbolTable.ts`'s own `/\r?\n/` walk — that module derives line/column
   // only and does no offset arithmetic. `\r` is not an identifier character and
   // sits after every identifier on its line, so keeping it cannot affect
-  // `IDENT_RE`, `column`, or `precededByDot`.
+  // `identRe`, `column`, or `precededByDot`.
   const lines = masked.split("\n");
   // Struct member *names* share the global namespace's spelling but not its
   // binding (L5) — see `structMemberNameOffsets`. Member types and array sizes
   // are deliberately NOT excluded: they are real uses of real globals.
   const memberNameOffsets = structMemberNameOffsets(masked);
   const sites: ReferenceSite[] = [];
+  const identRe = identScanner();
 
   let lineStart = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     const lineNo = i + 1;
 
-    IDENT_RE.lastIndex = 0;
+    identRe.lastIndex = 0;
     let m: RegExpExecArray | null;
     // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
-    while ((m = IDENT_RE.exec(line)) !== null) {
+    while ((m = identRe.exec(line)) !== null) {
       if (m[0] !== target.name) continue;
       // `v.color` / `s.xyz` bind to a member, never to the same-named global.
       if (precededByDot(line, m.index)) continue;

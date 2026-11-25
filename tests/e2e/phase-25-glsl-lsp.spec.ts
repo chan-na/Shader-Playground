@@ -5,8 +5,8 @@ import { bootApp } from "./helpers/fixtures";
 import { withSp } from "./helpers/sp";
 
 // Phase 25 — LSP-like editor features layered onto CodeMirror 6: a
-// scope-aware symbol table (unit-tested in src/core/glsl/symbolTable.test.ts)
-// and a hover tooltip that reads symbols, builtin signatures and system
+// scope-aware symbol table (unit-tested in src/core/glsl/symbolTable.test.ts
+// and symbolScope.test.ts) and a hover tooltip that reads symbols, builtin signatures and system
 // uniforms. The hover wiring is exercised by loading a fragment into the
 // editor and asserting the CodeMirror tooltip DOM appears with the right
 // content.

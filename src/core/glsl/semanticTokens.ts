@@ -13,7 +13,7 @@
  * `Decoration.mark` ranges scoped to the visible viewport.
  *
  * Resolution priority for each identifier:
- *   1. Scope-aware document symbols (`resolveSymbol` from symbolTable.ts) —
+ *   1. Scope-aware document symbols (`resolveSymbol` from symbolScope.ts) —
  *      mirrors hover/autocomplete behaviour so locals shadow globals etc.
  *   2. `BUILTIN_FUNCTIONS` catalogue → `function-builtin`.
  *   3. `SYSTEM_UNIFORMS` set → `system-uniform` (catches names that are
@@ -27,13 +27,11 @@
 
 import { SYSTEM_UNIFORMS } from "../graph/uniformParser";
 import { BUILTIN_FUNCTIONS } from "./builtins";
+import { precededByDot } from "./glslDecl";
+import { identScanner } from "./ident";
 import { maskComments } from "./stripComments";
-import {
-  buildSymbolTable,
-  precededByDot,
-  resolveSymbol,
-  type SymbolTable,
-} from "./symbolTable";
+import { resolveSymbol } from "./symbolScope";
+import { buildSymbolTable, type SymbolTable } from "./symbolTable";
 
 /**
  * Closed enumeration of token kinds the highlighter emits. The CodeMirror
@@ -61,13 +59,6 @@ export interface SemanticToken {
   to: number;
   kind: SemanticTokenKind;
 }
-
-/**
- * Identifier scanner. Matches GLSL identifier shapes — we run this against
- * already-stripped lines (no block/line comments), so it can't accidentally
- * tag a word inside a comment.
- */
-const IDENT_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
 
 /** Map a symbol-table entry's `kind` to the highlighter token kind. */
 function tokenKindForSymbol(
@@ -154,15 +145,19 @@ export function classifySemanticTokens(source: string): SemanticToken[] {
   // doc.lineAt(...).from semantics — every offset stays 1:1 with the original
   // source because `maskComments` preserves length and line terminators.
   let lineStart = 0;
+  // Identifier scanner (`ident.ts`). Run against already-masked lines (no
+  // block/line comments), so it can't accidentally tag a word inside a
+  // comment.
+  const identRe = identScanner();
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     const lineNo = i + 1;
 
-    IDENT_RE.lastIndex = 0;
+    identRe.lastIndex = 0;
     let m: RegExpExecArray | null;
     // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
-    while ((m = IDENT_RE.exec(line)) !== null) {
+    while ((m = identRe.exec(line)) !== null) {
       // `v.xyz` / `light.color` name a member, not the same-named global —
       // painting them with the global's colour is a lie (L5).
       if (precededByDot(line, m.index)) continue;

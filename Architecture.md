@@ -694,7 +694,10 @@ ShaderPlayground/
    │  ├─ glsl/                       # Phase 24/25/26/27/28 — 라이브 GLSL 검증 + LSP-like 정적 분석
    │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
    │  │  ├─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
-   │  │  ├─ symbolTable.ts           # Phase 25 — uniform/in/out/const/local/parameter/function/struct 파서 + scope 추적 (+ test)
+   │  │  ├─ symbolTable.ts           # Phase 25 — uniform/in/out/const/local/parameter/function/struct 파서 + 소스별 LRU 캐시 (+ test)
+   │  │  ├─ glslDecl.ts              # 선언자 분할 · struct 멤버 이름 오프셋 · precededByDot · 파라미터 리스트 파서 (+ test)
+   │  │  ├─ symbolScope.ts           # symbolsVisibleAt / resolveSymbol — 라인별 scope 쿼리 (+ test)
+   │  │  ├─ ident.ts                 # GLSL 식별자 정규식 단일 정의 (IDENT_RE · IDENT_EXACT_RE · identScanner)
    │  │  ├─ builtins.ts              # Phase 25 — GLSL_FUNCTIONS 시그니처/설명 + KEYWORD_DESCRIPTIONS (+ test)
    │  │  ├─ semanticTokens.ts        # Phase 26 — 식별자 역할 분류기 (symbolTable + builtins + SYSTEM_UNIFORMS) (+ test)
    │  │  └─ references.ts            # Phase 27/28 — findReferences + findReferencesAcrossStages (cross-stage rename) (+ test)

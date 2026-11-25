@@ -38,13 +38,14 @@
 
 import { Transaction } from "@codemirror/state";
 import { type EditorView, keymap } from "@codemirror/view";
+import { precededByDot } from "../../core/glsl/glslDecl";
+import { IDENT_EXACT_RE } from "../../core/glsl/ident";
 import {
   type CrossStageReferenceSite,
   findReferences,
   findReferencesAcrossStages,
   type ShaderStage,
 } from "../../core/glsl/references";
-import { precededByDot } from "../../core/glsl/symbolTable";
 import type { PortRename } from "../../core/graph/edgePrune";
 import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
 import { useEditorStore } from "../../state/editorStore";
@@ -52,8 +53,6 @@ import { useGraphStore } from "../../state/graphStore";
 import { GLSL_KEYWORDS, GLSL_TYPES } from "./autocomplete";
 import { currentEditorNodeId } from "./editorNode";
 import { identifierAt } from "./hover";
-
-const IDENT_VALID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 // GLSL ES has more reserved words than what we ship in the autocomplete
 // catalogue (e.g. unused future-reserved words), but `keywords ∪ types`
@@ -68,7 +67,7 @@ export interface RenameValidation {
 
 export function validateRenameName(newName: string): RenameValidation {
   if (!newName) return { ok: false, error: "Name cannot be empty" };
-  if (!IDENT_VALID_RE.test(newName)) {
+  if (!IDENT_EXACT_RE.test(newName)) {
     return { ok: false, error: "Invalid GLSL identifier" };
   }
   if (RESERVED.has(newName)) {

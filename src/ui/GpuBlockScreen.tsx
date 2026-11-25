@@ -5,7 +5,7 @@ import { tokens, withAlpha } from "../theme";
 const GPU_BLOCK_TITLE_ID = "gpu-block-title";
 
 /** Scrim tint — needs alpha math the CSS `.modal-scrim` class can't express
- * (see index.css's comment on that class). */
+ * (see its comment in src/styles/93-modals.css). */
 const SCRIM_STYLE: CSSProperties = {
   background: withAlpha(tokens.surface.appDarker, 0.72),
   zIndex: 9990,

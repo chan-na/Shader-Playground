@@ -1,0 +1,758 @@
+/* ── Export & Share dialog (design/Export & Share.dc.html, M6-U3) ──
+ * Its own overlay/modal (not .cmdk-overlay/.cmdk-modal) — different size
+ * (880×600 vs 624px-wide command palette) and a lower z-index so the
+ * command palette always wins if both were somehow open at once. */
+.es-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--surface-app-darker) 62%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9500;
+}
+@keyframes es-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.es-modal {
+  width: 880px;
+  max-width: 92vw;
+  height: 600px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  animation: es-dialog-in var(--motion-duration-max) var(--motion-easing);
+}
+.es-header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  height: 60px;
+  flex-shrink: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-docking-header);
+}
+.es-header-icon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  background: color-mix(in srgb, var(--accent-default) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-default) 35%, transparent);
+  color: var(--accent-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+.es-header-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+.es-header-subtitle {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.es-header-spacer {
+  flex: 1;
+}
+.es-close {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+.es-close:hover {
+  background: var(--surface-input);
+  color: var(--text-primary);
+}
+.es-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.es-rail {
+  width: 236px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-rail);
+  overflow-y: auto;
+  padding: 16px 12px;
+}
+.es-rail-group {
+  margin-bottom: 18px;
+}
+.es-rail-group-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 8px;
+  margin-bottom: 8px;
+}
+.es-rail-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.es-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: var(--radius-overlay);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-bright-body);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.es-rail-item--active {
+  background: color-mix(in srgb, var(--accent-default) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent-default) 32%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.es-rail-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+.es-rail-icon--gif {
+  background: color-mix(in srgb, var(--warning) 13%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  color: var(--warning);
+}
+.es-rail-icon--webm {
+  background: color-mix(in srgb, var(--port-resource) 13%, transparent);
+  border-color: color-mix(in srgb, var(--port-resource) 35%, transparent);
+  color: var(--port-resource);
+}
+.es-rail-icon--html {
+  background: color-mix(in srgb, var(--accent-default) 13%, transparent);
+  border-color: color-mix(in srgb, var(--accent-default) 35%, transparent);
+  color: var(--accent-default);
+}
+.es-rail-icon--link {
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  color: var(--success);
+}
+.es-rail-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.es-rail-name {
+  font-size: 12.5px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.es-rail-meta {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.es-rail-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-default);
+  box-shadow: 0 0 6px var(--accent-default);
+}
+.es-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-y: auto;
+}
+.es-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px;
+}
+.es-panel--center {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.es-panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.es-panel-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 18px;
+  max-width: 480px;
+}
+.es-file-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-node-card);
+  background: var(--surface-card);
+}
+.es-file-tile {
+  width: 46px;
+  height: 56px;
+  flex-shrink: 0;
+  /* No tokens.radius entry matches 8 (button/input=7, overlay=9 are the
+   * neighbors) — literal value, same policy as controls.css's
+   * .ctl-segmented border-radius. */
+  border-radius: 8px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--accent-hover);
+}
+.es-file-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.es-file-card-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+/* ── [C-10] HTML export "File name" field (design/Export & Share.dc.html
+   L167-171) ── The editable base and the static `-{timestamp}.html` suffix
+   share one field box, so the box chrome moves from the inner `.ctl-text`
+   (see controls.css) onto this wrapper and the input goes transparent. */
+.es-field-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.es-filename-field {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 4px 0 10px;
+  background: var(--surface-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+}
+/* Focus ring lives on the wrapper since the input itself has no border. */
+.es-filename-field:focus-within {
+  border-color: var(--accent-default);
+}
+.es-filename-field .ctl-text {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+.es-filename-suffix {
+  flex-shrink: 0;
+  padding-right: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.es-info-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-node-card);
+  background: var(--surface-card);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.es-info-chip {
+  display: inline-block;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-hover);
+  background: var(--surface-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  padding: 4px 8px;
+}
+.es-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-docking-header);
+}
+.es-footer-hint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.es-footer-spacer {
+  flex: 1;
+}
+.es-btn-cancel {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-overlay);
+  border: 1px solid var(--border-stronger);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.es-btn-cancel:hover {
+  background: var(--surface-card);
+  color: var(--text-primary);
+}
+.es-btn-secondary {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: var(--radius-overlay);
+  border: 1px solid var(--border-stronger);
+  background: var(--surface-input);
+  color: var(--text-bright-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.es-btn-secondary:hover {
+  background: var(--surface-hover);
+}
+.es-btn-primary {
+  height: 36px;
+  padding: 0 20px;
+  border-radius: var(--radius-overlay);
+  border: none;
+  background: var(--accent-default);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  /* design/Export & Share.dc.html L284/L295 — inset highlight is a plain
+   * white channel with no brand/semantic token (same policy as
+   * controls.css's .ctl-slider-input thumb shadow: literal rgba() for
+   * non-token structural highlights, not a "raw brand hex"). */
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset;
+}
+.es-btn-primary:hover {
+  background: var(--accent-hover);
+}
+.es-done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 22px 30px;
+  text-align: center;
+  animation: es-dialog-in var(--motion-duration-max) var(--motion-easing);
+}
+.es-done-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.es-done-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  margin-bottom: 8px;
+}
+.es-done-msg {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 360px;
+  margin-bottom: 22px;
+}
+.es-done-url-row {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.es-done-url {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  background: var(--surface-app);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-overlay);
+  padding: 0 12px;
+  height: 40px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-hover);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.es-copy-btn {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-overlay);
+  border: 1px solid var(--accent-default);
+  background: var(--accent-default);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.es-copy-btn--copied {
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  color: var(--success);
+}
+.es-done-file-card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-node-card);
+  background: var(--surface-card);
+  margin-bottom: 16px;
+  text-align: left;
+}
+.es-done-file-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-overlay);
+  background: color-mix(in srgb, var(--accent-default) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-default) 35%, transparent);
+  color: var(--accent-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+}
+.es-done-file-main {
+  flex: 1;
+  min-width: 0;
+}
+.es-done-file-name {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.es-done-file-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.es-done-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ── Export & Share · Record configure/recording/encoding (GIF/WebM, M6-U4)
+ * design/Export & Share.dc.html L100-144 (configure), L214-234 (recording),
+ * L238-251 (encoding). Segmented/slider/toggle controls are ui/controls —
+ * only the layout scaffolding + est chip/progress bar/ring/REC chip below
+ * are new. */
+.es-rec-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.es-rec-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.es-rec-codec {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.es-rec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+}
+.es-rec-field--wide {
+  grid-column: 1 / -1;
+}
+.es-rec-field-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  margin-bottom: 7px;
+}
+.es-rec-duration-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.es-rec-duration-row .es-rec-field-label {
+  margin-bottom: 0;
+}
+.es-rec-duration-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+}
+.es-rec-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.es-rec-toggle-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-bright-body);
+}
+.es-rec-est-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.es-rec-est-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.es-rec-est-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--surface-app-darker) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border-radius: var(--radius-chip);
+  padding: 3px 8px;
+}
+.es-rec-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 18px;
+  max-width: 480px;
+}
+
+/* Recording (L214-234) */
+@keyframes es-rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.es-rec-live-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.es-rec-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--error);
+  box-shadow: 0 0 8px var(--error);
+  animation: es-rec-pulse 1s infinite;
+}
+.es-rec-live-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.es-rec-counter {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.es-rec-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  border-radius: var(--radius-node-card);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
+  background: radial-gradient(
+    circle at 50% 42%,
+    var(--surface-card),
+    var(--surface-app) 80%
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--error) 25%, transparent),
+    0 0 24px color-mix(in srgb, var(--error) 15%, transparent);
+  margin-bottom: 20px;
+}
+.es-rec-preview-badge {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--error) 85%, transparent);
+  border-radius: var(--radius-chip);
+  padding: 3px 9px;
+}
+.es-rec-preview-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  animation: es-rec-pulse 1s infinite;
+}
+.es-rec-elapsed-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.es-rec-elapsed {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.es-rec-elapsed-total {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.es-rec-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-input);
+  overflow: hidden;
+}
+.es-rec-progress-fill {
+  height: 100%;
+  background: var(--error);
+  border-radius: 3px;
+  transition: width 0.06s linear;
+}
+
+/* Encoding (L238-251, GIF only) */
+.es-enc-ring {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 24px;
+}
+.es-enc-ring svg {
+  width: 96px;
+  height: 96px;
+  transform: rotate(-90deg);
+}
+.es-enc-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.es-enc-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.es-enc-sub {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* Done · record file card tints (extends .es-done-file-icon from M6-U3) */
+.es-done-file-icon--gif {
+  background: color-mix(in srgb, var(--warning) 13%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  color: var(--warning);
+}
+.es-done-file-icon--webm {
+  background: color-mix(in srgb, var(--port-resource) 13%, transparent);
+  border-color: color-mix(in srgb, var(--port-resource) 35%, transparent);
+  color: var(--port-resource);
+}

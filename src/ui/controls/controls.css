@@ -5,7 +5,7 @@
  * tokenized via var(--*) (src/theme.ts is the single source) except two
  * literal rgba() values called out below, which have no semantic/brand
  * token equivalent — same policy the rest of the codebase already
- * follows for one-off drop shadows (see src/index.css's `.cmdk-modal`
+ * follows for one-off drop shadows (see src/styles/40-command-palette.css's `.cmdk-modal`
  * box-shadow).
  * design/Side Panel.dc.html — L85 (slider), L92/L264 (color), L107-108 +
  * L246-248 (multi-axis), L121/L232 (toggle), L257 (number input),

@@ -50,9 +50,9 @@ import { StageTabs } from "./StageTabs";
  * the panel's right edge (clipped by `.panel`'s `overflow:hidden`, real
  * pointer unreachable even though the DOM node was technically present).
  * M3 regression fix: this chip (plus its leading divider) now renders
- * inside a `.code-stage-strip-meta` wrapper (index.css) instead of as two
+ * inside a `.code-stage-strip-meta` wrapper (src/styles/21-dock-panels.css) instead of as two
  * bare fragment children of `.code-stage-strip` — the wrapper is what
- * actually collapses to 0 width under squeeze (see its index.css comment);
+ * actually collapses to 0 width under squeeze (see its stylesheet comment);
  * this component's own `minWidth: 0` below is only the inner half of that
  * — it lets the chip shrink *within* the wrapper before the wrapper itself
  * has to clip it entirely. */
@@ -102,7 +102,7 @@ const BREADCRUMB_KIND_STYLE: CSSProperties = {
 /** Height budget for `AUTO_VERTEX_NOTE_STYLE` below — the editor container's
  * height is reduced by exactly this much (via `calc()`) so the note sits
  * above the document without overlapping it (`.panel-body` isn't a flex
- * container, so this can't be a `flex: 1` sibling without an index.css
+ * container, so this can't be a `flex: 1` sibling without a stylesheet
  * change — see A-1's design-noninvasive note). */
 const AUTO_VERTEX_NOTE_HEIGHT = 22;
 /** The text is ~44 CJK-ish characters, so in a narrow Code panel it wrapped
@@ -641,7 +641,7 @@ export function CodeEditor() {
       <DockPanelHeader meta="GLSL · ES 3.0" metaAlign="end" />
       {/* Stage-tab sub-strip (design/CHANGELOG.md §v2.0 Changed) — a direct
           `.panel` child, so the existing collapsed-rail rule
-          (`.shell-slot--collapsed .panel > :not(.dock-header)`, index.css)
+          (`.shell-slot--collapsed .panel > :not(.dock-header)`, 20-dock-shell.css)
           hides it automatically along with the editor body; no extra
           isRail check needed here (unlike when it lived inside
           DockPanelHeader's children slot, gated by `!isRail`). */}

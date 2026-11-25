@@ -52,7 +52,7 @@ export interface DockPanelHeaderProps {
  * 따른다. 탭/접기/최대화/닫기의 단일 출처는 `dockStore` — 이 leaf의 경로는
  * `useDockLeaf()`(DockLayout이 심어둔 컨텍스트)로 얻는다. 패널 자체는
  * 언마운트되지 않는다(WebGL 컨텍스트/CodeMirror 인스턴스 보존은
- * `DockLayout`/`index.css`의 슬롯 클래스가 담당).
+ * `DockLayout`/`src/styles/20-dock-shell.css`의 슬롯 클래스가 담당).
  *
  * (v1.4 R6/R12) 탭은 dock 모델의 `leaf.tabs`를 그대로 렌더한다 — `label`
  * prop은 폐기됐다(탭이 라벨 자리를 대신한다). 탭 자체는 기존 Side Panel

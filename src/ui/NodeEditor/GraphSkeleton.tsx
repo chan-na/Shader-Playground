@@ -13,7 +13,7 @@
  * the same `.panel-body` slot. `pointer-events: none` since there's nothing
  * to interact with and the real ReactFlow pane sits right behind it.
  * [v1.1 D4] The status row is a canvas-center floating pill (not a
- * bottom-left corner row) — see .graph-skeleton-status in index.css.
+ * bottom-left corner row) — see .graph-skeleton-status in src/styles/90-skeletons.css.
  */
 
 const SKELETON_CARDS: ReadonlyArray<{ id: string; left: number; top: number }> =

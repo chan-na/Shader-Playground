@@ -1,0 +1,194 @@
+/* ── App toolbar (App Shell.dc.html L30-80, M1-U3) ───────────────── */
+.app-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--border-default);
+}
+.tb-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-default);
+  flex-shrink: 0;
+}
+.tb-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-right: 4px;
+  flex-shrink: 0;
+}
+.tb-brand-word {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+}
+.tb-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tb-spacer {
+  flex: 1;
+}
+.tb-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-button);
+  color: var(--text-bright-body);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-btn:hover {
+  background: var(--surface-input);
+  border-color: var(--border-stronger);
+}
+.tb-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tb-btn:disabled:hover {
+  background: var(--surface-card);
+  border-color: var(--border-default);
+}
+.tb-btn--muted {
+  color: var(--text-secondary);
+}
+.tb-btn--primary {
+  background: var(--accent-default);
+  border: none;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.tb-btn--primary:hover {
+  background: var(--accent-hover);
+}
+.tb-caret {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+.tb-tile {
+  width: 15px;
+  height: 15px;
+  border-radius: var(--radius-icon-box);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.tb-menu {
+  position: relative;
+}
+.tb-menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 190px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-button);
+  box-shadow: var(--shadow-node-card);
+  padding: 4px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tb-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px; /* dc "Docking Prototype.dc.html" L51 — ＋ Panel item dot/label/hint
+               spacing. +More/Presets items are single-text children so this
+               is a no-op for them (no visible change). */
+  height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-chip);
+  color: var(--text-bright-body);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.tb-menu-item:hover {
+  background: var(--surface-hover);
+}
+.tb-menu-item-label {
+  flex: 1; /* dc L52 flex:1 */
+}
+/* dc L53 font:11px #565e68 — no matching token exists (between text.muted
+   #656d78 and text.disabled #454c55); approximated with text.muted per
+   temp/design-followup-v1.4.md §2 (designer confirmation requested). */
+.tb-menu-item-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+/* dc L57 padding:10px font:11.5px #565e68 text-align:center — same #565e68
+   approximation as .tb-menu-item-hint above. */
+.tb-menu-empty {
+  padding: 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.tb-menu-divider {
+  height: 1px;
+  background: var(--border-default);
+  margin: 4px 2px;
+}
+.tb-undo-group {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-button);
+  padding: 2px;
+}
+.tb-undo-btn {
+  width: 28px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  border-radius: var(--radius-icon-box);
+  cursor: pointer;
+  font-size: 14px;
+}
+.tb-undo-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.tb-undo-btn:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+.tb-kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-app);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-icon-box);
+  padding: 1px 5px;
+  margin-left: 6px;
+}
+.tb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}

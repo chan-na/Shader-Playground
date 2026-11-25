@@ -29,7 +29,7 @@ import { NODE_CATEGORY_OF } from "./NodeEditor/nodeTheme";
  * this only while the graph is empty (0 nodes), as a ReactFlow sibling inside
  * `.panel-body` (already `position: relative`) — the same slot pattern as
  * the selection-count-badge. The root is `pointer-events: auto` (see
- * index.css's `.welcome-overlay` comment) — at narrower dock layouts
+ * src/styles/70-welcome.css's `.welcome-overlay` comment) — at narrower dock layouts
  * `.welcome-content` is taller than the panel, so the overlay's own
  * `overflow: auto` has to actually receive the wheel instead of it falling
  * through to ReactFlow's pane and being consumed as a zoom gesture. That
@@ -149,7 +149,7 @@ const STARTERS: Starter[] = [
 ];
 
 /** CSS modifier suffix for each starter's thumbnail artwork — the gradients
- * themselves are static var(--*)-only classes in index.css
+ * themselves are static var(--*)-only classes in src/styles/70-welcome.css
  * (.welcome-card-thumb--<key>), matching the .cmdk-icon--<category>
  * convention rather than computing them inline here. */
 const THUMB_CLASS: Record<Starter["key"], string> = {
@@ -174,14 +174,14 @@ const FILE_ACCEPT =
  * (not imported) since AppToolbar doesn't export them and isn't part of
  * this unit's scope. The white channel here can't be expressed as a static
  * CSS var, so — like AppToolbar's own inline mark — it stays inline while
- * position/size/gradient (all token-only) live in index.css. */
+ * position/size/gradient (all token-only) live in 70-welcome.css. */
 const MARK_SHADOW = `0 6px 20px ${withAlpha(tokens.accent.default, 0.35)}, inset 0 1px 0 ${withAlpha("#ffffff", 0.25)}`;
 const SQUARE_BORDER = `5px solid ${withAlpha("#ffffff", 0.92)}`;
 const DOT_BORDER = `4px solid ${withAlpha("#ffffff", 0.95)}`;
 
 /** "N nodes" thumbnail chip (Welcome.dc.html L110) — identical across all 4
  * cards. color/border need a white channel, so those stay inline; position/
- * font/padding/radius live in .welcome-card-chip (index.css). */
+ * font/padding/radius live in .welcome-card-chip (src/styles/70-welcome.css). */
 const CHIP_STYLE: CSSProperties = {
   color: withAlpha("#ffffff", 0.82),
   background: withAlpha(tokens.surface.appDarker, 0.5),

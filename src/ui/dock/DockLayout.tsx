@@ -96,7 +96,7 @@ function cx(...parts: Array<string | false | undefined>): string {
  * 드래그가 아니라 클릭(탭 선택)으로 그대로 통과한다. */
 const DRAG_THRESHOLD_PX = 4;
 
-/** R11(반응형) — 컴팩트 도킹 폴백의 임계값. C-6(`src/index.css`의
+/** R11(반응형) — 컴팩트 도킹 폴백의 임계값. C-6(`src/styles/60-viewport.css`의
  * `@container vp-body (max-width: 990px)`, 트랜스포트 바 컴팩트 변형)이 이미
  * 확정한 990px·inclusive(`max-width`, ≤990) 시맨틱을 그대로 재사용한다 — 신규
  * 임계 상수 도입 금지(CHANGELOG §v1.4 R11). C-6은 도킹 패널 내부 크기의
@@ -664,7 +664,7 @@ function DockLeafView({
       )}
       // R11: 인라인 style이 CSS보다 우선 적용되므로(specificity와 무관하게
       // 항상 이긴다), 컴팩트 고정 스택 flex는 CSS가 아니라 여기서 분기한다
-      // — `.dock-root--compact .dock-leaf { height: 46vh }`(index.css)는
+      // — `.dock-root--compact .dock-leaf { height: 46vh }`(src/styles/20-dock-shell.css)는
       // 세로 스택 각 항목의 높이만 담당하고, 폭 방향으로 늘어나지 않게
       // 막는 `0 0 auto`는 이 인라인 값이 담당한다.
       style={{ flex: compact ? "0 0 auto" : flex }}

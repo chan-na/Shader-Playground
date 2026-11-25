@@ -636,12 +636,13 @@ ShaderPlayground/
 ├─ Architecture.md
 ├─ README.md
 ├─ CLAUDE.md                         # Claude 작업 규약 / 품질 게이트
-├─ tests/e2e/                        # Playwright E2E 스펙 (40 파일 / 156 테스트 — Phase 1~39, 도킹은 phase-35-*)
+├─ tests/e2e/                        # Playwright E2E 스펙 (40 파일 / 151 테스트 — Phase 1~39, 도킹은 phase-35-*)
 │  └─ helpers/                      # fixtures·sp(window.__sp)·dom·editor·render·canvas 공용 헬퍼
 └─ src/
    ├─ main.tsx                       # React 엔트리, App 마운트
    ├─ App.tsx                        # 셸 (NodeEditor / Viewport / CodeEditor / SidePanel / StatusBar + overlay)
-   ├─ index.css
+   ├─ index.css                      # 전역 스타일 진입점 — styles/의 영역별 파셜을 @import
+   ├─ styles/                        # 영역별 CSS 파셜 (base·dock·toolbar·palette·statusbar·viewport·welcome·export·skeleton·modal)
    ├─ test-setup.ts                  # Vitest + jsdom 부트스트랩
    ├─ vite-env.d.ts
    │

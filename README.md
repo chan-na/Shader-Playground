@@ -59,7 +59,7 @@ npm run test:e2e:ui       # Playwright UI 모드 (대화형 디버깅)
 npm run test:e2e:headed   # 브라우저 창을 띄워 실행
 ```
 
-Phase 1~39 핵심 시나리오(도킹 레이아웃은 Phase 35 `phase-35-*.spec.ts`)가 `tests/e2e/`의 40개 스펙 파일(156 테스트)에 있다. 공용 헬퍼는 `tests/e2e/helpers/`(`fixtures`·`sp`·`dom`·`editor`·`render`·`canvas`). dev 서버는 `playwright.config.ts`의 `webServer.command`로 자동 기동되며, 이미 `npm run dev`가 떠 있으면 재사용한다 (chromium / SwiftShader / workers 1 / 직렬 실행).
+Phase 1~39 핵심 시나리오(도킹 레이아웃은 Phase 35 `phase-35-*.spec.ts`)가 `tests/e2e/`의 40개 스펙 파일(151 테스트)에 있다. 공용 헬퍼는 `tests/e2e/helpers/`(`fixtures`·`sp`·`dom`·`editor`·`render`·`canvas`). dev 서버는 `playwright.config.ts`의 `webServer.command`로 자동 기동되며, 이미 `npm run dev`가 떠 있으면 재사용한다 (chromium / SwiftShader / workers 1 / 직렬 실행).
 
 ## 품질 게이트
 

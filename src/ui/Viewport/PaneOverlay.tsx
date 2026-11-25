@@ -13,7 +13,7 @@ import { bottomRowFlags, dividerCssRects, paneCssRects } from "./paneLayout";
  * `splitLayout` split the GL composite pass draws into, so this layer can
  * never drift from the WebGL canvas beneath it.
  *
- * Entirely `pointer-events: none` (see `.vp-overlay` in index.css) so camera
+ * Entirely `pointer-events: none` (see `.vp-overlay` in src/styles/60-viewport.css) so camera
  * orbit drag and the `u_mouse` pointer listeners on the canvas underneath
  * keep working through it.
  */

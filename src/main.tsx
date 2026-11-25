@@ -57,7 +57,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 // 디자인 토큰(src/theme.ts 단일 출처)을 :root CSS 변수로 파생 주입.
-// index.css 및 컴포넌트 CSS는 var(--*)만 참조한다 (M0).
+// index.css·src/styles/*.css 및 컴포넌트 CSS는 var(--*)만 참조한다 (M0).
 const themeStyle = document.createElement("style");
 themeStyle.id = "sp-theme-vars";
 themeStyle.textContent = `:root {\n${cssVars()}\n}`;

@@ -94,8 +94,8 @@ function safeFiniteNumber(v: unknown, fallback = 0): number {
  * source, CM normalises it into a `docChanged`, the update listener commits the
  * LF twin, and `updateShaderSource` → `pushHistory` clears `future`. Undoing
  * back across such an edit destroys the redo the user just earned, every time.
- * Normalising here means the store and the editor agree from the first frame.
- * (F22 — also closes the per-stage divergence in F23.)
+ * Normalising here means the store and the editor agree from the first frame,
+ * and both shader stages are normalised alike.
  */
 function normalizeLineEndings(v: string): string {
   return v.replace(/\r\n?/g, "\n");
@@ -302,7 +302,7 @@ function buildNode(raw: Record<string, unknown>, id: string): GraphNode {
             .slice(0, SANITIZE_LIMITS.MAX_UNIFORM_ARRAY_LEN)
             .map((n) => safeFiniteNumber(n))
         : safeFiniteNumber(v);
-      // [A-1] `label` is no longer a param field — sanitizeGraphNode migrates a
+      // `label` is no longer a param field — sanitizeGraphNode migrates a
       // legacy one into `name`.
       const node: ParamGraphNode = { id, kind: "param", paramKind, value };
       return node;
@@ -390,8 +390,8 @@ export function sanitizeGraphNode(raw: unknown): SanitizeResult {
   }
   try {
     const node = buildNode(obj, id);
-    // [A-1] `name` is the single rename source for every non-group kind. Params
-    // written before v1.2 kept their title in `label`, so carry that over —
+    // `name` is the single rename source for every non-group kind. Older
+    // projects kept a param's title in `label`, so carry that over —
     // dropping the field without this migration would silently rename every
     // existing param back to "Parameter". An explicit `name` always wins; the
     // legacy `label` is only consulted when it would otherwise be lost.

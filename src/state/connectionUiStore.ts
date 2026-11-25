@@ -3,7 +3,7 @@ import type { PortType } from "../core/graph/types";
 
 /** 드래그가 시작된 포트의 신원 — design/README.md §Interactions "노드 연결"의
  *  팬아웃 하이라이트(호환 입력 펄스 링 / 비호환 dim)를 계산하는 근거.
- *  node-connect.jsx L116-127의 grabbing/fanout 상태에 해당. */
+ *  design/node-connect.jsx의 `grabbing`/`fanout` 상태에 해당. */
 export interface ConnectionDragSource {
   nodeId: string;
   handleId: string;
@@ -12,7 +12,7 @@ export interface ConnectionDragSource {
 }
 
 /** 마지막 연결 확정 지점(입력 포트)의 1회성 스냅 펄스. seq는 같은 포트에
- *  연속 연결해도 재생되도록 단조 증가. node-connect.jsx L303-309 snap ring.
+ *  연속 연결해도 재생되도록 단조 증가. design/node-connect.jsx의 snap ring.
  *  portDragMode.ts의 snapSeqFor가 이 형을 그대로 재사용한다(스토어가 단일
  *  출처). */
 export interface SnapPulse {

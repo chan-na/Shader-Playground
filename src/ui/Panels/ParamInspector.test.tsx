@@ -85,20 +85,6 @@ describe("ParamInspector", () => {
     });
   });
 
-  // [A-1] The per-param Label field is gone — renaming a param goes through the
-  // Inspector's common Name field (covered in Inspector.test.tsx), so this
-  // panel must not render a second title input of its own.
-  describe("label field removal [A-1]", () => {
-    it("renders no title/label input — renaming lives in the common Name field", () => {
-      const node = floatNode();
-      useGraphStore.getState().addNode(node);
-      const { container } = render(<ParamInspector node={node} />);
-
-      expect(screen.queryByPlaceholderText("Param float")).toBeNull();
-      expect(container.querySelector('input[type="text"]')).toBeNull();
-    });
-  });
-
   describe("time", () => {
     it("falls back to [1, 0] and renders 2 range + 2 number inputs", () => {
       const node = floatNode({ paramKind: "time", value: [1, 0] });

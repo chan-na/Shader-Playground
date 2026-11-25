@@ -1,6 +1,6 @@
 /**
- * Graph-restore loading overlay (design/System States.dc.html L122-133,
- * "graph: SKELETON" state, M7-U1). NodeEditor mounts this instead of
+ * Graph-restore loading overlay (design/System States.dc.html
+ * "graph: SKELETON" state). NodeEditor mounts this instead of
  * WelcomeOverlay while bootstrapStore's phase isn't yet "done" — i.e. while
  * BootstrapGate is still deciding whether a saved session, a share-link
  * graph, or the first-run demo/prompt should populate the graph. Without it
@@ -12,8 +12,8 @@
  * all absolutely positioned like WelcomeOverlay/the selection-count-badge in
  * the same `.panel-body` slot. `pointer-events: none` since there's nothing
  * to interact with and the real ReactFlow pane sits right behind it.
- * [v1.1 D4] The status row is a canvas-center floating pill (not a
- * bottom-left corner row) — see .graph-skeleton-status in index.css.
+ * The status row is a canvas-center floating pill (not a
+ * bottom-left corner row) — see .graph-skeleton-status in src/styles/90-skeletons.css.
  */
 
 const SKELETON_CARDS: ReadonlyArray<{ id: string; left: number; top: number }> =

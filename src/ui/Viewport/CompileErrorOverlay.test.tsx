@@ -5,11 +5,8 @@ import { useEditorStore } from "../../state/editorStore";
 import { useGraphStore } from "../../state/graphStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { resetAllStores } from "../../state/testStores";
 import { CompileErrorOverlay } from "./CompileErrorOverlay";
-
-const initialDiagnostics = useDiagnosticsStore.getState();
-const initialEditor = useEditorStore.getState();
-const initialRenderer = useRendererStore.getState();
 
 const FRAGMENT_SOURCE = [
   "#version 300 es",
@@ -42,18 +39,10 @@ function seedFragmentError() {
   useRendererStore.getState().setPanes([]);
 }
 
-function resetStores() {
-  useDiagnosticsStore.setState(initialDiagnostics, true);
-  useEditorStore.setState(initialEditor, true);
-  useRendererStore.setState(initialRenderer, true);
-  useGraphStore.getState().reset();
-  useSelectionStore.getState().select(null);
-}
-
-beforeEach(resetStores);
+beforeEach(resetAllStores);
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 describe("CompileErrorOverlay", () => {

@@ -459,6 +459,229 @@ void main() { outColor = vec4(float(v_id), 0.0, 0.0, 1.0); }
   });
 });
 
+describe("comma declarator signatures (review [6] regression)", () => {
+  // `declarationSignature` used to read only the first name after the type
+  // token, so every declarator after the comma in `flat out float v_a, v_b;`
+  // came back `null` — and the comparison was skipped in silence. The symbol
+  // table harvests those names, so the row existed and rendered a confident
+  // `linked` ✓ next to a program that does not link.
+  const vertOf = (decl: string) => `#version 300 es
+in vec3 a_position;
+${decl}
+void main() { gl_Position = vec4(a_position, 1.0); }
+`;
+  const fragOf = (decl: string) => `#version 300 es
+precision highp float;
+${decl}
+out vec4 outColor;
+void main() { outColor = vec4(v_a + v_b, 0.0, 0.0, 1.0); }
+`;
+
+  it("withdraws confidence when a later declarator's qualifier differs", () => {
+    const c = computeVaryingContract(
+      vertOf("flat out float v_a, v_b;"),
+      fragOf("flat in float v_a;\nin float v_b;"),
+    );
+    expect(c.confident).toBe(false);
+    expect(confidentVaryingWarnings(c)).toHaveLength(0);
+  });
+
+  it("withdraws confidence when a later declarator's array size differs", () => {
+    const c = computeVaryingContract(
+      vertOf("out float v_a[2], v_b[2];"),
+      fragOf("in float v_a[2];\nin float v_b[3];"),
+    );
+    expect(c.confident).toBe(false);
+  });
+
+  it("withdraws confidence when the comma list is on the fragment side", () => {
+    const c = computeVaryingContract(
+      vertOf("flat out float v_a;\nout float v_b;"),
+      fragOf("flat in float v_a, v_b;"),
+    );
+    expect(c.confident).toBe(false);
+  });
+
+  it("keeps the ✓ when every declarator of both lists agrees", () => {
+    // The fix must not degrade into blanket silence for the shape the symbol
+    // table explicitly supports.
+    const c = computeVaryingContract(
+      vertOf("flat out float v_a, v_b;"),
+      fragOf("flat in float v_a, v_b;"),
+    );
+    expect(c.confident).toBe(true);
+    expectStatus(rowByName(c.rows, "v_a"), "linked");
+    expectStatus(rowByName(c.rows, "v_b"), "linked");
+    expect(confidentVaryingWarnings(c)).toHaveLength(0);
+  });
+
+  it("keeps the ✓ when matching array suffixes sit on later declarators", () => {
+    const c = computeVaryingContract(
+      vertOf("out float v_a[2], v_b[3];"),
+      fragOf("in float v_a[2], v_b[3];"),
+    );
+    expect(c.confident).toBe(true);
+    expectStatus(rowByName(c.rows, "v_b"), "linked");
+  });
+});
+
+describe("several declarations on one line (review [7] regression)", () => {
+  // `RE_STORAGE_DECL` was `exec`ed once per line, so everything after the
+  // first `;` vanished from the symbol table — and none of the hazards could
+  // see it. The vanished stage then produced *confident* false verdicts in
+  // both directions. The symbol table now rescans the line.
+  it("links two vertex outputs declared on the same line", () => {
+    const vert = `#version 300 es
+out vec2 v_uv; out vec3 v_n;
+void main() {
+  v_uv = vec2(0.0);
+  v_n = vec3(0.0);
+  gl_Position = vec4(0.0);
+}
+`;
+    const frag = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+in vec3 v_n;
+out vec4 outColor;
+void main() {
+  outColor = vec4(v_uv, v_n.x, 1.0);
+}
+`;
+    const c = computeVaryingContract(vert, frag);
+    expect(c.confident).toBe(true);
+    expectStatus(rowByName(c.rows, "v_uv"), "linked");
+    expectStatus(rowByName(c.rows, "v_n"), "linked");
+    expect(confidentVaryingWarnings(c)).toHaveLength(0);
+  });
+
+  it("links a vertex output declared after a single-line struct", () => {
+    const vert = `#version 300 es
+struct L { vec3 c; };  out vec3 v_c;
+void main() {
+  v_c = vec3(0.0);
+  gl_Position = vec4(0.0);
+}
+`;
+    const frag = `#version 300 es
+precision highp float;
+in vec3 v_c;
+out vec4 outColor;
+void main() {
+  outColor = vec4(v_c, 1.0);
+}
+`;
+    const c = computeVaryingContract(vert, frag);
+    expect(c.confident).toBe(true);
+    expectStatus(rowByName(c.rows, "v_c"), "linked");
+    expect(confidentVaryingWarnings(c)).toHaveLength(0);
+  });
+
+  it("does not call a consumed fragment input unused when both share a line", () => {
+    const vert = `#version 300 es
+out vec2 v_uv;
+out vec3 v_n;
+void main() {
+  v_uv = vec2(0.0);
+  v_n = vec3(0.0);
+  gl_Position = vec4(0.0);
+}
+`;
+    const frag = `#version 300 es
+precision highp float;
+in vec2 v_uv; in vec3 v_n;
+out vec4 outColor;
+void main() {
+  outColor = vec4(v_uv, v_n.x, 1.0);
+}
+`;
+    const c = computeVaryingContract(vert, frag);
+    expect(c.confident).toBe(true);
+    expectStatus(rowByName(c.rows, "v_uv"), "linked");
+    expectStatus(rowByName(c.rows, "v_n"), "linked");
+  });
+});
+
+describe("macro-built storage qualifiers (review [25] regression)", () => {
+  // The symbol table does not expand `#define`, so a varying declared through
+  // a macro is invisible to it — and used to come back as a confident
+  // "vertex가 제공하지 않음" warning for a program that links fine.
+  const FRAG = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+void main() {
+  outColor = vec4(v_uv, 0.0, 1.0);
+}
+`;
+
+  it("withdraws confidence when a macro stands in for `out`", () => {
+    const vert = `#version 300 es
+#define VOUT out
+in vec3 a_position;
+VOUT vec2 v_uv;
+void main() {
+  v_uv = a_position.xy;
+  gl_Position = vec4(a_position, 1.0);
+}
+`;
+    const c = computeVaryingContract(vert, FRAG);
+    expect(c.confident).toBe(false);
+    expect(confidentVaryingWarnings(c)).toHaveLength(0);
+  });
+
+  it("withdraws confidence for a function-like declaration macro", () => {
+    const vert = `#version 300 es
+#define VARYING(t, n) out t n;
+in vec3 a_position;
+VARYING(vec2, v_uv)
+void main() {
+  gl_Position = vec4(a_position, 1.0);
+}
+`;
+    expect(computeVaryingContract(vert, FRAG).confident).toBe(false);
+  });
+
+  it("withdraws confidence when the macro is on the fragment side", () => {
+    const vert = `#version 300 es
+out vec2 v_uv;
+void main() {
+  v_uv = vec2(0.0);
+  gl_Position = vec4(0.0);
+}
+`;
+    const frag = `#version 300 es
+precision highp float;
+#define FIN in
+FIN vec2 v_uv;
+out vec4 outColor;
+void main() {
+  outColor = vec4(v_uv, 0.0, 1.0);
+}
+`;
+    expect(computeVaryingContract(vert, frag).confident).toBe(false);
+  });
+
+  it("keeps the ✓ for ordinary value macros", () => {
+    // Only the macro *body*'s qualifiers count — a blanket `#define` hazard
+    // would silence the feature for nearly every real shader.
+    const vert = `#version 300 es
+#define PI 3.14159
+#define MAX_STEPS 64
+#define SATURATE(x) clamp(x, 0.0, 1.0)
+#define OUTLINE_WIDTH 0.1
+out vec2 v_uv;
+void main() {
+  v_uv = vec2(SATURATE(PI));
+  gl_Position = vec4(0.0);
+}
+`;
+    const c = computeVaryingContract(vert, FRAG);
+    expect(c.confident).toBe(true);
+    expectStatus(rowByName(c.rows, "v_uv"), "linked");
+  });
+});
+
 describe("unterminated block comment (T4/M4 regression)", () => {
   // `maskComments` blanks an unterminated `/*` all the way to EOF, so every
   // declaration below it disappears from the masked source the diff is

@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph, trivialShaderSources } from "./helpers/fixtures";
-import { withSp } from "./helpers/sp";
+import {
+  bootApp,
+  selectNode,
+  setGraph,
+  trivialShaderSources,
+} from "./helpers/fixtures";
 
 /**
  * Phase 38 — mental-model correction (E-3,
@@ -8,7 +12,7 @@ import { withSp } from "./helpers/sp";
  * `createImageTexture` (REPEAT + mipmap + flip-Y), while every Shader node's
  * FBO output texture is created by `createColorTexture`
  * (CLAMP_TO_EDGE, no mipmap, no flip) — the same GLSL sampling one vs. the
- * other can produce a different result (L2). This spec pins that both facts
+ * other can produce a different result. This spec pins that both facts
  * are readable in the Inspector, derived from `core/gl/texture.ts`'s
  * constants rather than a hand-copied string.
  */
@@ -48,11 +52,7 @@ test.describe("Phase 38 — texture parameters (Image vs. Shader FBO)", () => {
     page,
   }) => {
     await setGraph(page, imageAndShaderGraph(), {});
-    await withSp(
-      page,
-      (sp) => sp.selection.getState().select("img1"),
-      undefined,
-    );
+    await selectNode(page, "img1");
 
     const section = page.getByTestId("texture-params");
     await expect(section).toBeVisible();
@@ -65,7 +65,7 @@ test.describe("Phase 38 — texture parameters (Image vs. Shader FBO)", () => {
     page,
   }) => {
     await setGraph(page, imageAndShaderGraph(), {});
-    await withSp(page, (sp) => sp.selection.getState().select("s1"), undefined);
+    await selectNode(page, "s1");
 
     const section = page.getByTestId("texture-params");
     await expect(section).toBeVisible();

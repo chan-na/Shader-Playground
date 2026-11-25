@@ -184,7 +184,7 @@ describe("UniformControl", () => {
     });
   });
 
-  // [L1/E-4] `drivenBy` means an edge is overwriting whatever this control
+  // `drivenBy` means an edge is overwriting whatever this control
   // would send (execute.ts's bindUserUniforms/bindSamplers) every frame — the
   // control disables and a note names the driving node.
   describe("drivenBy", () => {

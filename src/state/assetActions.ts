@@ -81,7 +81,7 @@ export interface ImportResult {
  * Losing the cache only costs a re-import after reload, so this must never
  * become a toast — otherwise a private-mode user gets an error banner for every
  * 4 KB PNG they drop in. Log it instead so the diagnostics panel can show it.
- * Same category as `cache.ts`'s own read-path warnings. (#23)
+ * Same category as `cache.ts`'s own read-path warnings.
  */
 function warnCacheWriteFailed(kind: AssetKind, id: string, e: unknown): void {
   log.warn(
@@ -100,10 +100,10 @@ async function importFile(
   const graphStore = useGraphStore.getState();
   const selection = useSelectionStore.getState();
 
-  // T0-2(learnability 2026-08): loaders.gl(~43 KiB gzip)을 엔트리 청크에서 제거하기
-  // 위한 동적 import. gltfLoader가 objLoader의 toGeometryHandle을 import하므로
-  // 둘 다 동적이어야 엔트리에서 완전히 빠진다. 청크 fetch 실패(오프라인/배포 중
-  // 캐시 불일치)는 이 await가 reject → 유일한 호출자 importFiles의 try/catch가
+  // loaders.gl(~43 KiB gzip)을 엔트리 청크에서 제거하기 위한 동적 import
+  // (docs/learnability-plan-2026-08.md T0-2). gltfLoader가 objLoader의
+  // toGeometryHandle을 import하므로 둘 다 동적이어야 엔트리에서 완전히 빠진다.
+  // 청크 fetch 실패(오프라인/배포 중 캐시 불일치)는 이 await가 reject → 유일한 호출자 importFiles의 try/catch가
   // 기존 `자산 임포트 실패 (${file.name})` toast.error로 표면화한다.
   if (kind === "obj") {
     const { loadObjFromFile } = await import("../core/assets/objLoader");
@@ -211,7 +211,7 @@ async function importFile(
  * (two mesh nodes sharing one OBJ, a duplicated image node…). `hydrateAssetsFor`
  * snapshots the store once, before its first `await`, so every copy of an id
  * would clear the "already present?" guard and fire its own IndexedDB read plus
- * a redundant `addImage`/`addMesh` store write. (#30)
+ * a redundant `addImage`/`addMesh` store write.
  */
 export function hydrateGraphAssets(nodes: GraphNode[]): void {
   const meshes = new Set<string>();
@@ -328,7 +328,7 @@ export async function importFiles(
   }
   // One aggregate warning, and only when *nothing* landed: multi-selecting a
   // model with its sidecars (.obj + .mtl, .gltf + .bin) is the normal case and
-  // must not scold the user for the sidecars that were correctly ignored. (#34)
+  // must not scold the user for the sidecars that were correctly ignored.
   if (skipped.length > 0 && results.length === 0) {
     const names = skipped.slice(0, 3).join(", ");
     const more = skipped.length > 3 ? ` 외 ${skipped.length - 3}개` : "";

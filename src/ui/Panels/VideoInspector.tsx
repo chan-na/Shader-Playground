@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-import { getExternalStatus } from "../../core/external/registry";
 import type { VideoGraphNode } from "../../core/graph/types";
 import { useAssetStore } from "../../state/assetStore";
 import { useGraphStore } from "../../state/graphStore";
@@ -7,35 +5,14 @@ import { SelectField } from "../controls/SelectField";
 import { Slider } from "../controls/Slider";
 import { Toggle } from "../controls/Toggle";
 import { StatusPill } from "./StatusPill";
-
-interface StatusSnapshot {
-  ready: boolean;
-  error: string | null;
-  width: number;
-  height: number;
-}
+import { useExternalStatus } from "./useExternalStatus";
 
 export function VideoInspector({ node }: { node: VideoGraphNode }) {
   const setVideoConfig = useGraphStore((s) => s.setVideoConfig);
   const videos = useAssetStore((s) => s.videos);
   const videoList = Object.values(videos);
   const currentAsset = node.assetId ? videos[node.assetId] : null;
-  const [status, setStatus] = useState<StatusSnapshot | null>(null);
-
-  useEffect(() => {
-    let timer: number | null = null;
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      setStatus(getExternalStatus(node.id));
-      timer = window.setTimeout(tick, 500);
-    };
-    tick();
-    return () => {
-      cancelled = true;
-      if (timer !== null) clearTimeout(timer);
-    };
-  }, [node.id]);
+  const status = useExternalStatus(node.id);
 
   const duration = currentAsset?.duration ?? 0;
   const seekValue = node.currentTime ?? 0;

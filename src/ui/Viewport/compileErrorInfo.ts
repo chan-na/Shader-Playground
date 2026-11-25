@@ -27,15 +27,16 @@ export interface CompileErrorInfo {
   /** `line-2..line+1` window into the stage's source, clamped to bounds.
    *  Empty when `line` is null. */
   excerpt: CompileErrorExcerptRow[];
-  /** Total number of shader nodes carrying an error-severity diagnostic
-   *  [D19]. The overlay always reports a single failing node's count, but
+  /** Total number of shader nodes carrying an error-severity diagnostic.
+   *  The overlay always reports a single failing node's count, but
    *  when this is 2 or more it appends "(+N-1 more)" to explain why that
    *  differs from the Status Bar's cross-node sum. */
   failingNodeCount: number;
 }
 
 // Lines before/after the error line included in the excerpt window (dc
-// System States.dc.html L227-235 shows a 4-line window: line-2..line+1).
+// System States.dc.html compile-error excerpt shows a 4-line window:
+// line-2..line+1).
 const EXCERPT_LINES_BEFORE = 2;
 const EXCERPT_LINES_AFTER = 1;
 
@@ -128,7 +129,7 @@ export function firstCompileError(
         // fullscreen.vert (not node.vertexSource) whenever the node compiled
         // as a fullscreen pass. Falling back to the node's own source is only
         // for diagnostics recorded before the compiler reported a source.
-        // Since A-1, the Code editor's vertex tab shows this exact same
+        // The Code editor's vertex tab shows this exact same
         // `compiledVertexSource` value (verbatim, read-only) whenever the
         // node is fullscreen — see CodeEditor/index.tsx's `isAutoVertex`
         // source override — so this excerpt and the on-screen document are

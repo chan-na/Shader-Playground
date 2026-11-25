@@ -4,10 +4,10 @@ import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
 
 /** Playback speed presets cycled by the transport bar's speed button
- * (design/Viewport.dc.html L120 + L268/L284 `cycleSpeed`). */
+ * (design/Viewport.dc.html `cycleSpeed`). */
 const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 
-/** 컴팩트 변형의 FOV 탭 순환 프리셋 (deg) — design/Viewport.dc.html L310 [D3]. */
+/** 컴팩트 변형의 FOV 탭 순환 프리셋 (deg) — design/Viewport.dc.html `stepFov`. */
 const FOV_PRESETS = [35, 55, 75, 90] as const;
 
 /**
@@ -47,12 +47,12 @@ function nextFovDeg(fovDeg: number): number {
 
 /**
  * Bottom-center floating transport bar for playback + camera controls
- * (design/Viewport.dc.html L107-135, M3-U3). Hosts the Time/Camera controls
+ * (design/Viewport.dc.html "overlay control bar"). Hosts the Time/Camera controls
  * that previously lived in the Inspector's `ViewportControls` side panel —
  * moved here so the transport sits directly over the render it scrubs. The
  * underlying store wiring (timeStore/cameraStore) is unchanged.
  *
- * Self-gates to `panes.length === 0` (M7-U4): none of System States.dc.html's
+ * Self-gates to `panes.length === 0`: none of System States.dc.html's
  * empty/loading/compile-error/webcam-permission mocks show this bar, and
  * concretely, the bar's floating `z-index` used to sit above
  * CompileErrorOverlay's action row regardless of DOM order, making its
@@ -62,10 +62,11 @@ function nextFovDeg(fovDeg: number): number {
  * makes the two mutually exclusive by construction rather than by
  * z-index arithmetic.
  *
- * Renders a single DOM tree that covers both the full (design/Viewport.dc.html
- * L108-136) and compact (L141-152, [D3]) transport bar variants — the switch
- * between them is a `@container vp-body (max-width: 990px)` query [C-6] in
- * index.css, not a second JSX branch, so there's exactly one set of
+ * Renders a single DOM tree that covers both the full and compact
+ * (design/Viewport.dc.html "overlay control bar — full" / "— compact")
+ * transport bar variants — the switch between them is a
+ * `@container vp-body (max-width: 990px)` query in
+ * src/styles/60-viewport.css, not a second JSX branch, so there's exactly one set of
  * testid/state hooks regardless of panel width. The compact variant hides
  * the scrub + FOV sliders and the u_time/Reset-camera text labels, and swaps
  * in the `camera-fov-step` stepper button (cycling `FOV_PRESETS`) in place of

@@ -62,7 +62,7 @@ export interface UniformSpec {
   defaultValue: number | number[];
   /**
    * True only when an explicit `@default` hint was present in a comment AND
-   * actually merged into `defaultValue` (C-2). Left unset for uniforms that
+   * actually merged into `defaultValue`. Left unset for uniforms that
    * only got a value from `defaultRangeFor`'s name-based heuristic — binding
    * those too would be a much bigger behavior change (every unannotated
    * color-named uniform in an existing project would jump from GL's zero
@@ -167,6 +167,22 @@ export interface UniformHints {
 }
 
 /**
+ * One numeric literal, in every form the serializer can emit. `fmtNum` is
+ * `String(n)`, which switches to scientific notation below 1e-6 and at/above
+ * 1e21 — a reader that only accepted plain decimals silently mis-read what the
+ * writer had just produced (`@step 1e-7` parsed back as step 1, killing the
+ * slider; `@range 0..1e-7` came back as max 1). Every pattern that reads or
+ * strips a managed number is built from this source so the two directions
+ * cannot drift apart again.
+ */
+const NUM = String.raw`-?\d*\.?\d+(?:[eE][+-]?\d+)?`;
+
+const RE_RANGE = new RegExp(String.raw`@range\s+(${NUM})\s*\.\.\s*(${NUM})`);
+const RE_MIN = new RegExp(String.raw`@min\s+(${NUM})`);
+const RE_MAX = new RegExp(String.raw`@max\s+(${NUM})`);
+const RE_STEP = new RegExp(String.raw`@step\s+(${NUM})`);
+
+/**
  * Parses GLSL annotation comments. Hints may appear on the same line as the
  * uniform declaration (after `//`) or on the line immediately preceding it.
  *
@@ -185,18 +201,17 @@ export function parseHintComment(text: string): UniformHints {
   const hints: UniformHints = {};
   if (!text) return hints;
 
-  const rangeMatch =
-    /@range\s+(-?\d+(?:\.\d+)?)\s*\.\.\s*(-?\d+(?:\.\d+)?)/.exec(text);
+  const rangeMatch = RE_RANGE.exec(text);
   if (rangeMatch) {
     hints.min = parseFloat(rangeMatch[1]!);
     hints.max = parseFloat(rangeMatch[2]!);
   }
-  const minMatch = /@min\s+(-?\d+(?:\.\d+)?)/.exec(text);
+  const minMatch = RE_MIN.exec(text);
   if (minMatch) hints.min = parseFloat(minMatch[1]!);
-  const maxMatch = /@max\s+(-?\d+(?:\.\d+)?)/.exec(text);
+  const maxMatch = RE_MAX.exec(text);
   if (maxMatch) hints.max = parseFloat(maxMatch[1]!);
 
-  const stepMatch = /@step\s+(-?\d+(?:\.\d+)?)/.exec(text);
+  const stepMatch = RE_STEP.exec(text);
   if (stepMatch) hints.step = parseFloat(stepMatch[1]!);
 
   const defMatch = /@default\s+([^@\n]+)/.exec(text);
@@ -253,11 +268,23 @@ export function parseHintComment(text: string): UniformHints {
  * any free-text the author wrote in the same comment survives a GUI edit.
  * Keep the alternatives in sync with the patterns parseHintComment recognises.
  */
-const ANNOTATION_TOKEN_RE =
-  /@range\s+-?\d+(?:\.\d+)?\s*\.\.\s*-?\d+(?:\.\d+)?|@min\s+-?\d+(?:\.\d+)?|@max\s+-?\d+(?:\.\d+)?|@step\s+-?\d+(?:\.\d+)?|@default\s+-?\d*\.?\d+(?:\s*,\s*-?\d*\.?\d+)*|@label\s+(?:"[^"]*"|[^\n@]+)|@(?:color|slider|multi)\b/g;
+const ANNOTATION_TOKEN_RE = new RegExp(
+  [
+    String.raw`@range\s+${NUM}\s*\.\.\s*${NUM}`,
+    String.raw`@min\s+${NUM}`,
+    String.raw`@max\s+${NUM}`,
+    String.raw`@step\s+${NUM}`,
+    String.raw`@default\s+${NUM}(?:\s*,\s*${NUM})*`,
+    String.raw`@label\s+(?:"[^"]*"|[^\n@]+)`,
+    String.raw`@(?:color|slider|multi)\b`,
+  ].join("|"),
+  "g",
+);
 
 function fmtNum(n: number): string {
-  // parseFloat round-trips this; avoid scientific notation for typical ranges.
+  // `parseFloat` round-trips every form `String` produces, including the
+  // scientific notation it falls back to for |n| < 1e-6 — the readers above
+  // accept an exponent, so no clamping/padding is needed here.
   return String(n);
 }
 
@@ -324,7 +351,7 @@ function stripManagedTokens(line: string): string | null {
  * both, and a leftover preceding `@range` would otherwise win). Returns the
  * rewritten source, or null when no matching declaration is found.
  *
- * Declaration *matching* runs against a block-comment-masked copy (L33) so a
+ * Declaration *matching* runs against a block-comment-masked copy so a
  * `uniform` line that only exists inside `/* … *\/` is never rewritten — that
  * would have edited commented-out code and left the live declaration alone.
  * The rewrite itself reads the RAW line: masking is length-preserving, so the

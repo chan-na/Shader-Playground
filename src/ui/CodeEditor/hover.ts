@@ -22,15 +22,11 @@ import {
   BUILTIN_FUNCTIONS,
   KEYWORD_DESCRIPTIONS,
 } from "../../core/glsl/builtins";
-import {
-  buildSymbolTable,
-  type GlslSymbol,
-  resolveSymbol,
-} from "../../core/glsl/symbolTable";
+import { identScanner } from "../../core/glsl/ident";
+import { resolveSymbol } from "../../core/glsl/symbolScope";
+import { buildSymbolTable, type GlslSymbol } from "../../core/glsl/symbolTable";
 import { SYSTEM_UNIFORM_DESCRIPTIONS } from "../../core/graph/uniformParser";
 import { tokens } from "../../theme";
-
-const IDENT_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
 
 /**
  * Find the identifier word that contains `pos` (an offset within `line`),
@@ -42,11 +38,11 @@ export function identifierAt(
   lineFrom: number,
   pos: number,
 ): { from: number; to: number; word: string } | null {
-  IDENT_RE.lastIndex = 0;
+  const identRe = identScanner();
   const col = pos - lineFrom;
   let m: RegExpExecArray | null;
   // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic RegExp.exec loop
-  while ((m = IDENT_RE.exec(lineText)) !== null) {
+  while ((m = identRe.exec(lineText)) !== null) {
     const start = m.index;
     const end = m.index + m[0].length;
     // Hovering at end-of-word (col === end) still counts as "on the word"

@@ -7,16 +7,13 @@
  *
  * 이 파일이 src/theme.ts 이며, main.tsx가 부트 시 cssVars()를 :root에
  * 주입해 CSS 변수로도 파생한다(예: --surface-panel: #131519). 아래 cssVars() 참고.
- * design/ 번들의 theme.ts는 핸드오프의 출처이고, 런타임 값의 출처는 이 파일이다 [D20].
+ * design/ 번들의 theme.ts는 핸드오프의 출처이고, 런타임 값의 출처는 이 파일이다.
  * 두 파일은 의도적으로 다르다 — design/theme.ts는 디자이너 정본(값의 출처)이고,
  * 이 파일은 거기에 dc 실측 기반 구현 파생 토큰(nodeCardSolid · emptyStateIcon ·
  * cardLg · modal · thumbnailInset · onCanvasText · overlayBar · shadow.modal)과
  * 헬퍼(withAlpha · 확장 cssVars)를 더한 상위집합이다. 번들 갱신 시 design/theme.ts로
- * 이 파일을 덮어쓰지 말 것 — 위 파생분이 사라진다(v1.1 실사고). 신규 토큰만 병합한다.
- *
- * 버전: v2.0 · 2026-07-19 (design/theme.ts v2.0 = 4b430a7+d11c83a 기준 병합)
- * v1.3(b6ef934)·v1.4(3a1981d): 신규 토큰 0 — 병합분 없음. fontBundle 트리는 design 쪽에서 제거됐고(src 원래 미포팅, Q10-b) 이 파일 기준 변화 없다.
- * v2.0(S26): 신규 토큰 6종 병합 — accent.bright · semantic.successBright · nodeCategory.processBright/valueBright/outputBright · gradient.viewportActive/shaderSphere. 그 외 드리프트는 기존 토큰으로 흡수(신규 0).
+ * 이 파일을 덮어쓰지 말 것 — 위 파생분이 사라진다(실제로 한 번 유실된 적 있다).
+ * 신규 토큰만 병합한다. 마지막 병합 기준: design/theme.ts @ d11c83a.
  */
 
 export const tokens = {
@@ -36,29 +33,29 @@ export const tokens = {
     // 보더 참조용 — design/Node Editor.dc.html의 모든 핸들이 이 값을
     // border/background로 사용한다.
     nodeCardSolid: "#16181c",
-    letterbox: "#08090b", // Webcam/Video 프리뷰 레터박스 (= appDarker) [D8]
+    letterbox: "#08090b", // Webcam/Video 프리뷰 레터박스 (= appDarker)
   },
 
-  // ── Overlay channels (알파 파생용 명명 토큰) [D9] ────────────────────
+  // ── Overlay channels (알파 파생용 명명 토큰) ─────────────────────────
   // 캔버스 텍스처/오버레이 레이어에서 white/black 채널을 코드가 직접
   // 파생하지 않도록 이름을 부여.
   overlay: {
     gridDot: "rgba(255,255,255,0.045)", // 노드 캔버스 도트 그리드
     // GPU 칩(향후 몰입 모드) 공용 스크림. 모달 백드롭은 이 값이 아니라
-    // withAlpha(surface.appDarker, 0.72) — M7-U5 결정 [B-1 v1.2: 범위 축소].
+    // withAlpha(surface.appDarker, 0.72)다.
     scrim: "rgba(0,0,0,0.5)",
-    // Video 스크럽 등 중립 트랙/필 표면. 순백 채널 직접 파생을 명명 토큰으로 [B-4].
+    // Video 스크럽 등 중립 트랙/필 표면. 순백 채널 직접 파생을 명명 토큰으로.
     track: "rgba(255,255,255,0.18)",
   },
 
-  // ── Gradients (종점을 토큰으로) [D10] ────────────────────────────────
+  // ── Gradients (종점을 토큰으로) ──────────────────────────────────────
   gradient: {
     // 뷰포트 빈 상태 배경 (surface.app 근처 2종점 radial)
     emptyState: "radial-gradient(circle at 50% 40%, #10131a 0%, #0a0b0e 70%)",
-    // 활성 뷰포트 navy 백드롭 (셰이더 구체 뒤) [S26-E].
+    // 활성 뷰포트 navy 백드롭 (셰이더 구체 뒤).
     viewportActive:
       "radial-gradient(circle at 50% 42%, #12325e 0%, #0c1c38 40%, #080a10 80%)",
-    // 셰이더 프리뷰 구체(디폴트 미리보기 렌더). 5종점, 복붙 금지 — 이 문자열이 정본 [S26-E].
+    // 셰이더 프리뷰 구체(디폴트 미리보기 렌더). 5종점, 복붙 금지 — 이 문자열이 정본.
     shaderSphere:
       "radial-gradient(circle at 40% 32%, #bcdcff 0%, #4ba3ff 26%, #2b6fe0 52%, #12336b 78%, #08152e 100%)",
   },
@@ -76,7 +73,7 @@ export const tokens = {
   accent: {
     default: "#3d9bff",
     hover: "#57a9ff",
-    // hover보다 밝은 단계 — 틴트 배경 위 아이콘/텍스트·a:hover [S26-B].
+    // hover보다 밝은 단계 — 틴트 배경 위 아이콘/텍스트·a:hover.
     bright: "#7dbcff",
     active: "#2b6fe0",
     muted: "#1c3452",
@@ -85,7 +82,7 @@ export const tokens = {
   // ── Text ────────────────────────────────────────────────────────────
   text: {
     primary: "#e7eaee",
-    // 순백 강조 — 인라인 rename 편집 중 상태를 헤더 타이틀과 구분 [B-2].
+    // 순백 강조 — 인라인 rename 편집 중 상태를 헤더 타이틀과 구분.
     emphasis: "#ffffff",
     brightBody: "#c4cad2",
     secondary: "#9aa2ac",
@@ -96,7 +93,7 @@ export const tokens = {
   // ── Semantic ────────────────────────────────────────────────────────
   semantic: {
     success: "#34d399",
-    // 밝은 success — GPU active 표시·Shader perf 배지 [S26-D].
+    // 밝은 success — GPU active 표시·Shader perf 배지.
     successBright: "#6fe3b8",
     warning: "#f5b13d",
     error: "#f0555c",
@@ -112,9 +109,9 @@ export const tokens = {
     value: "#d4a53c", // Param · Math · Swizzle · Combine
     container: "#77828f", // Group
     // source 카테고리의 밝은 변형(Webcam 렌즈 링 등). source 알파 파생 근사에
-    // 이름을 부여한 것 [B-3].
+    // 이름을 부여한 것.
     sourceBright: "#6fd6a3",
-    // [S26-D] 카테고리 밝은 변형 — 선택/호버/아이콘·배지의 lighten 변형(기존엔 source만 있었음).
+    // 카테고리 밝은 변형 — 선택/호버/아이콘·배지의 lighten 변형.
     processBright: "#7dbcff", // = accent.bright
     valueBright: "#e2ba57", // value 아이콘·perf 배지 yellow 통합(#f4d774 흡수)
     outputBright: "#ee7fac",
@@ -168,22 +165,22 @@ export const tokens = {
     // 캔버스 부유 오버레이(미니맵/줌 컨트롤) — Node Editor.dc.html 미니맵
     // radius 9 · 줌 컨트롤 radius 8의 대표값.
     overlay: 9,
-    // 뷰포트 하단 플로팅 트랜스포트 바 — Viewport.dc.html L107: border-radius 12.
+    // 뷰포트 하단 플로팅 트랜스포트 바 — Viewport.dc.html 트랜스포트 바 radius 12.
     transportBar: 12,
-    // 컴팩트(≤990px) 티어 전용 — 풀 바(12/9) 상속 근사 대신 정본화 [B-5].
+    // 컴팩트(≤990px) 티어 전용 — 풀 바(12/9) 상속 근사 대신 dc 실측 정본화.
     transportBarCompact: 11,
     overlayCompact: 8,
     // 캔버스 플로팅 필 (그래프 스켈레톤 상태 + add-node pill 공용) — 근사(overlay 9)
-    // 대신 dc 실측 정본화 [B-6·X14].
+    // 대신 dc 실측 정본화.
     floatingPill: 10,
-    // 뷰포트 빈 상태 중앙 아이콘 박스(64×64) — Viewport.dc.html L52:
+    // 뷰포트 빈 상태 중앙 아이콘 박스(64×64) — Viewport.dc.html 빈 상태:
     // border-radius 16. Graph-empty 온보딩 아이콘(56×56)도 같은 토큰을 공유
-    // (System States.dc.html L110의 실측 15px과 1px 차이 — 두 "빈 상태 아이콘"
+    // (System States.dc.html "graph: EMPTY" 아이콘의 실측 15px과 1px 차이 — 두 "빈 상태 아이콘"
     // 개념을 하나의 토큰으로 통일하는 쪽을 pixel-perfect보다 우선).
     emptyStateIcon: 16,
-    // Welcome 화면 스타터 카드 — Welcome.dc.html L107: border-radius 12.
+    // Welcome 화면 스타터 카드 — Welcome.dc.html 스타터 카드: border-radius 12.
     cardLg: 12,
-    // Export & Share 모달 바깥 테두리 — design/Export & Share.dc.html L60:
+    // Export & Share 모달 바깥 테두리 — design/Export & Share.dc.html 모달 카드:
     // border-radius 16 (Command Palette는 기존 radius.panel=14를 그대로 씀).
     modal: 16,
   },
@@ -196,26 +193,26 @@ export const tokens = {
       "0 0 0 1.5px rgba(61,155,255,0.75), 0 0 18px rgba(61,155,255,0.4)",
     errorRing: "0 0 0 1.5px rgba(240,85,92,0.7), 0 0 18px rgba(240,85,92,0.35)",
     // 권한 차단 카드 링(Webcam/Audio pending·denied 스킨). errorRing과 동일한
-    // 0.7 알파 패밀리 일관성 유지 [D12] — design/System States.dc.html의 solid
+    // 0.7 알파 패밀리 일관성 유지 — design/System States.dc.html의 solid
     // #f5b13d 링 대신 이 값이 정본이다.
     warnRing: "0 0 0 1.5px rgba(245,177,61,0.7), 0 0 14px rgba(245,177,61,0.3)",
     // 캔버스 플로팅 필 (그래프 스켈레톤 상태 + add-node pill 공용). nodeCard 패밀리 +
-    // blur 24 — 근사(nodeCard blur 20) 대신 dc 실측 정본화 [B-6·X14].
+    // blur 24 — 근사(nodeCard blur 20) 대신 dc 실측 정본화.
     floatingPill: "0 8px 24px rgba(0,0,0,0.5)",
     portOutputGlow: (famHex: string) => `0 0 7px ${famHex}aa`,
     // 노드 카드 썸네일(Shader/Image 96px 프리뷰) 안쪽 그림자.
-    // design/Node Editor.dc.html L188: box-shadow: inset 0 1px 4px rgba(0,0,0,0.5).
+    // design/Node Editor.dc.html 노드 썸네일: box-shadow: inset 0 1px 4px rgba(0,0,0,0.5).
     thumbnailInset: "inset 0 1px 4px rgba(0,0,0,0.5)",
     // 뷰포트 pane 오버레이(라벨/해상도 캡션)의 text-shadow — 밝은 배경 위에서도
-    // 가독성을 유지한다. design/Viewport.dc.html L76/L83: text-shadow:0 1px 3px
-    // rgba(0,0,0,0.6).
+    // 가독성을 유지한다. design/Viewport.dc.html pane 라벨/캡션:
+    // text-shadow:0 1px 3px rgba(0,0,0,0.6).
     onCanvasText: "0 1px 3px rgba(0,0,0,0.6)",
-    // 뷰포트 하단 플로팅 트랜스포트 바 — design/Viewport.dc.html L107:
+    // 뷰포트 하단 플로팅 트랜스포트 바 — design/Viewport.dc.html 트랜스포트 바:
     // box-shadow: 0 10px 30px rgba(0,0,0,0.55).
     overlayBar: "0 10px 30px rgba(0,0,0,0.55)",
     // 모달(Command Palette / Export & Share) 공용 베이스 그림자. 각 화면은
     // 여기에 자기만의 글로우(예: accent alpha)를 덧붙인다 — design/Command
-    // Palette.dc.html L78 · design/Export & Share.dc.html L60.
+    // Palette.dc.html · design/Export & Share.dc.html의 모달 카드.
     modal: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.4)",
   },
 
@@ -237,7 +234,7 @@ export const PORT_DIAMETER = { card: 11, hero: 13 } as const;
  *   center y = node.top + portTop + 5.5
  * portTop 은 노드 실제 높이(header 30 + pad 9 + previewH + pad 9) 안에 들 것.
  * 엣지 path 는 위 포트 중심 좌표에 맞춘 베지어(stroke-width 2.5, 색=소스 패밀리).
- * 포트 라벨은 카드 좌/우 rail(폭 ~46px)에 두고 썸네일을 그만큼 안쪽으로 민다 [D2].
+ * 포트 라벨은 카드 좌/우 rail(폭 ~46px)에 두고 썸네일을 그만큼 안쪽으로 민다.
  */
 
 /** :root CSS 변수로 파생하고 싶을 때 (선택) */
@@ -254,7 +251,7 @@ export function cssVars(): string {
     ...Object.entries(t.accent).map(([k, v]) => `--accent-${kebab(k)}: ${v};`),
     ...Object.entries(t.text).map(([k, v]) => `--text-${kebab(k)}: ${v};`),
     // kebab(k): semantic 키가 전부 단일 단어(success/warning/error/info)였을
-    // 때는 무영향이었으나, successBright(S26) 추가로 camelCase 키가 처음
+    // 때는 무영향이었으나, successBright 추가로 camelCase 키가 처음
     // 생겨 kebab 변환 누락이 노출됐다 — 기존 단일 단어 키의 출력은 불변.
     ...Object.entries(t.semantic).map(([k, v]) => `--${kebab(k)}: ${v};`),
     ...Object.entries(t.nodeCategory).map(

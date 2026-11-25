@@ -2,10 +2,7 @@ import {
   type ConnectionLineComponentProps,
   ConnectionLineType,
   Position,
-  ReactFlowProvider,
 } from "@xyflow/react";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
   MeshGraphNode,
@@ -15,12 +12,7 @@ import type {
 import { useGraphStore } from "../../state/graphStore";
 import { tokens } from "../../theme";
 import { ConnectionLine } from "./ConnectionLine";
-
-/** ReactFlow's Handle requires ReactFlowProvider context to mount (see
- *  nodeViews.test.tsx). */
-function renderInFlow(element: ReactElement): string {
-  return renderToStaticMarkup(<ReactFlowProvider>{element}</ReactFlowProvider>);
-}
+import { renderInFlowStatic } from "./testFlow";
 
 /** Minimal ConnectionLineComponentProps stand-in — only the fields
  *  ConnectionLine.tsx actually reads (fromX/Y, toX/Y, positions, fromNode.id,
@@ -90,7 +82,7 @@ describe("ConnectionLine", () => {
   });
 
   it("always renders a dashed 2.5-width path with the sp-connection-line class", () => {
-    const html = renderInFlow(
+    const html = renderInFlowStatic(
       <ConnectionLine
         {...mockProps("mesh1", { id: "mesh", type: "source" })}
       />,
@@ -102,7 +94,7 @@ describe("ConnectionLine", () => {
   });
 
   it("drag from a mesh output handle: resource family stroke", () => {
-    const html = renderInFlow(
+    const html = renderInFlowStatic(
       <ConnectionLine
         {...mockProps("mesh1", { id: "mesh", type: "source" })}
       />,
@@ -111,7 +103,7 @@ describe("ConnectionLine", () => {
   });
 
   it("drag from a float param output handle: scalar family stroke", () => {
-    const html = renderInFlow(
+    const html = renderInFlowStatic(
       <ConnectionLine
         {...mockProps("param1", { id: "value", type: "source" })}
       />,
@@ -120,7 +112,7 @@ describe("ConnectionLine", () => {
   });
 
   it("drag from a shader's float uniform *input* handle: scalar family stroke (target-side lookup)", () => {
-    const html = renderInFlow(
+    const html = renderInFlowStatic(
       <ConnectionLine
         {...mockProps("shader1", { id: "u_x", type: "target" })}
       />,
@@ -129,7 +121,7 @@ describe("ConnectionLine", () => {
   });
 
   it("handle id not found on the node's port list: accent fallback", () => {
-    const html = renderInFlow(
+    const html = renderInFlowStatic(
       <ConnectionLine
         {...mockProps("shader1", { id: "u_missing", type: "target" })}
       />,
@@ -138,7 +130,7 @@ describe("ConnectionLine", () => {
   });
 
   it("fromNode not present in the graph store: accent fallback", () => {
-    const html = renderInFlow(
+    const html = renderInFlowStatic(
       <ConnectionLine
         {...mockProps("missing-node", { id: "value", type: "source" })}
       />,

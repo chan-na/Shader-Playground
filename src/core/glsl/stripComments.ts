@@ -1,12 +1,11 @@
 /**
- * Comment masking for the GLSL editor tooling (L20).
+ * Comment masking for the GLSL editor tooling.
  *
  * Every offset-sensitive GLSL consumer in this codebase (symbol table,
- * reference finder, semantic tokens, uniform parser, uniform-hint writer) used
- * to carry its own copy of a `/* … *\/` stripper plus a per-line `//` walk.
- * Four near-identical copies drifted: some masked, some truncated, and the
- * regex-based block strippers happily matched a `/*` that lived *inside* a
- * line comment, blanking real code that followed.
+ * reference finder, semantic tokens, uniform parser, uniform-hint writer)
+ * masks comments through this one scanner. Per-consumer copies drift (some
+ * masking, some truncating), and a regex-based block stripper happily matches
+ * a `/*` that lives *inside* a line comment, blanking real code that follows.
  *
  * This module owns the single scanner. It is a **leaf**: it imports nothing,
  * so no consumer can close an import cycle through it.
@@ -110,7 +109,7 @@ function scan(
       // boundary. `blank()` already leaves `\r` alone, so the returned string is
       // identical either way — this only keeps the scanner's own `i`/`plainStart`
       // bookkeeping pointing at the start of the terminator rather than inside
-      // it. (Offset consumers no longer depend on it: `references.ts` and
+      // it. (Offset consumers do not depend on it: `references.ts` and
       // `semanticTokens.ts` split on "\n" and keep the `\r` in the line.)
       if (stop > i && source.charCodeAt(stop - 1) === 13 /* "\r" */) stop -= 1;
       if (maskLine) {

@@ -17,7 +17,7 @@ describe("frameDelays", () => {
     expect(frameDelays([200, 100], 80)).toEqual([0, 80]);
   });
 
-  // #31 — a backgrounded tab throttles RAF to ~1 Hz or stops it outright, so
+  // A backgrounded tab throttles RAF to ~1 Hz or stops it outright, so
   // the gap across a hidden stretch must not be baked into the GIF verbatim.
   it("clamps a backgrounded-tab gap to the 1s ceiling", () => {
     // 12 fps → 83.3ms nominal, so the ceiling is the 1000ms floor, not 4×.
@@ -37,7 +37,7 @@ describe("frameDelays", () => {
 // --- Store with mocked 2D canvas ------------------------------------------
 
 // fillRect/fillStyle are part of the required surface: captureFrame paints an
-// opaque matte before drawImage (#16) and swallows any throw in its try/catch,
+// opaque matte before drawImage and swallows any throw in its try/catch,
 // so a FakeCtx missing them would silently degrade every test below to
 // frameCount 0 rather than failing loudly.
 interface FakeCtx {
@@ -89,7 +89,7 @@ describe("useGifRecorderStore", () => {
     resetStore();
   });
 
-  /** Ordered log of matte/draw calls so #16's ordering can be asserted. */
+  /** Ordered log of matte/draw calls so matte-first order can be asserted. */
   let calls: string[] = [];
   /** `fillStyle` as it stood at each fillRect call. */
   let fillStyles: string[] = [];
@@ -236,7 +236,7 @@ describe("useGifRecorderStore", () => {
     expect(useGifRecorderStore.getState().frameCount).toBe(2);
   });
 
-  // --- #16: opaque matte behind every captured frame ----------------------
+  // --- opaque matte behind every captured frame ---------------------------
 
   it("paints one full-size opaque matte before drawImage on each capture", () => {
     installFakeContext();

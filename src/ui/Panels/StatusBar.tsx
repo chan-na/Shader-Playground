@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import { confidentVaryingWarnings } from "../../core/glsl/varyingContract";
 import { useDebugUiStore } from "../../state/debugUiStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
-import { useDockStore } from "../../state/dockStore";
-import { collectPanelIds } from "../../state/dockTree";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
+import { useDockStore } from "../dock/dockStore";
+import { collectPanelIds } from "../dock/tree";
 import { type StatusTone, statusSummary } from "./statusSummary";
 
-/** Left status pill text color per tone (App Shell.dc.html L402 pattern). */
+/** Left status pill text color per tone (App Shell.dc.html STATUS BAR). */
 const TONE_COLOR: Record<StatusTone, string> = {
   success: "var(--success)",
   warning: "var(--warning)",
@@ -21,9 +21,9 @@ const TONE_COLOR: Record<StatusTone, string> = {
 };
 
 /**
- * Status dot glow per tone (App Shell.dc.html L402: box-shadow:0 0 6px
- * #34d399 for the ready/success case). `muted` has no dc glow reference —
- * the pre-init dot stays flat.
+ * Status dot glow per tone (design/App Shell.dc.html STATUS BAR:
+ * box-shadow:0 0 6px #34d399 for the ready/success case). `muted` has no dc
+ * glow reference — the pre-init dot stays flat.
  */
 const TONE_DOT_GLOW: Partial<Record<StatusTone, string>> = {
   success: `0 0 6px ${withAlpha(tokens.semantic.success, 1)}`,
@@ -41,7 +41,7 @@ const TONE_DOT_GLOW: Partial<Record<StatusTone, string>> = {
 const TIME_SAMPLE_INTERVAL_MS = 250;
 
 export function StatusBar() {
-  // [#42] Field selectors, not `s.stats`. Every RAF frame that does GPU work
+  // Field selectors, not `s.stats`. Every RAF frame that does GPU work
   // calls `bumpRenderTick()`, which spreads a *new* `stats` object — so
   // subscribing to the object re-rendered this whole bar ~60x/sec even though
   // `renderTick` is never displayed here. `fps` changes about once a second,
@@ -65,11 +65,9 @@ export function StatusBar() {
     }
     return n;
   });
-  // R5: shader diagnostics count across all severities (not just errors) —
-  // mirrors the former SidePanel Problems badge total (SidePanel.tsx
-  // problemCount selector, pre-B5-U3). Combined with runtime errors below
-  // into the status-problems count. Distinct from compileErrorCount above
-  // (errors only, feeds statusSummary) — left untouched per B5-U3 scope.
+  // Shader diagnostics count across all severities (not just errors),
+  // combined with runtime errors below into the status-problems count.
+  // Distinct from compileErrorCount above (errors only, feeds statusSummary).
   const diagnosticsProblemCount = useDiagnosticsStore((s) => {
     let n = 0;
     for (const d of Object.values(s.byNode)) {
@@ -77,11 +75,11 @@ export function StatusBar() {
     }
     return n;
   });
-  // E-1 (T2): silent-uniform-warning count across every shader pass row.
+  // Silent-uniform-warning count across every shader pass row.
   // A numeric-returning selector, so this stays reference-stable like
   // compileErrorCount/diagnosticsProblemCount above — passPlanStore only
   // republishes on recompile (not the RAF hot path), so this doesn't run
-  // afoul of the #42 field-selector discipline either.
+  // afoul of the field-selector discipline (see the stats selectors) either.
   const silentWarningCount = usePassPlanStore((s) => {
     let n = 0;
     for (const r of s.rows) {
@@ -89,8 +87,8 @@ export function StatusBar() {
     }
     return n;
   });
-  // A-2 (T4): varying-bridge warnings land in the same ProblemsPanel section
-  // as the E-1 rows above and are counted the same way there
+  // Varying-bridge warnings land in the same ProblemsPanel section
+  // as the silent-warning rows above and are counted the same way there
   // (`silentEntries.length + varyingEntries.length`), so leaving them out
   // here let the bar read "no problems" while the panel showed a warning
   // row. Same reference-stable numeric-selector shape as the count above;
@@ -111,18 +109,13 @@ export function StatusBar() {
   const toggleProblems = useDebugUiStore((s) => s.toggleProblems);
   const passesOpen = useDebugUiStore((s) => s.passesOpen);
   const togglePasses = useDebugUiStore((s) => s.togglePasses);
-  // R5 (B5-U3): diagnostics is no longer a Side Panel tab — it's a bottom
-  // transient overlay (StatusOverlays) toggled purely by debugUiStore.open.
-  // The D1-era un-collapse dance (finding the inspector/assets dock leaf and
-  // force-expanding it so the *tab* would be visible) no longer applies: the
-  // overlay renders outside the dock tree entirely, so there's nothing to
-  // un-collapse. toggleDiag is wired directly.
-  // B6-U2 (R9): dockStore/dockTree are imported again, but only for the
-  // 'N panels docked' count below — `collectPanelIds(s.tree).length` is a
-  // number, so the selector is reference-stable and safe to subscribe
-  // directly (no useMemo needed, unlike AppToolbar's closedPanels array).
-  // Leaf-path traversal (the un-collapse logic removed above) still has no
-  // place here.
+  // Diagnostics is a bottom transient overlay (StatusOverlays) toggled purely
+  // by debugUiStore.open — it renders outside the dock tree, so toggleDiag
+  // never needs to find or un-collapse a dock leaf.
+  // dockStore is read only for the 'N panels docked' count below —
+  // `collectPanelIds(s.tree).length` is a number, so the selector is
+  // reference-stable and safe to subscribe directly (no useMemo needed,
+  // unlike AppToolbar's closedPanels array).
   const dockedCount = useDockStore((s) => collectPanelIds(s.tree).length);
 
   // Sampled, not subscribed — see TIME_SAMPLE_INTERVAL_MS above.

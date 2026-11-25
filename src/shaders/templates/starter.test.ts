@@ -6,7 +6,7 @@ import starterFrag from "./starter.frag?raw";
 import unlitFrag from "./unlit.frag?raw";
 
 /**
- * [C-7] A new Shader node is always born without a mesh input, and
+ * A new Shader node is always born without a mesh input, and
  * compile.ts substitutes fullscreen.vert for mesh-less shader passes. In
  * GLSL ES 3.0 every fragment-stage `in` must be matched by a vertex-stage
  * `out` or the program fails to link — so the default template for a new node
@@ -49,7 +49,7 @@ describe("new-node shader template varying contract [C-7]", () => {
   });
 
   it("documents why unlit.frag cannot be the new-node default: it reads a varying fullscreen.vert never emits", () => {
-    // This is the actual C-7 defect, pinned so nobody restores unlit.frag as
+    // This is the actual defect, pinned so nobody restores unlit.frag as
     // the default for CTA / Add Shader. unlit stays the *mesh* template (demo
     // graph + the explicit "Add Shader: Unlit" command), where basic.vert
     // supplies v_normal.
@@ -63,10 +63,9 @@ describe("new-node shader template varying contract [C-7]", () => {
 });
 
 /**
- * [Q1-b] starter.frag's default output was promoted from an interim visual
- * to the design-canon recipe in v1.3 (the 'New Shader' demo card in
- * design/Node Editor.dc.html): a u_baseColor central soft glow + a dark
- * vignette + a subtle u_time modulation. [R14] The dc CSS gradient stops are
+ * starter.frag's default output is the design-canon recipe (the 'New Shader'
+ * demo card in design/Node Editor.dc.html): a u_baseColor central soft glow +
+ * a dark vignette + a subtle u_time modulation. The dc CSS gradient stops are
  * ported as a recipe, not matched stop-for-stop, so these are text
  * assertions pinning the recipe's presence rather than a pixel/GL
  * comparison — same rationale as the varying-contract tests above: jsdom has
@@ -87,7 +86,7 @@ describe("starter.frag default-output recipe [Q1-b]", () => {
   });
 
   it("does not widen the varying contract — starter.frag still declares only v_uv as `in`", () => {
-    // Stronger than the [C-7] "contains v_uv" checks above: pins the exact
+    // Stronger than the "contains v_uv" checks above: pins the exact
     // set so the vignette recipe can't accidentally grow the varying list.
     expect(declaredVaryings(starterFrag, "in")).toEqual(["v_uv"]);
   });
@@ -105,11 +104,11 @@ describe("starter.frag default-output recipe [Q1-b]", () => {
   });
 
   it("declares unlit.frag's u_baseColor @default too (T3/C-2 regression)", () => {
-    // `Add Shader: Unlit` runs the same generic template path that used to
-    // hardcode `uniformValues: { u_baseColor: [0.5, 0.7, 1.0] }` for every
-    // template. C-2 removed that seed in favour of GLSL hints, so a template
-    // that declares u_baseColor without a hint falls through to GL zero and
-    // the new node renders near-black — which is deletion, not migration.
+    // `Add Shader: Unlit` runs the same generic template path, which creates
+    // nodes with `uniformValues: {}` and relies on GLSL hints rather than a
+    // hardcoded `u_baseColor` seed — so a template that declares u_baseColor
+    // without a hint falls through to GL zero and the new node renders
+    // near-black.
     const spec = parseUniforms(unlitFrag).find((u) => u.name === "u_baseColor");
     expect(spec?.hasExplicitDefault).toBe(true);
     expect(spec?.defaultValue).toEqual([0.5, 0.7, 1.0]);

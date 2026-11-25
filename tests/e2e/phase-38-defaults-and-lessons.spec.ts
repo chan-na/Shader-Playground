@@ -1,13 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered, readCanvasStats } from "./helpers/canvas";
-import { bootApp } from "./helpers/fixtures";
+import { bootApp, loadChainDemo } from "./helpers/fixtures";
 import { readSp, withSp } from "./helpers/sp";
 
 /**
- * Phase 38 — mental model correction (docs/learnability-plan-2026-08.md T3),
- * unit U1's slice: C-2 (`uniformValues` hardcoding → GLSL `@default`) + F-2
- * (demo lesson groups). E-2/E-3/F-1 are covered by the parallel units' own
- * specs.
+ * Phase 38 — mental model correction (docs/learnability-plan-2026-08.md T3):
+ * C-2 (`uniformValues` hardcoding → GLSL `@default`) + F-2 (demo lesson
+ * groups). E-2/E-3/F-1 are covered by the other phase-38-* specs.
  *
  * C-2's invariant under test: a brand-new Shader node is created with
  * `uniformValues: {}` (no hardcoded seed value survives in TS anywhere) yet
@@ -174,20 +173,7 @@ test.describe("Phase 38 — F-2 demo lesson groups", () => {
   test("Presets → Chain loads with its own lesson group labels", async ({
     page,
   }) => {
-    // Same path as phase-5-6-graph-chain.spec.ts's chain load: the dropdown
-    // item carries an explicit role="menuitem" (AppToolbar's ToolbarMenu).
-    await page.getByRole("button", { name: "Presets" }).click();
-    await page.getByRole("menuitem", { name: "Chain", exact: true }).click();
-
-    await expect
-      .poll(() =>
-        readSp(page, (sp) =>
-          sp.graph.getState().nodes.find((n) => n.id === "tonemap1")
-            ? "ok"
-            : "no",
-        ),
-      )
-      .toBe("ok");
+    await loadChainDemo(page);
 
     await expect(page.getByTestId("group-label-text").first()).toBeVisible();
     const parents = await readSp(page, (sp) => sp.graph.getState().parents);

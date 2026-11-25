@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered } from "./helpers/canvas";
-import { bootApp, setGraph } from "./helpers/fixtures";
+import { bootApp, selectNode, setGraph } from "./helpers/fixtures";
 import { readSp, waitForRev } from "./helpers/sp";
 
 // Phase 17 — per-pass resolution scale. A downsample chain renders a gradient
@@ -97,7 +97,7 @@ test.describe("Phase 17 — per-pass resolution scale", () => {
     await expectCanvasRendered(canvas, { ratio: 0.5 });
 
     // Select the generator node so the Inspector targets it.
-    await readSp(page, (sp) => sp.selection.getState().select("gen"));
+    await selectNode(page, "gen");
 
     const select = page.getByTestId("resolution-scale");
     await expect(select).toBeVisible();

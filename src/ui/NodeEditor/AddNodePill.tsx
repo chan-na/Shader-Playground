@@ -54,8 +54,8 @@ function PillButton({
 }
 
 /**
- * Floating add-node pill — Node Editor canvas top-center (W4, design/App
- * Shell.dc.html L130-137 + L855-860). Quick-access category buttons +
+ * Floating add-node pill — Node Editor canvas top-center (design/App
+ * Shell.dc.html "floating add-node palette"). Quick-access category buttons +
  * a `＋ More` overflow into the ⌘K CommandPalette (role split: pill = fast
  * 1-click access to the 4 common kinds, palette = full search including
  * Webcam/Video/Audio/Blend/Param and everything else).
@@ -63,7 +63,7 @@ function PillButton({
  * Category actions follow CommandPalette's pattern (src/ui/CommandPalette/
  * index.tsx) — addNode via useGraphStore.getState() at click time, then
  * useSelectionStore.getState().select(id) so the new node becomes the
- * active selection (Inspector/CodeEditor focus, W5 auto-code, etc.).
+ * active selection (Inspector/CodeEditor focus, Code auto-open, etc.).
  */
 export function AddNodePill() {
   const nodes = useGraphStore((s) => s.nodes);
@@ -86,7 +86,7 @@ export function AddNodePill() {
     useSelectionStore.getState().select(id);
   };
 
-  // [C-7] Starter template, not unlit — a node added here has no mesh input,
+  // Starter template, not unlit — a node added here has no mesh input,
   // so it compiles against fullscreen.vert (v_uv only) and unlit.frag's
   // `in vec3 v_normal` could never link on its first frame. See starter.frag.
   // (Reason carried over from AppToolbar.tsx's addShader — same starter
@@ -98,7 +98,7 @@ export function AddNodePill() {
       kind: "shader",
       vertexSource: basicVert,
       fragmentSource: starterFrag,
-      // C-2: no hardcoded seed values — the initial glow color comes from
+      // No hardcoded seed values — the initial glow color comes from
       // starter.frag's `@default` hint, bound by compile.ts's
       // withExplicitDefaults at compile time.
       uniformValues: {},

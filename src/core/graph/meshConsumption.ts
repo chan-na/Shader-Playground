@@ -1,5 +1,5 @@
 /**
- * Per-attribute consumption verdict for a mesh's attribute contract (B-2),
+ * Per-attribute consumption verdict for a mesh's attribute contract,
  * aggregated across every shader pass currently wired to that mesh's output.
  *  - `"unknown"`: no consumer information at all — either nothing consumes
  *    this mesh yet, or none of its consumers declared this attribute name.

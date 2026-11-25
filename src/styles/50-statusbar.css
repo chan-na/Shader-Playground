@@ -1,0 +1,97 @@
+/* ── Status bar (design/App Shell.dc.html STATUS BAR) ────────────── */
+.statusbar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--surface-docking-header);
+  border-top: 1px solid var(--border-header-divider);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+.statusbar-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.statusbar-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.statusbar-muted {
+  color: var(--text-muted);
+}
+.statusbar-spacer {
+  flex: 1;
+}
+/* ⚠ N problems (dc App Shell status bar) — reset a <button> down to the plain
+   status-bar text/icon look (no border/box), then color it semantic.warning
+   (#f5b13d, dc exact match). Zero-count state layers `.statusbar-muted`
+   on top (below) for its higher-specificity color override, keeping the
+   layout reset shared by both states — the "no problems" copy has no dc
+   reference (dc always shows a nonzero demo count), carried over from the
+   legacy 'no errors' slot as a provisional decision. */
+.statusbar-problems {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--warning);
+}
+.statusbar-problems.statusbar-muted {
+  color: var(--text-muted);
+}
+.statusbar-diag {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 1px 8px;
+}
+.statusbar-diag[aria-pressed="true"] {
+  /* dc `diagColor`: diagOpen ? "#3d9bff" — tokens.accent.default exact
+     match. */
+  background: var(--surface-hover);
+  color: var(--accent-default);
+}
+
+/* ── Status overlays — bottom transient panel (design/App Shell.dc.html
+   DIAGNOSTICS / PROBLEMS OVERLAY). diagnostics/problems
+   are not dock tabs — they share this one 172px absolute region above the
+   status bar, mutually exclusive via debugUiStore. ──────────────────── */
+.status-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 172px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  /* dc App Shell 오버레이 #0f1114 = surface.rail 정확 일치 — 오버레이
+     본문+스트립 rail 톤 통일. */
+  background: var(--surface-rail);
+  border-top: 1px solid var(--border-default); /* dc #20242a 정확 일치 */
+}
+.status-overlay-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0 10px 0 12px;
+  background: var(--surface-docking-header); /* dc #101216 정확 일치 */
+  border-bottom: 1px solid var(--border-header-divider); /* dc #17191e 정확 일치 */
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-bright-body); /* dc #c4cad2 정확 일치 */
+}

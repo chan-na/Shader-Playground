@@ -69,6 +69,60 @@ describe("serializeProject / deserializeProject", () => {
     expect(restored.warnings).toEqual([]);
   });
 
+  it("round-trips webcam / video / audio external-source nodes (Phase 14)", () => {
+    const graph: Graph = {
+      nodes: [
+        { id: "w1", kind: "webcam" },
+        {
+          id: "v1",
+          kind: "video",
+          assetId: "asset-xyz",
+          playing: true,
+          loop: true,
+          muted: true,
+        },
+        {
+          id: "a1",
+          kind: "audio",
+          sourceKind: "file",
+          assetId: "asset-abc",
+          fftSize: 256,
+          smoothing: 0.8,
+          playing: true,
+          loop: true,
+        },
+      ],
+      edges: [],
+    };
+    const restored = deserializeProject(
+      JSON.parse(JSON.stringify(serializeProject(graph, {}))),
+    );
+    expect(restored.warnings).toEqual([]);
+    expect(
+      restored.graph.nodes.filter((n) => n.kind === "webcam").map((n) => n.id),
+    ).toEqual(["w1"]);
+
+    const video = restored.graph.nodes.find((n) => n.kind === "video");
+    expect(video?.kind === "video" ? video : null).toMatchObject({
+      id: "v1",
+      assetId: "asset-xyz",
+      loop: true,
+      muted: true,
+      playing: true,
+    });
+
+    const audio = restored.graph.nodes.find((n) => n.kind === "audio");
+    expect(audio?.kind === "audio" ? audio : null).toMatchObject({
+      id: "a1",
+      sourceKind: "file",
+      assetId: "asset-abc",
+      fftSize: 256,
+      smoothing: 0.8,
+      playing: true,
+      loop: true,
+    });
+  });
+
   it("round-trips a node's name [D15]", () => {
     const graph: Graph = {
       nodes: [{ id: "out1", kind: "output", name: "Hero Output" }],

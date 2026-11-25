@@ -1,0 +1,364 @@
+/* ── Command Palette (design/Command Palette.dc.html) ─────────────
+ * Shared with HelpModal.tsx (.cmdk-overlay / .cmdk-modal / .cmdk-hint) —
+ * HelpModal supplies its own .help-modal width/box override, everything
+ * else here (scrim, modal chrome, footer) is intentionally generic so both
+ * dialogs pick it up. */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--surface-app-darker) 62%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 9999;
+}
+.cmdk-modal {
+  width: 624px;
+  max-width: 92vw;
+  margin-top: 104px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-stronger);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cmdk-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--border-default);
+}
+.cmdk-search-icon {
+  flex-shrink: 0;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.cmdk-mode-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-chip);
+  padding: 3px 8px;
+}
+.cmdk-mode-chip--node {
+  color: var(--port-scalar);
+  background: color-mix(in srgb, var(--port-scalar) 10%, transparent);
+  border-color: color-mix(in srgb, var(--port-scalar) 35%, transparent);
+}
+.cmdk-mode-chip--command {
+  color: var(--accent-default);
+  background: color-mix(in srgb, var(--accent-default) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-default) 35%, transparent);
+}
+.cmdk-mode-chip--preset {
+  color: var(--port-vector);
+  background: color-mix(in srgb, var(--port-vector) 10%, transparent);
+  border-color: color-mix(in srgb, var(--port-vector) 35%, transparent);
+}
+.cmdk-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  caret-color: var(--accent-default);
+  padding: 2px 0;
+}
+.cmdk-input::placeholder {
+  color: var(--text-muted);
+}
+.cmdk-esc-chip {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-app);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-icon-box);
+  padding: 2px 7px;
+}
+.cmdk-results {
+  max-height: 436px;
+  overflow-y: auto;
+  padding: 6px;
+}
+.cmdk-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 5px;
+}
+.cmdk-group-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cmdk-group-count {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-disabled);
+}
+.cmdk-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 11px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-overlay);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cmdk-row--active {
+  background: color-mix(in srgb, var(--accent-default) 13%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--accent-default) 40%, transparent);
+}
+.cmdk-icon {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.cmdk-icon--source {
+  background: color-mix(in srgb, var(--node-cat-source) 16%, transparent);
+  border-color: var(--node-cat-source);
+  color: var(--node-cat-source);
+}
+.cmdk-icon--process {
+  background: color-mix(in srgb, var(--node-cat-process) 16%, transparent);
+  border-color: var(--node-cat-process);
+  color: var(--node-cat-process);
+}
+.cmdk-icon--output {
+  background: color-mix(in srgb, var(--node-cat-output) 16%, transparent);
+  border-color: var(--node-cat-output);
+  color: var(--node-cat-output);
+}
+.cmdk-icon--value {
+  background: color-mix(in srgb, var(--node-cat-value) 16%, transparent);
+  border-color: var(--node-cat-value);
+  color: var(--node-cat-value);
+}
+.cmdk-icon--container {
+  background: color-mix(in srgb, var(--node-cat-container) 16%, transparent);
+  border-color: var(--node-cat-container);
+  color: var(--node-cat-container);
+}
+.cmdk-icon--command {
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+.cmdk-icon--preset {
+  background: color-mix(in srgb, var(--port-vector) 14%, transparent);
+  border-color: color-mix(in srgb, var(--port-vector) 40%, transparent);
+  color: var(--port-vector);
+}
+.cmdk-main {
+  flex: 1;
+  min-width: 0;
+}
+.cmdk-label {
+  display: block;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmdk-seg--hit {
+  color: var(--accent-hover);
+  font-weight: 700;
+}
+.cmdk-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* ⚠ needs Mesh 앰버 배지 — dc Command Palette.dc.html 결과 행 `warn`.
+   warning 패밀리 알파(bg 0.12 / border 0.35). dc 글자색 #f5c778은 무토큰이라
+   var(--warning)로 근사(신규 토큰 0 규칙). */
+.cmdk-warn-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  border-radius: var(--radius-icon-box); /* 5px = dc radius 5 */
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+  font-size: 9.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cmdk-tag {
+  flex-shrink: 0;
+  min-width: 52px;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-icon-box);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--surface-card);
+}
+.cmdk-tag--preset {
+  color: var(--port-vector);
+  background: color-mix(in srgb, var(--port-vector) 10%, transparent);
+}
+.cmdk-trailing {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 56px;
+}
+.cmdk-enter-glyph {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-hover);
+}
+.cmdk-key-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--surface-rail);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-icon-box);
+  padding: 1px 6px;
+}
+.cmdk-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 34px 20px 30px;
+  text-align: center;
+}
+.cmdk-empty-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-node-card);
+  color: var(--text-disabled);
+  font-size: 18px;
+}
+.cmdk-empty-text {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+.cmdk-empty-text strong {
+  color: var(--text-primary);
+  font-weight: 400;
+}
+/* dc "Command Palette.dc.html" empty 블록의 빈 결과 CTA 행.
+   raw hex(rgba(61,155,255,·) / #c4cad2 / #7dbcff / radius 9)를
+   accent.default 알파 파생 · text.brightBody · 기존 cmdk-enter-glyph가
+   쓰는 accent-hover · radius-overlay로 매핑. */
+.cmdk-empty-cta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border-radius: var(--radius-overlay);
+  background: color-mix(in srgb, var(--accent-default) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-default) 30%, transparent);
+  font-size: 12.5px;
+  color: var(--text-bright-body);
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+}
+.cmdk-empty-cta-term {
+  color: var(--accent-hover);
+}
+.cmdk-empty-cta-kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-hover);
+}
+.cmdk-hint {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-docking-header);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.cmdk-hint-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.cmdk-hint-key {
+  color: var(--text-secondary);
+}
+.cmdk-hint-spacer {
+  flex: 1;
+}
+.cmdk-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.cmdk-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cmdk-legend-chip {
+  font-family: var(--font-mono);
+  background: var(--surface-rail);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-icon-box);
+  padding: 1px 6px;
+}
+.cmdk-legend-chip--node {
+  color: var(--port-scalar);
+}
+.cmdk-legend-chip--command {
+  color: var(--accent-default);
+}
+.cmdk-legend-chip--preset {
+  color: var(--port-vector);
+}

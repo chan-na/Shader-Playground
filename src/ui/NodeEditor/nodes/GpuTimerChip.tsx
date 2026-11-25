@@ -12,7 +12,7 @@ interface Props {
  * user disabled the timer, so unsupported environments
  * (Safari/SwiftShader/Firefox-default) stay visually clean.
  *
- * Style source: design/Node Editor.dc.html L185 — the "0.31ms" chip sitting
+ * Style source: design/Node Editor.dc.html Fresnel shader — the "0.31ms" chip sitting
  * in the Fresnel header's `margin-left:auto` slot.
  */
 export function GpuTimerChip({ nodeId }: Props) {

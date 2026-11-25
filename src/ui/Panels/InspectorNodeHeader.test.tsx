@@ -54,7 +54,7 @@ describe("InspectorNodeHeader", () => {
     );
 
     // No `name` set → displayNodeName() falls back to NODE_META.shader.label
-    // (D15) — no longer the raw lowercase `node.kind`.
+    // — not the raw lowercase `node.kind`.
     expect(screen.getByTestId("insp-node-title").textContent).toBe("Shader");
     expect(screen.getByText("process · shader")).not.toBeNull();
   });

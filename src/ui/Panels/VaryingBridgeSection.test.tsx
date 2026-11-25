@@ -2,17 +2,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { NodeVaryingRow, NodeVaryings } from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
+import { resetAllStores } from "../../state/testStores";
 import { VaryingBridgeSection } from "./VaryingBridgeSection";
-
-const initialPassPlan = usePassPlanStore.getState();
-
-function resetStores() {
-  usePassPlanStore.setState(initialPassPlan, true);
-}
 
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 function contractOf(rows: NodeVaryingRow[], confident = true): NodeVaryings {

@@ -57,7 +57,7 @@ describe("disposeTexture", () => {
   });
 });
 
-// [E-3] No-drift contract: the GL calls below must derive from
+// No-drift contract: the GL calls below must derive from
 // FBO_TEXTURE_PARAMS / IMAGE_TEXTURE_PARAMS, not independent literals — this
 // pins the exact enum values applied so the constants the Inspector reads can
 // never silently diverge from what the GL layer actually does.

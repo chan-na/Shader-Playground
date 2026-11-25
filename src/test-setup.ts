@@ -3,7 +3,7 @@
 import "fake-indexeddb/auto";
 import { setMinLevel } from "./utils/log";
 
-// Keep the dev logger's console mirroring quiet under tests — the P3 catch-site
+// Keep the dev logger's console mirroring quiet under tests — the catch-site log
 // traces would otherwise flood test output. The buffer still records every
 // entry, so tests asserting log behavior are unaffected (log.test.ts sets its
 // own level).
@@ -60,8 +60,8 @@ if (typeof globalThis.ImageData === "undefined") {
 //
 // So we install a small spec-compatible in-memory Storage *unconditionally* —
 // a version-sniffing guard (`typeof globalThis.localStorage === "undefined"`)
-// is exactly what made this fragile. Tests that exercise real localStorage (R9
-// dock layout persistence, `src/state/autoSave.test.ts`) then always see one
+// is exactly what made this fragile. Tests that exercise real localStorage (dock
+// layout persistence, `src/state/autoSave.test.ts`) then always see one
 // stable instance, matching a real browser. `.nvmrc` pins Node 22.
 class MemoryStorage implements Storage {
   #data = new Map<string, string>();
@@ -102,4 +102,26 @@ class MemoryStorage implements Storage {
       writable: true,
     });
   }
+}
+
+// Silent stand-ins for jsdom's "not implemented" media/canvas methods. jsdom's
+// versions report through the virtual console, which prints a full stack trace
+// per call and buries real failures in the run output. These keep jsdom's
+// observable results — play/pause/load return undefined, getContext returns
+// null (no canvas package installed) — so code paths and `vi.spyOn` overrides
+// behave exactly as before. `defineProperty` keeps the prototype slots
+// writable/configurable, which spying relies on.
+for (const [proto, name, result] of [
+  [HTMLMediaElement.prototype, "play", undefined],
+  [HTMLMediaElement.prototype, "pause", undefined],
+  [HTMLMediaElement.prototype, "load", undefined],
+  [HTMLCanvasElement.prototype, "getContext", null],
+] as const) {
+  Object.defineProperty(proto, name, {
+    value: function notImplementedUnderJsdom() {
+      return result;
+    },
+    configurable: true,
+    writable: true,
+  });
 }

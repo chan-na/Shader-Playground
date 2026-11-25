@@ -8,7 +8,7 @@ WebGL2 기반 노드 그래프 셰이더 플레이그라운드. React Flow 캔�
 
 ## 사전 요구사항
 
-- **Node.js 22** — CI(`.github/workflows/check.yml`)가 Node 22로 `check`와 `e2e`를 검증한다. 로컬도 22 권장. `package.json`에 `engines`나 저장소에 `.nvmrc`는 없다.
+- **Node.js 22** — CI(`.github/workflows/check.yml`)가 Node 22로 `check`와 `e2e`를 검증한다. 로컬도 22 권장 — 저장소 루트의 `.nvmrc`가 `22`를 고정하므로 `nvm use`로 맞출 수 있다. `package.json`에 `engines`는 없다.
 - **npm** — Node에 동봉된 버전 사용 (워크플로도 `actions/setup-node@v4`의 기본).
 - **E2E를 돌리려면 Playwright Chromium**:
   ```bash
@@ -59,87 +59,26 @@ npm run test:e2e:ui       # Playwright UI 모드 (대화형 디버깅)
 npm run test:e2e:headed   # 브라우저 창을 띄워 실행
 ```
 
-Phase 1~34 핵심 시나리오가 `tests/e2e/`의 30개 스펙 파일에 있다. dev 서버는 `playwright.config.ts`의 `webServer.command`로 자동 기동되며, 이미 `npm run dev`가 떠 있으면 재사용한다 (chromium / SwiftShader / workers 1 / 직렬 실행).
+Phase 1~39 핵심 시나리오(도킹 레이아웃은 Phase 35 `phase-35-*.spec.ts`)가 `tests/e2e/`의 40개 스펙 파일(151 테스트)에 있다. 공용 헬퍼는 `tests/e2e/helpers/`(`fixtures`·`sp`·`dom`·`editor`·`render`·`canvas`). dev 서버는 `playwright.config.ts`의 `webServer.command`로 자동 기동되며, 이미 `npm run dev`가 떠 있으면 재사용한다 (chromium / SwiftShader / workers 1 / 직렬 실행).
 
 ## 품질 게이트
 
-머지 전 반드시 셋 다 초록이어야 한다. CI는 `check`·`e2e`·`bundle-size` 세 잡으로 분리해 동일한 게이트를 검증한다.
+게이트 정의·임계치·우회 금지 규약·`biome-ignore` 정책의 정본은 [CLAUDE.md](./CLAUDE.md)다. 머지 전 아래가 모두 초록이어야 한다 (CI는 `check`·`e2e`·`bundle-size` 세 잡).
 
 ```bash
-npm run check       # typecheck → lint → deadcode → circular → unit test (순차, 첫 실패에서 즉시 중단)
-npm run test:e2e    # Playwright (Phase 1~34, 30개 스펙)
-npm run build && npm run size:check    # gzip 번들 크기 예산 가드 (CI bundle-size 잡)
+npm run check                          # typecheck → lint → deadcode → circular → unit test
+npm run test:e2e                       # Playwright E2E
+npm run build && npm run size:check    # gzip 번들 크기 예산 (CI bundle-size 잡)
 ```
 
-`npm run check`가 묶는 단계:
+## 디렉토리 구조
 
-| 단계        | 명령                                                  | 도구 / 기준                                                          |
-| ----------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
-| typecheck   | `tsc --noEmit`                                        | TypeScript 5.6 — `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` |
-| lint        | `biome check`                                         | Biome 2.4 — errors **0** / warnings **0**                            |
-| deadcode    | `knip`                                                | Knip 6 — 미사용 export / type / dep **0**                            |
-| circular    | `dpdm --no-warning --no-tree --exit-code circular:1 src/main.tsx` | dpdm 4 — 순환 의존성 **0**                                   |
-| test        | `vitest run`                                          | Vitest 4 — 유닛 통과 + 커버리지 임계치 만족                          |
+디렉토리별 책임과 주요 진입 파일의 단일 정본은 [Architecture.md §12](./Architecture.md#12-디렉토리-맵)다. 최상위만 요약하면 다음과 같다.
 
-자동 수정이 필요할 때:
+- `src/core/`: React/Zustand에 의존하지 않는 순수 TS(그래프 컴파일·실행, WebGL2 래퍼, GLSL 분석, 에셋, 외부 소스, GIF). `src/state/`: Zustand 스토어와 영속화. `src/ui/`: React 컴포넌트(도킹 셸은 `src/ui/dock/`). `src/styles/`: CSS 파셜.
+- `src/export/`·`src/shaders/`·`src/utils/`·`src/build/`: 단일 HTML export, 빌트인 GLSL, 공용 유틸, Vite 플러그인. `tests/e2e/`: Playwright 스펙. `docs/`: Phase별 스펙과 아키텍처 보조 문서.
 
-```bash
-npm run lint:fix    # biome check --write
-npm run format      # biome format --write
-```
-
-게이트의 도입 경위·우회 금지 규약·`biome-ignore` 정책은 [CLAUDE.md](./CLAUDE.md) §0~§3 참조.
-
-## 디렉토리 구조 (src/ 기준)
-
-```
-src/
-├─ main.tsx              # React 엔트리, App 마운트
-├─ App.tsx               # 셸 (NodeEditor / Viewport / CodeEditor / SidePanel / StatusBar)
-│
-├─ core/                 # ── React/Zustand 비의존 순수 TS ──
-│  ├─ gl/                # WebGL2 래퍼 (program / texture / framebuffer / mesh / uniforms)
-│  ├─ graph/             # compile / execute / validate / uniformParser / diagnostics
-│  ├─ nodes/             # 노드 레지스트리 + utility 노드(Math/Swizzle/Combine) CPU 평가
-│  ├─ thumbnail/         # 동기 readPixels + 비동기 PBO readback + 10Hz 스케줄러
-│  ├─ camera/            # OrbitCamera 상태/입력 바인딩
-│  └─ assets/            # 프리미티브 / OBJ·GLTF·이미지 로더 / IndexedDB 캐시
-│
-├─ state/                # ── Zustand 스토어 16개(녹화 컨트롤러 포함) + 직렬화/공유/자동저장 ──
-│  ├─ graphStore.ts      # nodes/edges/positions + rev/uniformRev
-│  ├─ assetStore.ts      # 메시/이미지 런타임 핸들 카탈로그
-│  ├─ selectionStore.ts  # selectedNodeId
-│  ├─ editorStore.ts     # vertex/fragment 탭 + 라인 점프 요청
-│  ├─ diagnosticsStore.ts# GLSL Diagnostic 컬렉션
-│  ├─ cameraStore.ts / viewportStore.ts / timeStore.ts / rendererStore.ts
-│  ├─ historyStore.ts    # Undo/Redo 최대 100건
-│  ├─ recorder.ts        # MediaRecorder → WebM/mp4
-│  ├─ gifRecorder.ts     # 애니메이션 GIF 녹화 (Web Worker 인코딩, Phase 31~34)
-│  ├─ autoSave.ts        # 30초 디바운스 IndexedDB 저장
-│  ├─ shareUrl.ts        # gzip + base64url + #share=...
-│  └─ serialization.ts   # 프로젝트 JSON v1
-│
-├─ ui/                   # ── React 18 컴포넌트 ──
-│  ├─ NodeEditor/        # React Flow 캔버스, Toolbar, 커스텀 노드 뷰
-│  ├─ CodeEditor/        # CodeMirror 6 + GLSL(호버/정의 이동/이름 변경/자동완성/시맨틱 하이라이트) + lint 어댑터
-│  ├─ Viewport/          # <canvas> + RAF 루프 + asyncReadback 펌프
-│  ├─ CommandPalette/    # Cmd+K — 노드/프리셋/유틸 추가
-│  ├─ Panels/            # SidePanel (Inspector ↔ Assets ↔ Problems) + StatusBar
-│  ├─ BootstrapGate.tsx  # share / autosave 복구 / 데모 분기 + 다이얼로그
-│  └─ KeyboardShortcuts.tsx
-│
-├─ export/               # 의존성 0 단일 HTML export + standalone player
-├─ shaders/              # 빌트인 GLSL (fullscreen.vert, color.frag, templates/*)
-└─ utils/                # debounce, id
-```
-
-레이어 원칙:
-
-- **`core/`는 React/Zustand를 모른다.** `src/export/standalonePlayer.js`가 같은 알고리즘을 의존성 0으로 다시 구현할 수 있는 근거.
-- **UI는 Core를 직접 부르지 않는다.** UI는 스토어에 패치를 보내고, RAF 루프가 매 프레임 `snapshotGraph()` / `snapshotAssets()`로 스냅샷을 떠서 Core에 넘긴다.
-- **렌더 루프는 React 외부에서 RAF로 독립 구동.** Viewport의 `useEffect` 한 번에서 시작되고, 컴포넌트 리렌더와 무관하게 회전한다.
-
-전체 트리(`.test.ts` 동거 포함)와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-34-기준) 참조.
+레이어 원칙(`core`는 React를 모르고, UI는 스토어를 거치며, RAF 루프는 React 밖에서 돈다)은 [Architecture.md §1](./Architecture.md#1-레이어-구분)에 있다.
 
 ## 기술 스택
 

@@ -14,21 +14,8 @@ import type {
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { resetAllStores } from "../../state/testStores";
 import { ProblemsPanel } from "./ProblemsPanel";
-
-const initialDiagnostics = useDiagnosticsStore.getState();
-const initialEditor = useEditorStore.getState();
-const initialRenderer = useRendererStore.getState();
-const initialPassPlan = usePassPlanStore.getState();
-
-function resetStores() {
-  useDiagnosticsStore.setState(initialDiagnostics, true);
-  useEditorStore.setState(initialEditor, true);
-  useRendererStore.setState(initialRenderer, true);
-  usePassPlanStore.setState(initialPassPlan, true);
-  useGraphStore.getState().reset();
-  useSelectionStore.getState().select(null);
-}
 
 function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {
   return {
@@ -65,10 +52,10 @@ function varyingsFixture(
   return { rows, confident };
 }
 
-beforeEach(resetStores);
+beforeEach(resetAllStores);
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 describe("ProblemsPanel", () => {
@@ -154,8 +141,8 @@ describe("ProblemsPanel", () => {
     expect(screen.queryByTestId("problem-row")).toBeNull();
   });
 
-  // D15: the diagnostic row's location text used to read `${kind} · ${id}`,
-  // leaking the internal id. It should show the node's display name instead.
+  // The diagnostic row's location text must show the node's display name,
+  // never `${kind} · ${id}` (the internal id is not user-facing).
   it("shows the node's display name (not its raw id) once a node exists for the diagnostic", () => {
     useGraphStore.getState().addNode({
       id: "s1",
@@ -193,7 +180,7 @@ describe("ProblemsPanel", () => {
     expect(row.textContent).toContain("deleted-node");
   });
 
-  // E-1 (T2): silent uniform warnings surfaced from passPlanStore rows.
+  // Silent uniform warnings surfaced from passPlanStore rows.
   describe("Pipeline warnings (E-1)", () => {
     it("renders a silent-warning-row per warning and folds it into the warning chip", () => {
       usePassPlanStore.getState().publish(
@@ -215,6 +202,33 @@ describe("ProblemsPanel", () => {
       expect(row.getAttribute("data-uniform-name")).toBe("u_tex");
       expect(row.getAttribute("data-kind")).toBe("sampler-unconnected");
       expect(row.textContent).toContain("u_tex");
+      expect(screen.getByText("1 warning")).not.toBeNull();
+    });
+
+    // [9]/[12]: the connected-but-empty-source sampler reaches this panel as
+    // its own kind, so the message can name the real cause (the edge is fine,
+    // the source has no texture) instead of "연결된 입력이 없습니다".
+    it("renders a sampler-source-empty warning with its own kind and a source-empty message", () => {
+      usePassPlanStore.getState().publish(
+        [
+          shaderRowFixture({
+            samplers: [{ uniformName: "u_tex", sourceNodeId: "img1", unit: 0 }],
+            silentWarnings: [
+              { uniformName: "u_tex", kind: "sampler-source-empty" },
+            ],
+          }),
+        ],
+        {},
+        {},
+      );
+
+      render(<ProblemsPanel />);
+
+      const row = screen.getByTestId("silent-warning-row");
+      expect(row.getAttribute("data-kind")).toBe("sampler-source-empty");
+      expect(row.getAttribute("data-uniform-name")).toBe("u_tex");
+      expect(row.textContent).toContain("텍스처가 없습니다");
+      expect(row.textContent).not.toContain("연결된 입력이 없습니다");
       expect(screen.getByText("1 warning")).not.toBeNull();
     });
 
@@ -249,7 +263,7 @@ describe("ProblemsPanel", () => {
     });
   });
 
-  // A-2 (T4): varying-bridge warnings surfaced from passPlanStore.varyingsByNode.
+  // Varying-bridge warnings surfaced from passPlanStore.varyingsByNode.
   describe("Pipeline warnings (A-2 varying bridge)", () => {
     it("renders a varying-warning-row per confident warning and folds it into the warning chip", () => {
       usePassPlanStore.getState().publish(

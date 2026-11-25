@@ -304,7 +304,7 @@ describe("sanitizeGraphNode — line endings (F22)", () => {
 
   it("normalises a lone CR, matching CodeMirror's line-break rule", () => {
     // CM's DefaultSplit is /\r\n?|\n/, so a bare \r is a line break there too.
-    // Leaving it in the store would reintroduce exactly the F22 mismatch.
+    // Leaving it in the store would reintroduce the store↔editor mismatch.
     const r = sanitizeGraphNode({
       id: "s",
       kind: "shader",
@@ -534,14 +534,14 @@ describe("sanitizeGraphNode — param / math / swizzle / combine", () => {
     expect(r.ok).toBe(true);
     if (r.ok && r.node.kind === "param") {
       expect(r.node.value).toEqual([1, 0, 3, 4, 5]);
-      // [A-1] The label migrates into `name` and is clamped like any name,
+      // The label migrates into `name` and is clamped like any name,
       // rather than being dropped for being oversized.
       expect(r.node.name).toHaveLength(SANITIZE_LIMITS.MAX_NODE_NAME_LEN);
       expect("label" in r.node).toBe(false);
     }
   });
 
-  // [A-1] param.label → name migration. Without this, removing the Label field
+  // param.label → name migration. Without this, removing the Label field
   // would silently rename every existing param back to "Parameter".
   describe("param label → name migration [A-1]", () => {
     const param = (extra: Record<string, unknown>) =>

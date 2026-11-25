@@ -4,7 +4,8 @@ import {
   findReferencesAcrossStages,
   findReferencesOf,
 } from "./references";
-import { buildSymbolTable, resolveSymbol } from "./symbolTable";
+import { resolveSymbol } from "./symbolScope";
+import { buildSymbolTable } from "./symbolTable";
 
 const FRAG = `#version 300 es
 precision highp float;
@@ -485,7 +486,7 @@ void main() {
 });
 
 /**
- * CRLF sources (F3). The reported offsets are absolute document offsets, and
+ * CRLF sources. The reported offsets are absolute document offsets, and
  * `rename.ts` feeds them straight into `String.prototype.slice` on the paired
  * stage's source (`applyEdits`) as well as into CodeMirror edit ranges. The
  * walk used to `split(/\r?\n/)`, which drops each line's `\r` while the

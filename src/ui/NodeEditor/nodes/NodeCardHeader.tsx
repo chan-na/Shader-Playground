@@ -11,18 +11,18 @@ export interface NodeCardHeaderProps {
   meta?: ReactNode;
   /**
    * When "error", the header gradient switches from the node's category
-   * color to semantic.error — design/Node Editor.dc.html L198 (Blend, ERROR
-   * state): `rgba(240,85,92,0.26) → rgba(240,85,92,0.1)`. The icon box glyph
-   * stays the category color (unaffected — see L199, still the process blue
-   * diamond) since the tint communicates "this instance is broken", not "the
+   * color to semantic.error — design/Node Editor.dc.html "Blend shader
+   * (ERROR)": `rgba(240,85,92,0.26) → rgba(240,85,92,0.1)`. The icon box
+   * glyph stays the category color (the dc keeps the process-blue diamond)
+   * since the tint communicates "this instance is broken", not "the
    * node kind changed".
    */
   tone?: "error";
   /**
-   * Enables double-click-to-rename on the title (D15,
-   * design/Node Editor.dc.html L387-394) when present. Omitted for callers
-   * that don't have a stable node id (there are none left after V1-2, but
-   * the prop stays optional so the plain-title rendering path — and its
+   * Enables double-click-to-rename on the title (design/Node Editor.dc.html
+   * "Double-click title → rename") when present. Omitted for callers that
+   * don't have a stable node id (there are none left today, but the prop
+   * stays optional so the plain-title rendering path — and its
    * existing tests — keep working unchanged).
    */
   nodeId?: string;
@@ -31,8 +31,8 @@ export interface NodeCardHeaderProps {
 /**
  * Standard node card header: category-gradient bar + icon box (glyph) +
  * title + right-aligned meta slot. Design source: design/Node Editor.dc.html
- * L73-76 (standard header, e.g. Mesh) — the selected/"hero" header (L182-185)
- * uses the same shape with a brighter gradient driven by the selection ring,
+ * "Mesh" card (standard header) — the selected/"hero" header (Fresnel shader,
+ * SELECTED) uses the same shape with a brighter gradient driven by the selection ring,
  * which the card's `.selected` box-shadow already conveys separately.
  */
 export function NodeCardHeader({
@@ -63,7 +63,7 @@ export function NodeCardHeader({
   const cat = categoryHexFor(kind);
   // Error tone swaps both the gradient hex (category → semantic.error) and
   // its stop alphas (0.22/0.08 → 0.26/0.1) to match the Blend/ERROR header
-  // exactly — design/Node Editor.dc.html L198 vs. the standard L73 header.
+  // exactly — design/Node Editor.dc.html Blend (ERROR) vs. the Mesh header.
   const [gradientHex, stopA, stopB] =
     tone === "error"
       ? ([tokens.semantic.error, 0.26, 0.1] as const)
@@ -143,9 +143,8 @@ export function NodeCardHeader({
             boxShadow: `0 0 0 2px ${withAlpha(tokens.accent.default, 0.22)}`,
             fontSize: 11.5,
             fontWeight: 600,
-            // dc L393: the edit box is pure white — text.emphasis exists to
-            // mark the "being edited" state apart from the text.primary header
-            // title [B-2].
+            // dc: the edit box is pure white — text.emphasis exists to mark the
+            // "being edited" state apart from the text.primary header title.
             color: "var(--text-emphasis)",
             width: "100%",
             minWidth: 0,
@@ -155,7 +154,7 @@ export function NodeCardHeader({
         // A button keeps the rename trigger keyboard-accessible (Enter/Space
         // start editing) and `nodrag` lets the click reach us — React Flow's
         // drag handler otherwise swallows pointer interactions on node
-        // content. The dc's blinking caret span (L393) is dropped in favor
+        // content. The dc's blinking caret span is dropped in favor
         // of the input's own native caret once editing starts.
         <button
           type="button"
@@ -207,7 +206,7 @@ export function NodeCardHeader({
             display: "flex",
             alignItems: "center",
             // Lets a fragment of multiple meta children (e.g. ShaderNodeView's
-            // FullscreenBadge + ErrorBadge/GpuTimerChip pair, A-1) sit apart
+            // FullscreenBadge + ErrorBadge/GpuTimerChip pair) sit apart
             // without touching — a no-op for every other caller's single
             // ReactNode meta.
             gap: 5,

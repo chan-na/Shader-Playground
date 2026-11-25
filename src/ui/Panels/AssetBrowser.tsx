@@ -17,7 +17,7 @@ import { log, normalizeError } from "../../utils/log";
 
 type AssetTag = "MESH" | "TEX" | "VID" | "AUD";
 
-// design/Side Panel.dc.html L333-338: every asset tag uses the same purple
+// design/Side Panel.dc.html (ASSETS): every asset tag uses the same purple
 // (portFamily.resource) regardless of MESH/TEX/VID/AUD — the design doesn't
 // differentiate tag color by kind, only the label text differs.
 const ASSET_TAG_STYLE: CSSProperties = {
@@ -260,7 +260,7 @@ export function AssetBrowser() {
 }
 
 /**
- * design/Side Panel.dc.html L179-181: one 2-col grid cell — thumbnail (with
+ * design/Side Panel.dc.html (ASSETS): one 2-col grid cell — thumbnail (with
  * a top-left type tag) over a name/meta footer. The `＋` button is the
  * design's "add to graph" affordance; the `✕` forget button has no design
  * counterpart (Assets in the mock is read-only demo data) but is kept in the

@@ -2,9 +2,9 @@
 // renders a serialized project against a canvas. Inlined verbatim into the
 // HTML produced by the "Export HTML" command. Keep this file dependency-free.
 //
-// 폴백 div의 color:white 등 인라인 스타일은 의도적으로 토큰 비의존 —
-// CHANGELOG §v1.3 Q11 [A-8] 확정. ?raw로 원문 인라인되어 보간 지점이 없고,
-// D6(폴백은 토큰 비의존, README §도메인)이 standalone 폴백에도 적용된다.
+// 폴백 div의 color:white 등 인라인 스타일은 의도적으로 토큰 비의존이다.
+// ?raw로 원문 인라인되어 보간 지점이 없고, "폴백은 토큰에 의존하지 않는다"는
+// design/README.md의 원칙이 standalone 폴백에도 적용된다.
 // 토큰화/템플릿 리팩터 금지(크래시 폴백에 빌드 파이프라인 의존을 늘리지 않는다).
 //
 // Expected globals at runtime:
@@ -473,7 +473,7 @@
   // ── main ────────────────────────────────────────────────────────────────
   var project = window.__SP_PROJECT;
   if (!project) {
-    // Q11: color:white 현행 유지 정본 — 파일 헤더 주석 참조
+    // color:white는 의도된 값 — 파일 헤더 주석 참조
     document.body.innerHTML =
       '<div style="color:white;font-family:sans-serif;padding:24px">No project data.</div>';
     return;
@@ -849,8 +849,8 @@
 
   // Resize only reallocates each pass's FBO at the new canvas size — programs
   // and meshes are size-independent and never recompiled (the graph is static).
-  // Previously a resize rebuilt everything, leaking the old programs/VAOs/VBOs
-  // and re-compiling every shader on every resize event.
+  // Rebuilding everything here would leak the old programs/VAOs/VBOs and
+  // re-compile every shader on every resize event.
   function resizePasses() {
     var W = canvas.width,
       H = canvas.height;
@@ -1000,8 +1000,8 @@
 
   // Value-node resolution — mirrors Core src/core/nodes/utility.ts so the
   // exported HTML evaluates param/math/swizzle/combine chains exactly like the
-  // editor. Previously only `param` nodes fed uniforms; math/swizzle/combine
-  // were mis-routed to texture samplers and their uniforms stuck at defaults.
+  // editor: math/swizzle/combine feed uniforms just like `param` (routing them
+  // to texture samplers would leave their uniforms stuck at defaults).
   var MASK_INDEX = { x: 0, y: 1, z: 2, w: 3 };
   var MATH_UNARY = { abs: 1, sin: 1, cos: 1 };
 
@@ -1137,7 +1137,7 @@
     // resize() has the side effect of syncing the drawing buffer to the CSS
     // box, so it must run unconditionally. Testing sizeDirty first short-
     // circuits it away on exactly the frame after a window resize, leaving
-    // canvas.width stale while resizePasses() sizes the FBOs from it. (#29)
+    // canvas.width stale while resizePasses() sizes the FBOs from it.
     var resized = resize();
     if (sizeDirty || resized) {
       sizeDirty = false;
@@ -1196,7 +1196,7 @@
         setUniform(u["u_model"], model);
         // Same set the app binds in execute.ts's bindSystemUniforms — without
         // u_camera any lighting model that needs a view vector reads 0 in the
-        // export and renders differently from the editor. (#27)
+        // export and renders differently from the editor.
         setUniform(u["u_camera"], eye);
       }
 
@@ -1267,7 +1267,7 @@
     if (drawable.length > 0) {
       var cells = splitLayout(drawable.length, canvas.width, canvas.height);
       // splitLayout tops out at 4 cells, so a graph with 5+ connected outputs
-      // would run off the end and throw on `c.x` every frame. (#28)
+      // would run off the end and throw on `c.x` every frame.
       var drawCount = Math.min(drawable.length, cells.length);
       for (var i = 0; i < drawCount; i++) {
         var c = cells[i];

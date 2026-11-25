@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useDockStore } from "../ui/dock/dockStore";
+import { createDefaultDockTree, type DockNode } from "../ui/dock/tree";
 import {
   clearSession,
   createAutoSaveScheduler,
@@ -7,8 +9,6 @@ import {
   startDockLayoutPersistence,
   stopAutoSave,
 } from "./autoSave";
-import { useDockStore } from "./dockStore";
-import { createDefaultDockTree, type DockNode } from "./dockTree";
 import { useGraphStore } from "./graphStore";
 import type { SerializedProject } from "./serialization";
 import { useToastStore } from "./toastStore";
@@ -330,9 +330,9 @@ describe("startAutoSave error surfacing", () => {
   });
 });
 
-// ── Dock layout persistence (R9, B6-U1) ─────────────────────────────────────
+// ── Dock layout persistence ─────────────────────────────────────────────────
 // localStorage 키는 autoSave.ts 내부 프라이빗 상수라 여기서 문자열로 재선언한다
-// (design/CHANGELOG.md §v1.4 R9 정본값과 동일 — autoSave.ts의 LAYOUT_KEY 참조).
+// (autoSave.ts의 LAYOUT_KEY와 동일해야 한다).
 
 const LAYOUT_KEY = "shader-playground.dock-layout";
 
@@ -406,7 +406,7 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
   });
 
   it("V4 (v2.0 quiet fallback): a version:1 (pre-v2.0 schema) snapshot is silently discarded — the v2.0 default tree is kept, no banner/throw", () => {
-    // A well-formed *old* v1.x-shaped tree — the shape/leaf ids don't matter,
+    // A well-formed *old* version:1-shaped tree — the shape/leaf ids don't matter,
     // the version gate rejects it before the tree is ever inspected.
     const oldSchemaTree: DockNode = {
       type: "split",
@@ -457,7 +457,7 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
       stop = startDockLayoutPersistence();
     }).not.toThrow();
 
-    // no banner/warning surfaced — just a quiet fallback to the v2.0 default.
+    // no banner/warning surfaced — just a quiet fallback to the default tree.
     expect(useDockStore.getState().tree).toEqual(createDefaultDockTree());
   });
 
@@ -480,8 +480,8 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
     // localStorage polyfill in `test-setup.ts` isn't a `Storage` instance.
     const setItemSpy = vi.spyOn(localStorage, "setItem");
 
-    // ["b", "b"] is the viewport|inspector-assets col split in the v2.0
-    // default tree (same fixture path used in dockTree.test.ts's
+    // ["b", "b"] is the viewport|inspector-assets col split in the
+    // default tree (same fixture path used in dock/drop.test.ts's
     // insertDetachedLeaf specs).
     for (let ratio = 0.3; ratio <= 0.6; ratio += 0.05) {
       useDockStore.getState().setDividerRatio(["b", "b"], ratio, 1000, 800);

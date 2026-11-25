@@ -3,7 +3,7 @@
  * shared by the controls library. Same clamp/rounding semantics as the
  * private copy in src/ui/NodeEditor/nodes/ValueInput.tsx (out-of-range
  * channels clamp to [0,1], missing channels read as 0) — consolidated
- * here for ColorField in M5-U1; ValueInput keeps its own copy.
+ * here for ColorField; ValueInput keeps its own copy.
  */
 export function rgbToHex(rgb: readonly number[]): string {
   const c = (x: number | undefined) =>

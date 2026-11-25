@@ -24,13 +24,13 @@ interface Entry {
   diag: GLSLDiagnostic;
 }
 
-/** A pass's silent-warning row (E-1, T2), flattened for rendering. */
+/** A pass's silent-warning row, flattened for rendering. */
 interface SilentEntry {
   nodeId: string;
   warning: SilentUniformWarning;
 }
 
-/** A node's varying-bridge warning row (A-2, T4), flattened for rendering. */
+/** A node's varying-bridge warning row, flattened for rendering. */
 interface VaryingEntry {
   nodeId: string;
   row: NodeVaryingRow;
@@ -38,8 +38,10 @@ interface VaryingEntry {
 
 type Severity = GLSLDiagnostic["severity"];
 
-// design/Side Panel.dc.html L192-194 / L198-199: ✕/⚠/ⓘ paired with
-// semantic.error/warning/info — the panel's only severity → glyph/color map.
+// ✕/⚠/ⓘ paired with semantic.error/warning/info come from the former
+// Side Panel Problems tab (design ≤v2.0; tab removed by design/CHANGELOG
+// Y1). No current dc defines ⓘ. System States "panel: PROBLEMS" uses ✕/!.
+// This is the panel's only severity → glyph/color map.
 const SEVERITY_ICON: Record<Severity, string> = {
   error: "✕",
   warning: "⚠",
@@ -77,7 +79,7 @@ export function ProblemsPanel() {
     return out;
   }, [byNode]);
 
-  // E-1 (T2): flatten every shader pass row's silentWarnings into rows this
+  // Flatten every shader pass row's silentWarnings into rows this
   // panel can render alongside compile diagnostics. Compute rows are never a
   // source — silent uniform warnings only apply to linked shader programs.
   const silentEntries: SilentEntry[] = useMemo(() => {
@@ -91,7 +93,7 @@ export function ProblemsPanel() {
     return out;
   }, [passRows]);
 
-  // A-2 (T4): flatten every shader node's confident varying-bridge warnings
+  // Flatten every shader node's confident varying-bridge warnings
   // (a fragment `in` that's statically used but vertex doesn't provide it,
   // or provides it with a mismatched type) into rows this panel can render.
   // `confidentVaryingWarnings` already withholds every row when the diff
@@ -108,7 +110,8 @@ export function ProblemsPanel() {
     return out;
   }, [varyingsByNode]);
 
-  // design/Side Panel.dc.html L192-194: severity summary chips, one per
+  // Severity summary chips (from the former Side Panel Problems tab, design
+  // ≤v2.0, removed in CHANGELOG Y1; no current dc defines them), one per
   // severity present (>0 count) above the diagnostic/runtime-error list.
   // Silent warnings and varying-bridge warnings both fold into the
   // "warning" bucket alongside any diagnostic of severity "warning" —
@@ -129,7 +132,7 @@ export function ProblemsPanel() {
 
   const nodeLabel = (id: string) => {
     const n = nodes.find((nn) => nn.id === id);
-    // `kind` is dropped (D15 UI clean-up): the row already shows
+    // `kind` is omitted: the row already shows
     // `stage:line[:column]` right after this label, and `kind` duplicated
     // that context without adding anything the stage doesn't already say.
     // A diagnostic can outlive its node (e.g. deleted while a stale
@@ -151,7 +154,7 @@ export function ProblemsPanel() {
     });
   };
 
-  // A-2 (T4): jump to the fragment declaration that's missing/mismatching
+  // Jump to the fragment declaration that's missing/mismatching
   // its vertex counterpart. Always the fragment stage — that's where the
   // `in`/`varying` this warning is about is declared. `fragmentLine` is
   // absent for the rare row this diff can locate but not line-number

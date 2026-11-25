@@ -8,23 +8,21 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useBootstrapStore } from "../../state/bootstrapStore";
 import { useDebugUiStore } from "../../state/debugUiStore";
+import { usePassPlanStore } from "../../state/passPlanStore";
+import { resetAllStores } from "../../state/testStores";
 import { StatusOverlays } from "./StatusOverlays";
 
-const initialDebugUi = useDebugUiStore.getState();
-const initialBootstrap = useBootstrapStore.getState();
-
 function resetStores() {
-  useDebugUiStore.setState(initialDebugUi, true);
-  // StatusOverlays gates its body on bootstrap phase (SidePanel L96-97
-  // precedent) — tests that don't care about the skeleton force "done"
-  // since the store is a module singleton.
-  useBootstrapStore.setState({ ...initialBootstrap, phase: "done" }, true);
+  resetAllStores();
+  // StatusOverlays gates its body on bootstrap phase, like SidePanel — tests
+  // that don't care about the skeleton force it to "done".
+  useBootstrapStore.setState({ phase: "done" });
 }
 
 beforeEach(resetStores);
 afterEach(() => {
   cleanup();
-  useBootstrapStore.setState(initialBootstrap, true);
+  resetAllStores();
 });
 
 describe("StatusOverlays", () => {
@@ -62,8 +60,8 @@ describe("StatusOverlays", () => {
     );
   });
 
-  // T1/D-1: passesOpen is the third mutually-exclusive slot (see
-  // debugUiStore.ts's 3-way exclusion / design-request v2.3 AA1 note).
+  // passesOpen is the third mutually-exclusive slot (see debugUiStore.ts's
+  // 3-way exclusion note).
   it("shows the passes overlay with the Pass Inspector when passesOpen", () => {
     render(<StatusOverlays />);
 
@@ -75,7 +73,13 @@ describe("StatusOverlays", () => {
     expect(screen.getByTestId("passes-overlay").textContent).toContain(
       "▤ Passes",
     );
-    // Empty-state text from PassInspector (no rows published in this test).
+    // Empty-state text from PassInspector, standing in for "the table is
+    // mounted here". Published with no rows on purpose: unpublished renders
+    // the *other* empty state ("renderer not running"), which would make this
+    // assertion pass for the wrong reason if the mount ever regressed.
+    act(() => {
+      usePassPlanStore.getState().publish([], {}, {});
+    });
     expect(screen.getByTestId("passes-overlay").textContent).toContain(
       "no passes — compile a shader node first",
     );
@@ -93,7 +97,7 @@ describe("StatusOverlays", () => {
   });
 
   it("shows the panel skeleton instead of the diagnostics panel while bootstrap isn't done", () => {
-    useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
+    useBootstrapStore.setState({ phase: "init" });
     render(<StatusOverlays />);
 
     act(() => {
@@ -118,9 +122,9 @@ describe("StatusOverlays", () => {
     expect(useDebugUiStore.getState().open).toBe(false);
   });
 
-  // T3/T4 (§v1.6, design/App Shell.dc.html L403-433): diagnostics gets the
-  // 26px metric strip; problems never gets the strip. (X12 §v2.1 removed the
-  // 2x2 metric cards entirely, so there is no longer a suppression to assert.)
+  // design/App Shell.dc.html "DIAGNOSTICS / PROBLEMS OVERLAY": diagnostics
+  // gets the 26px metric strip; problems never gets the strip. There are no
+  // metric cards, so there is no suppression to assert.
   it("shows the metric strip when diagnostics is open (T3)", () => {
     render(<StatusOverlays />);
 
@@ -143,7 +147,7 @@ describe("StatusOverlays", () => {
   });
 
   it("renders the metric strip alongside the panel skeleton while bootstrap isn't done (interim decision)", () => {
-    useBootstrapStore.setState({ ...initialBootstrap, phase: "init" });
+    useBootstrapStore.setState({ phase: "init" });
     render(<StatusOverlays />);
 
     act(() => {

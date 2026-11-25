@@ -1,8 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph, trivialShaderSources } from "./helpers/fixtures";
+import {
+  bootApp,
+  selectNode,
+  setGraph,
+  trivialShaderSources,
+} from "./helpers/fixtures";
 import { withSp } from "./helpers/sp";
 
-// Phase 37 — driven-uniform disable + note (L1/E-4), and Sampler inputs
+// Phase 37 — driven-uniform disable + note, and Sampler inputs
 // connection state. A uniform is also an input port (registry.ts): when a
 // graph edge targets it, execute.ts's bindUserUniforms overwrites whatever
 // the Inspector slider would send every frame, so the slider must disable
@@ -134,7 +139,7 @@ test.describe("Phase 37 — silent-failure diagnostics: driven uniforms + sample
     page,
   }) => {
     await setGraph(page, drivenUniformGraph(), {});
-    await withSp(page, (sp) => sp.selection.getState().select("s1"), undefined);
+    await selectNode(page, "s1");
 
     const tintRow = page.locator(
       "[data-testid='uniform-row'][data-uniform-name='u_tint']",
@@ -187,7 +192,7 @@ test.describe("Phase 37 — silent-failure diagnostics: driven uniforms + sample
     page,
   }) => {
     await setGraph(page, samplerGraph(), {});
-    await withSp(page, (sp) => sp.selection.getState().select("s1"), undefined);
+    await selectNode(page, "s1");
 
     const row = page.locator(
       "[data-testid='sampler-input-row'][data-uniform-name='u_tex']",

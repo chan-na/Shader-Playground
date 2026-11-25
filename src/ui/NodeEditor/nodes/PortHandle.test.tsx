@@ -1,11 +1,9 @@
-import { cleanup, render } from "@testing-library/react";
-import { ReactFlowProvider } from "@xyflow/react";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ConnectionDragSource } from "../../../state/connectionUiStore";
 import { useConnectionUiStore } from "../../../state/connectionUiStore";
 import { PORT_DIAMETER, tokens } from "../../../theme";
+import { renderInFlow, renderInFlowStatic } from "../testFlow";
 import {
   multiPortBodyMinH,
   multiPortPreviewH,
@@ -15,18 +13,12 @@ import {
 } from "./PortHandle";
 
 /**
- * NOTE on render method: unlike ConnectionLine.test.tsx/nodeViews.test.tsx
- * (renderToStaticMarkup), this file uses @testing-library/react's `render`
- * (client render, same as WebcamNodeView.test.tsx which also mounts a
- * Handle-bearing view). PortHandle subscribes to connectionUiStore through
- * the `useConnectionUiStore(selector)` *hook* (not `.getState()`), and
- * zustand's react binding feeds `useSyncExternalStore` a `getServerSnapshot`
- * that always returns the store's state *at module load* — so under
- * `renderToStaticMarkup`, a `setState()` call made before rendering would
- * never show up in the markup (verified directly against zustand's
- * react.js: `getServerSnapshot = () => selector(api.getInitialState())`).
- * Client rendering reads the live `getState()` instead, which is what these
- * dragging-state assertions need.
+ * NOTE on render method: PortHandle subscribes to connectionUiStore through
+ * the `useConnectionUiStore(selector)` hook, and static markup only ever sees
+ * the store's initial snapshot (see `renderInFlowStatic`), so the
+ * dragging-state assertions use the client `renderInFlow`. The "shape recipe"
+ * describe below fixes the idle, store-independent CSS recipe (hollow ring vs
+ * solid disc + glow), so a plain static-markup string is enough there.
  *
  * NOTE on the `origin` mode: `useNodeId()` only resolves once React Flow
  * itself renders a node type inside `<ReactFlow>` and supplies its
@@ -34,24 +26,7 @@ import {
  * (no actual `<ReactFlow>` node tree) always sees `nodeId === null`, so the
  * `origin` branch can't be exercised at this level. It's covered instead by
  * portDragMode.test.ts's direct unit tests of the pure classifier.
- *
- * NOTE on the "shape recipe" describe below (todo D1): those assertions fix
- * the *idle*, store-independent shape/color CSS recipe (hollow ring vs solid
- * disc + glow) rather than any dragging/snap state, so they use
- * `renderToStaticMarkup` (like nodeViews.test.tsx's `renderInFlow`) instead
- * of this file's client `render` — a plain string assertion is enough and
- * keeps that describe decoupled from connectionUiStore/jsdom style
- * normalization concerns entirely.
  */
-function renderInFlow(element: ReactElement) {
-  return render(<ReactFlowProvider>{element}</ReactFlowProvider>);
-}
-
-/** Static-markup variant used only by the shape-recipe describe below —
- *  see the NOTE above for why this describe doesn't use `renderInFlow`. */
-function renderInFlowStatic(element: ReactElement): string {
-  return renderToStaticMarkup(<ReactFlowProvider>{element}</ReactFlowProvider>);
-}
 
 /** jsdom normalizes inline hex colors to `rgb(r, g, b)` when read back off
  *  `element.style`, so assertions on family color compare against this
@@ -230,7 +205,7 @@ describe("PortHandle — shape recipe (todo D1)", () => {
 });
 
 /**
- * [C-3] Multi-port vertical rhythm. The property that matters is containment:
+ * Multi-port vertical rhythm. The property that matters is containment:
  * a uniform-driven card gains one port per uniform, and no port may fall
  * outside the card — that overflow (4th port escaping the fixed 144px card) is
  * exactly what this rule was raised to fix.
@@ -264,9 +239,9 @@ describe("multi-port card geometry [C-3]", () => {
   });
 
   it("regression: a 5-port shader no longer overflows the old fixed 144px card", () => {
-    // Pre-C-3 the card was header+pad+96+pad = 144 regardless of port count.
-    // The request doc says overflow starts at the 4th port, but that figure is
-    // in the dc's geometry (port 0 at top:64). In this implementation port 0
+    // Previously the card was header+pad+96+pad = 144 regardless of port
+    // count. The design request placed the overflow at the 4th port, but that
+    // figure is in the dc's geometry (port 0 at top:64). In this implementation port 0
     // sits at PORT_TOP_PAD(38), so 4 ports still fit (139 <= 144) and the 5th
     // is the first to escape — hence 5, not 4, is the regression case here.
     expect(lastPortBottom(4)).toBeLessThanOrEqual(144);

@@ -7,7 +7,8 @@ import { tokens, withAlpha } from "../../theme";
 import { firstCompileError, formatDiagnosticRaw } from "./compileErrorInfo";
 
 /**
- * Viewport compile-error overlay (design/System States.dc.html L216-244):
+ * Viewport compile-error overlay (design/System States.dc.html
+ * "viewport: COMPILE ERROR"):
  * shown instead of the WebGL canvas when the first shader node with an
  * error-severity diagnostic drops every drawable Output pane (0-length
  * `panes`). Deliberately checked *before* EmptyState's "No Output connected"
@@ -20,7 +21,7 @@ import { firstCompileError, formatDiagnosticRaw } from "./compileErrorInfo";
  * covers a working render) or when no shader node currently carries an
  * error-severity diagnostic.
  *
- * Its action row (Jump to line / Copy log, M7-U4) shares its mount condition
+ * Its action row (Jump to line / Copy log) shares its mount condition
  * with TransportBar's own self-gate (`panes.length === 0`, see
  * TransportBar.tsx) — the transport bar cannot be mounted whenever this
  * overlay is, so its floating `z-index` can never sit above these buttons
@@ -144,8 +145,8 @@ export function CompileErrorOverlay() {
             >
               {/* raw already carries its severity prefix
                   (formatDiagnosticRaw → `ERROR: 0:{line}[:col]: {msg}`) —
-                  do not prepend another one (dc System States.dc.html L237
-                  shows a single-prefix footer). */}
+                  do not prepend another one (dc System States.dc.html
+                  compile-error footer shows a single prefix). */}
               {info.raw}
             </div>
           </div>

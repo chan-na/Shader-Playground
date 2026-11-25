@@ -45,7 +45,7 @@ export interface Diagnostics {
   link: Diagnostic[];
 }
 
-// Loose mirror of src/state/dockTree.ts's DockNode (DockLeaf | DockSplit).
+// Loose mirror of src/ui/dock/tree.ts's DockNode (DockLeaf | DockSplit).
 // We deliberately avoid importing the real type — see file header comment.
 export type DockTreeNodeMinimal =
   | {

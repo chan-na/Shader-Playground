@@ -38,16 +38,18 @@ import { thumbnailScheduler } from "../../state/thumbnailScheduler";
 import { useTimeStore } from "../../state/timeStore";
 import { toast } from "../../state/toastStore";
 import { useViewportStore } from "../../state/viewportStore";
+import { downloadBlob } from "../../utils/downloadBlob";
 import { log, normalizeError } from "../../utils/log";
-import { DockPanelHeader } from "../DockPanelHeader";
+import { DockPanelHeader } from "../dock/DockPanelHeader";
 import { CompileErrorOverlay } from "./CompileErrorOverlay";
 import { EmptyState } from "./EmptyState";
 import { PaneOverlay } from "./PaneOverlay";
 import { buildPassRows, buildVaryingContracts } from "./passPlanPublish";
 import { TransportBar } from "./TransportBar";
+import { VIEWPORT_CANVAS_CLASS } from "./viewportCanvas";
 
 /** Output 노드 개수 → Viewport 헤더 메타 배지 텍스트("1 · single" 등, App
- *  Shell.dc.html L215). 분할 구현 전이라도 배지는 현재 그래프 상태를 반영한다. */
+ *  Shell.dc.html Viewport 패널 헤더). 분할 구현 전이라도 배지는 현재 그래프 상태를 반영한다. */
 function splitLabel(outputCount: number): string {
   if (outputCount <= 1) return "single";
   if (outputCount === 2) return "split";
@@ -60,7 +62,7 @@ function splitLabel(outputCount: number): string {
  * from inside the RAF tick that drew the frame: the GL context is created with
  * `preserveDrawingBuffer: false`, so reading the canvas from an event handler
  * (as the toolbar used to) hands back an already-cleared buffer. Not exported
- * — the request is placed through `rendererStore.requestSnapshot()`. (#3)
+ * — the request is placed through `rendererStore.requestSnapshot()`.
  */
 function downloadCanvasPng(canvas: HTMLCanvasElement) {
   canvas.toBlob((blob) => {
@@ -68,12 +70,7 @@ function downloadCanvasPng(canvas: HTMLCanvasElement) {
       toast.error("스냅샷 저장 실패 — 캔버스를 읽지 못했습니다.");
       return;
     }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = exportFileName(DEFAULT_EXPORT_BASE, "png");
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, exportFileName(DEFAULT_EXPORT_BASE, "png"));
   }, "image/png");
 }
 
@@ -108,7 +105,7 @@ export function Viewport() {
       return;
     }
     // Reached only once createGLContext succeeds — clears a prior failed
-    // attempt's GpuBlockScreen (retry success path, M7-U5).
+    // attempt's GpuBlockScreen (retry success path).
     useRendererStore.getState().setContextUnavailable(false);
 
     // Capture the GL adapter identity once for the diagnostics report. The
@@ -138,7 +135,7 @@ export function Viewport() {
     // from the controller's stale copy. Mirror external writes back into it.
     // Placed *after* the createGLContext try/catch: the catch path returns
     // without running this cleanup, so subscribing earlier would leak. zustand
-    // 5 takes a single listener argument (no selector overload). (#6)
+    // 5 takes a single listener argument (no selector overload).
     const unsubscribeCamera = useCameraStore.subscribe((s) => {
       cameraCtl.state = s.camera;
     });
@@ -239,10 +236,10 @@ export function Viewport() {
         }
         // Prune diagnostics for shader nodes that no longer exist (deleted /
         // undone / replaced) so ProblemsPanel rows and badge counts don't keep
-        // reporting phantom problems (M10).
+        // reporting phantom problems.
         diagStore.retainOnly(shaderNodeIds);
-        // Publish the Pass Inspector's plan-summary rows (T1/D-1) and each
-        // shader node's varying contract (A-2/T4). A fatal validate (cycle
+        // Publish the Pass Inspector's plan-summary rows and each shader
+        // node's varying contract. A fatal validate (cycle
         // etc.) yields `emptyPlan`, which is a transient state — publishing
         // it here would blank the badges/Pass Inspector to a false "0
         // passes" (and drop every varying contract) while the user is
@@ -290,7 +287,7 @@ export function Viewport() {
         // are gone. Leaving `plan` pointing at it would have the frame loop
         // keep executing a disposed plan every tick. Swap in an empty plan
         // instead — its `dispose` is a no-op, so the next recompile's leading
-        // dispose stays safe. (#7)
+        // dispose stays safe.
         plan = emptyPlan(w, h);
         pushError(String(e));
         useRendererStore.getState().setPanes([]);
@@ -351,7 +348,7 @@ export function Viewport() {
       // Live external sources (webcam/video/audio) outlive the plan, so their
       // cached GL textures are not covered by the recompile above. Drop the now
       // dead texture handles so the first tick after restore re-creates them
-      // instead of texSubImage2D-ing into nothing. (#13)
+      // instead of texSubImage2D-ing into nothing.
       resetExternalTextures();
     };
     const onContextRestored = () => {
@@ -374,7 +371,7 @@ export function Viewport() {
       if (contextLost) {
         // A snapshot can't be served while the context is gone, and holding
         // the request would fire it on some arbitrary frame long after the
-        // user asked. Drop it and say so. (#3)
+        // user asked. Drop it and say so.
         if (useRendererStore.getState().consumeSnapshotRequest()) {
           toast.error("GPU 컨텍스트 손실 — 스냅샷을 저장하지 못했습니다.");
         }
@@ -440,7 +437,7 @@ export function Viewport() {
         useGifRecorderStore.getState().status === "recording";
       // A pending PNG snapshot must force one real draw: the capture reads the
       // drawing buffer right after executePlan, and on a paused static graph
-      // the idle gate below would otherwise skip straight past it forever. (#3)
+      // the idle gate below would otherwise skip straight past it forever.
       const snapshotPending = useRendererStore.getState().snapshotRequested;
 
       const needsRender =
@@ -489,11 +486,11 @@ export function Viewport() {
           );
         }
         // Fill in thumbnails for cards that still need a first capture — e.g.
-        // a node scrolled into view while paused (L16). Only forced/uncaptured
+        // a node scrolled into view while paused. Only forced/uncaptured
         // nodes (pickForced), never throttle-driven, so once every visible card
         // is captured this issues nothing and the loop stays idle. The readback
         // downsamples the pass's already-rendered FBO into a separate thumb FBO;
-        // it neither re-executes the plan nor bumps renderTick, so the B2 idle
+        // it neither re-executes the plan nor bumps renderTick, so the idle
         // guarantee (paused static graph stops *rendering*) is preserved.
         const forced = thumbnailScheduler.pickForced();
         for (const id of forced) {
@@ -520,7 +517,7 @@ export function Viewport() {
       // Pull current uniform values into the plan (cheap). Both shader and
       // compute passes carry slider-driven uniformValues that get hot-patched
       // every frame without recompile. Replacing the whole map is safe for
-      // the C-2 `@default` seeds because they live in the pass's separate
+      // the `@default` seeds because they live in the pass's separate
       // `seededDefaults` field — `bindUserUniforms` composes
       // `{...seededDefaults, ...uniformValues}` per frame, so this
       // assignment can no longer clobber a seed before its first draw.
@@ -581,7 +578,7 @@ export function Viewport() {
 
       // Same constraint as the GIF capture above: the PNG snapshot has to read
       // the drawing buffer in the tick that drew it. `snapshotPending` above
-      // already forced this frame past the idle gate. (#3)
+      // already forced this frame past the idle gate.
       if (useRendererStore.getState().consumeSnapshotRequest()) {
         downloadCanvasPng(canvas);
       }
@@ -650,7 +647,7 @@ export function Viewport() {
       // armed would fire it on the first frame after the *next* mount, so a
       // reopened (or merely re-docked) Viewport downloads a PNG nobody asked
       // for. Same hazard the context-loss path above already handles, same
-      // treatment: drop it and say so. (F1)
+      // treatment: drop it and say so.
       //
       // The window is at most one frame wide — `snapshotPending` forces the idle
       // gate open, so the tick that follows a request always consumes it — and
@@ -685,11 +682,17 @@ export function Viewport() {
       // The plan the rows describe is gone, and `retainOnly` can't remove
       // them — it prunes by node id, and the nodes are all still in the
       // graph. Without this the Pass Inspector keeps listing passes for a
-      // disposed plan (and the FULLSCREEN badges / varying contracts stay
-      // frozen) for as long as the Viewport is unmounted. The remount's
-      // `recompile()` republishes immediately, so this only ever shows as
-      // an honest empty state.
-      usePassPlanStore.getState().reset();
+      // disposed plan for as long as the Viewport is unmounted.
+      //
+      // Only the *published* flag drops, not the payload. This cleanup also
+      // runs for `closePanel("viewport")`, which has no remount behind it, so
+      // an earlier full `reset()` here left the graph-derived facts erased
+      // for as long as the panel stayed closed: the StatusBar answered "no
+      // problems" for a graph whose warnings were still true, and every
+      // auto-vertex surface read the missing `fullscreenByNode` entry as a positive "not
+      // a fullscreen pass" — badge gone, vertex tab silently editable again.
+      // Those facts belong to the graph, not to this component's lifetime.
+      usePassPlanStore.getState().markUnpublished();
     };
     // glRetryTick is a deliberate dep (see the log.debug call above): bumping
     // it via retryGlContext() tears down and re-runs this whole effect,
@@ -710,7 +713,7 @@ export function Viewport() {
       <div className="panel-body">
         <canvas
           ref={canvasRef}
-          className="viewport-canvas"
+          className={VIEWPORT_CANVAS_CLASS}
           data-testid="viewport-canvas"
         />
         <EmptyState />

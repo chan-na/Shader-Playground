@@ -24,7 +24,7 @@ export interface MeshInspectorSectionProps {
 }
 
 /**
- * [B-1] Mesh node Inspector section — the mesh-side counterpart to the
+ * Mesh node Inspector section — the mesh-side counterpart to the
  * existing Compute "Attributes" block (chips + mono attribute rows), so the
  * `mesh` port's fixed a_position/a_normal/a_uv contract is no longer only
  * visible on the node card.
@@ -37,7 +37,7 @@ export function MeshInspectorSection({ node }: MeshInspectorSectionProps) {
   const passRows = usePassPlanStore((s) => s.rows);
   const contract = useMemo(() => meshContractFor(node, asset), [node, asset]);
 
-  // [B-2] Same aggregation as MeshNodeView's node-card warning line — see
+  // Same aggregation as MeshNodeView's node-card warning line — see
   // that file's comment for the "any consumer" rationale. Rendered here as a
   // per-attribute status marker instead of a single warning line, since the
   // Inspector already lists attributes one per row.

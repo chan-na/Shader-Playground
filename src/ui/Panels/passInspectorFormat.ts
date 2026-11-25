@@ -1,5 +1,5 @@
 /**
- * Pure string-formatting helpers for the Pass Inspector (T1/D-1). No React,
+ * Pure string-formatting helpers for the Pass Inspector. No React,
  * no store reads — everything here takes plain values already sourced from
  * `passPlanStore`/`gpuTimerStore` and returns a display string. Kept separate
  * from `PassInspector.tsx` so the formatting rules have their own focused
@@ -18,13 +18,22 @@ export function formatFbo(
 }
 
 /** "u_tex ← noise1 (unit 0)" — which texture unit a sampler uniform is bound
- * to and which upstream node feeds it. */
+ * to and which upstream node feeds it.
+ *
+ * `bound: false` renders "u_tex ← image1 (미바인딩)" instead: the edge exists,
+ * but the source hands `execute.ts` no texture, so `bindSamplers` skips the
+ * unit entirely and the sampler keeps its link-time default. The unit number
+ * is dropped rather than kept, because the plan's unit is precisely the one
+ * that never gets assigned — printing it would be the same false binding
+ * claim in smaller type. */
 export function formatSampler(
   uniformName: string,
   sourceLabel: string,
   unit: number,
+  bound = true,
 ): string {
-  return `${uniformName} ← ${sourceLabel} (unit ${unit})`;
+  const state = bound ? `unit ${unit}` : "미바인딩";
+  return `${uniformName} ← ${sourceLabel} (${state})`;
 }
 
 /** GPU timer column. `undefined` means no sample has landed yet for this
@@ -46,7 +55,7 @@ export function computeMeshLabel(
 }
 
 /** "blend off · cull off · depth on" — a shader pass's actual GL render
- * state (E-2). The parameter is a structural type, not
+ * state. The parameter is a structural type, not
  * `core/graph/renderState.ts`'s `PassRenderState`, so this module stays free
  * of a `core/` import — the caller (`PassInspector.tsx`) is what ties the
  * value to `renderStateFor`, the single function `execute.ts` also calls. */

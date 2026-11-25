@@ -125,5 +125,39 @@ describe("passPlanStore.reset", () => {
     expect(s.rows).toEqual([]);
     expect(s.fullscreenByNode).toEqual({});
     expect(s.varyingsByNode).toEqual({});
+    expect(s.published).toBe(false);
+  });
+});
+
+describe("passPlanStore.markUnpublished", () => {
+  it("drops only the published flag — the Viewport unmounting is not a graph edit", () => {
+    // The Viewport's cleanup runs for `closePanel("viewport")` too, which has
+    // no remount behind it. Erasing the payload there made the StatusBar
+    // report "no problems" for warnings that were still true, and turned every
+    // A-1 surface inside out (a missing `fullscreenByNode` entry reads as a
+    // positive "not a fullscreen pass").
+    const warned: ShaderPassRow = {
+      ...shaderRow("a"),
+      silentWarnings: [{ uniformName: "u_tex", kind: "sampler-unconnected" }],
+    };
+    usePassPlanStore
+      .getState()
+      .publish([warned], { a: true }, { a: varyings("v_uv") });
+    usePassPlanStore.getState().markUnpublished();
+
+    const s = usePassPlanStore.getState();
+    expect(s.published).toBe(false);
+    expect(s.rows).toEqual([warned]);
+    expect(s.rows[0]?.kind === "shader" && s.rows[0].silentWarnings).toEqual([
+      { uniformName: "u_tex", kind: "sampler-unconnected" },
+    ]);
+    expect(s.fullscreenByNode).toEqual({ a: true });
+    expect(s.varyingsByNode).toEqual({ a: varyings("v_uv") });
+  });
+
+  it("is undone by the next publish", () => {
+    usePassPlanStore.getState().markUnpublished();
+    usePassPlanStore.getState().publish([shaderRow("b")], {}, {});
+    expect(usePassPlanStore.getState().published).toBe(true);
   });
 });

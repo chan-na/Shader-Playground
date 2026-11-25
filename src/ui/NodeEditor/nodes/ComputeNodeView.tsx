@@ -15,7 +15,7 @@ import {
 import { usePortInternals } from "./usePortInternals";
 
 /** label mono 10px muted / value mono 11px primary, space-between — mirrors
- * design/Node Editor.dc.html L221-225's particles/dispatch/buffer rows. */
+ * design/Node Editor.dc.html "Compute node" particles/dispatch/buffer rows. */
 function ComputeKvRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="node-card__kv-row">
@@ -61,10 +61,8 @@ export function ComputeNodeView({ id, data }: NodeProps) {
           paddingRight: 22,
           // Compute grows one input port per non-sampler uniform just like
           // Shader does, but its body is a fixed 3-row kv list with no
-          // thumbnail to expand — so the port span sets a floor instead [C-3].
-          // This expansion rule (no 96 floor) was a provisional call at
-          // v1.2 (no dc coverage yet) — CHANGELOG §v1.3 Q8 now canonically
-          // approves it.
+          // thumbnail to expand — so the port span sets a floor instead (no
+          // 96 floor; design/README.md §B).
           minHeight: multiPortBodyMinH(inputs.length),
         }}
       >

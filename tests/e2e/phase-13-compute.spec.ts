@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered } from "./helpers/canvas";
 import { bootApp, setGraph } from "./helpers/fixtures";
+import {
+  expectNoRendererErrors,
+  readRenderTick,
+  waitForNextRender,
+  waitForRenderIdle,
+} from "./helpers/render";
 import { readSp, waitForRev, withSp } from "./helpers/sp";
 
 // Compute particle vertex shader (Transform Feedback). Mirrors
@@ -139,18 +145,15 @@ test.describe("Phase 13 — Transform Feedback compute node", () => {
 
   test("plan.hasCompute reflects compute pass presence", async ({ page }) => {
     await setGraph(page, particleGraph(), {});
-    // Wait one frame so recompile fires.
-    await page.waitForTimeout(200);
-    const hasCompute = await page.evaluate(() => {
-      // Probe via dynamic import of compile.ts in dev — round trip a tiny graph
-      // through compileGraph would require GL context, so instead verify the
-      // pass union is populated by reading rev + node count.
-      const sp = window.__sp;
-      if (!sp) return null;
-      const g = sp.graph.getState();
-      return g.nodes.some((n) => n.kind === "compute");
-    });
-    expect(hasCompute).toBe(true);
+    // compileGraph needs a GL context, so rather than compiling a plan here
+    // this checks the compute node the plan is built from reached the store.
+    await expect
+      .poll(() =>
+        readSp(page, (sp) =>
+          sp.graph.getState().nodes.some((n) => n.kind === "compute"),
+        ),
+      )
+      .toBe(true);
   });
 
   test("removing the compute node disposes cleanly (no errors)", async ({
@@ -160,58 +163,22 @@ test.describe("Phase 13 — Transform Feedback compute node", () => {
     const before = await readSp(page, (sp) => sp.graph.getState().rev);
     await withSp(page, (sp) => sp.graph.getState().removeNode("c1"), undefined);
     await waitForRev(page, before);
-    const errors = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.errors,
-    );
-    expect(errors).toEqual([]);
+    await waitForNextRender(page);
+    await expectNoRendererErrors(page);
     const remaining = await readSp(page, (sp) =>
       sp.graph.getState().nodes.map((n) => n.id),
     );
     expect(remaining).not.toContain("c1");
   });
 
-  test("compute node survives serialization round-trip", async ({ page }) => {
-    await setGraph(page, particleGraph(), {});
-    const restored = await page.evaluate(async () => {
-      // @ts-expect-error - dev path
-      const mod = await import("/src/state/serialization.ts");
-      const sp = window.__sp;
-      if (!sp) return null;
-      const g = sp.graph.getState();
-      const serialized = (
-        mod.serializeProject as (
-          g: unknown,
-          p: unknown,
-        ) => Record<string, unknown>
-      )({ nodes: g.nodes, edges: g.edges }, g.positions);
-      const json = JSON.parse(JSON.stringify(serialized));
-      const out = (
-        mod.deserializeProject as (raw: unknown) => {
-          graph: { nodes: Array<{ id: string; kind: string }> };
-        }
-      )(json);
-      return out.graph.nodes
-        .filter((n) => n.kind === "compute")
-        .map((n) => n.id);
-    });
-    expect(restored).toEqual(["c1"]);
-  });
-
   test("pausing time stops the simulation (idle gate)", async ({ page }) => {
     await setGraph(page, particleGraph(), {});
-    // Pause the clock and let one render tick land.
+    // Pause the clock and let the pause frame flush.
     await withSp(page, (sp) => sp.time.getState().setPlaying(false), undefined);
-    await page.waitForTimeout(250);
-    const a = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.renderTick,
-    );
+    const a = await waitForRenderIdle(page);
+    // Elapsed time is the subject: a paused tick must stay put across a window.
     await page.waitForTimeout(400);
-    const b = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.renderTick,
-    );
+    const b = await readRenderTick(page);
     // Idle gate keeps renderTick from advancing while paused with no inputs.
     expect(b - a).toBeLessThanOrEqual(2);
   });

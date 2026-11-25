@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { expectCanvasRendered } from "./helpers/canvas";
 import {
   bootApp,
+  selectNode,
   setGraph,
   trivialMeshGraph,
   trivialShaderSources,
@@ -62,13 +63,7 @@ test.describe("Phase 3-4 — editor & uniform exposure", () => {
     await page.getByTestId("tab-inspector").click();
 
     // Select s1 so the inspector binds to it.
-    await withSp(
-      page,
-      (sp) => {
-        sp.selection.getState().select("s1");
-      },
-      undefined,
-    );
+    await selectNode(page, "s1");
 
     const before = await readSp(page, (sp) => sp.graph.getState().rev);
     const newFrag = trivialShaderSources.fragment.replace(
@@ -95,13 +90,7 @@ test.describe("Phase 3-4 — editor & uniform exposure", () => {
     page,
   }) => {
     await page.getByTestId("tab-inspector").click();
-    await withSp(
-      page,
-      (sp) => {
-        sp.selection.getState().select("s1");
-      },
-      undefined,
-    );
+    await selectNode(page, "s1");
 
     // Inject three custom uniforms so the search has something to filter.
     const before = await readSp(page, (sp) => sp.graph.getState().rev);
@@ -213,14 +202,10 @@ test.describe("Phase 3-4 — editor & uniform exposure", () => {
       .toBeGreaterThan(0);
 
     // Select node so editor binds + stage tab visible.
-    await withSp(
-      page,
-      (sp) => {
-        sp.selection.getState().select("s1");
-      },
-      undefined,
-    );
+    await selectNode(page, "s1");
     const fragTab = page.getByTestId("stage-tab-fragment");
     await expect(fragTab).toBeVisible();
+    // The compile diagnostics alone (no live-validator keystroke) flag the tab.
+    await expect(fragTab).toHaveAttribute("data-has-error", "true");
   });
 });

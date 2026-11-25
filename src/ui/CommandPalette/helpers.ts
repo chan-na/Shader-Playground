@@ -57,7 +57,7 @@ export type CommandKind = "node" | "command" | "preset";
 export type PaletteMode = "all" | CommandKind;
 
 /**
- * 쿼리 첫 글자로 모드를 판별한다 (dc.html renderVals L252-255):
+ * 쿼리 첫 글자로 모드를 판별한다 (dc.html `renderVals`의 prefix 분기):
  * `@`→node, `>`→command, `/`→preset, 그 외→all. prefix 문자만 제거하고
  * term은 그대로(트림/소문자화 없이) 반환 — 대소문자 무시·트림은 이미
  * fuzzyMatch/rankCommands 쪽에서 처리하므로 여기선 순수 prefix 파싱만 한다.
@@ -100,7 +100,7 @@ export interface FuzzySegment {
 
 /**
  * `label`에 대해 `term`을 subsequence로 매치한 글자 인덱스를 찾아 연속된
- * hit/non-hit 구간으로 나눈다 (dc.html fuzzy()/segs() L172-191 참조).
+ * hit/non-hit 구간으로 나눈다 (dc.html `fuzzy()`/`segs()` 참조).
  * 매치 실패(term의 글자가 label 안에 순서대로 다 나타나지 않음) 시
  * `[{ text: label, hit: false }]`을 반환한다. 대소문자는 무시하지만
  * 반환하는 `text`는 항상 label의 원본 대소문자를 유지한다.

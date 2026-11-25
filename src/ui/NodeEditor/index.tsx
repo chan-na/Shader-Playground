@@ -7,6 +7,7 @@ import {
   MiniMap,
   type Node,
   type NodeChange,
+  type OnBeforeDelete,
   type OnConnectEnd,
   type OnConnectStart,
   type OnNodeDrag,
@@ -18,6 +19,7 @@ import "@xyflow/react/dist/style.css";
 import "./nodeCard.css";
 
 import {
+  allDescendants,
   getAbsolutePosition,
   hasCollapsedAncestor,
 } from "../../core/graph/parents";
@@ -32,7 +34,7 @@ import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
 import { nextId } from "../../utils/id";
-import { DockPanelHeader } from "../DockPanelHeader";
+import { DockPanelHeader } from "../dock/DockPanelHeader";
 import { MOTION_MAX_MS } from "../motion";
 import { WelcomeOverlay } from "../WelcomeOverlay";
 import { AddNodePill } from "./AddNodePill";
@@ -114,7 +116,7 @@ export function NodeEditor() {
 
   // Auto-fit when the graph is replaced wholesale (Demo/Chain Demo/Clear,
   // import, share restore, undo/redo) so small graph panels still show every
-  // node. `graphEpoch` moves only on those replacements [#38] — keying this on
+  // node. `graphEpoch` moves only on those replacements — keying this on
   // `rev` re-framed the canvas after every structural edit (adding one node,
   // wiring one edge, each shader recompile), animating the view out from under
   // the user mid-work.
@@ -138,7 +140,7 @@ export function NodeEditor() {
   // Visibility net for the refit removed above: node adds use fixed flow
   // coordinates (AddNodePill / CommandPalette), so with the canvas panned away
   // a new node now lands off-screen and the menu looks like it did nothing.
-  // Pan — never zoom, that is what #38 removed — and only when the node really
+  // Pan — never zoom, re-framing is what the epoch gate removed — and only when the node really
   // is outside the visible area, so an add in plain sight leaves the viewport
   // untouched. See addedPanDecision for the framing rules.
   //
@@ -314,6 +316,51 @@ export function NodeEditor() {
         };
       }),
     [graphEdges, graphNodes],
+  );
+
+  /**
+   * Delete key guard for group nodes.
+   *
+   * React Flow's delete path expands a doomed node into its children
+   * (@xyflow/system `getElementsToRemove`, the `parentHit` branch) and then
+   * pulls in every edge connected to them. Since every starter graph now ships
+   * lesson groups, pressing Delete on a label box would silently take the node
+   * inside it — and its wiring — along: exactly what
+   * `removeGroup(id, "delete-children")` does, minus the confirmation
+   * GroupInspector demands before doing it.
+   *
+   * So a group deleted from the canvas means *ungroup*: the group node goes,
+   * its descendants stay (removeNode promotes their positions back to
+   * absolute). A descendant is only deleted alongside it when the user picked
+   * that descendant too — `selected` is what the delete-key handler filtered
+   * on, so it marks the explicitly targeted elements.
+   */
+  const onBeforeDelete = useCallback<OnBeforeDelete>(
+    async ({ nodes, edges }) => {
+      const groupIds = nodes.filter((n) => n.type === "group").map((n) => n.id);
+      if (groupIds.length === 0) return { nodes, edges };
+      const state = useGraphStore.getState();
+      const released = new Set<string>();
+      for (const gid of groupIds) {
+        for (const d of allDescendants(gid, state.nodes, state.parents)) {
+          released.add(d.id);
+        }
+      }
+      const doomedNodes = nodes.filter(
+        (n) => n.selected === true || !released.has(n.id),
+      );
+      const doomedIds = new Set(doomedNodes.map((n) => n.id));
+      // Edges were only pulled in because a node they touch was doomed, so
+      // the ones whose nodes just got released have to be released too.
+      const doomedEdges = edges.filter(
+        (e) =>
+          e.selected === true ||
+          doomedIds.has(e.source) ||
+          doomedIds.has(e.target),
+      );
+      return { nodes: doomedNodes, edges: doomedEdges };
+    },
+    [],
   );
 
   const onNodesChange = useCallback(
@@ -511,7 +558,7 @@ export function NodeEditor() {
 
   /**
    * Records the source port's side/type into connectionUiStore the moment a
-   * drag starts, so fanout-highlight consumers (U3/U4) know what "compatible"
+   * drag starts, so fanout-highlight consumers (PortHandle) know what "compatible"
    * means for this drag. Looked up against the graph store (same pattern as
    * ConnectionLine's strokeForHandle) rather than React Flow's internal node
    * data.
@@ -593,6 +640,7 @@ export function NodeEditor() {
           nodeTypes={NODE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onBeforeDelete={onBeforeDelete}
           onPaneClick={onPaneClick}
           onConnect={onConnect}
           onConnectStart={onConnectStart}

@@ -21,16 +21,16 @@
 
 /* Error ring goes first so a higher-specificity `.selected` rule (below)
  * always wins when a node is both selected and erroring — mirrors
- * design/Node Editor.dc.html L366-369's `shadowFor()`, which checks
+ * design/Node Editor.dc.html's `shadowFor()`, which checks
  * `s.sel === id` before ever falling back to the error shadow. */
 .node-card--error {
   box-shadow: var(--shadow-error-ring), var(--shadow-node-card);
 }
 
 /* Permission-blocked skin for Webcam/Audio nodes whose external source is
- * pending/denied (M7-U3) — same placement as .node-card--error above, base
- * card shadow plus the warning-hued ring. design/System States.dc.html
- * L484's combined webcam-blocked box-shadow. */
+ * pending/denied — same placement as .node-card--error above, base
+ * card shadow plus the warning-hued ring. design/System States.dc.html's
+ * combined webcam-blocked node shadow (`isWebcam ? …`). */
 .node-card--blocked {
   box-shadow: var(--shadow-node-card), var(--shadow-warn-ring);
 }
@@ -42,7 +42,8 @@
 
 /* Multi-select marquee: both the wrapping rect React Flow draws around a
  * committed multi-node selection AND the live box-select drag rect share
- * this dashed accent style (design/Node Editor.dc.html L275). Do NOT set
+ * this dashed accent style (design/Node Editor.dc.html multi-select
+ * marquee). Do NOT set
  * pointer-events here — .react-flow__nodesselection-rect is the element
  * group-drag dispatches from, so killing pointer-events would break
  * dragging a multi-selection. */
@@ -69,7 +70,7 @@
 }
 
 /* Key-value rows (Compute node body) — label mono/muted, value mono/primary,
- * space-between. design/Node Editor.dc.html L221-225. */
+ * space-between. design/Node Editor.dc.html "Compute node". */
 .node-card__kv-list {
   display: flex;
   flex-direction: column;
@@ -107,7 +108,7 @@
  * once a shader/compute node has diagnostics (ErrorBadge.tsx). Unlike the
  * timer chip, every value here is a fixed token (no per-node computed hex),
  * so it's a plain CSS class rather than inline styles.
- * design/Node Editor.dc.html L201. */
+ * design/Node Editor.dc.html "Blend shader (ERROR)". */
 .node-card__error-badge {
   display: inline-flex;
   align-items: center;
@@ -126,7 +127,7 @@
 /* Blocked badge (BlockedBadge.tsx) — header meta-slot pill for a Webcam/Audio
  * node whose external source is pending/denied permission. Unlike
  * .node-card__error-badge (solid fill, fixed tokens), design/System
- * States.dc.html's `warnBadge` (L472) is a translucent tint over the header
+ * States.dc.html's `warnBadge` is a translucent tint over the header
  * gradient, so this uses color-mix(var(--warning)) instead of a solid
  * background — nodeCard.css is a static file, and color-mix keeps the alpha
  * derivation token-based without needing an inline withAlpha() call here. */
@@ -162,9 +163,10 @@
 }
 
 /* ─── 포트 라벨 rail(폭 ~46px) ─────────────────────────────────────
- * 라벨은 카드 좌/우 rail에 배치, 색=타입 패밀리 [D2]. 색은 PortHandle.tsx가
+ * 라벨은 카드 좌/우 rail에 배치, 색=타입 패밀리. 색은 PortHandle.tsx가
  * 포트별로 portFamilyHex를 인라인 style.color로 주입하므로 여기서는
- * color를 선언하지 않는다. design/Node Editor.dc.html L190-195. */
+ * color를 선언하지 않는다. design/Node Editor.dc.html "input/output port
+ * rail". */
 .node-card__port-label {
   position: absolute;
   font-size: 8.5px;
@@ -196,8 +198,8 @@
   transition:
     transform var(--motion-duration-min) var(--motion-easing),
     box-shadow var(--motion-duration-min) var(--motion-easing),
-    /* Fanout dim fade (M8-U3). The prototype's fanout ramp is ~230ms
-     * (node-connect.jsx L120: 1.72s→1.95s) but that's clamped down to the
+    /* Fanout dim fade. The prototype's fanout ramp is ~230ms
+     * (node-connect.jsx `fanoutStrength`: 1.72s→1.95s) but that's clamped down to the
      * README §Motion 90-150ms band's upper bound rather than imported as-is. */
     opacity
     var(--motion-duration-max) var(--motion-easing);
@@ -216,10 +218,9 @@
  * input x = node.left, output x = node.left + node.width. React Flow v12의
  * 기본 `.react-flow__handle-left { left: 0 }` / `-right { right: 0 }` +
  * `transform: translate(∓50%, -50%)`가 지름과 무관하게 핸들 중심을 정확히
- * 카드 모서리에 정렬하므로 여기서 추가 offset을 주지 않는다. (이전에 있던
- * -5.5px 오버레이는 RF 기본 translate와 이중으로 겹쳐 중심이 ~4.5px 바깥으로
- * 빠지는 회귀였다 — dc.html의 -6px는 transform 없는 정적 HTML 기준이라
- * 그대로 옮기면 안 된다.) */
+ * 카드 모서리에 정렬하므로 여기서 추가 offset을 주지 않는다. (dc.html의
+ * -6px는 transform 없는 정적 HTML 기준이라, 그대로 옮기면 RF 기본
+ * translate와 이중으로 겹쳐 중심이 ~4.5px 바깥으로 빠진다.) */
 
 /* Light drag feedback: a compatible target handle gets a soft accent ring
  * while a connection is being dragged toward it. React Flow itself toggles
@@ -227,7 +228,7 @@
  * app state needed. This stacks with the full fan-out highlight/dim pass
  * across every compatible/incompatible port (design/README.md §Interactions
  * "호환 입력 포트 하이라이트", implemented in PortHandle.tsx via
- * portDragMode.ts + connectionUiStore for M8-U3) — the hovered drop target
+ * portDragMode.ts + connectionUiStore) — the hovered drop target
  * gets both its own accent ring here and the family-colored glow/pulse
  * below, which is harmless duplication. */
 .react-flow__handle.connectingto.valid {
@@ -235,7 +236,8 @@
     color-mix(in srgb, var(--accent-default) 40%, transparent);
 }
 
-/* ─── Connection drag line (design/Node Editor.dc.html L19, L64) ─────────
+/* ─── Connection drag line (design/Node Editor.dc.html "DRAG IN PROGRESS"
+ * edge) ──────────────────────────────────────────────────────────────
  * Dashed, family-colored line rendered only while a port drag is in
  * progress (ConnectionLine.tsx) — not an idle/ambient animation, so it's
  * exempt from the "no idle animation" rule (see theme.ts §motion). */
@@ -248,7 +250,7 @@
   animation: sp-edge-dash 0.6s linear infinite;
 }
 
-/* 호환 포트 팬아웃 펄스 링 — node-connect.jsx L94-99(30px ring)·L123-124
+/* 호환 포트 팬아웃 펄스 링 — node-connect.jsx `Port` pulse(30px ring)·`pulseT`
  * (period 1/1.7s≈590ms, scale 1→1.5, opacity .85→0). 포트 드래그 중에만
  * 마운트되므로 idle-animation 금지 규칙(theme.ts §motion)의 예외. */
 @keyframes sp-port-pulse {
@@ -268,7 +270,7 @@
   animation: sp-port-pulse 590ms linear infinite;
 }
 
-/* 연결 확정 스냅 펄스 — node-connect.jsx L134·L303-309: 600ms, scale 1→2.6,
+/* 연결 확정 스냅 펄스 — node-connect.jsx `snapP`/snap ring: 600ms, scale 1→2.6,
  * opacity .9→0. 연결 이벤트에 대한 1회성 상태 피드백(forwards 후 언마운트)이라
  * idle-animation 금지 규칙과 무관. */
 @keyframes sp-port-snap {
@@ -395,7 +397,7 @@
 }
 
 /* ─── Zoom controls (bottom-left canvas overlay) ──────────────────
- * design/Node Editor.dc.html L296-302. Chrome (background/border/radius/
+ * design/Node Editor.dc.html "zoom controls". Chrome (background/border/radius/
  * padding) is set inline in ZoomControls.tsx since it mixes withAlpha()
  * with a token hex; this file only owns the hover state React can't express
  * via inline styles. */

@@ -14,9 +14,9 @@ export interface SegmentedControlProps {
 }
 
 /**
- * Segmented button group (design/Side Panel.dc.html L231's "Solid / Wire /
- * Points" control-library sample). First consumer: AudioInspector's
- * mic/file source switch (M5-U3).
+ * Segmented button group (design/Side Panel.dc.html "Segmented · toggle"
+ * control-library sample, "Solid / Wire / Points"). First consumer:
+ * AudioInspector's mic/file source switch.
  */
 export function SegmentedControl({
   options,

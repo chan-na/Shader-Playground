@@ -137,7 +137,7 @@ describe("buildExportedHtml", () => {
   });
 });
 
-// C-2: the standalone player binds exactly the serialized `uniformValues`
+// The standalone player binds exactly the serialized `uniformValues`
 // (it has no `@default` parser of its own), so the export boundary must
 // materialize GLSL `@default` hints into the embedded project — otherwise a
 // brand-new node (stored map `{}`) exports a GL-zero render while the app
@@ -192,7 +192,7 @@ describe("buildExportedHtml — @default materialization (C-2)", () => {
     if (sd?.kind !== "shader") return;
     // `@default 0.5, 0.7, 1.0` materialized — the player will bind it.
     expect(sd.uniformValues.u_tint).toEqual([0.5, 0.7, 1.0]);
-    // The stored value 2 beats the `@default 3` hint (C-2 invariant).
+    // The stored value 2 beats the `@default 3` hint (stored always wins).
     expect(sd.uniformValues.u_amt).toBe(2);
   });
 
@@ -291,7 +291,7 @@ describe("buildExportedHtml — @default materialization (C-2)", () => {
   });
 });
 
-// F-2 (T3): every demo wraps its nodes in lesson Groups, and a grouped node's
+// Every demo wraps its nodes in lesson Groups, and a grouped node's
 // `positions` entry is group-relative (GroupGraphNode semantics). An export
 // that drops `parents` therefore re-imports as a graph laid out against groups
 // that no longer exist — every lesson node stacked at the origin — so the map
@@ -420,7 +420,7 @@ describe("downloadExportedHtml", () => {
 
     const returned = downloadExportedHtml(sample, {}, "my-project");
 
-    // [D16] displayed name = actually-saved name — this is the return-value/
+    // Displayed name = actually-saved name — this is the return-value/
     // a.download equality this test exists to pin down.
     expect(returned).toMatch(/^my-project-\d{8}-\d{4}\.html$/);
     expect(capturedDownload).toBe(returned);

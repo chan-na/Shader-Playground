@@ -17,7 +17,7 @@ describe("withExplicitDefaults (T3/C-2)", () => {
 
   it("does not seed a color-named uniform whose default is only the name-based heuristic", () => {
     // u_baseColor's [1,1,1] heuristic default has no @default hint behind
-    // it — must stay unseeded (C-2's explicit-only decision).
+    // it — must stay unseeded (only explicit @default hints are seeded).
     const source = `uniform vec3 u_baseColor;`;
     expect(withExplicitDefaults(source, {})).toEqual({});
   });

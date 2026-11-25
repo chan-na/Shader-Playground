@@ -54,7 +54,7 @@ export function categoryHexFor(kind: GraphNodeKind): string {
 
 /**
  * 노드 카드 헤더 아이콘 박스에 그리는 유니코드 글리프.
- * design/Node Editor.dc.html L371-382 renderVals()의 `cats[].nodes[].glyph` 전수.
+ * design/Node Editor.dc.html renderVals()의 `cats[].nodes[].glyph` 전수.
  */
 export const NODE_GLYPH: Record<GraphNodeKind, string> = {
   mesh: "▣",

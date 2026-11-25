@@ -16,7 +16,7 @@ export interface CompiledProgram {
    * Reflected GLSL type enum per uniform (GL_FLOAT, GL_INT, GL_FLOAT_VEC2, …),
    * keyed by the same array-subscript-stripped name as `uniforms`. The upload
    * path needs it to pick the int vs float entry point — `uniform1f` against an
-   * `int` location is INVALID_OPERATION in WebGL2. (#11)
+   * `int` location is INVALID_OPERATION in WebGL2.
    */
   uniformTypes: Record<string, number>;
 }
@@ -52,12 +52,11 @@ function compileShader(
 
 /**
  * Shared tail for both program builders: link check, GL-error drain, and the
- * active-attribute / active-uniform reflection loops. Extracted because the two
- * builders carried byte-identical copies of it — a fix applied to only one of
- * them still type-checks, so "works for shader nodes but not compute nodes"
- * was a silent failure mode (the reflection now records `info.type` in exactly
- * one place). `label` stays a parameter so each caller keeps its own name in
- * the GL error log. (#40)
+ * active-attribute / active-uniform reflection loops. Shared so the
+ * reflection records `info.type` in exactly one place — separate per-builder
+ * copies let a fix land in only one of them and still type-check, a silent
+ * "works for shader nodes but not compute nodes" failure mode. `label` stays a
+ * parameter so each caller keeps its own name in the GL error log.
  */
 function finishProgram(
   gl: WebGL2RenderingContext,

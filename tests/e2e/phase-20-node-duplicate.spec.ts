@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
-import { readSp, withSp } from "./helpers/sp";
+import { blurActive } from "./helpers/dom";
+import {
+  bootApp,
+  selectNode,
+  setGraph,
+  trivialMeshGraph,
+} from "./helpers/fixtures";
+import { readSp } from "./helpers/sp";
 
 // Phase 20 — node duplication. Cmd/Ctrl+D deep-clones the selected node under
 // a fresh id (offset position, no edges) and moves the selection onto the
@@ -23,11 +29,8 @@ test.describe("Phase 20 — node duplication (Cmd/Ctrl+D)", () => {
 
     // Select the shader node, then blur so the keystroke reaches the global
     // window listener instead of an editor.
-    await withSp(page, (sp) => sp.selection.getState().select("s1"), null);
-    await page.evaluate(() => {
-      const el = document.activeElement;
-      if (el instanceof HTMLElement) el.blur();
-    });
+    await selectNode(page, "s1");
+    await blurActive(page);
 
     const before = await readSp(page, (sp) => ({
       count: sp.graph.getState().nodes.length,
@@ -65,11 +68,8 @@ test.describe("Phase 20 — node duplication (Cmd/Ctrl+D)", () => {
 
   test("Cmd/Ctrl+D with no selection is a no-op", async ({ page }) => {
     await setGraph(page, trivialMeshGraph(), {});
-    await withSp(page, (sp) => sp.selection.getState().select(null), null);
-    await page.evaluate(() => {
-      const el = document.activeElement;
-      if (el instanceof HTMLElement) el.blur();
-    });
+    await selectNode(page, null);
+    await blurActive(page);
 
     const before = await readSp(page, (sp) => sp.graph.getState().nodes.length);
     await page.keyboard.press("Meta+d");

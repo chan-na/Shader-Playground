@@ -10,14 +10,14 @@ import { portFamilyHex, portFamilyOf } from "../NodeEditor/nodeTheme";
 
 const TIME_LABELS = ["Scale", "Offset"] as const;
 
-// [A-1] No Label field here — the Inspector's common Name field (Inspector.tsx)
-// renames every kind, params included. Two title fields on one node was the
-// defect this removes; pre-v1.2 `label` values migrate in projectSanitize.
+// No Label field here — the Inspector's common Name field (Inspector.tsx)
+// renames every kind, params included (two title fields on one node would
+// conflict); legacy param `label` values migrate in projectSanitize.
 export function ParamInspector({ node }: { node: ParamGraphNode }) {
   const setParamValue = useGraphStore((s) => s.setParamValue);
 
-  // [D18] Output type 배지 색 = 포트 타입 패밀리 (design/README.md §도메인 규칙,
-  // design/Side Panel.dc.html L141: "vec3 · Vector" 배지 색 = vector 패밀리).
+  // Output type 배지 색 = 포트 타입 패밀리 (design/README.md §도메인 규칙,
+  // design/Side Panel.dc.html PARAM: "vec3 · Vector" 배지 색 = vector 패밀리).
   // paramKind → GLSL 포트 타입은 registry의 paramOutputPort가 단일 출처
   // (float/time → float(scalar), vec3/color → vec3(vector)).
   const outPort = paramOutputPort(node.paramKind);

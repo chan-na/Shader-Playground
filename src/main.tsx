@@ -11,19 +11,8 @@ import { App } from "./App";
 import {
   setAudioBlobResolver,
   setVideoBlobResolver,
-} from "./core/external/registry";
-import { BUILTIN_FUNCTIONS, KEYWORD_DESCRIPTIONS } from "./core/glsl/builtins";
+} from "./core/external/resolvers";
 import { glslValidator } from "./core/glsl/glslValidator";
-import { findReferences } from "./core/glsl/references";
-import {
-  classifyIdentifier,
-  classifySemanticTokens,
-} from "./core/glsl/semanticTokens";
-import {
-  buildSymbolTable,
-  resolveSymbol,
-  symbolsVisibleAt,
-} from "./core/glsl/symbolTable";
 import { getCurrentView, getCursorLine } from "./ui/CodeEditor/currentView";
 import "./index.css";
 import * as assetActions from "./state/assetActions";
@@ -32,7 +21,6 @@ import { startDockLayoutPersistence } from "./state/autoSave";
 import { useCameraStore } from "./state/cameraStore";
 import { startCodeAutoOpen } from "./state/codeAutoOpen";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
-import { useDockStore } from "./state/dockStore";
 import { useEditorStore } from "./state/editorStore";
 import { useGifRecorderStore } from "./state/gifRecorder";
 import { useGpuTimerStore } from "./state/gpuTimerStore";
@@ -44,9 +32,10 @@ import { useSelectionStore } from "./state/selectionStore";
 import { useTimeStore } from "./state/timeStore";
 import { useViewportStore } from "./state/viewportStore";
 import { cssVars } from "./theme";
+import { useDockStore } from "./ui/dock/dockStore";
 import { log, normalizeError } from "./utils/log";
 
-// 전역 안전망: 잡히지 않은 에러/거부를 로거에 기록 (Debugging-Plan P2).
+// 전역 안전망: 잡히지 않은 에러/거부를 로거에 기록.
 window.addEventListener("error", (e) => {
   log.error("app", "window.onerror", {
     message: e.message,
@@ -60,7 +49,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 // 디자인 토큰(src/theme.ts 단일 출처)을 :root CSS 변수로 파생 주입.
-// index.css 및 컴포넌트 CSS는 var(--*)만 참조한다 (M0).
+// index.css·src/styles/*.css 및 컴포넌트 CSS는 var(--*)만 참조한다.
 const themeStyle = document.createElement("style");
 themeStyle.id = "sp-theme-vars";
 themeStyle.textContent = `:root {\n${cssVars()}\n}`;
@@ -72,13 +61,13 @@ document.head.appendChild(themeStyle);
 setVideoBlobResolver(getVideoBlob);
 setAudioBlobResolver(getAudioBlob);
 
-// 도킹 레이아웃 하이드레이션(R9) — createRoot 렌더 전에 동기 실행해 기본
+// 도킹 레이아웃 하이드레이션 — createRoot 렌더 전에 동기 실행해 기본
 // 트리 → 저장된 트리로 바뀌는 첫 프레임 플래시를 막는다. 그래프 세션
 // 복구(BootstrapGate의 startAutoSave)와는 별개 — 레이아웃은 recovery
 // 다이얼로그 없이 무조건 즉시 복원된다.
 startDockLayoutPersistence();
 
-// W5 — 노드 선택 → Code 자동 접기/펼침 구동(autoCode 게이트, 기본 ON).
+// 노드 선택 → Code 자동 접기/펼침 구동(autoCode 게이트, 기본 ON).
 startCodeAutoOpen();
 
 if (import.meta.env.DEV) {
@@ -89,7 +78,7 @@ if (import.meta.env.DEV) {
     assets: useAssetStore,
     assetActions,
     diagnostics: useDiagnosticsStore,
-    // B7 — E2E dock-tree setup/inspection (m5-dock-chrome.spec.ts R8).
+    // E2E dock-tree setup/inspection (`setDockTree` in tests/e2e/helpers).
     dock: useDockStore,
     time: useTimeStore,
     viewport: useViewportStore,
@@ -103,28 +92,9 @@ if (import.meta.env.DEV) {
     // capture via the RAF loop, stops, and validates the produced blob.
     gifRecorder: useGifRecorderStore,
     glslValidator,
-    // Phase 25 — LSP helpers exposed for E2E. Tests build a symbol table
-    // from a source string and resolve identifiers without round-tripping
-    // through CodeMirror.
-    glslSymbols: {
-      build: buildSymbolTable,
-      visibleAt: symbolsVisibleAt,
-      resolve: resolveSymbol,
-      builtins: BUILTIN_FUNCTIONS,
-      keywords: KEYWORD_DESCRIPTIONS,
-      // Phase 27 — reference finder. E2E can ask for every occurrence of a
-      // symbol at a given line without round-tripping through CodeMirror.
-      findReferences,
-    },
-    // Phase 26 — semantic token classifier exposed for E2E. Tests can drive
-    // `classify(source)` without going through the CodeMirror ViewPlugin to
-    // verify token kinds and offsets directly.
-    glslSemanticTokens: {
-      classify: classifySemanticTokens,
-      classifyIdentifier,
-    },
-    // Phase 27 — CodeMirror observation hook. Tests read cursor state /
-    // dispatch focus on the active editor without owning the React ref.
+    // CodeMirror observation hook used by phase-27 E2E (`sp.codeEditor`):
+    // tests read cursor state / dispatch focus on the active editor without
+    // owning the React ref.
     codeEditor: {
       getCursorLine,
       focus: () => {

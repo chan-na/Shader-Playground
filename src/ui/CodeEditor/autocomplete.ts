@@ -9,11 +9,9 @@ import {
   BUILTIN_FUNCTIONS,
   KEYWORD_DESCRIPTIONS,
 } from "../../core/glsl/builtins";
-import {
-  buildSymbolTable,
-  type GlslSymbol,
-  symbolsVisibleAt,
-} from "../../core/glsl/symbolTable";
+import { IDENT_EXACT_RE, IDENT_RE } from "../../core/glsl/ident";
+import { symbolsVisibleAt } from "../../core/glsl/symbolScope";
+import { buildSymbolTable, type GlslSymbol } from "../../core/glsl/symbolTable";
 import {
   parseUniforms,
   SYSTEM_UNIFORM_DESCRIPTIONS,
@@ -337,7 +335,7 @@ export function glslSource(
   context: CompletionContext,
 ): CompletionResult | null {
   if (lineTextBefore(context).includes("//")) return null;
-  const word = context.matchBefore(/[A-Za-z_][A-Za-z0-9_]*/);
+  const word = context.matchBefore(IDENT_RE);
   // Auto-trigger only when a partial identifier precedes the cursor; Ctrl+Space
   // (explicit) still produces the full list at non-word positions.
   if (!word && !context.explicit) return null;
@@ -354,7 +352,7 @@ export function glslSource(
   return {
     from: word ? word.from : context.pos,
     options,
-    validFor: /^[A-Za-z_][A-Za-z0-9_]*$/,
+    validFor: IDENT_EXACT_RE,
   };
 }
 

@@ -406,7 +406,7 @@ describe("cloneGraphNode", () => {
     expect(clonedWithDevice).toEqual(withDevice);
   });
 
-  // [A-1] A param carries no `label` any more — its title rides on the common
+  // A param carries no `label` — its title rides on the common
   // `name`, which cloneGraphNode copies via the shared BaseNode path.
   it("clones a param without reintroducing a label field, and deep-copies its value", () => {
     const named: ParamGraphNode = {
@@ -519,8 +519,8 @@ describe("displayNodeName [D15]", () => {
     expect(displayNodeName(sn)).toBe("Shader");
   });
 
-  // [A-1] `label` is no longer a param field, so there is no label fallback
-  // step any more: a param resolves by `name` then the registry default, like
+  // `label` is not a param field, so there is no label fallback step: a
+  // param resolves by `name` then the registry default, like
   // every other kind. Legacy label values are migrated into `name` on load —
   // see projectSanitize.test.ts.
   it("param: no name → falls back to the registry default", () => {

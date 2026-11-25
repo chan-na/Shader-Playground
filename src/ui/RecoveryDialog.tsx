@@ -4,7 +4,7 @@ import { tokens, withAlpha } from "../theme";
 const RECOVERY_TITLE_ID = "recovery-dialog-title";
 
 /** Scrim tint — same alpha-derivation exception as GpuBlockScreen's
- * SCRIM_STYLE (see index.css's `.modal-scrim` comment). */
+ * SCRIM_STYLE (see `.modal-scrim`'s comment in src/styles/93-modals.css). */
 const SCRIM_STYLE: CSSProperties = {
   background: withAlpha(tokens.surface.appDarker, 0.72),
   zIndex: 9999,

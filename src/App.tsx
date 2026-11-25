@@ -1,7 +1,7 @@
 import { AppToolbar } from "./ui/AppToolbar";
 import { BootstrapGate } from "./ui/BootstrapGate";
 import { CommandPalette } from "./ui/CommandPalette";
-import { DockLayout } from "./ui/DockLayout";
+import { DockLayout } from "./ui/dock/DockLayout";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { ExportShareDialog } from "./ui/ExportShare/ExportShareDialog";
 import { GpuBlockScreen } from "./ui/GpuBlockScreen";

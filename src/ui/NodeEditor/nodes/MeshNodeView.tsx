@@ -35,7 +35,7 @@ export function MeshNodeView({ id, data }: NodeProps) {
   const usingAsset = !!asset;
   const label = usingAsset ? asset?.name : node.primitive;
 
-  // [B-1] The mesh port's actual attribute contract — computed from the same
+  // The mesh port's actual attribute contract — computed from the same
   // sources the render path reads (asset.data, or makePrimitive for a
   // built-in), never inferred. Memoized: makePrimitive regenerates full
   // vertex buffers on every call.
@@ -44,7 +44,7 @@ export function MeshNodeView({ id, data }: NodeProps) {
     .map((a) => `${a.name} ${attrTypeLabel(a.size)}`)
     .join(" · ");
 
-  // [B-2] Attributes this mesh provides but that no connected consumer's
+  // Attributes this mesh provides but that no connected consumer's
   // linked program actually bound (core/gl/mesh.ts's quiet skip, made
   // visible). Aggregated across every shader pass wired to this mesh's
   // output port — "any consumer" semantics, see aggregateMeshConsumption.

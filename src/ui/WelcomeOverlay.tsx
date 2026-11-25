@@ -25,11 +25,11 @@ import { GraphEmptyState } from "./GraphEmptyState";
 import { NODE_CATEGORY_OF } from "./NodeEditor/nodeTheme";
 
 /**
- * First-run empty-canvas overlay (Welcome.dc.html L87-145). NodeEditor mounts
+ * First-run empty-canvas overlay (design/Welcome.dc.html). NodeEditor mounts
  * this only while the graph is empty (0 nodes), as a ReactFlow sibling inside
  * `.panel-body` (already `position: relative`) — the same slot pattern as
  * the selection-count-badge. The root is `pointer-events: auto` (see
- * index.css's `.welcome-overlay` comment) — at narrower dock layouts
+ * src/styles/70-welcome.css's `.welcome-overlay` comment) — at narrower dock layouts
  * `.welcome-content` is taller than the panel, so the overlay's own
  * `overflow: auto` has to actually receive the wheel instead of it falling
  * through to ReactFlow's pane and being consumed as a zoom gesture. That
@@ -37,15 +37,15 @@ import { NODE_CATEGORY_OF } from "./NodeEditor/nodeTheme";
  * is moot — the graph is empty (0 nodes) whenever this is mounted, so
  * there's nothing behind it to pan toward.
  *
- * The design's brand mark is a bespoke SVG symbol (dc.html L33-43) with a
- * `spBreathe` looping halo (L96) — both are intentionally NOT reproduced
+ * The design's brand mark is a bespoke SVG symbol with a `spBreathe` looping
+ * halo (Welcome.dc.html hero) — both are intentionally NOT reproduced
  * here: the symbol is swapped for a 3×-scaled version of AppToolbar.tsx's
  * existing `tb-brand` mark (reuse over new asset), and the halo is a static
- * glow (no keyframe) per CLAUDE.md's "상시 애니메이션 금지" policy.
+ * glow (no keyframe) per design/README.md's "상시 애니메이션 금지" motion rule.
  *
  * Once `dismissed` (the "Start blank" button below), this renders
  * `GraphEmptyState` instead of `null` — the design's empty-graph onboarding
- * (design/System States.dc.html, M7-U2) — whose "Load a preset" flips
+ * (design/System States.dc.html "graph: EMPTY") — whose "Load a preset" flips
  * `dismissed` back to false to return here.
  */
 
@@ -149,7 +149,7 @@ const STARTERS: Starter[] = [
 ];
 
 /** CSS modifier suffix for each starter's thumbnail artwork — the gradients
- * themselves are static var(--*)-only classes in index.css
+ * themselves are static var(--*)-only classes in src/styles/70-welcome.css
  * (.welcome-card-thumb--<key>), matching the .cmdk-icon--<category>
  * convention rather than computing them inline here. */
 const THUMB_CLASS: Record<Starter["key"], string> = {
@@ -174,21 +174,21 @@ const FILE_ACCEPT =
  * (not imported) since AppToolbar doesn't export them and isn't part of
  * this unit's scope. The white channel here can't be expressed as a static
  * CSS var, so — like AppToolbar's own inline mark — it stays inline while
- * position/size/gradient (all token-only) live in index.css. */
+ * position/size/gradient (all token-only) live in 70-welcome.css. */
 const MARK_SHADOW = `0 6px 20px ${withAlpha(tokens.accent.default, 0.35)}, inset 0 1px 0 ${withAlpha("#ffffff", 0.25)}`;
 const SQUARE_BORDER = `5px solid ${withAlpha("#ffffff", 0.92)}`;
 const DOT_BORDER = `4px solid ${withAlpha("#ffffff", 0.95)}`;
 
-/** "N nodes" thumbnail chip (Welcome.dc.html L110) — identical across all 4
+/** "N nodes" thumbnail chip (Welcome.dc.html starter card) — identical across all 4
  * cards. color/border need a white channel, so those stay inline; position/
- * font/padding/radius live in .welcome-card-chip (index.css). */
+ * font/padding/radius live in .welcome-card-chip (src/styles/70-welcome.css). */
 const CHIP_STYLE: CSSProperties = {
   color: withAlpha("#ffffff", 0.82),
   background: withAlpha(tokens.surface.appDarker, 0.5),
   border: `1px solid ${withAlpha("#ffffff", 0.14)}`,
 };
 
-/** Primary "Create …" button's inset highlight (Welcome.dc.html L130) — same
+/** Primary "Create …" button's inset highlight (Welcome.dc.html) — same
  * white-channel reasoning as CHIP_STYLE above. */
 const CREATE_SHADOW = `0 4px 16px ${withAlpha(tokens.accent.default, 0.32)}, 0 1px 0 ${withAlpha("#ffffff", 0.15)} inset`;
 
@@ -205,8 +205,8 @@ export function WelcomeOverlay() {
     STARTERS.find((s) => s.key === selectedKey) ?? SPHERE_STARTER;
 
   // Enter creates the currently-selected starter, but only when focus is on
-  // body or a welcome-card button (a card click leaves focus there — see B2
-  // below) — not on an input, the command palette, etc., otherwise this
+  // body or a welcome-card button (a card click leaves focus there — see the
+  // focus note below) — not on an input, the command palette, etc., otherwise this
   // would hijack Enter from every text field on the page. Skipped entirely
   // once dismissed so a stray Enter after "Start blank" can't silently
   // repopulate the graph the user just asked to keep empty.
@@ -215,7 +215,7 @@ export function WelcomeOverlay() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Enter") return;
       const el = document.activeElement;
-      // 카드 버튼에 포커스가 있을 때도 Enter는 Create로 동작해야 한다(B2):
+      // 카드 버튼에 포커스가 있을 때도 Enter는 Create로 동작해야 한다:
       // 카드 클릭 → 버튼이 포커스를 가져가 body 가드에 걸리고, Enter가 카드
       // 재클릭(버튼 기본 동작)으로만 소비되던 문제. preventDefault가 그 기본
       // 동작(재클릭)도 함께 막는다. 그 외 포커스(입력창·팔레트 등)에서는 기존

@@ -66,10 +66,10 @@ const defaultMapper: FrameMapper = (rgba, palette) =>
   mapToPalette(rgba, palette);
 
 /**
- * Growable byte sink for the GIF assembler (L26). Replaces the former
- * `number[]` accumulator — which boxed one heap number per byte and then copied
- * the whole list into a Uint8Array at the end — with a doubling Uint8Array
- * buffer. Bytes land directly in typed storage (no boxing), and large runs
+ * Growable byte sink for the GIF assembler: a doubling Uint8Array buffer
+ * rather than a `number[]` accumulator (which would box one heap number per
+ * byte and copy the whole list at the end). Bytes land directly in typed
+ * storage (no boxing), and large runs
  * (LZW sub-block payloads) copy in one `set()` instead of per byte. `finish()`
  * returns an exact-size Uint8Array (fresh buffer) so the encode worker can
  * still transfer `bytes.buffer` cleanly.
@@ -230,7 +230,7 @@ export function encodeGif(
     // very small values as "as fast as possible". The upper bound is a format
     // constraint, not a policy: the field is u16, so anything past 0xffff would
     // silently wrap and turn a stalled frame into a near-zero delay. Delay
-    // *policy* stays with the caller (`gifRecorder.frameDelays`). (#31)
+    // *policy* stays with the caller (`gifRecorder.frameDelays`).
     const delayCs = Math.min(
       0xffff,
       Math.max(2, Math.round(frame.delayMs / 10)),

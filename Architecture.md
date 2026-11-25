@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 34)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 39 + 2026-11 구조 정리 이후)** 의 실제 동작을 설명한다. 디렉토리 지도는 §12, 도킹 모델은 §13. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -8,23 +8,28 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ UI Layer (React 18)                             │
-│   App / NodeEditor / Viewport / CodeEditor      │
-│   SidePanel · CommandPalette · BootstrapGate    │
+│ UI Layer (React 18 · src/ui)                    │
+│   App → AppToolbar / DockLayout / StatusBar     │
+│   DockLayout leaf = NodeEditor · Viewport ·     │
+│     CodeEditor · SidePanel (ui/dock, §13)       │
+│   overlays: CommandPalette · ExportShareDialog  │
+│     BootstrapGate · Toasts · GpuBlockScreen     │
 └──────────────┬──────────────────────────────────┘
                │ commands · selectors
 ┌──────────────▼──────────────────────────────────┐
 │ State Layer (Zustand stores · src/state)        │
-│   graph · asset · selection · renderer          │
+│   graph(+slices) · asset · selection · renderer │
 │   camera · viewport · time · history · editor   │
 │   diagnostics · autoSave · recorder · shareUrl  │
+│   (+ ui/dock/dockStore — §13.6 예외)            │
 └──────────────┬──────────────────────────────────┘
                │ snapshotGraph()  snapshotAssets()
 ┌──────────────▼──────────────────────────────────┐
 │ Core Layer (pure TS · src/core)                 │
 │   graph (compile/execute/validate/parser)       │
 │   gl (program/texture/framebuffer/mesh/uniform) │
-│   camera · thumbnail · nodes · assets           │
+│   glsl · external · nodes · assets · camera     │
+│   thumbnail · gif                               │
 └──────────────┬──────────────────────────────────┘
                │ WebGL2 calls
 ┌──────────────▼──────────────────────────────────┐
@@ -136,14 +141,14 @@
 
 ### 3.1 컴파일 절차
 
-0. **`reconcileExternal`** — 외부 소스 노드(webcam / video / audio) specs 를 모아 `core/external/registry.ts` 의 싱글톤 풀에 전달. 새 노드 ID 는 acquire 시작(webcam/audio-mic 는 비동기 getUserMedia, video/audio-file 은 resolver 로 Blob 해석), 사라진 노드 ID 는 release, restart 가 필요한 변경(webcam deviceId / video assetId / audio sourceKind·assetId)만 restart 하고 나머지(play/pause/loop/mute/seek/fftSize/smoothing)는 in-place 적용. **validate 보다 먼저** 호출되므로 cycle 같은 일시적 fatal 이 카메라/비디오/오디오를 죽이지 않는다. `hasExternal`(외부 소스 1 개 이상) 도 이 시점에 결정되어 fatal 분기에서도 보존.
+0. **`reconcileExternal`** — 외부 소스 노드(webcam / video / audio) specs 를 모아 `core/external/registry.ts` 의 싱글톤 풀에 전달. 새 노드 ID 는 acquire 시작(webcam/audio-mic 는 비동기 getUserMedia, video/audio-file 은 resolver 로 Blob 해석), 사라진 노드 ID 는 release, restart 가 필요한 변경(webcam deviceId / video assetId / audio sourceKind·assetId)만 restart 하고 나머지(play/pause/loop/mute/seek/fftSize/smoothing)는 in-place 적용. **validate 보다 먼저** 호출되므로 cycle 같은 일시적 fatal 이 카메라/비디오/오디오를 죽이지 않는다. `hasExternal`(외부 소스 1 개 이상) 도 이 시점에 결정되어 fatal 분기에서도 보존. 이 풀은 **ExecutionPlan 밖에 사는 싱글톤**이다 — FBO·mesh·TF object 등 다른 리소스는 `plan.dispose` 와 함께 사라지지만, 외부 핸들까지 그러면 recompile 마다 getUserMedia 권한 재요청이 일어난다. 그래서 plan 은 `hasExternal` flag 만 보유하고, `bindSamplers` 가 매번 `getExternalTexture(nodeId)` 로 조회하며, RAF dirty 게이트가 이 flag 를 idle 우회 신호로 쓴다.
 1. `validateGraph` — `cycle`/`multi_input`/`multiple_outputs` 중 하나라도 있으면 **patch 만 채운 emptyPlan** 으로 즉시 종료 (단 `hasExternal` 은 위에서 결정된 값을 그대로 캐리). `missing_node` 는 fatal 아님(엣지를 건너뛰고 계속).
 2. `topologicalOrder` → shader/compute 노드만 filter (두 종류 모두 패스를 생성).
 3. **ImageTexture 업로드**: 그래프의 모든 ImageNode 를 순회해 `assetStore` 에 비트맵이 있으면 `createImageTexture` 로 GPU 에 올린다. **키는 node.id** (assetId 가 아니다) — 그래야 다음 패스의 sampler 라우팅에서 `edge.source` 만으로 찾을 수 있다.
 4. **위상 순서대로 Pass 생성** — 각 노드의 `kind` 에 따라 ShaderPass 또는 ComputePass 가 만들어져 `passes[]` 에 들어간다. union 단일 배열이며 위상 순서가 보존된다.
    - **ShaderPass (`kind: 'shader'`)**:
      - **메시 결정**: `(target=sn.id, handle='mesh')` 인 엣지가 있으면 메시 노드에서 가져오고 `meshIsFullscreen=false`. 없거나 메시 노드가 비어 있으면 `quad` 프리미티브 + `fullscreen.vert` 가 자동 주입되어 `meshIsFullscreen=true`.
-     - **컴퓨트 mesh 입력 특수 경로**: 메시 엣지의 source 가 ComputeNode 인 경우, 컴파일 시점에 해당 ComputePass 의 두 vbo 세트(A/B) 각각에 대해 VAO 두 개를 만들어 `pass.meshComputeVaos = [vaoA, vaoB]` 로 보관. `pass.meshComputeNodeId` 로 연결된 ComputePass 를 식별. `pass.mesh.primitive` 는 ComputeNode 의 primitive 를, `vertexCount` 는 ComputeNode 의 `count` 를 그대로 가져온다.
+     - **컴퓨트 mesh 입력 특수 경로**: 메시 엣지의 source 가 ComputeNode 인 경우, 컴파일 시점에 해당 ComputePass 의 두 vbo 세트(A/B) 각각에 대해 VAO 두 개를 만들어 `pass.meshComputeVaos = [vaoA, vaoB]` 로 보관. `pass.meshComputeNodeId` 로 연결된 ComputePass 를 식별. `pass.mesh.primitive` 는 ComputeNode 의 primitive 를, `vertexCount` 는 ComputeNode 의 `count` 를 그대로 가져온다. 이 두 VAO 는 ShaderPass 가 dispose 하지만 그 뒤의 vbo 는 **ComputePass 소유**다 — 일반 mesh 경로와 인터페이스는 같고 vbo lifetime 만 외부 소유로 다르다.
      - **프로그램 컴파일**: `createProgram(gl, vertexSource, fragmentSource)`. 실패하면 `shaderErrors[node.id]` 에 stage 정보와 함께 누적되고 해당 패스는 건너뛰어진다 — 그래프 나머지는 계속 컴파일됨.
      - **FBO** 할당 — 노드의 `resolutionScale`(Phase 17)를 canvas `width × height` 에 곱한 뒤 `scaledDimensions` 로 반올림·최소 1px 클램프한 per-pass 해상도(`pass.width × pass.height`)로 생성. `resolutionScale` 이 없으면 1× 라서 캔버스 해상도와 동일. plan 최상위 `width/height` 는 캔버스 원본 해상도를 유지한다.
      - **입력 라우팅**: `sn.id` 로 들어오는 모든 엣지를 순회.
@@ -163,7 +168,7 @@
 ### 3.2 sampler vs param 라우팅 — 한 번 더
 
 - **sampler 경로**: 실행 시 `bindSamplers` 가 `pass.samplers[]` 를 따라가며, `passByNode.get(source).fbo.color.texture` → `plan.imageTextures[source]` → `getExternalTexture(source)` (Phase 14a, webcam 같은 live source) 순으로 텍스처를 찾아 `gl.uniform1i` + `bindTexture`. 어디서도 못 찾으면 sampler 스킵(검은 frame fallback) — external 핸들이 acquire 중이라 아직 텍스처가 없는 경우가 정상 케이스. 메시 그래프의 텍스처 라우팅 = ShaderNode → ShaderNode 체이닝 = 자동 FBO ping-pong.
-- **param 경로**: 실행 시 `bindUserUniforms` 가 `pass.uniformValues` 를 베이스로 시작해 `paramBindings` 가 가리키는 노드를 `resolveValueFor(sourceId, graph, {time}, cache)` 로 재귀 평가해 덮어쓴다. utility 노드들은 GL 패스를 만들지 않고 CPU 에서만 평가된다. ShaderPass 와 ComputePass 가 같은 캐시 + 같은 resolver 를 공유.
+- **param 경로**: 실행 시 `bindUserUniforms` 가 `{...pass.seededDefaults, ...pass.uniformValues}` 를 베이스로 만들고, `paramBindings` 가 가리키는 노드를 `resolveValueFor(sourceId, graph, {time}, cache)` 로 재귀 평가해 그 위에 덮어쓴다. 우선순위는 **paramBindings > 저장된 `uniformValues` > GLSL `@default`(`seededDefaults`) > GL zero** 다(학습 가시성 라운드 C-2). `seededDefaults` 는 컴파일 시점에 `withExplicitDefaults(컴파일된 vertex + fragment 소스)` 로 채워지는 **별도 필드**이며 `uniformValues` 에 병합하지 않는다 — 병합하면 Viewport 가 매 RAF 수행하는 `pass.uniformValues = node.uniformValues` 핫패치가 첫 draw 전에 시드를 통째로 덮어써 사라진다(실제 회귀 사례라 `execute.test.ts` 에 가드가 있다). utility 노드들은 GL 패스를 만들지 않고 CPU 에서만 평가된다. ShaderPass 와 ComputePass 가 같은 캐시 + 같은 resolver 를 공유.
 
 ---
 
@@ -197,7 +202,7 @@
 for each pass in plan.passes:           # 토포 순서가 보존되어 있음 (Shader | Compute union)
     if pass.kind == 'compute':
         useProgram(pass.program)
-        bindUserUniforms     # uniformValues + paramBindings; system u_time / u_frame 자동
+        bindUserUniforms     # seededDefaults(@default) < uniformValues(저장값) < paramBindings; system u_time / u_frame 자동
         bindVertexArray(pass.read == 'A' ? vaoA : vaoB)             # 입력 attribute
         bindTransformFeedback(pass.read == 'A' ? tfB : tfA)         # 캡처 대상
         enable(RASTERIZER_DISCARD)
@@ -211,7 +216,7 @@ for each pass in plan.passes:           # 토포 순서가 보존되어 있음 (
         depth on if !fullscreen, off if fullscreen
         useProgram(pass.program)
         bindSystemUniforms   # u_time, u_resolution, u_mouse, u_frame; matrix(u_view/u_proj/u_model/u_camera) 는 메시일 때만
-        bindUserUniforms     # uniformValues 위에 paramBindings 덮어쓰기
+        bindUserUniforms     # seededDefaults(@default) < uniformValues(저장값) < paramBindings
         bindSamplers         # FBO color attach 또는 imageTextures 에서
         if pass.meshComputeNodeId:                                  # 컴퓨트 mesh 입력
             cp = passByNode.get(pass.meshComputeNodeId)
@@ -380,7 +385,7 @@ poll(gl):
 
 ## 7. 상태 스토어 (Zustand)
 
-`src/state/*` 의 16 개 스토어. 책임 분리가 분명하므로 다음 표가 가장 빠른 인덱스다.
+`src/state/*` 의 Zustand 스토어는 22 개다(도킹 스토어 `ui/dock/dockStore` 는 §13). 아래 표는 렌더 파이프라인과 맞물리는 핵심 스토어의 인덱스다. 나머지(bootstrap·commandPalette·connectionUi·exportShare·helpModal·passPlan 등 UI 상태 스토어)는 파일 머리 주석을 보면 된다.
 
 | Store | 보관 | recompile? | history? | 비고 |
 |---|---|---|---|---|
@@ -473,216 +478,14 @@ diagnosticsStore.set(nodeId, {vertex, fragment, link})
 
 `rendererStore.stats.errors[]` 는 `pushError(msg)` 로 누적. `compileGraph` 가 throw 하거나 plan.errors (validate 결과) 가 있으면 한 줄 join. StatusBar 에 카운트, ProblemsPanel "Runtime errors" 섹션에 메시지 노출.
 
-### 8.5 LSP-like 편집기 기능 (Phase 25)
+### 8.4 ~ 8.7 GLSL 편집기 인텔리전스 → [docs/architecture/glsl-editor.md](./docs/architecture/glsl-editor.md)
 
-Phase 24 의 *진단* 채널과 별도로, **에디터 측 심볼 인식과 hover** 를 위한 정적 분석 계층. CodeMirror 6 위에 다음 두 모듈이 얹힌다:
+CodeMirror 위의 에디터 보조 기능은 분량이 커서 하위 문서로 분리했다. 절 번호는 그대로 유지된다.
 
-```
-CM updateListener (doc 변경)
-    │
-    └─▶ autocomplete (codemirror autocompletion override)
-            │  source = state.doc.toString(), line = state.doc.lineAt(pos).number
-            ▼
-        glslSource(context)
-            │
-            ├─▶ symbolCompletions(source, line)
-            │       └─ buildSymbolTable(source) → symbolsVisibleAt(table, line)
-            │
-            ├─▶ uniformCompletions(source)          // @label / system desc
-            │
-            └─▶ STATIC_BASE                          // GLSL_FUNCTIONS/TYPES/KEYWORDS
-                                                     // 빌트인은 BUILTIN_FUNCTIONS 에서
-                                                     // signature(detail) + 설명(info) 부착
-
-CM pointer (hover)
-    │
-    └─▶ hoverTooltip(view, pos)
-            │  identifierAt(line.text, line.from, pos)  → {from, to, word}
-            ▼
-        lookupHover(source, word, line)
-            │
-            ├─▶ resolveSymbol(buildSymbolTable, word, line)   // 1순위: 문서 심볼
-            ├─▶ BUILTIN_FUNCTIONS[word]                       // 2순위: 빌트인 함수
-            ├─▶ SYSTEM_UNIFORM_DESCRIPTIONS[word]             // 3순위: 미선언 system uniform
-            └─▶ KEYWORD_DESCRIPTIONS[word]                    // 4순위: storage/제어 키워드
-                                                              // 매칭 없으면 null → 툴팁 미표시
-```
-
-**심볼 테이블 (`core/glsl/symbolTable.ts`)** — 정규식 + 중괄호 깊이 워커:
-- 블록 코멘트는 공백으로 치환(라인 번호 유지), 라인 코멘트는 라인 단위 strip.
-- `depth === 0 && !structDepth`: storage-qualified decl(`uniform/in/out/attribute/varying/const`), `struct ... {`, 함수 헤더(`<retType> <name>(<args>) {`) 매칭. 함수 헤더 진입 시 파라미터들을 `scope = funcName` 로 추가.
-- `depth ≥ 1` 안에서: 로컬 변수 decl(쉼표 멀티 — `float a, b = 1.0;` 두 번째 패스로 수집), `for (int i = ...)` 인덕션 변수.
-- `if/for/while/return/case/switch` 키워드는 `NOT_A_FUNCTION` 화이트리스트로 함수 헤더 매칭에서 제외.
-- 출력 `GlslSymbol` 은 `{name, type, kind, line, column, scope, parameters?}`. `scope` 는 함수 이름 또는 `null`(top-level).
-- `symbolsVisibleAt(table, line)` — 라인의 enclosing 함수를 *해당 라인 이전의 마지막 함수 헤더* 로 근사(body 의 정확한 끝을 추적하지 않아도 sequential function 정의에서는 정확). 출력 순서: 로컬(decl ≤ line) → 파라미터 → 글로벌, 이름 중복은 처음 등장한 것만 유지(local shadow 글로벌이 우선).
-
-**빌트인 카탈로그 (`core/glsl/builtins.ts`)** — `BUILTIN_FUNCTIONS: Record<name, {signatures[], description}>` + `KEYWORD_DESCRIPTIONS`. `GLSL_FUNCTIONS` 와 양방향 일치(단위 테스트가 강제).
-
-**오작동 시나리오 — 명시적으로 받아들임**:
-- 중첩 블록 안의 로컬도 함수 scope 로 처리(블록 scope 추적 안 함). hover 가 잠시 풀어진 로컬을 제안할 뿐, 컴파일은 진단 채널이 잡으므로 안전.
-- 사용자가 GLSL 의 nested function 처럼 보이는 lambda 등을 적으면 헤더 매칭이 어긋날 수 있으나, GLSL ES 는 nested function decl 자체가 없어서 실제 셰이더에서는 발생하지 않음.
-- `for` 안의 동일 라인에 일반 decl 이 함께 있으면 dupe 회피 가드가 두 번째 등록을 막음.
-
-**DEV bridge** — `window.__sp.glslSymbols = { build, visibleAt, resolve, builtins, keywords }` (다른 store 와 동형, DEV 빌드 한정). E2E 가 CM 와이어링 없이 심볼 파싱 정확도를 직접 검증할 때 사용.
-
-### 8.6 시맨틱 토큰 하이라이트 (Phase 26)
-
-Phase 25 의 심볼 테이블 위에 *식별자 역할 색* 만 덧칠하는 layered approach. lexer-based `glsl()` 언어팩과 `defaultHighlightStyle` (키워드·타입·숫자·연산자)은 그대로 두고, 식별자 위에 우리 decoration 이 색을 덮어쓴다.
-
-```
-CM ViewPlugin (mounted from glslSetup.ts)
-   │
-   │  update.docChanged || update.viewportChanged
-   ▼
-buildSemanticDecorations(view)
-   │
-   ├─▶ classifySemanticTokens(source)
-   │       ├─ buildSymbolTable(source)            // Phase 25 재사용
-   │       ├─ stripBlockComments + maskLineComment
-   │       └─ 라인별 identifier 정규식 매칭마다:
-   │             (1) resolveSymbol → kind 매핑 (local 은 null)
-   │             (2) BUILTIN_FUNCTIONS[name]      → function-builtin
-   │             (3) SYSTEM_UNIFORMS.has(name)    → system-uniform
-   │             else                              → 토큰 미발행
-   │
-   ├─▶ Decoration 캐시 (kind 당 단일 Decoration.mark 인스턴스)
-   │
-   └─▶ view.visibleRanges 와 정렬된 토큰을 lockstep 으로 walk
-           → RangeSetBuilder.add(from, to, deco)  // 정렬 보장
-```
-
-- **11 종 토큰 kind**: `uniform / system-uniform / in / out / attribute / varying / const / parameter / struct-type / function-user / function-builtin`. local 은 의도적으로 미분류 → 에디터 기본 색.
-- **우선순위**: in-scope 심볼 테이블이 1순위 → 사용자가 `float sin(...)` 으로 빌트인 이름을 재정의하면 `function-user` 가 이긴다. 이미 사용자 uniform 이름이 `u_*` 라도 SYSTEM_UNIFORMS 셋에 없으면 `uniform` 으로 분류된다.
-- **CSS 매핑**: 각 kind 는 `cm-glsl-token-<kind>` 클래스 → `glslSetup.ts` 의 dark theme 에서 색 지정 (VS Code Dark+ 관례).
-- **cost 통제**: 정규식 스캔은 라인당 1 회지만 **심볼 테이블 lookup 은 식별자마다** 일어난다 (`classifyIdentifier` → `resolveSymbol` → `symbolsVisibleAt`). 그래서 `symbolsVisibleAt` 이 `WeakMap<SymbolTable, Map<line, GlslSymbol[]>>` 로 메모이즈되어 있고(테이블 **아이덴티티** 키 — cross-stage rename 이 한 호출에서 두 테이블을 쓴다), 같은 라인의 N 개 식별자는 계산을 1 회만 공유한다. 메모는 캐시 배열을 그대로 주지 않고 `slice()` 사본을 돌려준다 — `main.tsx` 의 DEV `__sp.glslSymbols.visibleAt` 브리지로 E2E 페이지 코드가 그 배열을 쥐기 때문. viewport 외 토큰은 RangeSetBuilder 에 추가하지 않으므로 큰 문서에서도 O(visible-lines) decoration 만 보유.
-- **주석 마스킹 단일화 (`core/glsl/stripComments.ts`)**: import 0 건 leaf. `maskComments`(블록+라인) / `maskBlockComments`(블록만) 두 진입점을 한 스캐너가 처리한다. symbolTable · references · semanticTokens 는 combined 를, `parseUniforms` / `writeUniformHints` 는 **block-only** 를 쓴다 — 후자는 `//` 뒤의 `@range` / `@label` 을 *읽어야* 하므로 combined 를 쓰면 앱 전체의 uniform 힌트가 사라진다. 두 진입점 모두 **길이 보존**이 계약이다(라인 길이로 doc offset 을 전진시켜 rename 편집 범위를 만든다). 미종료 `/*` 처리는 두 진입점이 **의도적으로 갈린다** — `maskComments` 는 GLSL 렉서처럼 EOF 까지 마스킹하고(소비자는 심볼/하이라이트/참조 같은 에디터 보조 기능뿐), `maskBlockComments` 는 평문으로 남긴다. 후자의 소비자는 노드의 **포트 표면**(`parseUniforms` → `nodeInputPorts`)을 만들고 스토어는 사라진 포트의 엣지를 프룬하므로, EOF 마스킹이면 사용자가 `/*` 를 치는 순간 50ms 디바운스가 그 노드의 입력 엣지를 전부 지운다 — 닫는 `*/` 를 쳐도 포트만 돌아오고 배선은 돌아오지 않는다. 잠정적·구문 미완성 편집이 그래프 상태를 파괴해서는 안 된다.
-- **DEV bridge**: `window.__sp.glslSemanticTokens = { classify, classifyIdentifier }` (다른 store/glsl 모듈과 동형, DEV 빌드 한정). E2E 가 CM 와이어링 없이 분류 정확도와 정렬 계약을 직접 검증.
-
-### 8.7 Goto / References / Rename (Phase 27 + Phase 28 cross-stage)
-
-Phase 25 의 심볼 테이블 + `resolveSymbol` 을 그대로 재활용해 같은 declaration 으로 해석되는 모든 occurrence 를 모으고, 그 위에 (a) cursor 점프 (b) 단일 트랜잭션 rename (c) active reference 페인트 세 가지 surface 를 얹는다. Phase 28 에서 rename 은 ShaderNode 의 vertex + fragment 두 stage 를 묶는 *프로그램* 단위로 확장 — 한 `updateShaderSource({vertexSource,fragmentSource})` 패치 = 한 graph history push.
-
-```
-core/glsl/references.ts
-   findReferences(source, name, atLine)
-      ├─ buildSymbolTable + resolveSymbol(name, atLine) → target
-      ├─ source 의 모든 identifier 위치 스캔(블록/라인 코멘트 마스킹)
-      ├─ 각 위치에서 다시 resolveSymbol → target 과 line·column 일치만 채택
-      └─ ReferenceSite[] (from/to/line/column/isDefinition) — document 순서
-
-CodeMirror 와이어링 (glslSetup.ts)
-   ├─ glslGotoDefinition()    F12 keymap + Cmd/Ctrl+Click DOM 핸들러
-   │      └─ findDefinitionAt(view, pos) → EditorSelection.cursor + scrollIntoView
-   ├─ glslRename()            F2 keymap
-   │      └─ runRename(view, promptFn) → validateRenameName → findReferences
-   │           → view.dispatch({ changes: sites.map(...) })  // single undo step
-   └─ glslReferenceHighlight() StateField<DecorationSet>
-          └─ docChanged || selection 변화 시 buildReferenceDecorations
-                  → isDefinition ? .cm-glsl-ref-definition : .cm-glsl-ref-occurrence
-```
-
-- **Shadowing 규칙은 references 단에서 한 번 적용**: 한 occurrence 의 binding 이 target 과 다르면(예: 로컬이 글로벌을 가린 안쪽), 그 위치는 결과에서 빠진다. global rename 은 shadowed 안 된 곳만, local rename 은 자기 함수 본문만 변경되는 게 자동 보장된다.
-- **멤버 / struct 본문 제외 (두 가드는 한 쌍)**: `precededByDot` 은 `light.color` · `v.xyz` 처럼 앞의 첫 비공백이 `.` 인 매치를 버리고, `structMemberNameOffsets` 는 `struct Light { vec3 color; }` 의 **멤버 선언자 이름 위치**(`color`)만 버린다. 본문 전체를 버리지 않는 게 핵심이다 — 멤버의 *타입* 토큰과 배열 크기 식(`struct Outer { Inner i; }` 의 `Inner`, `float v[MAX];` 의 `MAX`)은 실제 글로벌에 대한 진짜 사용처라서, 함께 버리면 선언만 개명되고 사용처가 남는 같은 실패가 반대 방향으로 재현된다. 심볼 테이블이 struct 멤버를 인덱싱하지 않으므로 **한쪽만 넣으면 rename 이 셰이더를 깨뜨린다** — 멤버 *선언*은 개명되고 그 멤버 *접근*은 dot 가드에 걸려 남기 때문. 커서 쪽에도 같은 가드가 있어 스위즐 글자 위 F2 / F12 는 조용한 no-op (`runRename` → `no-binding`, `findDefinitionAt` → `null`). **알려진 한계**: (1) 줄바꿈으로 분리된 `light\n  .color` 는 감지하지 않는다(가드는 현재 라인 안만 뒤로 훑는다). (2) 내장 struct 정의(`struct Outer { struct Inner { … } i; }`)의 안쪽 멤버 이름은 수집하지 않는다 — GLSL ES 가 내장 struct 정의를 금지하므로 이 형태는 애초에 컴파일되지 않는다. semanticTokens 는 dot 가드만 공유한다 — struct 멤버 선언은 여전히 동명 글로벌 색으로 칠해지지만 rename 대상이 아니므로 표시상의 문제일 뿐.
-- **F12 / Cmd+Click 분기**: 키맵은 `view.state.selection.main.head` 기준, 클릭 핸들러는 `posAtCoords(clientXY)` 로 doc offset 계산. modifier(`metaKey || ctrlKey`) 가 없으면 무시 — CM 기본 selection 동작 보존. 미정의 식별자(builtin / keyword / no-binding) 는 silently no-op.
-- **Rename UX**: 기본 prompt 는 `window.prompt` (가장 마찰 적은 경로). 검증은 `^[A-Za-z_][A-Za-z0-9_]*$` + `GLSL_KEYWORDS ∪ GLSL_TYPES` 예약어 set. 결과는 `RenameResult` discriminated union — `applied: true` 면 `{ sites, otherStageSites, newName }`(`otherStageSites` = 다른 stage 에서 교체된 site 수, single-document rename 은 0), false 면 `{ reason }` 로 5 종 skip 사유(`not-on-identifier` / `no-binding` / `prompt-cancelled` / `unchanged` / `invalid-name`).
-- **Active highlight**: 단일 site(decl 만 존재)면 `Decoration.none` — 노이즈 회피. 비용은 cursor 이동마다 `buildSymbolTable + findReferences` 한 번이지만 playground 규모에서 < 1ms 추정이라 debounce 없음.
-- **CodeEditor observation bridge (`ui/CodeEditor/currentView.ts`)**: CodeEditor.tsx 가 mount/unmount 시 `setCurrentView(view)` / `setCurrentView(null)` 로 module-level ref 갱신. 프로덕션 코드는 의존하지 않고, `__sp.codeEditor = { getCursorLine, focus }` (DEV 한정) 으로 E2E 가 cursor 위치를 직접 읽는다 — F12 점프 결과 검증을 CM DOM 추측 없이 line number 비교로 처리.
-- **DEV bridge 추가**: `window.__sp.glslSymbols.findReferences` (references finder), `window.__sp.codeEditor` (cursor introspection). 기존 Phase 25 의 `glslSymbols` 객체에 한 함수만 더해 형태가 일관된다.
-
-#### 8.7.1 Cross-stage rename (Phase 28)
-
-ShaderNode 는 vertex + fragment 두 GLSL 소스를 한 *프로그램* 으로 묶는다 — uniform / varying / function / struct 같은 글로벌은 GLSL 링커가 한 binding 으로 본다. Phase 28 의 rename 은 이 사실을 반영해 두 stage 의 occurrence 를 같은 트랜잭션으로 교체한다.
-
-```
-core/glsl/references.ts
-   findReferencesAcrossStages({vertex, fragment}, name, originStage, atLine)
-      ├─ originSource = stages[originStage]
-      ├─ resolveSymbol(originTable, name, atLine) → target
-      ├─ findReferencesOf(origin) → originSites  (각 site.stage = originStage)
-      │
-      └─ if target.scope === null && CROSS_STAGE_KINDS.has(target.kind):
-           otherTable = buildSymbolTable(otherSource)
-           otherTarget = resolveSymbol(otherTable, target.name, 1)
-           if otherTarget?.scope === null && CROSS_STAGE_KINDS.has(otherTarget.kind):
-             findReferencesOf(other) → otherSites
-      → sortByStageAndOffset(originSites + otherSites)
-
-ui/CodeEditor/rename.ts
-   runRename(view, promptFn, crossStage?)
-      ├─ collectSites — crossStage 가 있으면 findReferencesAcrossStages,
-      │                 없으면 Phase 27 의 findReferences
-      ├─ split → localSites (= origin stage) + otherSites
-      ├─ wroteOtherStage = crossStage && otherSites.length > 0
-      ├─ if wroteOtherStage:
-      │     newOrigin = applyEdits(source, localSites, next)
-      │     newOther  = applyEdits(crossStage.otherStageSource, otherSites, next)
-      │     crossStage.applyBothStages(newOrigin, newOther)   // 한 history push
-      └─ view.dispatch({
-            changes: localSites,
-            // wroteOtherStage 면 CM undo 스택 제외 (#1c)
-            ...(wroteOtherStage
-                 ? { annotations: Transaction.addToHistory.of(false) } : {}),
-         })
-
-   ui/CodeEditor/editorNode.ts   (leaf — index.tsx 와 rename.ts 의 공용 규칙)
-      pickEditorNodeId(selectedId, nodes)
-         = selectedId ?? nodes.find(kind === 'shader')?.id ?? null
-      currentEditorNodeId() = pickEditorNodeId(selection.getState(), graph.getState())
-
-   resolveCrossStageContext()  (module-private)
-      ├─ currentEditorNodeId() → ShaderGraphNode 이어야  (#10)
-      ├─ editorStore.getState().activeStage → originStage
-      └─ applyBothStages = (newOrigin, newOther) =>
-            graphStore.updateShaderSource(sn.id, {
-              vertexSource:  originStage === 'vertex' ? newOrigin : newOther,
-              fragmentSource: originStage === 'vertex' ? newOther : newOrigin,
-            })
-```
-
-- **`CROSS_STAGE_KINDS`**: `uniform / in / out / attribute / varying / const / function / struct`. 로컬 / 파라미터는 GLSL 링커가 다른 binding 으로 보므로 의도적으로 제외 — vertex `main` 의 `float k` 와 fragment `main` 의 `float k` 는 이름만 같은 별개 변수. 같은 stage 안에서는 Phase 27 의 shadowing 규칙 그대로.
-- **Partial rename**: other stage 에 동명 글로벌이 없으면 (예: vertex 의 `in a_position`) origin-stage 단독 rewrite. 결과는 partial 이지만 정상 종료 — 오류 아님.
-- **Other-stage shadowing**: other stage 의 글로벌 binding 은 잡되, 그 안에서 같은 이름의 로컬이 가린 곳(`resolveSymbol` 이 로컬을 돌려주는 위치)은 자동 제외. global rename 이 local 을 망가뜨리지 않는다.
-- **Single graph-history push**: `applyBothStages` 가 한 `updateShaderSource({ vertexSource, fragmentSource })` 패치로 양 stage 를 동시에 set. 이후 CM dispatch 가 origin stage 의 view 를 갱신하고, 50 ms 후 commit debounce 가 다시 `updateShaderSource(...)` 를 부를 때는 store 값이 같아 early-return → 추가 push 없음.
-- **Undo 범위 (2026-07 리뷰 #1c)**: other stage 를 실제로 쓴 CM dispatch 는 `Transaction.addToHistory.of(false)` 라 **CM undo 스택에 없다**. CM history 는 view 의 한 문서만 커버하므로 undo 를 허용하면 보이는 stage 만 되돌아가고 짝 stage 는 새 이름으로 남아 링크가 깨진다. 대가: `KeyboardShortcuts.tsx` 가 `.cm-editor` 안을 editing target 으로 보고 Cmd+Z 를 CodeMirror 에 양보하므로 **에디터 포커스 상태에서는 cross-stage rename 이 키보드로 되돌려지지 않는다**. graph history 의 단일 엔트리는 살아 있으므로 에디터 밖에서 Cmd+Z 를 누르면 전체가 한 번에 복구된다. partial rename(other stage 미기록)과 단일 문서 rename 은 종전대로 CM undo 1 스텝.
-- **ComputeNode / 비-Shader 편집 대상**: `resolveCrossStageContext()` 가 `undefined` 반환 → `runRename` 은 Phase 27 의 single-document 경로로 폴백. 단위 테스트와 ComputeNode 편집기에서 기존 동작 변화 없음.
-- **편집 대상 노드의 단일 규칙 (#10)**: Code 패널은 선택이 없어도 그래프의 첫 `shader` 노드를 연다. 그 규칙은 `ui/CodeEditor/editorNode.ts` 의 `pickEditorNodeId(selectedId, nodes)` 하나뿐이고, `CodeEditor/index.tsx` 는 zustand 셀렉터 **안에서**(reactive 유지), `rename.ts` 는 `currentEditorNodeId()` 로 같은 규칙을 읽는다. 예전에 rename 이 `selectionStore.selectedNodeId` 만 보던 시절엔 선택이 빈 상태의 F2 가 cross-stage 를 못 타고 절반만 rename 했다. 별도 leaf 모듈인 이유는 순환 회피 — `rename.ts → index.tsx → glslSetup.ts → rename.ts` 는 `npm run circular`(dpdm) 하드 게이트에 걸린다.
-
-### 8.4 라이브 GLSL 검증 (Phase 24)
-
-Authoritative recompile 경로(`graphStore.rev` → `compileGraph` → `gl.getShaderInfoLog`) 와 별개로, **CodeMirror 의 키스트로크마다** OffscreenCanvas WebGL2 워커에 셰이더를 보내 컴파일 로그를 받아오는 라이브 채널을 둔다. 사용자가 50ms commit debounce + 그래프 recompile 까지 기다리지 않고 밑줄을 본다.
-
-```
-CM updateListener (doc 변경)
-   │
-   ├─▶ commit (debounce 50ms)  ─▶ updateShaderSource ─▶ graphStore.rev++ ─▶ 권위 진단 (그대로)
-   │
-   └─▶ liveValidate (debounce 150ms)
-           │
-           ▼
-       glslValidator().validate(stage, source)
-           │  (lazy 첫 호출에 ?worker 인스턴스화)
-           ▼
-       Worker: OffscreenCanvas(1,1).getContext('webgl2')
-               → createShader/compileShader/getShaderInfoLog
-               → postMessage({log, ok})
-           │
-           ▼
-       parseShaderInfoLog(log) → GLSLDiagnostic[]
-           │  (ctxRef 가 promise 도착 시점에 같은 (node, stage) 면 적용)
-           ▼
-       setLiveDiags(diags)
-           │
-           ▼
-       CM diagnostics push effect: 권위 ∪ 라이브 (같은 line:severity 면 라이브 드롭)
-                                  → setDiagnostics → CM 밑줄
-```
-
-- **백엔드 선정 근거**: M0 측정 (`tests/measure/glsl-validator.spec.ts`) 에서 워커의 InfoLog 가 메인 스레드 GL 컨텍스트와 byte-perfect 일치(5/5 셰이더, syntax/undeclared/type-mismatch 포함) 함을 확인. 신규 의존성 0, 워커 소스 ~1KB, init 52ms. glslang-wasm (~1.8MB wasm, deprecated) 대비 모든 축에서 우세 — 측정 없이 채택.
-- **격리**: 워커는 메인 스레드 GL 컨텍스트와 분리된 OffscreenCanvas 라 사용자 셰이더가 잘못 컴파일돼도 렌더 GL state 를 오염시키지 않는다. 워커 GL 컨텍스트는 한 번 만들고 영구 재사용 (셰이더만 매 요청에 create/compile/delete).
-- **실패 모델**: 워커 construct/post/error 어느 단계 실패해도 클라이언트는 `[]` resolve. 권위 recompile 경로가 source of truth 로 그대로 동작 — 라이브는 *보조* 채널이다. 워커 미가용 환경에서는 기존 동작(컴파일 후 진단)만 남는다.
-- **머지/우선순위**: CodeEditor 진단 push effect 가 `auth = diagnosticsStore[stage] + link` 와 `live = liveDiags` 를 합성하되 *같은 `line:severity` 가 양쪽에 있으면 라이브 드롭*. 사용자가 에러를 고치는 순간 — 라이브는 즉시 비고, 권위는 다음 recompile 까지 잠시 stale — 잠깐 권위가 살아 있는 동안 라이브가 추가로 중복 표시하지 않는다.
-- **switch race**: `liveValidate` 가 dispatch 한 promise 가 다른 노드/스테이지로 전환된 뒤 도착하면 `ctxRef` 가 다른 `(id, stage)` 라 그대로 폐기. doc 교체 effect 는 switching 일 때 라이브 진단을 비운다 — 단 **이미 비어 있으면 배열 아이덴티티를 유지**한다(`setLiveDiags((prev) => prev.length === 0 ? prev : [])`). 매번 새 `[]` 를 넣으면 `[diags, stage, liveDiags]` 진단 effect 가 전환마다 무조건 재발화해 CM dispatch 가 중복되고, 아래 (2) 의 보상 dispatch 가 없어도 결과가 같아져 **가드가 사라진다**.
-- **문서 교체 = `view.setState` (2026-07 리뷰 #1a)**: 노드/스테이지 전환은 `{from:0,to:len}` 변경 트랜잭션이 아니라 **`view.setState(EditorState.create({ doc, extensions }))`** 로 처리한다. 한 view 가 (노드 × stage) 개의 서로 다른 문서를 돌려쓰는데 트랜잭션으로 갈아끼우면 undo 타임라인이 문서 경계를 넘어 이어져, 전환 직후 Cmd+Z 가 *문서 로드 트랜잭션* 을 pop 해 이전 문서를 현재 stage 에 쏟아붓고 50 ms commit debounce 가 그걸 store 에 써 버린다. 구현 계약 3 가지: (1) `extensions` 는 마운트 때 만든 **동일 배열**(`glslExtensions() + updateListener`)을 재사용한다 — `glslExtensions()` 만 다시 담으면 update listener 가 사라져 이후 모든 타이핑이 store 에 커밋되지 않는다. (2) `setState` 는 트랜잭션이 아니므로 보상 dispatch 2 개가 뒤따른다 — lint 재설치·재적용(`setDiagnostics`; lint 는 `StateEffect.appendConfig` 로 설치돼 extensions 배열에 없다)과 `liveValidate(source)` 명시 호출(`commit` 은 호출하지 않는다 — 들어온 텍스트의 출처가 store 다). (3) `EditorView` 인스턴스는 그대로 유지 — `currentView.ts` 브리지가 붙들고 있다. 잃는 상태는 fold 범위 / lint 마커 / 열린 자동완성·hover 팝업 / 커서·스크롤 위치이며, 나머지 확장은 doc+selection 의 순수 함수라 재계산된다. `historyCompartment.reconfigure(history())` 는 대안이 되지 못한다 — `@codemirror/commands` 의 history 필드는 모듈 싱글턴이라 reconfigure 경로가 기존 상태를 **보존**한다.
+- **§8.4 라이브 GLSL 검증 (Phase 24)** — OffscreenCanvas WebGL2 워커로 키스트로크마다 컴파일 로그 수집, 권위 ∪ 라이브 진단 머지, 노드/스테이지 전환 시 `view.setState` 문서 교체 계약.
+- **§8.5 LSP-like 편집기 기능 (Phase 25)** — `core/glsl/symbolTable.ts` 심볼 테이블, `core/glsl/builtins.ts` 빌트인 카탈로그, 자동완성 · hover.
+- **§8.6 시맨틱 토큰 하이라이트 (Phase 26)** — 식별자 역할 분류(`core/glsl/semanticTokens.ts`) + `core/glsl/stripComments.ts` 주석 마스킹 계약.
+- **§8.7 Goto / References / Rename (Phase 27)** · **§8.7.1 Cross-stage rename (Phase 28)** — `core/glsl/references.ts`, `ui/CodeEditor/rename.ts`, `ui/CodeEditor/editorNode.ts`.
 
 ### 8.8 디버깅 · 진단 인프라 (Phase 16)
 
@@ -820,238 +623,101 @@ state/gifRecorder.ts    # 캡처 오케스트레이션 (recorder.ts 와 형제)
 
 ---
 
-## 12. 디렉토리 트리 (Phase 34 기준)
+## 12. 디렉토리 맵
 
-> `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
+> 디렉토리 단위 지도다. 파일별 책임은 각 파일 머리 주석이 정본이므로 `ls`·`grep` 으로 확인한다. 단위 테스트 `*.test.ts(x)` 는 대상 모듈과 같은 디렉토리에 둔다.
 
-```
-ShaderPlayground/
-├─ index.html
-├─ vite.config.ts
-├─ vitest.config.ts
-├─ tsconfig.json
-├─ biome.json                        # Biome 린트/포맷 설정
-├─ knip.json                         # Knip 데드코드 설정
-├─ playwright.config.ts              # Playwright E2E 러너 (SwiftShader chromium)
-├─ package.json
-├─ SPEC.md
-├─ Architecture.md
-├─ README.md
-├─ CLAUDE.md                         # Claude 작업 규약 / 품질 게이트
-├─ tests/e2e/                        # Playwright E2E 스펙 (Phase 1~12)
-└─ src/
-   ├─ main.tsx                       # React 엔트리, App 마운트
-   ├─ App.tsx                        # 셸 (NodeEditor / Viewport / CodeEditor / SidePanel / StatusBar + overlay)
-   ├─ index.css
-   ├─ test-setup.ts                  # Vitest + jsdom 부트스트랩
-   ├─ vite-env.d.ts
-   │
-   ├─ build/                         # ── 빌드 전용 (Vite 플러그인) ─────
-   │  └─ cspMetaPlugin.ts            # 프로덕션 HTML 에만 CSP meta 주입 (dev/E2E 제외) (+ test)
-   │
-   ├─ core/                          # ── React 비의존 ──────────────────
-   │  ├─ gl/
-   │  │  ├─ context.ts               # WebGL2 컨텍스트 생성/검증 (+ test)
-   │  │  ├─ program.ts               # 컴파일/링크 + InfoLog 노출 (+ test)
-   │  │  ├─ texture.ts               # 텍스처 생성/포맷 (+ test)
-   │  │  ├─ framebuffer.ts           # FBO + 컬러/깊이 어태치먼트 (+ test)
-   │  │  ├─ mesh.ts                  # VBO/VAO 업로드/draw (+ test)
-   │  │  ├─ uniforms.ts              # 유니폼 setter 디스패처 (+ test)
-   │  │  ├─ gpuTimer.ts              # Phase 15 — EXT_disjoint_timer_query_webgl2 풀 (+ test)
-   │  │  ├─ glError.ts               # DEV 전용 gl.getError() 표면화 (셋업 무조건 / 드로우 스로틀) (+ test)
-   │  │  └─ fakeGl.ts                # 테스트 전용 가짜 WebGL2 컨텍스트 (GL 모듈 단위 테스트용)
-   │  │
-   │  ├─ camera/
-   │  │  ├─ orbitCamera.ts           # OrbitCameraState + view/proj/orbit/pan/zoom (+ test)
-   │  │  └─ input.ts                 # createCameraController — pointer/wheel 부착 (+ test)
-   │  │
-   │  ├─ graph/
-   │  │  ├─ types.ts                 # GraphNode/Edge/Port + Param·Math·Swizzle·Combine·Compute·Group
-   │  │  ├─ compile.ts               # graph → ExecutionPlan (ShaderPass | ComputePass) (+ test)
-   │  │  ├─ execute.ts               # executePlan + splitLayout + TF dispatch
-   │  │  ├─ validate.ts              # cycle / multi_input / multiple_outputs (+ test)
-   │  │  ├─ diagnostics.ts           # GLSL 로그 파서 (+ test)
-   │  │  ├─ uniformParser.ts         # uniform + 주석 힌트 (+ test)
-   │  │  ├─ uniformCache.ts          # 패스별 유니폼 값 변경 감지 (엄격 비교 — 재업로드 스킵) (+ test)
-   │  │  ├─ computeSeed.ts           # sphere/cube/random/zero seed 생성기 (+ test)
-   │  │  ├─ parents.ts               # Phase 29/30 — parent map + abs/relative 좌표 + cycle 가드 + hasCollapsedAncestor (+ test)
-   │  │  └─ splitLayout.test.ts      # 분할 뷰포트 단위 테스트
-   │  │
-   │  ├─ thumbnail/
-   │  │  ├─ readback.ts              # 동기 readPixels + 96×96 다운샘플 (폴백)
-   │  │  ├─ asyncReadback.ts         # PBO + fenceSync 비동기 readback (+ test)
-   │  │  └─ scheduler.ts             # 10Hz 스로틀 + 가시성 큐 (+ test)
-   │  │
-   │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
-   │  │  └─ registry.ts              # singleton handle pool · reconcile/update/dispose · getUserMedia (+ test)
-   │  │
-   │  ├─ gif/                        # Phase 31~34 — 의존성 0 애니메이션 GIF 인코더 (worker 오프로드 · per-frame 팔레트 · 진행률)
-   │  │  ├─ quantize.ts              # median-cut 팔레트 + nearest / Floyd–Steinberg 디더 매핑 (+ test)
-   │  │  ├─ lzw.ts                   # GIF 가변폭 LZW 압축 (+ test)
-   │  │  ├─ encode.ts                # GIF89a 조립 (palette + NETSCAPE loop + frames + onProgress) (+ test)
-   │  │  ├─ gifEncoderClient.ts      # Phase 32 — 워커 클라이언트 (lazy · Promise · 실패 시 인라인 폴백) (+ test)
-   │  │  └─ gifEncoder.worker.ts     # Phase 32 — encodeGif 를 워커에서 실행 (?worker · reqId RPC)
-   │  │
-   │  ├─ glsl/                       # Phase 24/25/26/27/28 — 라이브 GLSL 검증 + LSP-like 정적 분석
-   │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
-   │  │  ├─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
-   │  │  ├─ symbolTable.ts           # Phase 25 — uniform/in/out/const/local/parameter/function/struct 파서 + scope 추적 (+ test)
-   │  │  ├─ builtins.ts              # Phase 25 — GLSL_FUNCTIONS 시그니처/설명 + KEYWORD_DESCRIPTIONS (+ test)
-   │  │  ├─ semanticTokens.ts        # Phase 26 — 식별자 역할 분류기 (symbolTable + builtins + SYSTEM_UNIFORMS) (+ test)
-   │  │  └─ references.ts            # Phase 27/28 — findReferences + findReferencesAcrossStages (cross-stage rename) (+ test)
-   │  │
-   │  ├─ nodes/
-   │  │  ├─ registry.ts              # 노드별 PortSpec + 동적 포트(Shader/Math/Swizzle/Combine) (+ test)
-   │  │  └─ utility.ts               # resolveValueFor + Math/Swizzle/Combine CPU 평가 (+ test)
-   │  │
-   │  └─ assets/
-   │     ├─ primitives.ts            # cube/sphere/plane/torus/quad 생성기 (+ test)
-   │     ├─ objLoader.ts             # @loaders.gl/obj 래퍼 (+ test)
-   │     ├─ gltfLoader.ts            # @loaders.gl/gltf 래퍼 (지오메트리만) (+ test)
-   │     ├─ imageLoader.ts           # createImageBitmap 래퍼 (+ test)
-   │     ├─ videoLoader.ts           # Phase 14b — mp4/webm 메타 프로빙 + Blob (+ test)
-   │     ├─ audioLoader.ts           # Phase 14c — decodeAudioData 메타 프로빙 + Blob (+ test)
-   │     ├─ cache.ts                 # IndexedDB 에셋 캐시 (mesh ArrayBuffer / image·video·audio Blob) (+ test)
-   │     └─ types.ts                 # GeometryHandle, ImageHandle, VideoAssetHandle, AudioAssetHandle
-   │
-   ├─ state/                         # ── Zustand 스토어 ────────────────
-   │  ├─ types.ts                    # 공유 상태 타입 (NodePosition 등)
-   │  ├─ graphStore.ts               # nodes/edges/positions + rev/uniformRev (+ test)
-   │  ├─ assetStore.ts               # 메시/이미지 카탈로그 (런타임 핸들) (+ test)
-   │  ├─ assetActions.ts             # import + IndexedDB hydrate (+ test)
-   │  ├─ selectionStore.ts           # selectedNodeIds[] + primary selectedNodeId (+ test)
-   │  ├─ rendererStore.ts            # fps/frame/drawCalls/errors (+ test)
-   │  ├─ cameraStore.ts              # OrbitCameraState 보관 + reset (+ test)
-   │  ├─ viewportStore.ts            # background rgb (+ test)
-   │  ├─ mouseStore.ts               # u_mouse 포인터 위치 (framebuffer px · bottom-left · xy 현재 / zw 마지막 down) (+ test)
-   │  ├─ timeStore.ts                # simTime/playing/speed/advance (+ test)
-   │  ├─ diagnosticsStore.ts         # byNode[id]={vertex/fragment/link} (+ test)
-   │  ├─ editorStore.ts              # activeStage + jumpRequest(rev) (+ test)
-   │  ├─ historyStore.ts             # Undo/Redo 100건 + suppressNext (+ test)
-   │  ├─ demoGraph.ts                # 부트스트랩/프리셋 그래프 시드 (+ test)
-   │  ├─ serialization.ts            # 프로젝트 JSON v1 (+ test)
-   │  ├─ projectSanitize.ts          # 비신뢰 프로젝트(share/import/autosave) 하드 캡 검증 (+ test)
-   │  ├─ shareUrl.ts                 # gzip + base64url + URL hash (+ test)
-   │  ├─ autoSave.ts                 # 30s debounce IndexedDB 자동저장 (+ test)
-   │  ├─ recorder.ts                 # MediaRecorder → WebM/mp4 (+ test)
-   │  ├─ gifRecorder.ts              # Phase 31~34 — 캔버스 프레임 캡처 → core/gif 인코드 → GIF Blob (+ encodeProgress) (+ test)
-   │  ├─ thumbnailScheduler.ts       # core/thumbnail/scheduler 싱글톤 (+ test)
-   │  ├─ gpuTimerStore.ts            # Phase 15 — byNode EMA ms + totalMs + supported/enabled (+ test)
-   │  ├─ toastStore.ts               # 사용자 토스트 큐 (info/success/warning/error) (+ test)
-   │  └─ debugUiStore.ts             # 진단 패널 open + level/category 필터 (leaf store — log 타입만 의존) (+ test)
-   │
-   ├─ ui/                            # ── React 컴포넌트 ────────────────
-   │  ├─ BootstrapGate.tsx           # share / autosave 복구 / 데모 분기 + 다이얼로그
-   │  ├─ KeyboardShortcuts.tsx       # 전역 단축키 — Cmd+Z/Y(undo/redo), Cmd+D(복제), Cmd+A(전체 선택), 화살표(선택 일괄 이동, Phase 23), Space(play/pause — 텍스트 입력 + 활성화 가능 컨트롤(button/a[href]/summary/role=button·menuitem·tab) 포커스 시 제외), Cmd+K
-   │  ├─ ErrorBoundary.tsx           # 최상위 에러 경계 → RecoveryDialog + 로그 export (+ test)
-   │  ├─ RecoveryDialog.tsx          # 크래시 복구 다이얼로그 (ESC 격리 · 로그 복사) (+ test)
-   │  ├─ Toasts.tsx                  # toastStore 구독 → ToastRow 리스트
-   │  ├─ ToastRow.tsx                # 단일 토스트 행 (kind 아이콘 + dismiss) (+ test)
-   │  │
-   │  ├─ NodeEditor/
-   │  │  ├─ index.tsx                # React Flow 캔버스 + graphStore 양방향
-   │  │  ├─ Toolbar.tsx              # 노드 팔레트 / 저장 / Share / Record / Export HTML
-   │  │  ├─ NodeThumbnail.tsx        # 카드 <canvas> + IntersectionObserver
-   │  │  ├─ nodeUiRegistry.ts        # GraphNodeKind → NodeView 컴포넌트 매핑 (+ test)
-   │  │  ├─ HelpModal.tsx            # 단축키/도움말 모달 (+ test)
-   │  │  ├─ nodeCard.css
-   │  │  └─ nodes/
-   │  │     ├─ MeshNodeView.tsx
-   │  │     ├─ ImageNodeView.tsx
-   │  │     ├─ WebcamNodeView.tsx    # Phase 14a — live <video> preview + getExternalStream polling
-   │  │     ├─ VideoNodeView.tsx     # Phase 14b — live <video> preview + status
-   │  │     ├─ AudioNodeView.tsx     # Phase 14c — source kind / fftSize / status 메타
-   │  │     ├─ ShaderNodeView.tsx    # FBO 라이브 썸네일 + 핸들/라벨
-   │  │     ├─ OutputNodeView.tsx
-   │  │     ├─ ParamNodeView.tsx     # Float/Vec3/Color/Time
-   │  │     ├─ UtilityNodeViews.tsx  # Math/Swizzle/Combine
-   │  │     ├─ ComputeNodeView.tsx   # TF 컴퓨트 — count/primitive/attribute 메타 표시
-   │  │     ├─ GroupNodeView.tsx     # Phase 29/30 — 그룹 카드 + NodeResizer + collapse 토글 + 라벨 인라인 편집
-   │  │     ├─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
-   │  │     ├─ PortHandle.tsx        # 포트 핸들 (React Flow Handle 래퍼)
-   │  │     ├─ ValueInput.tsx        # 숫자 입력 위젯 (라이브 커밋) (+ test)
-   │  │     └─ paramNodeViewHelpers.ts # 파람 값 → 카드 표시 문자열 (Time scale/offset) (+ test)
-   │  │
-   │  ├─ CodeEditor/
-   │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync + 라이브 검증 + currentView 등록
-   │  │  ├─ StageTabs.tsx            # vertex / fragment + 에러 닷
-   │  │  ├─ glslSetup.ts             # CM extensions 묶음 (lint + autocomplete + hover + semantic tokens + refs/goto/rename + theme)
-   │  │  ├─ autocomplete.ts          # Phase 25 — scope-aware 자동완성 (symbolTable + builtins) (+ test)
-   │  │  ├─ hover.ts                 # Phase 25 — hoverTooltip + lookupHover (+ test)
-   │  │  ├─ semanticHighlight.ts     # Phase 26 — ViewPlugin + Decoration.mark + visibleRanges walker (+ test)
-   │  │  ├─ gotoDef.ts               # Phase 27 — F12 keymap + Cmd/Ctrl+Click DOM 핸들러 (+ test)
-   │  │  ├─ rename.ts                # Phase 27 — F2 keymap + single-transaction rewrite + reserved-word 검증 (+ test)
-   │  │  ├─ referenceHighlight.ts    # Phase 27 — StateField → Decoration set (커서 위 심볼의 occurrence 페인트) (+ test)
-   │  │  ├─ currentView.ts           # Phase 27 — module-level EditorView ref (DEV bridge 관찰 전용)
-   │  │  ├─ editorNode.ts            # 편집 대상 노드 선택 규칙 (index.tsx ↔ rename.ts 공용 leaf, #10) (+ test)
-   │  │  └─ lintAdapter.ts
-   │  │
-   │  ├─ Viewport/
-   │  │  └─ index.tsx                # <canvas> + RAF + asyncReadback 펌프 + cameraCtl
-   │  │
-   │  ├─ CommandPalette/
-   │  │  ├─ index.tsx                # Cmd+K — 노드/프리셋/Math/Swizzle/Combine 추가
-   │  │  └─ helpers.ts               # fuzzyMatch 등 검색 스코어링 (+ test)
-   │  │
-   │  └─ Panels/
-   │     ├─ SidePanel.tsx            # Inspector ↔ Assets ↔ Problems 탭 컨테이너
-   │     ├─ Inspector.tsx            # 디스패처 (Shader/Param/Utility/Mesh/Webcam/Video/Audio)
-   │     ├─ UniformControl.tsx       # slider / multi / color
-   │     ├─ UniformHintEditor.tsx    # Phase 21 — ⚙ 주석 힌트 GUI (range/step/default/label)
-   │     ├─ uniformFilter.ts         # 유니폼 검색 쿼리 정규화/필터 (+ test)
-   │     ├─ ParamInspector.tsx
-   │     ├─ UtilityInspector.tsx
-   │     ├─ WebcamInspector.tsx      # Phase 14a — device dropdown + live status
-   │     ├─ VideoInspector.tsx       # Phase 14b — 에셋 선택 / play·loop·mute / seek
-   │     ├─ AudioInspector.tsx       # Phase 14c — mic↔file / fftSize / smoothing / play·loop
-   │     ├─ GroupInspector.tsx       # Phase 29 — label/color 편집 + ungroup / delete-with-children
-   │     ├─ ViewportControls.tsx     # 카메라 Reset/FOV + 배경색 + 시간 (+ test)
-   │     ├─ ProblemsPanel.tsx        # 진단 → select + setStage + requestJump
-   │     ├─ DiagnosticsPanel.tsx     # 개발자 진단 패널 — 로그/GL 정보 + 버그리포트 스냅샷 (+ test)
-   │     ├─ diagnosticsReport.ts     # 버그리포트 스냅샷 순수 조립기 (주입식 · store 무의존) (+ test)
-   │     ├─ AssetBrowser.tsx
-   │     └─ StatusBar.tsx            # (+ test)
-   │
-   ├─ export/                        # ── 정적 HTML export ──────────────
-   │  ├─ htmlExport.ts               # Project JSON → 단일 파일 HTML (+ test)
-   │  └─ standalonePlayer.js         # 의존성 0 미니 런타임 (Vite `?raw` 임베드)
-   │
-   ├─ shaders/                       # ── 빌트인 GLSL ───────────────────
-   │  ├─ fullscreen.vert
-   │  ├─ basic.vert
-   │  ├─ color.frag
-   │  ├─ tfNoop.frag                 # 컴퓨트 패스의 dummy fragment (RASTERIZER_DISCARD 와 짝)
-   │  ├─ particles/
-   │  │  ├─ particle.vert            # 컴퓨트 — sin 기반 noise field 시뮬
-   │  │  └─ particleRender.vert      # 컴퓨트 출력 attribute 를 받는 ShaderNode vertex
-   │  └─ templates/
-   │     ├─ unlit.frag
-   │     ├─ uvDebug.frag
-   │     ├─ blur.frag
-   │     ├─ noise.frag
-   │     ├─ tonemap.frag
-   │     ├─ blend.frag               # 두 sampler + u_mix + u_mode(0=mix/1=add/2=mul/3=screen)
-   │     ├─ mask.frag                # base/overlay/mask 3-sampler 마스킹 합성
-   │     ├─ composite3.frag          # 3-sampler 가중 합성 (u_a/u_b/u_c + u_wa/u_wb/u_wc)
-   │     └─ particlePoint.frag       # 컴퓨트 점 렌더용 fragment
-   │
-   └─ utils/
-      ├─ debounce.ts                 # (+ test)
-      ├─ id.ts                       # (+ test)
-      ├─ log.ts                      # 개발자용 런타임 로거 (store 무의존 · 단방향) (+ test)
-      └─ assertNever.ts              # discriminated union exhaustiveness 가드
-```
+| 경로 | 내용 · 주요 진입 파일 |
+|---|---|
+| 루트 | 게이트 설정(`tsconfig`·`biome`·`knip`·`vitest.config`·`playwright.config`), `scripts/check-bundle-size.mjs`(gzip 번들 예산) |
+| `src/` | `main.tsx`(엔트리: 테마 변수·리졸버 배선, 도킹 영속화 시작 후 `App` 마운트) · `App.tsx`(셸) · `theme.ts`(토큰) · `index.css`(파셜 `@import` 만) |
+| `src/styles/` | `NN-*.css` 영역별 파셜. 번호가 cascade 순서다: 10 base · 20~22 dock · 30 toolbar · 40 palette · 50 statusbar · 60 viewport · 70 welcome · 80 export · 90~93 skeleton/pill/empty/modal |
+| `src/build/` | Vite 빌드 플러그인: `cspMetaPlugin.ts`, `minifyStandalonePlayer.ts` |
+| `src/core/graph/` | 그래프 모델·컴파일·실행(§2~§4): `types.ts` · `compile.ts`(→ `ExecutionPlan`) · `execute.ts`(`executePlan`·`splitLayout`) · `validate.ts` · `uniformParser.ts` · `diagnostics.ts` · `parents.ts` 외 보조 모듈 |
+| `src/core/gl/` | WebGL2 래퍼: `context` · `program` · `texture` · `framebuffer` · `mesh` · `uniforms` · `gpuTimer` · `glError` |
+| `src/core/glsl/` | 검증 워커 `glslValidator(.worker).ts` + 정적 분석: `symbolTable.ts`(← `glslDecl`·`symbolScope`·`ident`), `builtins`·`semanticTokens`·`references`·`varyingContract`. 상세 [glsl-editor.md](./docs/architecture/glsl-editor.md) |
+| `src/core/external/` | 웹캠·비디오·오디오 라이브 텍스처. `registry.ts`(핸들 풀, reconcile), 종류별 `webcam.ts`·`video.ts`·`audio.ts`(+ `videoFrame.ts`), leaf 모듈 `types.ts`·`resolvers.ts`(주입 훅) |
+| `src/core/nodes/` | `registry.ts`: 노드별 PortSpec과 동적 포트의 단일 원본(§2.2). `utility.ts`: Math/Swizzle/Combine CPU 평가 |
+| `src/core/assets/` | 프리미티브, OBJ/glTF/이미지/비디오/오디오 로더, `meshContract.ts`, IndexedDB `cache.ts` |
+| `src/core/{camera,thumbnail,gif}/` | 오빗 카메라(§5), 썸네일 readback과 스케줄러(§6), 의존성 0 GIF 인코더와 워커(§11) |
+| `src/state/` | Zustand 스토어 22개 + 디스패치 모듈(§7). `graphStore.ts`(조립·코어 액션) + `graphStoreTypes`·`graphStoreGroups`·`graphStoreNodeConfig`·`graphStoreHelpers`. 영속화: `serialization`·`projectSanitize`·`shareUrl`·`autoSave`(그래프 IndexedDB + 도킹 localStorage) |
+| `src/ui/` | 셸 조각: `AppToolbar` · `BootstrapGate` · `KeyboardShortcuts` · `ErrorBoundary`/`RecoveryDialog` · `Toasts` · `WelcomeOverlay` · `GpuBlockScreen` · `GraphEmptyState` · `motion.ts` |
+| `src/ui/dock/` | 도킹 서브시스템 전체: 모델, 스토어, 렌더러(§13) |
+| `src/ui/NodeEditor/` | React Flow 캔버스 `index.tsx`, `nodes/*NodeView.tsx`(매핑은 `nodeUiRegistry.ts`), `AddNodePill` · `HelpModal` · `NodeThumbnail` |
+| `src/ui/CodeEditor/` | CodeMirror 6 `index.tsx`, 확장 묶음 `glslSetup.ts`, 기능별 모듈(hover·autocomplete·gotoDef·rename·하이라이트·lint), 편집 대상 규칙 `editorNode.ts` |
+| `src/ui/Viewport/` | `index.tsx` 단일 RAF 루프(§4.1) + 캔버스 헬퍼·분할 오버레이·`TransportBar`·에러 오버레이 |
+| `src/ui/Panels/` | `SidePanel.tsx`(Inspector/Assets 탭), `Inspector.tsx` 디스패처와 `*Inspector.tsx`, `ProblemsPanel` · `DiagnosticsPanel` · `StatusBar` |
+| `src/ui/CommandPalette/` | `index.tsx`(팔레트 UI) · `commands.ts`(`buildCommands` 카탈로그) · `helpers.ts`(퍼지 매칭) |
+| `src/ui/ExportShare/` | `ExportShareDialog.tsx` · `ExportSharePanels.tsx` · `useExportRecording.ts` · `recordConfig.ts` |
+| `src/ui/controls/` | 공용 폼 컨트롤: Slider · NumberField · ColorField · Toggle 등 |
+| `src/export/` | 단일 HTML export `htmlExport.ts`, 의존성 0 런타임 `standalonePlayer.js`(§10) |
+| `src/shaders/` | 빌트인 GLSL(`?raw` import). `templates/`, `particles/` |
+| `src/utils/` | `log` · `debounce` · `id` · `assertNever` · `downloadBlob` |
+| `tests/e2e/` | Playwright `phase-N-*.spec.ts`(40 파일 / 151 테스트). 공용 헬퍼는 `helpers/`(fixtures · sp · dom · editor · render · canvas · types) |
+
+**테스트 전용 헬퍼** (프로덕션에서 import 하지 않는다):
+
+- `src/state/testStores.ts`: `resetAllStores()`. 그래프·선택·에디터·진단·도킹 등 15개 스토어를 생성 시점 상태로 되돌린다(camera·viewport·toast·commandPalette·connectionUi·exportShare·recorder·gifRecorder는 제외 — 이 스토어를 쓰는 테스트는 직접 리셋한다)
+- `src/core/graph/testNodes.ts`: shader·compute·mesh·param·output 노드의 최소 유효 팩토리 (다른 종류는 테스트에서 직접 구성)
+- `src/ui/NodeEditor/testFlow.tsx`: `ReactFlowProvider` 로 감싼 렌더와 `nodeProps`
+- `src/ui/dock/testDockTree.ts`: `asSplit` narrowing
+- `src/core/gl/fakeGl.ts`: `createFakeGl()` 가짜 WebGL2 컨텍스트
 
 ### 12.1 초안과 달라진 지점
 
-- **`core/nodes/` 통합** — 처음에는 노드 종류별로 `meshNode.ts / imageNode.ts / shaderNode.ts / outputNode.ts` 를 따로 두려고 했으나, 포트 정의가 짧고 분기점이 한 곳이라 `registry.ts` 의 `NODE_META` 맵 + 인스턴스 의존 포트(`nodeInputPorts / nodeOutputPorts`)로 합쳤다. Param/Math/Swizzle/Combine 도 같은 레지스트리에서 분기. 유틸 노드의 평가 로직은 `utility.ts` 로 분리.
-- **`ui/NodeEditor/edges/` 폐기** — 별도 `TypedEdge` 컴포넌트를 두지 않고 React Flow 기본 엣지 + `isValidConnection` 으로 타입 검증.
-- **Viewport 분할 폐기** — `orbitBindings.ts`/`controls.tsx` 가 따로 없다. 입력 바인딩은 `core/camera/input.ts` 의 `createCameraController` 가 직접 캔버스에 부착, 카메라/시간/배경색 UI 는 `Panels/ViewportControls.tsx` 로 옮겨 Inspector 상단에 항상 노출된다.
-- **SidePanel 단일화** — Inspector 단독 패널 대신 `SidePanel` 이 Inspector ↔ Assets ↔ Problems 3 탭 컨테이너 (Phase 9).
-- **Bootstrap/Hotkey/CommandPalette** — Phase 9 이후 `BootstrapGate`, `KeyboardShortcuts`, `CommandPalette/` 가 App 셸에 상시 마운트.
-- **상태 스토어 확장** — 초안의 4개(`graph/asset/selection/renderer`) 외에 Phase 9~12 의 기능을 받기 위해 10여 개 스토어가 추가.
-- **`src/export/` 신설** — Phase 11 의 정적 HTML export 코드와 미니 런타임.
-- **셰이더 추가** — 초안의 `unlit/uvDebug/blur` 외에 `noise/tonemap/blend.frag` 와 패스스루용 `color.frag`, 그리고 Phase 13 의 컴퓨트 dummy `tfNoop.frag` + 파티클 데모 vert/frag.
-- **썸네일 readback 이원화** — `readback.ts`(동기 폴백) + `asyncReadback.ts`(PBO + fenceSync, Phase 12 기본 경로) 가 공존하고 `downsampleToThumb` / `THUMB_SIZE` 는 동기 모듈에서 공유.
-- **Pass union (Phase 13)** — 초안의 `ShaderPass[]` 는 `(ShaderPass | ComputePass)[]` 로 일반화. ComputePass 는 FBO 없이 vbo 두 세트 + VAO 두 개 + TF object 두 개로 ping-pong 시뮬레이션을 수행하고, 출력은 ShaderPass.mesh 의 duel VAO 로 흘러간다. dispose 책임은 ShaderPass 가 자기 mesh 의 VAO 두 개를 정리하되 vbo 자체는 ComputePass 소유 — 일반 mesh 경로와 인터페이스는 동일하지만 vbo lifetime 만 외부 소유로 다르다.
-- **External texture pool (Phase 14a)** — `core/external/registry.ts` 가 *ExecutionPlan 외부에* 사는 싱글톤이다. 다른 모든 리소스(FBO, mesh, TF object…) 가 plan.dispose 와 함께 사라지는 것과 의도적으로 다르며, 그 이유는 recompile 마다 getUserMedia 권한 재요청이 일어나는 것을 막기 위해서다. compile 은 webcam specs 만 추출해 `reconcileExternal` 에 넘기고, 핸들 lifecycle (acquire/restart/release) 은 registry 가 그래프 변화에 따라 자체 관리한다. plan 은 `hasExternal: boolean` flag 만 보유 — bindSamplers 가 매번 `getExternalTexture(nodeId)` 로 lookup 하고, RAF dirty 게이트가 idle 우회 신호로 사용한다.
+초기 SPEC 초안의 디렉토리 설계가 실제 구현에서 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 분할 폐기, SidePanel 단일화, export 신설 등)는 역사 자료이므로 [docs/archive/architecture-history.md](./docs/archive/architecture-history.md) 로 옮겼다. 현재 구조의 정본은 위 맵과 §1~§11, §13 이다.
+
+---
+
+## 13. 도킹 레이아웃 (`src/ui/dock/`)
+
+앱 셸 가운데 영역은 트리 기반 도크다. 모델, 스토어, 렌더러가 모두 `src/ui/dock/` 안에 있다. 사양과 Phase 기록은 [docs/spec/layout.md](./docs/spec/layout.md) Phase 35 에 있다.
+
+### 13.1 데이터 모델 (`tree.ts`)
+
+- 순수 JSON 트리다. `DockSplit {dir: "row"|"col", ratio, a, b}` 와 `DockLeaf {id, tabs[], active, collapsed?}` 로 구성되고, 위치는 `DockPath = ("a"|"b")[]` 로 지정한다. React와 zustand에 의존하지 않는다.
+- 도킹 가능한 패널은 `DockPanelId` 5종(`nodeEditor`·`viewport`·`inspector`·`code`·`assets`)이다. problems/diagnostics 는 도킹 탭이 아니다.
+- `createDefaultDockTree()` 의 구조는 `row 0.25 [ code(l4) | row 0.6 [ nodeEditor(l3) | col 0.52 [ viewport(l1) | inspector+assets(l2) ] ] ]` 이다.
+- 불변 갱신 헬퍼로 `getNodeAt` · `setNodeAt` · `removePanel` · `findLeafPath` · `findTabLeafPath` · `collectPanelIds` · `firstMergeableLeafPath` 가 있다. leaf 가 비어 소멸하면 부모 split 은 형제 노드로 축약된다.
+- `canMergeDockTabs`: `viewport`·`code` 는 이종 leaf 에 병합되지 않는다. WebGL 컨텍스트와 CodeMirror 재마운트를 막기 위해서다.
+- `tree.ts` 는 형제 모듈을 import 하지 않는 leaf 다. 의존은 단방향(비순환)이다: geometry → tree, drop → geometry·tree, dockLayoutModel → geometry·tree, dockStore → drop·geometry·tree, snapshot → tree.
+
+### 13.2 기하 배치 (`geometry.ts`)
+
+`layoutDockTree(tree, w, h)` 는 트리를 픽셀 `DockRegion[]`(leaf 영역)과 `DockDivider[]` 로 배치한다. 상수는 `DIVIDER_PX` 6, 접힌 strip `COLLAPSED_STRIP_PX` 34, 최소 leaf 크기 `MIN_LEAF_WIDTH/HEIGHT` 240×160 이다. 직계 leaf 자식이 접힌 split 에서는 divider 를 만들지 않는다. `clampDividerRatio` 는 비율을 0.15~0.85 로 묶고 픽셀 하한도 적용한다. 이 결과는 드래그 히트테스트에만 쓰고, 화면 렌더는 flex 로 한다(§13.5).
+
+### 13.3 드롭 판정 (`drop.ts`)
+
+- `computeDropTarget(x, y, w, h, regions)` 는 `DropHit {target, preview, label}` 을 반환한다. 판정 우선순위는 다음과 같다.
+  1. region 상단 34px 탭바 존: 탭 병합
+  2. 셸 바깥 42px 밴드: 외곽 도킹
+  3. region 내부 가장자리 22%: 스플릿
+  4. 그 밖의 region 안쪽: 중앙 병합
+- 드롭 타깃이 없으면 `fallbackDropTarget` 이 첫 region 에 강제로 도킹한다. 떠 있는(floating) 상태는 없다.
+- `insertDetachedLeaf` 는 분리된 leaf 를 타깃 위치에 불변 삽입한다.
+
+### 13.4 스토어 (`dockStore.ts`)
+
+`useDockStore` 의 상태는 `{tree: DockNode | null, maximized: leafId | null, nextLeafId}` 이며 전부 JSON 직렬화가 가능하다. `tree: null` 은 모든 패널을 닫은 상태로, 이것도 유효하다. 액션은 다음과 같다.
+
+- `setActiveTab` · `setDividerRatio`
+- `toggleCollapsed` · `setCollapsed(panelId)` · `toggleMaximized`
+- `closeTab` · `closePanel` · `addPanel` · `resetLayout`
+- 드래그용 `detachForDrag`(트리에서 분리) / `dockDetached(tabs, active, target)`(새 leaf `l${nextLeafId}` 로 재도킹)
+
+트리는 반드시 `tree`/`geometry`/`drop` 의 불변 함수로만 바꾼다. 이 스토어는 다른 스토어를 import 하지 않는다.
+
+### 13.5 렌더링 (`DockLayout.tsx` · `DockPanelHeader.tsx` · `Splitter.tsx`)
+
+- `DockLayout` 은 트리를 중첩 flex(`${ratio} 1 0px`)로 재귀 렌더한다. 각 leaf 는 `leafPanelKind`(`dockLayoutModel.ts`, 순수 파생 함수)에 따라 NodeEditor · Viewport · SidePanel · CodeEditor 중 하나를 렌더한다.
+- **패널은 언마운트하지 않는다.** 접기는 `.shell-slot--collapsed`, 최대화는 형제의 `.shell-slot--hidden` 클래스로 표현한다. CSS 정본은 `src/styles/20-dock-shell.css` 이다.
+- 드래그는 `pointer*` 이벤트만 쓴다. 4px 임계를 넘으면 고스트로 전환하고, `computeDropTarget` 프리뷰를 거쳐 release 시 `dockDetached` 를 호출한다. `DockLayout` 루트가 드래그 전체를 소유한다.
+- 시작 트리거는 `dockDragContext.ts` 로, leaf 의 `{leafId, path}` 는 `dockLeafContext.ts` 로 내려보낸다. 두 컨텍스트를 별도 모듈로 둔 이유는 `DockLayout → NodeEditor → DockPanelHeader` 순환을 피하기 위해서다.
+- `DockPanelHeader` 는 모든 패널이 공유하는 헤더다(grab ⣿ · 탭 · 메타 배지 · 접기 · 최대화 · 닫기). `Splitter` 는 divider 로, 키보드 화살표를 지원한다.
+- 컴팩트 모드(≤990px)에서는 도킹을 끄고 고정 스택으로 폴백한다. 이때 트리는 바꾸지 않는다.
+
+### 13.6 영속화와 의존 방향
+
+- `state/autoSave.ts` 의 `startDockLayoutPersistence()` 는 `main.tsx` 가 렌더 전에 1회 호출한다.
+- localStorage `shader-playground.dock-layout` 에서 읽은 값은 `snapshot.ts` 의 `sanitizeDockLayoutSnapshot` 으로 검증한다(`version: 2`, 하나라도 어긋나면 `null` 이 되어 조용히 기본 트리로 돌아간다). 통과하면 하이드레이션하고, 이후 변경은 500ms 디바운스로 저장한다. 그래프 IndexedDB 오토세이브와는 완전히 별개다.
+- **의존 방향 예외(수용됨)**: 원칙은 `ui → state` 단방향이지만, `state/autoSave.ts` · `state/codeAutoOpen.ts`(노드 선택 → `setCollapsed("code")`) · `state/testStores.ts` 는 `ui/dock` 을 import 한다. 도킹 기능은 스토어까지 포함해 `src/ui/dock` 안에 자기완결적으로 두었고, 그 dock 모듈들은 React 컴포넌트 쪽을 다시 import 하지 않는다(`dockStore`·`snapshot`·`tree` 는 React 비의존). 따라서 순환은 생기지 않는다(`npm run circular` 0건).

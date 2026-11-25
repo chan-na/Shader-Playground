@@ -1,0 +1,51 @@
+:root {
+  color-scheme: dark;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-bright-body);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--surface-app-darker);
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--surface-app-darker);
+}
+
+.statusbar {
+  flex-shrink: 0;
+}
+
+.panel {
+  background: var(--surface-panel);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}

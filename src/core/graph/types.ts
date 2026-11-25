@@ -37,8 +37,8 @@ export const SANITIZE_LIMITS = {
   MAX_UNIFORM_KEY_LEN: 128,
   MAX_UNIFORM_ARRAY_LEN: 16,
   MAX_NODE_NAME_LEN: 256,
-  // [A-1] No MAX_PARAM_LABEL_LEN — `param.label` is gone, and the value
-  // migrated into `name` is clamped by MAX_NODE_NAME_LEN like any other name.
+  // No MAX_PARAM_LABEL_LEN — params have no `label`; a legacy value migrated
+  // into `name` is clamped by MAX_NODE_NAME_LEN like any other name.
   MAX_SWIZZLE_LEN: 4,
   MAX_DEVICE_ID_LEN: 256,
   MAX_GROUP_LABEL_LEN: 256,
@@ -78,7 +78,7 @@ interface BaseNode {
   id: string;
   kind: GraphNodeKind;
   /**
-   * 사용자 지정 표시명 [D15]. 미지정 시 표시 폴백은 displayNodeName()
+   * 사용자 지정 표시명. 미지정 시 표시 폴백은 displayNodeName()
    * (core/nodes/registry) 참조. 빈 문자열은 저장하지 않는다(부재=미지정).
    */
   name?: string;
@@ -169,8 +169,8 @@ export interface ParamGraphNode extends BaseNode {
   paramKind: ParamKind;
   /** Current value. For 'time' it's [scale, offset] applied to simTime. */
   value: number | number[];
-  // [A-1] No `label` — a param is renamed through the common `name` field like
-  // every other kind. projectSanitize migrates pre-v1.2 `label` values.
+  // No `label` — a param is renamed through the common `name` field like
+  // every other kind. projectSanitize migrates legacy `label` values.
 }
 
 export type MathOp =

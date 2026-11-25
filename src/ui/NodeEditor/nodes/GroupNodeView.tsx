@@ -16,7 +16,7 @@ const DEFAULT_TINT = tokens.nodeCategory.container;
  * double-click-to-rename; collapsing hides every descendant (handled in
  * NodeEditor via `hasCollapsedAncestor`) and shrinks the card to the header.
  *
- * Style source: design/Node Editor.dc.html L110-117. The mock floats the
+ * Style source: design/Node Editor.dc.html "GROUP frame". The mock floats the
  * label pill *above* the frame (`top:-30px`), but this view keeps the pill
  * flush with the frame's own top edge instead: moving it outside would
  * shrink the box React Flow uses for hit-testing/dragging and shift the

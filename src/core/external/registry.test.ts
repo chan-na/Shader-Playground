@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  __setAudioContextFactoryForTests,
-  __setGetUserMediaForTests,
   disposeAllExternal,
   externalHandleCount,
   getExternalAudioBins,
@@ -12,10 +10,14 @@ import {
   reconcileExternal,
   resetExternalTextures,
   retryExternalSource,
-  setAudioBlobResolver,
-  setVideoBlobResolver,
   updateExternalSources,
 } from "./registry";
+import {
+  __setAudioContextFactoryForTests,
+  __setGetUserMediaForTests,
+  setAudioBlobResolver,
+  setVideoBlobResolver,
+} from "./resolvers";
 
 // All tests run against the module singleton — clean it up so order doesn't
 // matter and a flake in one case doesn't leak into the next.
@@ -28,7 +30,7 @@ afterEach(() => {
 });
 
 /**
- * Tiny fake MediaStream that satisfies the surface registry.ts touches:
+ * Tiny fake MediaStream that satisfies the surface webcam.ts/audio.ts touch:
  *   - getTracks() returns a stoppable array
  *   - is otherwise opaque
  */
@@ -114,7 +116,7 @@ describe("webcam acquisition outcomes", () => {
   });
 
   it("reports a clear error when MediaDevices is unavailable", async () => {
-    // Explicitly pass null so registry.ts falls back to navigator, then drop
+    // Explicitly pass null so resolvers.ts falls back to navigator, then drop
     // navigator.mediaDevices for this case.
     __setGetUserMediaForTests(null);
     const original = navigator.mediaDevices;
@@ -328,7 +330,7 @@ describe("video specs", () => {
     expect(getExternalTexture("v1")).toBeNull();
   });
 
-  // --- #26: 'loadeddata' must honour the live spec, not the acquire-time one.
+  // --- 'loadeddata' must honour the live spec, not the acquire-time one.
   // Decoding takes long enough that the user can pause or scrub while the file
   // is still loading; the deferred onReady used to replay the stale snapshot
   // and undo them.
@@ -424,7 +426,7 @@ describe("video specs", () => {
 });
 
 /**
- * Minimal AudioContext stand-in covering only the surface registry.ts touches.
+ * Minimal AudioContext stand-in covering only the surface audio.ts touches.
  * Returning fake AnalyserNode + buffer/source factories lets us assert the
  * lifecycle (acquire / restart / dispose) without depending on Web Audio.
  */

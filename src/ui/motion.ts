@@ -13,7 +13,7 @@ export const MOTION_MAX_MS = tokens.motion.durationMs.max; // 150
 export const MOTION_MID_MS = Math.round(
   (tokens.motion.durationMs.min + tokens.motion.durationMs.max) / 2,
 ); // 120
-/** 상태 표시용 펄스 shorthand (keyframe은 src/index.css의 sp-pulse, 주기 1.4s는
+/** 상태 표시용 펄스 shorthand (keyframe은 src/styles/93-modals.css의 sp-pulse, 주기 1.4s는
  *  design/System States.dc.html의 설계값 — 90-150ms 밴드는 '전환'용이고 상태
  *  펄스 루프는 별도 주기를 갖는다). */
 export const STATUS_PULSE_ANIMATION = "sp-pulse 1.4s ease-in-out infinite";

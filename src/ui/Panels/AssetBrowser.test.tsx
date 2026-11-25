@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GeometryHandle, ImageHandle } from "../../core/assets/types";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { resetAllStores } from "../../state/testStores";
 import { AssetBrowser } from "./AssetBrowser";
 
 // The full module is mocked so forget*/importFiles never touch the real
@@ -19,8 +20,6 @@ vi.mock("../../state/assetActions", () => ({
 
 import * as assetActions from "../../state/assetActions";
 import { useAssetStore } from "../../state/assetStore";
-
-const initialAssetState = useAssetStore.getState();
 
 const meshHandle: GeometryHandle = {
   id: "mesh-fake-tri",
@@ -45,20 +44,14 @@ const imageHandle: ImageHandle = {
   bitmap: null,
 };
 
-function resetStores() {
-  useAssetStore.setState(initialAssetState, true);
-  useGraphStore.getState().reset();
-  useSelectionStore.getState().select(null);
-}
-
 beforeEach(() => {
-  resetStores();
+  resetAllStores();
   vi.clearAllMocks();
 });
 
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 describe("AssetBrowser", () => {

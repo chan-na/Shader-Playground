@@ -132,9 +132,8 @@ export interface SpStores {
         line: number;
         column?: number;
       }) => void;
-      // W5(design/CHANGELOG.md §v2.0) — Code 자동 접기/펼침 게이트. E2E가
-      // autoCode를 UI 없이 직접 끌 수 있는 테스트 훅 계약(main.tsx의
-      // `editor: useEditorStore` 노출로 런타임 연결은 이미 존재).
+      // Code 자동 접기/펼침 게이트. E2E가 autoCode를 UI 없이 직접 끌 수
+      // 있는 테스트 훅 계약(main.tsx의 `editor: useEditorStore` 노출).
       autoCode: boolean;
       setAutoCode: (on: boolean) => void;
     };
@@ -179,17 +178,23 @@ export interface SpStores {
         renderTick: number;
         errors: string[];
       };
-      /** One-shot PNG snapshot request served by the RAF loop (#3). */
+      /** One-shot PNG snapshot request served by the RAF loop. */
       snapshotRequested: boolean;
       /**
        * Backing-store size of the drawing buffer, as `resize()` last set it.
-       * Clamps to 1x1 while the Viewport is `display:none` (F21).
+       * Clamps to 1x1 while the Viewport is `display:none`.
        */
       canvasSize: { width: number; height: number };
       /** Returns false — and arms nothing — when there is no loop to serve the
-       *  request (F1) or nothing visible to capture (F21). */
+       *  request or nothing visible to capture. */
       requestSnapshot: () => boolean;
     };
+    subscribe: (
+      listener: (
+        state: { stats: { renderTick: number; errors: string[] } },
+        prev: { stats: { renderTick: number; errors: string[] } },
+      ) => void,
+    ) => () => void;
   };
   gpuTimer: {
     getState: () => {
@@ -237,66 +242,6 @@ export interface SpStores {
       }>
     >;
     dispose: () => void;
-  };
-  glslSymbols: {
-    build: (source: string) => {
-      symbols: Array<{
-        name: string;
-        type: string;
-        kind: string;
-        line: number;
-        column: number;
-        scope: string | null;
-        parameters?: string;
-      }>;
-    };
-    visibleAt: (
-      table: { symbols: unknown[] },
-      line: number,
-    ) => Array<{
-      name: string;
-      type: string;
-      kind: string;
-      line: number;
-      column: number;
-      scope: string | null;
-    }>;
-    resolve: (
-      table: { symbols: unknown[] },
-      name: string,
-      line: number,
-    ) => {
-      name: string;
-      type: string;
-      kind: string;
-      line: number;
-      scope: string | null;
-    } | null;
-    builtins: Record<string, { signatures: string[]; description: string }>;
-    keywords: Record<string, string>;
-    findReferences: (
-      source: string,
-      name: string,
-      atLine: number,
-    ) => Array<{
-      from: number;
-      to: number;
-      line: number;
-      column: number;
-      isDefinition: boolean;
-    }>;
-  };
-  glslSemanticTokens: {
-    classify: (source: string) => Array<{
-      from: number;
-      to: number;
-      kind: string;
-    }>;
-    classifyIdentifier: (
-      table: { symbols: unknown[] },
-      name: string,
-      line: number,
-    ) => string | null;
   };
   codeEditor: {
     getCursorLine: () => number | null;
@@ -364,7 +309,7 @@ export async function readSp<R>(
 
 /** Wait until window.__sp is available (dev build flag).
  *
- * Timeout is generous (30s) because the dock specs (m3/m6) call this again
+ * Timeout is generous (30s) because the dock persistence specs call this again
  * after `page.reload()`, and a cold re-boot of the WebGL app under full-suite
  * load has occasionally needed >15s — a rare, load-induced flake in
  * `bootApp`-after-reload, not a product bug. The poll returns the instant

@@ -7,12 +7,12 @@ export interface TextureParamsSectionProps {
 }
 
 /**
- * [E-3] Displays a texture's actual wrap/filter/mipmap/flip parameters,
+ * Displays a texture's actual wrap/filter/mipmap/flip parameters,
  * derived straight from `core/gl/texture.ts`'s `FBO_TEXTURE_PARAMS` /
  * `IMAGE_TEXTURE_PARAMS` constants — never a hand-copied string. Same
  * `.inspector-section`/`.inspector-label` + mono-row shape as
  * `MeshInspectorSection` (display-only, no interactivity — see D-4 in
- * `docs/learnability-plan-2026-08.md`, out of scope for this round).
+ * `docs/learnability-plan-2026-08.md`, still open).
  */
 export function TextureParamsSection({
   title,

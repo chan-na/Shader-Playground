@@ -73,10 +73,10 @@ describe("debugUiStore", () => {
     expect(snapshot().problemsOpen).toBe(true);
   });
 
-  // T1/D-1: passesOpen joins open/problemsOpen as a third mutually-exclusive
-  // slot (design-request v2.3 AA1, interim decision — see debugUiStore.ts
-  // header). Every combination below mirrors the pre-existing 2-way pairs
-  // above rather than replacing them (those still guard the R5 contract).
+  // passesOpen joins open/problemsOpen as a third mutually-exclusive slot
+  // (interim decision — see debugUiStore.ts header). Every combination below
+  // mirrors the 2-way pairs above rather than replacing them (those still
+  // guard the diagnostics/problems exclusion).
 
   it("defaults passesOpen to false", () => {
     expect(snapshot().passesOpen).toBe(false);

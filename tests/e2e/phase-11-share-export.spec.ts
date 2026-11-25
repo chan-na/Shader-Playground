@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered } from "./helpers/canvas";
 import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
+import { readRenderTick, waitForRenderIdle } from "./helpers/render";
 import { readSp, withSp } from "./helpers/sp";
 
 test.describe("Phase 11 — share URL & HTML export", () => {
@@ -76,11 +77,11 @@ test.describe("Phase 11 — share URL & HTML export", () => {
     expect(html.length).toBeGreaterThan(15_000);
   });
 
-  // #3 — "Snap PNG" no longer reads the canvas from the click handler (the
-  // context uses preserveDrawingBuffer: false, so that returned a blank image
-  // whenever the idle gate had skipped the draw). It now arms a one-shot
-  // request that the RAF loop serves right after executePlan. Pausing first
-  // puts the loop in exactly the idle state the old code failed in.
+  // "Snap PNG" must not read the canvas from the click handler (the context
+  // uses preserveDrawingBuffer: false, so that returns a blank image whenever
+  // the idle gate skipped the draw). It arms a one-shot request that the RAF
+  // loop serves right after executePlan. Pausing first puts the loop in
+  // exactly the idle state where a click-handler read would fail.
   test("Snap PNG downloads a frame captured inside the render loop", async ({
     page,
   }) => {
@@ -89,8 +90,8 @@ test.describe("Phase 11 — share URL & HTML export", () => {
     await setGraph(page, trivialMeshGraph(), {});
     await expectCanvasRendered(page.getByTestId("viewport-canvas"));
 
-    // Pause and let the loop go idle (phase-9's B2 idle pattern): renderTick
-    // freezes because executePlan is skipped entirely.
+    // Pause and let the loop go idle (the phase-9 paused-idle pattern):
+    // renderTick freezes because executePlan is skipped entirely.
     await withSp(
       page,
       (sp) => {
@@ -98,16 +99,10 @@ test.describe("Phase 11 — share URL & HTML export", () => {
       },
       undefined,
     );
-    await page.waitForTimeout(400);
-    const idleStart = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.renderTick,
-    );
+    const idleStart = await waitForRenderIdle(page);
+    // Elapsed time is the subject: a frozen tick must stay frozen across it.
     await page.waitForTimeout(500);
-    const idleEnd = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.renderTick,
-    );
+    const idleEnd = await readRenderTick(page);
     expect(idleEnd).toBe(idleStart);
 
     const downloadPromise = page.waitForEvent("download", { timeout: 15_000 });
@@ -133,11 +128,11 @@ test.describe("Phase 11 — share URL & HTML export", () => {
     expect(pending).toBe(false);
   });
 
-  // F1 — the snapshot request must not survive the Viewport that would serve
-  // it. `snapshotRequested` has exactly one reader (the RAF loop above), so a
-  // request armed while the Viewport panel is closed used to sit there until
-  // the panel was reopened, at which point the first frame downloaded a PNG
-  // nobody had asked for. `src/ui/Viewport/index.tsx` has 0% line coverage, so
+  // The snapshot request must not survive the Viewport that would serve it.
+  // `snapshotRequested` has exactly one reader (the RAF loop above), so a
+  // request armed while the Viewport panel is closed would sit there until
+  // the panel was reopened, at which point the first frame would download a
+  // PNG nobody had asked for. `src/ui/Viewport/index.tsx` has 0% line coverage, so
   // only an end-to-end run observes the real wiring: a closed panel means an
   // unmounted component, `setReady(false)`, and a refused request.
   test("Snap PNG with the Viewport panel closed is refused, and reopening downloads nothing", async ({
@@ -243,12 +238,12 @@ test.describe("Phase 11 — share URL & HTML export", () => {
     expect(stats.nonZero).toBeGreaterThan(0);
   });
 
-  // F21 — the window F1's `ready` guard deliberately left open. Collapsing a
+  // The window the `ready` guard above deliberately leaves open. Collapsing a
   // slot to its rail keeps the panel mounted, so the RAF loop keeps running and
   // `ready` stays true; only CSS hides it (`.shell-slot--collapsed .panel >
   // :not(.dock-header) { display: none }`). `clientWidth/Height` then read 0,
-  // `resize()` clamps them to 1x1, and the capture used to read that clamped
-  // buffer — File ▸ Snap PNG downloaded a 1x1 PNG with no warning at all.
+  // `resize()` clamps them to 1x1, and capturing that clamped buffer would
+  // make File ▸ Snap PNG download a 1x1 PNG with no warning at all.
   //
   // `Viewport/index.tsx` has no unit coverage, so this spec is the only guard
   // on the wiring; the store-side invariant is pinned in `rendererStore.test`
@@ -272,8 +267,8 @@ test.describe("Phase 11 — share URL & HTML export", () => {
       .getByRole("button", { name: "Collapse panel" })
       .click();
 
-    // The distinguishing state: the loop is still alive (so F1's guard passes)
-    // but there is nothing on screen to capture.
+    // The distinguishing state: the loop is still alive (so the `ready` guard
+    // passes) but there is nothing on screen to capture.
     await expect
       .poll(
         () => readSp(page, (sp) => sp.renderer.getState().canvasSize.width),

@@ -38,7 +38,7 @@ export function UniformHintEditor({
   // What the Default field was pre-filled with on mount. `spec.defaultValue`
   // is not necessarily authored: for a uniform with no `@default` annotation
   // it's `defaultRangeFor`'s *name-based heuristic* (`u_*color*` → white, …).
-  // Since C-2 the annotation is no longer decoration — `withExplicitDefaults`
+  // The annotation is not decoration — `withExplicitDefaults`
   // seeds only `hasExplicitDefault` uniforms, and `bindUserUniforms` uploads
   // that seed every frame. So writing the field back out unconditionally
   // turned a heuristic guess into a *bound* value: adjusting only the slider's

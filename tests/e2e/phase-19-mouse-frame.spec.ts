@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readCanvasStats } from "./helpers/canvas";
+import { boxOf } from "./helpers/dom";
 import { bootApp, setGraph } from "./helpers/fixtures";
 import { readSp } from "./helpers/sp";
 
@@ -66,8 +67,7 @@ test.describe("Phase 19 — u_mouse / u_frame system uniforms", () => {
     const canvas = page.getByTestId("viewport-canvas");
     await setGraph(page, mouseGraph(), {});
 
-    const rect = await canvas.boundingBox();
-    if (!rect) throw new Error("canvas has no bounding box");
+    const rect = await boxOf(canvas);
 
     // Bottom-left of the canvas: low clientX → low u_mouse.x → low red, and
     // bottom of screen (high clientY) → low u_mouse.y (origin flipped) → low

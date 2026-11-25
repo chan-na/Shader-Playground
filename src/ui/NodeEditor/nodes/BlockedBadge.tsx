@@ -1,7 +1,7 @@
 /**
  * Header meta-slot badge for a Webcam/Audio node whose external source is
  * stuck in a pending/denied permission state — design/System States.dc.html
- * L472's `warnBadge` ("⚠ blocked" pill, applied to nodes[0]/nodes[1] in
+ * `warnBadge` ("⚠ blocked" pill, applied to nodes[0]/nodes[1] in
  * `renderVals()` when `isWebcam`/`isAudio`). Mirrors ErrorBadge.tsx's
  * presentation-only shape: the parent view (WebcamNodeView/AudioNodeView)
  * already knows the permission state from its own status poll, so this

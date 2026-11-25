@@ -9,9 +9,9 @@ export function OutputNodeView({ id, data }: NodeProps) {
   return (
     <div className="node-card" style={{ position: "relative", minWidth: 150 }}>
       <NodeCardHeader kind="output" title={displayNodeName(node)} nodeId={id} />
-      {/* design/Node Editor.dc.html L264 uses `→ viewport A`, but the pane
-       * letter isn't known here — the card has no pane assignment, only the
-       * graph does (followup: temp/design-followup-v1.1.md). paddingLeft is
+      {/* design/Node Editor.dc.html "Output A" uses `→ viewport A`, but the
+       * pane letter isn't known here — the card has no pane assignment, only
+       * the graph does. paddingLeft is
        * 46 (the full rail width) rather than dc's 34: our rail label is the
        * raw port name `texture` (not the shortened `tex` dc uses), and at
        * max-width 34px/left 11px that clears to x45 — 34 would clip into

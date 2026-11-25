@@ -16,26 +16,28 @@ import {
   TORUS_DEMO_LAYOUT,
   TORUS_DEMO_PARENTS,
 } from "../state/demoGraph";
-import { useDockStore } from "../state/dockStore";
-import { collectPanelIds, DOCK_PANEL_IDS } from "../state/dockTree";
 import { useExportShareStore } from "../state/exportShareStore";
 import { useGifRecorderStore } from "../state/gifRecorder";
 import { redoGraph, undoGraph, useGraphStore } from "../state/graphStore";
+import { useHelpModalStore } from "../state/helpModalStore";
 import { useHistoryStore } from "../state/historyStore";
 import { useRecorderStore } from "../state/recorder";
 import { useRendererStore } from "../state/rendererStore";
 import { deserializeProject, serializeProject } from "../state/serialization";
 import { toast } from "../state/toastStore";
 import { tokens, withAlpha } from "../theme";
-import { PANEL_DOTS, PANEL_TITLES } from "./dockLayoutModel";
-import { useHelpModalStore } from "./NodeEditor/HelpModal";
+import { downloadBlob } from "../utils/downloadBlob";
+import { PANEL_DOTS, PANEL_TITLES } from "./dock/dockLayoutModel";
+import { useDockStore } from "./dock/dockStore";
+import { collectPanelIds, DOCK_PANEL_IDS } from "./dock/tree";
+import { getViewportCanvas } from "./Viewport/viewportCanvas";
 
 const isMac =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD_LABEL = isMac ? "⌘" : "Ctrl";
 
-/** Brand mark box-shadow (App Shell.dc.html L33) — computed once, not per-render. */
+/** Brand mark box-shadow (App Shell.dc.html toolbar brand mark) — computed once, not per-render. */
 const BRAND_SHADOW = `0 2px 8px ${withAlpha(tokens.accent.default, 0.35)}, inset 0 1px 0 ${withAlpha("#ffffff", 0.25)}`;
 const BRAND_SQUARE_BORDER = `1.6px solid ${withAlpha("#ffffff", 0.92)}`;
 const BRAND_DOT_BORDER = `1.4px solid ${withAlpha("#ffffff", 0.95)}`;
@@ -105,7 +107,7 @@ export function AppToolbar() {
   const canUndo = useHistoryStore((s) => s.past.length > 0);
   const canRedo = useHistoryStore((s) => s.future.length > 0);
 
-  // B6-U2 (R9/R11/R1): ＋ Panel re-dock menu + Reset layout. Subscribe to
+  // ＋ Panel re-dock menu + Reset layout. Subscribe to
   // `s.tree` (not a derived array) and derive `closedPanels` via useMemo —
   // returning a fresh `collectPanelIds(s.tree)` array straight from the
   // selector would give zustand a new reference on every store change and
@@ -139,12 +141,7 @@ export function AppToolbar() {
     const blob = new Blob([JSON.stringify(project, null, 2)], {
       type: "application/json",
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = exportFileName(DEFAULT_EXPORT_BASE, "json");
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, exportFileName(DEFAULT_EXPORT_BASE, "json"));
   };
 
   const onPickProject = () => projectInputRef.current?.click();
@@ -171,15 +168,15 @@ export function AppToolbar() {
    * click handler returned an empty image whenever the idle gate had skipped
    * the draw, because the GL context uses `preserveDrawingBuffer: false`. The
    * request also wakes the loop for one frame, so a paused static graph still
-   * produces a file. (#3)
+   * produces a file.
    *
    * The request is refused outright when no render loop is running — with the
    * Viewport panel closed there is nothing to serve it, and the old code left
    * the flag armed so reopening the panel downloaded a PNG nobody asked for.
-   * Report the refusal instead of dropping it silently. (F1)
+   * Report the refusal instead of dropping it silently.
    *
    * A mounted-but-hidden Viewport (collapsed rail, maximised sibling) is
-   * refused too, since its drawing buffer is clamped to 1×1 (F21). The two
+   * refused too, since its drawing buffer is clamped to 1×1. The two
    * refusals need different instructions, and `ready` is what tells them apart:
    * the loop is still running in the hidden case. See `requestSnapshot`'s doc —
    * this branch is the caller half of that contract.
@@ -198,21 +195,14 @@ export function AppToolbar() {
 
   const toggleRecord = async () => {
     const r = useRecorderStore.getState();
-    const canvas = document.querySelector(
-      ".viewport-canvas",
-    ) as HTMLCanvasElement | null;
+    const canvas = getViewportCanvas();
     if (!canvas) return;
     if (r.status === "idle") {
       await r.start(canvas, 30);
     } else {
       const blob = await r.stop();
       if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = exportFileName(DEFAULT_EXPORT_BASE, "webm");
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        downloadBlob(blob, exportFileName(DEFAULT_EXPORT_BASE, "webm"));
       }
     }
   };
@@ -221,21 +211,14 @@ export function AppToolbar() {
   const gifEncodeProgress = useGifRecorderStore((r) => r.encodeProgress);
   const toggleGif = async () => {
     const g = useGifRecorderStore.getState();
-    const canvas = document.querySelector(
-      ".viewport-canvas",
-    ) as HTMLCanvasElement | null;
+    const canvas = getViewportCanvas();
     if (!canvas) return;
     if (g.status === "idle") {
       g.start();
     } else if (g.status === "recording") {
       const blob = await g.stop();
       if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = exportFileName(DEFAULT_EXPORT_BASE, "gif");
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        downloadBlob(blob, exportFileName(DEFAULT_EXPORT_BASE, "gif"));
       }
     }
   };

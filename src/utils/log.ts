@@ -38,7 +38,7 @@ const subscribers = new Set<(entry: LogEntry) => void>();
 let seqCounter = 0;
 
 // 콘솔 미러링은 DEV에서만. 버퍼엔 레벨과 무관하게 항상 저장하고,
-// 콘솔 출력만 minLevel로 게이트한다 (Debugging-Plan §3 P1 정책).
+// 콘솔 출력만 minLevel로 게이트한다.
 let minLevel: LogLevel = import.meta.env.DEV ? "debug" : "warn";
 
 /** Error를 직렬화 가능한 평면 객체로 정규화한다. */

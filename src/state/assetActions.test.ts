@@ -171,7 +171,7 @@ describe("importFiles", () => {
     expect(useGraphStore.getState().nodes).toHaveLength(0);
   });
 
-  // --- #34: unsupported files used to vanish without a word --------------
+  // --- unsupported files must not vanish without a word -----------------
 
   it("raises a single aggregate warning when nothing could be imported", async () => {
     useToastStore.getState().clear();
@@ -204,7 +204,7 @@ describe("importFiles", () => {
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 
-  // --- #23: best-effort cache writes are logged, never toasted ------------
+  // --- best-effort cache writes are logged, never toasted -----------------
 
   it("logs a warning when priming the IndexedDB cache fails", async () => {
     const handle = meshHandle("mesh-quota");
@@ -416,7 +416,7 @@ describe("hydrateGraphAssets (H5)", () => {
     expect(loadCachedMesh).toHaveBeenCalledWith("mesh1");
   });
 
-  // #30 — hydrateAssetsFor snapshots the store once, before its first await,
+  // hydrateAssetsFor snapshots the store once, before its first await,
   // so duplicate ids all clear the "already loaded?" guard and each fires its
   // own IndexedDB read plus a redundant store write.
   it("de-duplicates repeated assetIds across all four asset lists", async () => {

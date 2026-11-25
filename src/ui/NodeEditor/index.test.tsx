@@ -1,7 +1,14 @@
 import { act, cleanup, render } from "@testing-library/react";
+import type {
+  Edge,
+  EdgeChange,
+  Node,
+  NodeChange,
+  OnBeforeDelete,
+} from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGraphStore } from "../../state/graphStore";
-import { DockLeafContext } from "../dockLeafContext";
+import { DockLeafContext } from "../dock/dockLeafContext";
 import { MOTION_MAX_MS } from "../motion";
 import { NodeEditor } from "./index";
 
@@ -32,6 +39,11 @@ const rf = vi.hoisted(() => ({
   fitView: vi.fn(),
   zoom: 1,
   nodes: new Map<string, unknown>(),
+  // The delete-path props, captured from the last render so a test can drive
+  // them the way React Flow's own delete key handler would.
+  beforeDelete: null as OnBeforeDelete | null,
+  nodesChange: null as ((changes: NodeChange[]) => void) | null,
+  edgesChange: null as ((changes: EdgeChange[]) => void) | null,
 }));
 
 vi.mock("@xyflow/react", async (importOriginal) => {
@@ -40,6 +52,9 @@ vi.mock("@xyflow/react", async (importOriginal) => {
   type StubProps = {
     nodes: ReadonlyArray<{ id: string }>;
     onInit?: (instance: unknown) => void;
+    onBeforeDelete?: OnBeforeDelete;
+    onNodesChange?: (changes: NodeChange[]) => void;
+    onEdgesChange?: (changes: EdgeChange[]) => void;
   };
   const instance = {
     // The identity map keeps the test's px and flow numbers the same, so a
@@ -50,10 +65,19 @@ vi.mock("@xyflow/react", async (importOriginal) => {
     setCenter: rf.setCenter,
     fitView: rf.fitView,
   };
-  const ReactFlow = ({ nodes, onInit }: StubProps) => {
+  const ReactFlow = ({
+    nodes,
+    onInit,
+    onBeforeDelete,
+    onNodesChange,
+    onEdgesChange,
+  }: StubProps) => {
     useEffect(() => {
       onInit?.(instance);
     }, [onInit]);
+    rf.beforeDelete = onBeforeDelete ?? null;
+    rf.nodesChange = onNodesChange ?? null;
+    rf.edgesChange = onEdgesChange ?? null;
     return createElement(
       "div",
       { className: "react-flow" },
@@ -99,6 +123,25 @@ function flushFrames(): void {
 function resizePane(): void {
   for (const cb of [...resizeCallbacks]) cb();
   flushFrames();
+}
+
+/** jsdom gives NodeEditor neither of the two clocks it schedules against, so
+ *  every test in this file installs the same drivable stand-ins. */
+function installTimingStubs(): void {
+  vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    const id = nextFrameId++;
+    frames.push({ id, cb });
+    return id;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+    frames = frames.filter((f) => f.id !== id);
+  });
+  frames = [];
+  resizeCallbacks = [];
+  rf.beforeDelete = null;
+  rf.nodesChange = null;
+  rf.edgesChange = null;
 }
 
 const VIEW = { x: 0, y: 0, width: 1000, height: 600 };
@@ -166,17 +209,7 @@ function renderEditor(): HTMLElement {
 
 describe("NodeEditor — panning an added node into view", () => {
   beforeEach(() => {
-    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      const id = nextFrameId++;
-      frames.push({ id, cb });
-      return id;
-    });
-    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
-      frames = frames.filter((f) => f.id !== id);
-    });
-    frames = [];
-    resizeCallbacks = [];
+    installTimingStubs();
     rf.nodes.clear();
     rf.setCenter.mockClear();
     rf.fitView.mockClear();
@@ -205,7 +238,7 @@ describe("NodeEditor — panning an added node into view", () => {
     addParam("far", { x: 4000, y: 0 });
     flushFrames();
     // Center of the 180×64 card, at the zoom the user left behind — a pan,
-    // never a refit [#38].
+    // never a refit.
     expect(rf.setCenter).toHaveBeenCalledWith(4090, 32, {
       zoom: 1,
       duration: MOTION_MAX_MS,
@@ -367,7 +400,7 @@ describe("NodeEditor — panning an added node into view", () => {
   });
 
   it("pans without refitting on a plain add, and refits on a replace", () => {
-    // [#38] The auto-fit belongs to wholesale replacements only; a plain add
+    // The auto-fit belongs to wholesale replacements only; a plain add
     // must never re-frame the canvas out from under the user.
     renderEditor();
     addParam("far", { x: 4000, y: 0 });
@@ -401,5 +434,150 @@ describe("NodeEditor — panning an added node into view", () => {
       zoom: 0.42,
       duration: MOTION_MAX_MS,
     });
+  });
+});
+
+/**
+ * The Delete-key guard for lesson groups.
+ *
+ * React Flow expands a doomed node into its children and then into every edge
+ * touching them, so without `onBeforeDelete` pressing Delete on a group label
+ * box also takes the node inside it and that node's wiring — the destructive
+ * `removeGroup(id, "delete-children")` action, minus the confirmation
+ * GroupInspector demands for it. Every starter graph ships lesson groups now,
+ * so this is reachable on first launch.
+ *
+ * The stub above is the delete path's contract: the props React Flow's own
+ * key handler drives — `onBeforeDelete` first, then the surviving removals as
+ * edge changes and node changes, in that order (see deleteElements).
+ */
+describe("NodeEditor — deleting a group from the canvas", () => {
+  beforeEach(() => {
+    installTimingStubs();
+    rf.nodes.clear();
+    rf.zoom = 1;
+    useGraphStore.getState().reset();
+    // A lesson group holding one node, wired to a node outside it — the shape
+    // every starter graph boots with. mesh1's stored position is relative to
+    // the group, so it sits at (120, 140) in absolute terms.
+    useGraphStore.getState().setGraph(
+      {
+        nodes: [
+          {
+            id: "grp",
+            kind: "group",
+            label: "1 · Mesh — 정점 데이터",
+            width: 300,
+            height: 200,
+          },
+          { id: "mesh1", kind: "param", paramKind: "float", value: 0 },
+          { id: "shader1", kind: "param", paramKind: "float", value: 0 },
+        ],
+        edges: [
+          {
+            id: "e1",
+            source: "mesh1",
+            sourceHandle: "out",
+            target: "shader1",
+            targetHandle: "in",
+          },
+        ],
+      },
+      {
+        grp: { x: 100, y: 100 },
+        mesh1: { x: 20, y: 40 },
+        shader1: { x: 600, y: 100 },
+      },
+      { mesh1: "grp" },
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  /** What React Flow hands `onBeforeDelete`: the selected nodes already
+   *  expanded through `parentId` (@xyflow/system's `parentHit` branch) plus
+   *  every edge connected to that expanded set. */
+  function candidateNode(
+    id: string,
+    type: string,
+    selected: boolean,
+    parentId?: string,
+  ): Node {
+    const node: Node = {
+      id,
+      type,
+      selected,
+      position: { x: 0, y: 0 },
+      data: {},
+    };
+    if (parentId !== undefined) node.parentId = parentId;
+    return node;
+  }
+
+  const E1: Edge = { id: "e1", source: "mesh1", target: "shader1" };
+
+  /** Run the delete the way React Flow does: ask, then apply what came back
+   *  (edge changes before node changes, as `deleteElements` does). */
+  async function pressDelete(nodes: Node[], edges: Edge[]): Promise<void> {
+    const ask = rf.beforeDelete;
+    if (!ask) throw new Error("onBeforeDelete is not wired to ReactFlow");
+    const verdict = await ask({ nodes, edges });
+    if (typeof verdict === "boolean") {
+      throw new Error("expected a filtered set, not a blanket verdict");
+    }
+    await act(async () => {
+      rf.edgesChange?.(
+        verdict.edges.map((e): EdgeChange => ({ type: "remove", id: e.id })),
+      );
+      rf.nodesChange?.(
+        verdict.nodes.map((n): NodeChange => ({ type: "remove", id: n.id })),
+      );
+    });
+  }
+
+  it("removes only the group and leaves its child where it was drawn", async () => {
+    renderEditor();
+    await pressDelete(
+      [
+        candidateNode("grp", "group", true),
+        // Not selected: React Flow added it purely because its parent is going.
+        candidateNode("mesh1", "param", false, "grp"),
+      ],
+      [E1],
+    );
+    const s = useGraphStore.getState();
+    expect(s.nodes.map((n) => n.id)).toEqual(["mesh1", "shader1"]);
+    // Delete on a group means ungroup, so the child's edge survives with it.
+    expect(s.edges.map((e) => e.id)).toEqual(["e1"]);
+    // Promoted from group-relative (20, 40) to absolute — the card must not
+    // jump when the box under it disappears.
+    expect(s.positions.mesh1).toEqual({ x: 120, y: 140 });
+    expect(s.parents).toEqual({});
+  });
+
+  it("still deletes a child the user selected alongside the group", async () => {
+    renderEditor();
+    await pressDelete(
+      [
+        candidateNode("grp", "group", true),
+        candidateNode("mesh1", "param", true, "grp"),
+      ],
+      [E1],
+    );
+    const s = useGraphStore.getState();
+    expect(s.nodes.map((n) => n.id)).toEqual(["shader1"]);
+    expect(s.edges).toEqual([]);
+  });
+
+  it("leaves a plain node deletion alone, edges included", async () => {
+    renderEditor();
+    await pressDelete([candidateNode("mesh1", "param", true, "grp")], [E1]);
+    const s = useGraphStore.getState();
+    expect(s.nodes.map((n) => n.id)).toEqual(["grp", "shader1"]);
+    expect(s.edges).toEqual([]);
   });
 });

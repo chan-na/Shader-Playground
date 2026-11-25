@@ -9,7 +9,7 @@ const initialTime = useTimeStore.getState();
 const initialCamera = useCameraStore.getState();
 const initialRenderer = useRendererStore.getState();
 
-// TransportBar self-gates to `panes.length === 0` (M7-U4, see TransportBar.tsx)
+// TransportBar self-gates to `panes.length === 0` (see TransportBar.tsx)
 // so it never overlaps CompileErrorOverlay's action row. Every test in this
 // file exercises the bar itself, so seed a drawable pane up front — the
 // gating behavior is covered separately below.

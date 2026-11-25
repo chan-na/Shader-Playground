@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
+import { blurActive } from "./helpers/dom";
+import {
+  bootApp,
+  selectNode,
+  setGraph,
+  trivialMeshGraph,
+} from "./helpers/fixtures";
 import { readSp, withSp } from "./helpers/sp";
 
 // Phase 23 — multi-selection editing. selectionStore already holds a set of
@@ -31,13 +37,6 @@ async function readPositions(
     const p = sp.graph.getState().positions;
     const fill = (v?: XY): XY => v ?? { x: Number.NaN, y: Number.NaN };
     return { m1: fill(p.m1), s1: fill(p.s1), o1: fill(p.o1) };
-  });
-}
-
-async function blurActive(page: import("@playwright/test").Page) {
-  await page.evaluate(() => {
-    const el = document.activeElement;
-    if (el instanceof HTMLElement) el.blur();
   });
 }
 
@@ -82,7 +81,7 @@ test.describe("Phase 23 — multi-selection editing", () => {
     page,
   }) => {
     await setGraph(page, trivialMeshGraph(), LAYOUT);
-    await withSp(page, (sp) => sp.selection.getState().select(null), null);
+    await selectNode(page, null);
     await blurActive(page);
 
     const before = await readPositions(page);
@@ -94,7 +93,7 @@ test.describe("Phase 23 — multi-selection editing", () => {
 
   test("Cmd/Ctrl+A selects every node", async ({ page }) => {
     await setGraph(page, trivialMeshGraph(), LAYOUT);
-    await withSp(page, (sp) => sp.selection.getState().select(null), null);
+    await selectNode(page, null);
     await blurActive(page);
 
     await page.keyboard.press("Meta+a");
@@ -117,10 +116,10 @@ test.describe("Phase 23 — multi-selection editing", () => {
     await page.getByTestId("tab-inspector").click();
 
     // Single selection → no banner.
-    await withSp(page, (sp) => sp.selection.getState().select("s1"), null);
+    await selectNode(page, "s1");
     await expect(page.getByTestId("multi-select-banner")).toHaveCount(0);
 
-    // Rename s1 through the real Inspector Name field (UI path, D15) so the
+    // Rename s1 through the real Inspector Name field (UI path) so the
     // banner's "· editing <name>" fragment has a display name to assert on
     // that provably differs from the raw id.
     const nameInput = page.getByTestId("node-name-input");
@@ -137,7 +136,7 @@ test.describe("Phase 23 — multi-selection editing", () => {
     await expect(banner).toBeVisible();
     await expect(banner).toContainText("2 nodes selected");
     // Primary is the last id added to the set — shown via its display name
-    // (displayNodeName), not the raw internal id (D15 clean-up).
+    // (displayNodeName), not the raw internal id.
     await expect(banner).toContainText("Fresnel");
   });
 });

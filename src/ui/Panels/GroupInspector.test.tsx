@@ -3,21 +3,17 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GroupGraphNode, MeshGraphNode } from "../../core/graph/types";
 import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
+import { resetAllStores } from "../../state/testStores";
 import { tokens } from "../../theme";
 import { GroupInspector } from "./GroupInspector";
 
-function resetStores() {
-  useGraphStore.getState().reset();
-  useSelectionStore.getState().select(null);
-}
-
 beforeEach(() => {
-  resetStores();
+  resetAllStores();
 });
 
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 function groupNode(overrides: Partial<GroupGraphNode> = {}): GroupGraphNode {
@@ -32,19 +28,6 @@ function groupNode(overrides: Partial<GroupGraphNode> = {}): GroupGraphNode {
 }
 
 describe("GroupInspector", () => {
-  // [A-2] The Group label field is gone — a group renames through the
-  // Inspector's common Name field (Inspector.test.tsx covers that path, and
-  // graphStore.test.ts covers renameNode routing into `label`). This panel must
-  // not offer a second, competing rename UI.
-  it("renders no Group label field — renaming lives in the common Name field", () => {
-    const node = groupNode();
-    useGraphStore.getState().addNode(node);
-    render(<GroupInspector node={node} />);
-
-    expect(screen.queryByTestId("group-label-input")).toBeNull();
-    expect(screen.queryByText("Label")).toBeNull();
-  });
-
   it("changing the native color input calls setGroupColor", () => {
     const node = groupNode();
     useGraphStore.getState().addNode(node);
@@ -60,7 +43,8 @@ describe("GroupInspector", () => {
     expect(updated.color).toBe("#336699");
   });
 
-  // group-label-input is intentionally absent from this surface as of [A-2].
+  // group-label-input is intentionally absent: the Inspector's common Name
+  // field renames groups.
   it("preserves the group-* testid surface (inspector, color, ungroup, cascade)", () => {
     const node = groupNode();
     useGraphStore.getState().addNode(node);

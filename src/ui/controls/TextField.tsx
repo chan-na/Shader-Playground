@@ -9,8 +9,8 @@ export interface TextFieldProps {
   dataTestId?: string;
   id?: string;
   maxLength?: number;
-  /** Switches to `var(--font-mono)` at 11px (design L257's mono value
-   * input). Omit for the default UI-font 12px body text (L129's Label
+  /** Switches to `var(--font-mono)` at 11px (dc "Select · inputs" mono
+   * value input). Omit for the default UI-font 12px body text (dc Name
    * input). */
   mono?: boolean;
   ariaLabel?: string;
@@ -23,8 +23,8 @@ export interface TextFieldProps {
 }
 
 /**
- * Native `<input>` skinned per design/Side Panel.dc.html L129 (Param label) /
- * L257 (mono value input). Kept as a real `<input>` so Playwright's
+ * Native `<input>` skinned per design/Side Panel.dc.html's Name input /
+ * "Select · inputs" mono value input. Kept as a real `<input>` so Playwright's
  * `fill()` keeps working against `data-testid="uniform-search"` and the
  * other native-input consumers.
  */

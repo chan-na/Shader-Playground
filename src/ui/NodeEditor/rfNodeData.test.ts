@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { paramNode } from "../../core/graph/testNodes";
 import type {
   GroupGraphNode,
   ParamGraphNode,
@@ -12,10 +13,6 @@ import {
   groupBoxHeight,
   pendingAddedIds,
 } from "./rfNodeData";
-
-function paramNode(id: string): ParamGraphNode {
-  return { id, kind: "param", paramKind: "float", value: 0 };
-}
 
 const STAND_IN = { width: 180, height: 64 };
 
@@ -61,7 +58,7 @@ describe("groupBoxHeight", () => {
   });
 
   it("returns the header height for a collapsed group", () => {
-    // [#37] The drop-target math used the stored `height` for the node being
+    // The drop-target math used the stored `height` for the node being
     // dragged, so a collapsed group's "center" sat ~135px below its visible
     // 30px header and reparented against whatever was under that empty point.
     expect(groupBoxHeight(group({ collapsed: true }))).toBe(
@@ -86,7 +83,7 @@ describe("addedPanDecision — framing", () => {
   });
 
   it("returns null for a node fully inside the viewport", () => {
-    // [#38] The whole point of dropping the per-edit refit was that the
+    // The whole point of dropping the per-edit refit was that the
     // viewport stops moving while the user works — an add in plain sight must
     // not move it either.
     expect(panTarget(view, [card(400, 200)])).toBeNull();

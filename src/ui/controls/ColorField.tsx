@@ -9,7 +9,8 @@ export interface ColorFieldProps {
   disabled?: boolean;
 }
 
-/** Swatch + hex chip pair (design/Side Panel.dc.html L92, L264). The
+/** Swatch + hex chip pair (design/Side Panel.dc.html "color picker" and
+ * "Color" samples). The
  * native `<input type="color">` is an invisible overlay on top of the
  * swatch so the whole 30x30 square is clickable, matching the mock's
  * visual while keeping the OS color picker as the actual UI.
@@ -27,7 +28,7 @@ export function ColorField({
   const hex = rgbToHex(rgb);
 
   return (
-    // [L1/E-4] No new CSS class for the disabled dim — inline opacity only,
+    // No new CSS class for the disabled dim — inline opacity only,
     // applied here rather than in controls.css so it stays scoped to the
     // driven-uniform case (design 무침습 사다리 3단).
     <div className="ctl-color" style={disabled ? { opacity: 0.5 } : undefined}>

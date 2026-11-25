@@ -1,13 +1,20 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
+import {
+  bootApp,
+  selectNode,
+  setGraph,
+  trivialMeshGraph,
+} from "./helpers/fixtures";
+import { expectNoRendererErrors } from "./helpers/render";
 import { readSp, withSp } from "./helpers/sp";
 
 // Phase 30 — group collapse/expand (+ header double-click rename). Collapsing
 // is a pure editor-layer concern: the ExecutionPlan never sees groups, so a
 // collapsed group hides its descendants and shrinks to its header without ever
-// touching the render path. These tests cover the store toggle, the DOM
-// hide/restore of descendants, the chevron button, loading a pre-collapsed
-// graph, inline rename, and a render-loop regression guard.
+// touching the render path. These tests cover the DOM hide/restore of
+// descendants, the chevron button, loading a pre-collapsed graph, inline
+// rename, and a render-loop regression guard. The store toggle itself is
+// unit-tested in graphStore.test.ts.
 //
 // NOTE: readSp/withSp callbacks are serialized to the browser, so closure
 // variables (like `gid`) are NOT available inside them — we always read state
@@ -27,45 +34,6 @@ test.describe("Phase 30 — group collapse/expand", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await bootApp(page);
-  });
-
-  test("toggleGroupCollapsed flips the collapsed flag and bumps rev", async ({
-    page,
-  }) => {
-    await setGraph(page, trivialMeshGraph(), {
-      m1: { x: 100, y: 100 },
-      s1: { x: 300, y: 100 },
-      o1: { x: 500, y: 100 },
-    });
-
-    const gid = await withSp(
-      page,
-      (sp) =>
-        sp.graph
-          .getState()
-          .addGroup("G", { x: 50, y: 50 }, { width: 400, height: 300 }),
-      null,
-    );
-
-    const beforeRev = await readSp(page, (sp) => sp.graph.getState().rev);
-    await withSp(
-      page,
-      (sp, args) => sp.graph.getState().toggleGroupCollapsed(args.gid),
-      { gid },
-    );
-
-    expect(await collapsedOf(page, gid)).toBe(true);
-    expect(await readSp(page, (sp) => sp.graph.getState().rev)).toBe(
-      beforeRev + 1,
-    );
-
-    // Toggling again expands.
-    await withSp(
-      page,
-      (sp, args) => sp.graph.getState().toggleGroupCollapsed(args.gid),
-      { gid },
-    );
-    expect(await collapsedOf(page, gid)).toBe(false);
   });
 
   test("collapsing a group hides its descendants in the DOM; expanding restores them", async ({
@@ -210,7 +178,7 @@ test.describe("Phase 30 — group collapse/expand", () => {
     if (gid === null) throw new Error("groupSelected returned null");
 
     // Clear selection so the NodeResizer overlay isn't covering the header.
-    await withSp(page, (sp) => sp.selection.getState().select(null), null);
+    await selectNode(page, null);
 
     const label = page.locator(
       `[data-group-id="${gid}"] [data-testid="group-label-text"]`,
@@ -267,10 +235,6 @@ test.describe("Phase 30 — group collapse/expand", () => {
     await expect
       .poll(() => readSp(page, (sp) => sp.renderer.getState().stats.renderTick))
       .toBeGreaterThan(beforeTick);
-    const errors = await readSp(
-      page,
-      (sp) => sp.renderer.getState().stats.errors,
-    );
-    expect(errors).toEqual([]);
+    await expectNoRendererErrors(page);
   });
 });

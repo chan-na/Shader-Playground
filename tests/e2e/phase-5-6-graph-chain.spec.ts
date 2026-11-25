@@ -1,7 +1,8 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { expectCanvasRendered, readCanvasStats } from "./helpers/canvas";
-import { bootApp, setGraph } from "./helpers/fixtures";
+import { boxOf } from "./helpers/dom";
+import { bootApp, loadChainDemo, setGraph } from "./helpers/fixtures";
 import { readSp, waitForRev, withSp } from "./helpers/sp";
 
 const handleSel = (nodeId: string, handleId: string) =>
@@ -82,18 +83,6 @@ async function settledViewport(page: Page): Promise<void> {
       { message: "the canvas transform never settled", intervals: [80] },
     )
     .toBe(true);
-}
-
-/** A locator's box, or a thrown error naming it — `boundingBox()` returns null
- *  only for something not laid out at all, which is never a case these specs
- *  want to fold into an arithmetic default. */
-async function boxOf(
-  locator: Locator,
-  what: string,
-): Promise<{ x: number; y: number; width: number; height: number }> {
-  const box = await locator.boundingBox();
-  if (!box) throw new Error(`${what} has no layout box`);
-  return box;
 }
 
 /**
@@ -321,7 +310,7 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
     ]);
   });
 
-  // Regression [#38 follow-up]: every add path drops its node at a fixed flow
+  // Regression: every add path drops its node at a fixed flow
   // coordinate, and the editor no longer refits the canvas on a plain add — so
   // with the view parked elsewhere the new node appeared outside the viewport
   // with no feedback at all, as if the menu had done nothing. It has to be
@@ -400,8 +389,8 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
     expect(farAfter?.width ?? 0).toBeLessThan(framedWidth * 1.25);
   });
 
-  // Regression [#38 follow-up, round 2]: the "is it visible?" test above only
-  // means anything if it runs against the card's real box. React Flow fills
+  // Regression: the "is it visible?" test above only means anything if it
+  // runs against the card's real box. React Flow fills
   // `measured` from a ResizeObserver, and the browser delivers those callbacks
   // *after* the frame's requestAnimationFrame callbacks — so on the frame the
   // decision runs, a card that mounted with this commit has no measurement at
@@ -501,8 +490,8 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
     expect(box.y + 64 * before.zoom).toBeLessThan(paneNow.y);
   });
 
-  // Regression [#38 follow-up, round 2]: the pan is armed as a single
-  // requestAnimationFrame, and React runs the effect's cleanup — cancelling
+  // Regression: the pan is armed as a single requestAnimationFrame, and React
+  // runs the effect's cleanup — cancelling
   // that frame — the moment any later commit changes the node array. The set
   // difference that spotted the add was consumed by the run that got cancelled,
   // so a second commit landing inside the same 16ms frame dropped the pan
@@ -643,26 +632,9 @@ test.describe("Phase 5-6 — node graph & multi-shader chain", () => {
   }) => {
     const canvas = page.getByTestId("viewport-canvas");
 
-    // Use the built-in Chain demo via the toolbar's Presets menu (M1-U3
-    // moved the demo-graph buttons behind a "Presets" dropdown) — this still
-    // exercises both the store and the real preset wiring. The dropdown's
-    // items carry an explicit role="menuitem" (AppToolbar's ToolbarMenu,
-    // matching the App Shell.dc.html dropdown pattern), which overrides the
-    // <button>'s implicit "button" role for accessibility-tree queries — so
-    // the item itself must be queried by role="menuitem", not "button".
-    await page.getByRole("button", { name: "Presets" }).click();
-    await page.getByRole("menuitem", { name: "Chain", exact: true }).click();
-
-    // Wait for the new graph to be loaded.
-    await expect
-      .poll(() =>
-        readSp(page, (sp) =>
-          sp.graph.getState().nodes.find((n) => n.id === "tonemap1")
-            ? "ok"
-            : "no",
-        ),
-      )
-      .toBe("ok");
+    // The built-in Chain demo via the real toolbar Presets menu — exercises
+    // both the store and the preset wiring.
+    await loadChainDemo(page);
 
     const stats = await expectCanvasRendered(canvas, { ratio: 0.2 });
     expect(stats.spread).toBeGreaterThan(20);

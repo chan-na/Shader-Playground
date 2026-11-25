@@ -25,7 +25,7 @@ function meshSourceNode(graph: Graph, shaderNodeId: string) {
 
 /**
  * Label for a shader pass's mesh input, one of:
- *  - "fullscreen quad" — the auto-substituted fullscreen pass (A-1).
+ *  - "fullscreen quad" — the auto-substituted fullscreen pass.
  *  - "" — compute-driven; the caller renders the driving ComputeNode's own
  *    row instead of a mesh label here.
  *  - the built-in primitive name, or the loaded asset's display name.
@@ -60,6 +60,58 @@ function meshLabelFor(
 }
 
 /**
+ * Source-node kinds that hand `bindSamplers` a texture even when the plan
+ * itself carries none for them:
+ *  - shader/compute — a source that failed to compile has no entry in
+ *    `shaderPassByNode`, but `execute.ts` binds its opaque-black placeholder
+ *    (`ensureBlankTexture`) rather than skipping the unit.
+ *  - webcam/video/audio — external sources live outside the plan (they
+ *    survive recompiles) and their texture appears/disappears per frame, so
+ *    no compile-time verdict is possible. Treated as resolved: claiming
+ *    "unbound" for the frame or two before the first upload would be a false
+ *    alarm on every working webcam graph.
+ */
+const SELF_TEXTURING_KINDS: ReadonlySet<string> = new Set([
+  "shader",
+  "compute",
+  "webcam",
+  "video",
+  "audio",
+]);
+
+/**
+ * Sampler uniform names whose edge exists but whose source produces no
+ * texture at all — an ImageNode with no `assetId`, or one whose asset never
+ * made it into `plan.imageTextures` (catalog miss on a restored session,
+ * bitmap not decoded, `createImageTexture` threw). `execute.ts`'s
+ * `bindSamplers` `continue`s over exactly these, so no `uniform1i` and no
+ * `bindTexture` happens for them and the sampler keeps its link-time default
+ * of unit 0.
+ *
+ * This is the samplers-column counterpart to `meshLabelFor`'s
+ * "(asset not loaded)" fallback above: the Pass Inspector's whole premise is
+ * "what actually runs this frame", so an edge alone must not be reported as a
+ * binding. Mirrors the `bindSamplers` lookup order exactly (pass → plan image
+ * → external), which is why an absent source node counts as unresolved —
+ * `execute.ts` skips that unit too.
+ */
+function emptySourceSamplers(
+  plan: ExecutionPlan,
+  graph: Graph,
+  samplers: ReadonlyArray<{ uniformName: string; sourceNodeId: string }>,
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of samplers) {
+    if (plan.shaderPassByNode.has(s.sourceNodeId)) continue;
+    if (plan.imageTextures[s.sourceNodeId] !== undefined) continue;
+    const src = graph.nodes.find((n) => n.id === s.sourceNodeId);
+    if (src && SELF_TEXTURING_KINDS.has(src.kind)) continue;
+    out.add(s.uniformName);
+  }
+  return out;
+}
+
+/**
  * Turn a compiled `ExecutionPlan` into the shallow row summary the Pass
  * Inspector (leaf `passPlanStore`) displays. Preserves `plan.passes` order,
  * which is the same topological order `executePlan` draws in.
@@ -69,10 +121,10 @@ function meshLabelFor(
  * primitive read straight off the pass/node — recompile already runs on
  * every structural graph edit, so allocating a second nested copy of pass
  * state here would add avoidable GC pressure on top of that. `silentWarnings`
- * is the one field genuinely computed here (E-1, T2): it's a `parseUniforms`
+ * is the one field genuinely computed here: it's a `parseUniforms`
  * pass plus a small set diff, cheap enough at recompile frequency (not a RAF
  * hot path — see `Viewport/index.tsx`'s `recompile`). `buildVaryingContracts`
- * below is the same story for A-2 (T4): one `computeVaryingContract` call per
+ * below is the same story for the varying contract: one `computeVaryingContract` call per
  * shader node, i.e. two `buildSymbolTable` passes — also recompile-frequency,
  * not RAF.
  */
@@ -100,11 +152,11 @@ export function buildPassRows(
     const shaderNode =
       node && node.kind === "shader" ? (node as ShaderGraphNode) : null;
     const resolutionScale = shaderNode?.resolutionScale ?? 1;
-    // Declared-uniform set for E-1 is read from the *compiled* vertex source
+    // Declared-uniform set for silent-warning diffing is read from the *compiled* vertex source
     // (plan.compiledVertexSource), not node.vertexSource — a fullscreen-
     // substituted node's user vertex declarations never reached the GL
     // compiler, so asserting against them would manufacture warning noise
-    // (see compile.ts:144-153's doc on why compiledVertexSource exists).
+    // (see `ExecutionPlan.compiledVertexSource`'s doc in compile.ts).
     const silentWarnings = shaderNode
       ? computeSilentUniformWarnings(
           parseUniforms(
@@ -115,6 +167,7 @@ export function buildPassRows(
             ...pass.samplers.map((s) => s.uniformName),
             ...pass.paramBindings.map((p) => p.uniformName),
           ]),
+          emptySourceSamplers(plan, graph, pass.samplers),
         )
       : [];
     rows.push({
@@ -141,7 +194,7 @@ export function buildPassRows(
 }
 
 /**
- * Vertex↔fragment varying contract per shader node (A-2, T4), for the Pass
+ * Vertex↔fragment varying contract per shader node, for the Pass
  * Inspector to surface via `passPlanStore.varyingsByNode`.
  *
  * Reads `plan.compiledVertexSource[node.id]` — the vertex source actually

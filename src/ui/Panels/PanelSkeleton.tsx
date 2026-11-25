@@ -1,6 +1,6 @@
 /**
- * Side-panel loading placeholder (design/System States.dc.html L332-341,
- * "panel: SKELETON" state, M7-U1). SidePanel mounts this in place of
+ * Side-panel loading placeholder (design/System States.dc.html
+ * "panel: SKELETON" state). SidePanel mounts this in place of
  * Inspector/AssetBrowser/ProblemsPanel while bootstrapStore's phase isn't
  * yet "done" — the fields those panels would show (uniforms, assets,
  * diagnostics) don't exist until the restored/demo graph lands, so this

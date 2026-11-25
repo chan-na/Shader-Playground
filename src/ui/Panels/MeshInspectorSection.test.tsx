@@ -1,25 +1,15 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { MeshGraphNode } from "../../core/graph/types";
-import { useAssetStore } from "../../state/assetStore";
 import { useGraphStore } from "../../state/graphStore";
 import type { ShaderPassRow } from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
+import { resetAllStores } from "../../state/testStores";
 import { MeshInspectorSection } from "./MeshInspectorSection";
-
-const initialAsset = useAssetStore.getState();
-const initialGraph = useGraphStore.getState();
-const initialPassPlan = usePassPlanStore.getState();
-
-function resetStores() {
-  useAssetStore.setState(initialAsset, true);
-  useGraphStore.setState(initialGraph, true);
-  usePassPlanStore.setState(initialPassPlan, true);
-}
 
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
 });
 
 function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {

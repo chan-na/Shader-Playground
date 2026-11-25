@@ -6,8 +6,8 @@ export interface VaryingBridgeSectionProps {
 }
 
 /**
- * [A-2, T4] Row rendering rule for `missing-out`/`type-mismatch`: both share
- * the same confidence/usage mitigation ladder (spelled out in the unit brief)
+ * Row rendering rule for `missing-out`/`type-mismatch`: both share
+ * the same confidence/usage mitigation ladder
  * — a real link-error warning only fires when the diff is both confident
  * *and* the fragment side statically uses the varying. Order matters: an
  * unused declaration is muted-quiet even under low confidence (there's
@@ -40,7 +40,7 @@ function riskGlyphAndNote(
  */
 const HOLD_NOTE = "(파서가 확신할 수 없는 선언 형태 — 판정 보류)";
 
-/** [A-2, T4] Same caption-style block SystemUniformsSection uses for its
+/** Same caption-style block SystemUniformsSection uses for its
  *  explanatory note (11px, `var(--text-secondary)`, no card/border). */
 const CAPTION_STYLE = {
   color: "var(--text-secondary)",
@@ -58,7 +58,7 @@ const ROW_STYLE = {
 } as const;
 
 /**
- * [A-2, T4] "Varyings (vertex ▸ fragment)" Inspector section — the vertex
+ * "Varyings (vertex ▸ fragment)" Inspector section — the vertex
  * `out` ↔ fragment `in` link contract GLSL enforces at link time but this
  * app has never shown anywhere (there is no port/edge for it). Data comes
  * straight from `passPlanStore.varyingsByNode`, published once per recompile

@@ -8,6 +8,11 @@
  * (no full lexer/AST): it covers the patterns the playground's shaders use
  * and gracefully ignores anything it doesn't understand instead of throwing.
  *
+ * Sibling modules: `glslDecl.ts` holds the lexical/declarator helpers this
+ * parser and the reference consumers share; `symbolScope.ts` answers the
+ * per-line scope queries (`symbolsVisibleAt`, `resolveSymbol`) over a table
+ * built here.
+ *
  * Consumers:
  *   - autocomplete (`ui/CodeEditor/autocomplete.ts`) — in-scope locals plus
  *     file-level symbols.
@@ -21,10 +26,17 @@
 
 // biome-ignore-all lint/style/noNonNullAssertion: noUncheckedIndexedAccess + regex captures with documented length guards
 
+import {
+  bracketDepth,
+  formatParameters,
+  parseFunctionParameters,
+  splitTopLevelDeclarators,
+} from "./glslDecl";
+import { IDENT_RE } from "./ident";
 import { maskComments } from "./stripComments";
 
 // One union literal kept inline on `GlslSymbol.kind` — exporting it as a named
-// alias used to land in knip's "unused export" report (consumers always read
+// alias lands in knip's "unused export" report (consumers always read
 // the field through `GlslSymbol`, never the alias).
 type GlslSymbolKind =
   | "uniform"
@@ -74,8 +86,6 @@ const STORAGE_QUALIFIERS: Record<string, GlslSymbolKind> = {
   const: "const",
 };
 
-const IDENT_TOKEN = /[A-Za-z_][\w]*/;
-
 // Leading interpolation qualifiers (`flat out int v_id;`, `centroid in vec2
 // v;`) are consumed by a non-capturing group so capture-group indices — and
 // the column arithmetic below that keys off `sm[2]`/`sm[3]` — stay unchanged.
@@ -114,46 +124,6 @@ const RE_STORAGE_DECL =
 const RE_LOCAL_DECL =
   /^\s*(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+([A-Za-z_][\w]*)\s*(?:\[\d+\])?\s*(?:=\s*[^,;]+)?\s*([,;])/;
 
-/** Net bracket depth of `s` — positive if it leaves ()/[]/{} open. */
-function bracketDepth(s: string): number {
-  let d = 0;
-  for (const c of s) {
-    if (c === "(" || c === "[" || c === "{") d++;
-    else if (c === ")" || c === "]" || c === "}") d--;
-  }
-  return d;
-}
-
-/**
- * Split a declaration tail (`, b = mix(x, y), c;`) into declarator segments at
- * brace/paren depth-0 commas, stopping at the depth-0 semicolon. Commas nested
- * inside a function-call / array initializer are NOT separators, so
- * `vec3 c = mix(a, b, t);` yields no extra declarators (b/t are call args).
- */
-function splitTopLevelDeclarators(tail: string): string[] {
-  const out: string[] = [];
-  let depth = 0;
-  let seg = "";
-  for (const ch of tail) {
-    if (ch === "(" || ch === "[" || ch === "{") {
-      depth++;
-      seg += ch;
-    } else if (ch === ")" || ch === "]" || ch === "}") {
-      depth = Math.max(0, depth - 1);
-      seg += ch;
-    } else if (depth === 0 && ch === ";") {
-      out.push(seg);
-      return out;
-    } else if (depth === 0 && ch === ",") {
-      out.push(seg);
-      seg = "";
-    } else {
-      seg += ch;
-    }
-  }
-  if (seg.trim()) out.push(seg);
-  return out;
-}
 const RE_STRUCT = /^\s*struct\s+([A-Za-z_][\w]*)\s*\{/;
 // Function declaration header: `<returnType> <name>(<params>) [const]? {`.
 // We require the trailing `{` on the same line — multi-line headers are rare
@@ -174,226 +144,7 @@ const NOT_A_FUNCTION = new Set([
   "case",
 ]);
 
-/**
- * Struct head, mirroring {@link RE_STRUCT} but matched against a whole masked
- * source with the `m` flag (`[ \t]*` rather than `\s*` so `^` really means
- * start-of-line). Drives {@link structBodyRanges}.
- */
-const RE_STRUCT_HEAD = /^[ \t]*struct\s+[A-Za-z_][\w]*\s*\{/gm;
-
-/**
- * Absolute offset ranges covering struct *bodies* — the span strictly between
- * a `struct Foo {` head's `{` and its matching `}` — in a comment-masked
- * source. Module-local: consumers want the narrower
- * {@link structMemberNameOffsets}.
- *
- * `masked` must already have comments blanked (see `stripComments.ts`) so a
- * brace inside a comment cannot move the walk.
- */
-function structBodyRanges(masked: string): Array<{ from: number; to: number }> {
-  const ranges: Array<{ from: number; to: number }> = [];
-  RE_STRUCT_HEAD.lastIndex = 0;
-  let m = RE_STRUCT_HEAD.exec(masked);
-  while (m !== null) {
-    const open = masked.indexOf("{", m.index);
-    if (open < 0) break;
-    let depth = 0;
-    // An unbalanced body runs to end-of-source, matching how parseSymbolTable
-    // keeps `structDepth` raised until brace depth returns to zero.
-    let close = masked.length;
-    for (let k = open; k < masked.length; k++) {
-      const ch = masked[k];
-      if (ch === "{") depth += 1;
-      else if (ch === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          close = k;
-          break;
-        }
-      }
-    }
-    ranges.push({ from: open + 1, to: close });
-    // Nested heads inside this body are already covered by the range.
-    RE_STRUCT_HEAD.lastIndex = close;
-    m = RE_STRUCT_HEAD.exec(masked);
-  }
-  return ranges;
-}
-
-/** Qualifiers that may precede a struct member's type token. */
-const MEMBER_TYPE_QUALIFIERS = new Set(["highp", "mediump", "lowp", "struct"]);
-
-function isIdentStart(ch: string): boolean {
-  return /[A-Za-z_]/.test(ch);
-}
-
-function isIdentPart(ch: string): boolean {
-  return /[A-Za-z0-9_]/.test(ch);
-}
-
-/**
- * Absolute offsets of every struct **member declarator name** in a
- * comment-masked source — the `color` in `struct Light { vec3 color; };`.
- *
- * Struct members are not indexed by this parser (see `structDepth` in
- * {@link parseSymbolTable}), so an identifier inside a struct body resolves to
- * whatever *global* happens to share its name. That is harmless for hover but
- * catastrophic for rename: renaming `uniform vec3 color` would also rewrite
- * the unrelated member declaration `vec3 color;` inside `struct Light`, while
- * every `light.color` access is skipped by the member-access guard — the
- * shader stops compiling. Reference consumers therefore drop matches that
- * start at one of these offsets.
- *
- * Only the *name* position is excluded, never the whole body. A member's type
- * token and any array-size expression are ordinary references to real globals:
- * `struct Outer { Inner i; };` genuinely uses the struct `Inner`, and
- * `float v[MAX];` genuinely uses the const `MAX`. Skipping those would recreate
- * the same broken-shader failure from the other side — the declaration renamed,
- * the use left behind.
- *
- * Known limitation: members of an *embedded* struct definition
- * (`struct Outer { struct Inner { float a; } i; };`) are not collected — only
- * the outer declarator `i` is. GLSL ES forbids embedded struct definitions, so
- * this shape cannot compile in the playground anyway.
- */
-export function structMemberNameOffsets(masked: string): Set<number> {
-  const out = new Set<number>();
-  for (const body of structBodyRanges(masked)) {
-    collectMemberNames(masked, body.from, body.to, out);
-  }
-  return out;
-}
-
-/**
- * Walk one struct body, recording the offset of each declarator name. State is
- * a three-way "what does the next depth-0 identifier mean" flag: the type comes
- * first, then one name per depth-0 comma-separated declarator, reset at each
- * depth-0 `;`. Identifiers nested in `[...]` / `(...)` / an embedded body are
- * never names.
- */
-function collectMemberNames(
-  masked: string,
-  from: number,
-  to: number,
-  out: Set<number>,
-): void {
-  let depth = 0;
-  let expectType = true;
-  let expectName = false;
-  let i = from;
-  while (i < to) {
-    const ch = masked[i]!;
-    if (ch === "[" || ch === "(" || ch === "{") {
-      depth += 1;
-      i += 1;
-      continue;
-    }
-    if (ch === "]" || ch === ")" || ch === "}") {
-      depth = Math.max(0, depth - 1);
-      // Closing an embedded `struct … { … }`: the identifier that follows is
-      // the member declarator for it.
-      if (ch === "}" && depth === 0) {
-        expectType = false;
-        expectName = true;
-      }
-      i += 1;
-      continue;
-    }
-    if (depth === 0 && ch === ",") {
-      expectName = true;
-      i += 1;
-      continue;
-    }
-    if (depth === 0 && ch === ";") {
-      expectType = true;
-      expectName = false;
-      i += 1;
-      continue;
-    }
-    if (!isIdentStart(ch)) {
-      i += 1;
-      continue;
-    }
-    let j = i + 1;
-    while (j < to && isIdentPart(masked[j]!)) j += 1;
-    if (depth === 0) {
-      if (expectName) {
-        out.add(i);
-        expectName = false;
-      } else if (
-        expectType &&
-        !MEMBER_TYPE_QUALIFIERS.has(masked.slice(i, j))
-      ) {
-        expectType = false;
-        expectName = true;
-      }
-    }
-    i = j;
-  }
-}
-
-/**
- * True when the identifier starting at `index` is a member/swizzle access —
- * i.e. the nearest preceding non-blank character on the same line is `.`.
- *
- * `v.xyz`, `light.color` and `s.color.rgb` all bind to a *member*, never to
- * the global that happens to share the name, so reference/rename consumers
- * must not treat them as occurrences.
- *
- * Known limitation, deliberately left unhandled: a dot separated from its
- * member by a **line break** (`light\n  .color`) is not detected — the guard
- * only looks backwards within the current line. GLSL style in this playground
- * never wraps member access, and a cross-line walk would need the caller to
- * pass the whole document rather than one masked line.
- */
-export function precededByDot(line: string, index: number): boolean {
-  let k = index - 1;
-  while (k >= 0) {
-    const ch = line[k];
-    if (ch !== " " && ch !== "\t") break;
-    k -= 1;
-  }
-  return k >= 0 && line[k] === ".";
-}
-
-/**
- * Splits a function-parameter list (without surrounding parens) into
- * individual `{ qualifier?, type, name }` entries. Empty or `void` lists yield
- * an empty array. Default-value initializers are not supported by GLSL ES so
- * we don't attempt to parse them.
- */
-export function parseFunctionParameters(
-  list: string,
-): Array<{ type: string; name: string }> {
-  const trimmed = list.trim();
-  if (!trimmed || trimmed === "void") return [];
-  const out: Array<{ type: string; name: string }> = [];
-  for (const raw of trimmed.split(",")) {
-    const part = raw.trim();
-    if (!part) continue;
-    // Strip leading qualifiers (`in` / `out` / `inout` / precision).
-    const m =
-      /^(?:(?:in|out|inout)\s+)?(?:(?:highp|mediump|lowp)\s+)?(\w+)\s+([A-Za-z_][\w]*)\s*(?:\[\d+\])?\s*$/.exec(
-        part,
-      );
-    if (!m) continue;
-    out.push({ type: m[1]!, name: m[2]! });
-  }
-  return out;
-}
-
-/**
- * Returns a parameter list rendered back to its canonical `"type name, type
- * name"` form (no surrounding parens). Used as the `parameters` field on
- * function symbols for hover / autocomplete `detail`.
- */
-function formatParameters(
-  params: Array<{ type: string; name: string }>,
-): string {
-  return params.map((p) => `${p.type} ${p.name}`).join(", ");
-}
-
-// Memoization (L25). `buildSymbolTable` is a pure function of `source`, but the
+// Memoization. `buildSymbolTable` is a pure function of `source`, but the
 // editor calls it on every hover / autocomplete / go-to-def / semantic-token /
 // reference query — frequently several times against the *same* unchanged
 // source between two edits (one cursor move fires hover + autocomplete +
@@ -403,9 +154,9 @@ function formatParameters(
 // thrash; we keep a small LRU keyed by the source string.
 //
 // Safety: the returned SymbolTable and its GlslSymbol entries are treated as
-// read-only by every consumer. `symbolsVisibleAt` builds its result from a
-// fresh array (and hands out a copy of the memoized one — see
-// VISIBLE_AT_CACHE), `resolveSymbol` only reads, and references/semanticTokens
+// read-only by every consumer. `symbolsVisibleAt` (`symbolScope.ts`) builds
+// its result from a fresh array (and hands out a copy of the memoized one —
+// see `VISIBLE_AT_CACHE`), `resolveSymbol` only reads, and references/semanticTokens
 // reach the table exclusively through those two helpers. Sharing a cached
 // instance across callers is therefore safe — no consumer mutates it.
 const SYMBOL_TABLE_CACHE_MAX = 8;
@@ -482,113 +233,156 @@ function parseSymbolTable(source: string): SymbolTable {
     // line is recorded at the outer scope, and locals inside the function
     // body (which start the line AFTER `{`) land at depth >= 1.
     if (depth === 0 && structDepth === 0 && parenDepth === 0) {
-      // Storage-qualifier (uniform/in/out/attribute/varying/const).
-      const sm = RE_STORAGE_DECL.exec(code);
-      if (sm) {
-        const kind = STORAGE_QUALIFIERS[sm[1]!]!;
-        const type = sm[2]!;
-        const name = sm[3]!;
-        const col = code.indexOf(name, code.indexOf(type) + type.length) + 1;
-        symbols.push({
-          name,
-          type,
-          kind,
-          line: lineNo,
-          column: col,
-          scope: null,
-        });
-        // Comma multi-declaration (`out vec2 v_uv, v_st;`): same walk as the
-        // local-decl harvester below, including the bracketDepth guard so a
-        // comma inside a `const` initializer's call arguments is not
-        // harvested as a phantom global. `sm[0]` starts at offset 0 (the
-        // regex is `^`-anchored), so the tail begins at its length.
-        if (sm[4] === "," && bracketDepth(sm[0]) === 0) {
-          const tail = code.slice(sm[0].length);
-          let cursor = sm[0].length;
-          for (const declarator of splitTopLevelDeclarators(tail)) {
-            const m2 = IDENT_TOKEN.exec(declarator);
-            if (!m2) continue;
-            const idx = code.indexOf(m2[0], cursor);
-            if (idx < 0) continue;
-            symbols.push({
-              name: m2[0],
-              type,
-              kind,
-              line: lineNo,
-              column: idx + 1,
-              scope: null,
-            });
-            cursor = idx + m2[0].length;
-          }
-        }
-        // fall through — counting braces below is still cheap and harmless.
-      } else {
-        const stm = RE_STRUCT.exec(code);
-        if (stm) {
-          const name = stm[1]!;
-          const col = code.indexOf(name, code.indexOf("struct") + 6) + 1;
+      // Storage-qualifier declarations (uniform/in/out/attribute/varying/
+      // const), scanned REPEATEDLY across the line rather than once. A line
+      // may carry more than one `;`-terminated declaration — `out vec2 v_uv;
+      // out vec3 v_n;`, or one trailing a single-line `struct L { vec3 c; };`
+      // / `precision highp float;` — and stopping at the first would drop
+      // every later name from the table. `computeVaryingContract` would then
+      // report the fragment's input as a *confident* "vertex가 제공하지
+      // 않음" warning for a program that links fine (mirror direction: a
+      // consumed varying rendered as a confident "unused" row). Restarts are
+      // only attempted where the line's brackets are balanced (`lineDepth`),
+      // so a member inside `struct L { … }` or a body opened on this line can
+      // never be harvested as a global.
+      let scanFrom = 0;
+      let lineDepth = 0;
+      let firstAttempt = true;
+      while (scanFrom < code.length) {
+        const seg = code.slice(scanFrom);
+        const sm = lineDepth === 0 ? RE_STORAGE_DECL.exec(seg) : null;
+        let advance: number;
+        if (sm) {
+          const kind = STORAGE_QUALIFIERS[sm[1]!]!;
+          const type = sm[2]!;
+          const name = sm[3]!;
+          const col =
+            scanFrom + seg.indexOf(name, seg.indexOf(type) + type.length) + 1;
           symbols.push({
             name,
-            type: "struct",
-            kind: "struct",
+            type,
+            kind,
             line: lineNo,
             column: col,
             scope: null,
           });
-          structDepth += 1;
-          // Count remaining braces on this line below.
-        } else {
-          const fm = RE_FUNCTION_HEADER.exec(code);
-          if (
-            fm &&
-            !NOT_A_FUNCTION.has(fm[1]!) &&
-            !NOT_A_FUNCTION.has(fm[2]!)
-          ) {
-            const returnType = fm[1]!;
-            const name = fm[2]!;
-            const paramsRaw = fm[3]!;
-            const params = parseFunctionParameters(paramsRaw);
-            const col =
-              code.indexOf(name, code.indexOf(returnType) + returnType.length) +
-              1;
-            symbols.push({
-              name,
-              type: returnType,
-              kind: "function",
-              line: lineNo,
-              column: col,
-              scope: null,
-              parameters: formatParameters(params),
-            });
-            // Parameters belong inside the function body; they are recorded
-            // on the header's line at their own column. Two anchors keep that
-            // column honest (L32): a running cursor so parameter N is searched
-            // after parameter N-1's name, and each parameter's own type token
-            // so the search starts *after* the type. Without them a bare
-            // `indexOf(name, afterParen)` matches inside an earlier token —
-            // `void f(mat3 m)` would report the `m` of `mat3`, and
-            // `void f(vec3 v, float f)` the `f` of `float`. Falls back to the
-            // function name's column when a parameter can't be located.
-            let searchFrom = code.indexOf("(") + 1;
-            for (const p of params) {
-              const typeIdx = code.indexOf(p.type, searchFrom);
-              const anchor =
-                typeIdx >= 0 ? typeIdx + p.type.length : searchFrom;
-              const pCol = code.indexOf(p.name, anchor);
-              if (pCol >= 0) searchFrom = pCol + p.name.length;
+          // Comma multi-declaration (`out vec2 v_uv, v_st;`): same walk as the
+          // local-decl harvester below, including the bracketDepth guard so a
+          // comma inside a `const` initializer's call arguments is not
+          // harvested as a phantom global. `sm[0]` starts at offset 0 of the
+          // segment (the regex is `^`-anchored), so the tail begins at its
+          // length and every column is offset by `scanFrom`.
+          if (sm[4] === "," && bracketDepth(sm[0]) === 0) {
+            const tail = seg.slice(sm[0].length);
+            let cursor = sm[0].length;
+            for (const declarator of splitTopLevelDeclarators(tail)) {
+              const m2 = IDENT_RE.exec(declarator);
+              if (!m2) continue;
+              const idx = seg.indexOf(m2[0], cursor);
+              if (idx < 0) continue;
               symbols.push({
-                name: p.name,
-                type: p.type,
-                kind: "parameter",
+                name: m2[0],
+                type,
+                kind,
                 line: lineNo,
-                column: pCol >= 0 ? pCol + 1 : col,
-                scope: name,
+                column: scanFrom + idx + 1,
+                scope: null,
               });
+              cursor = idx + m2[0].length;
             }
-            // Enter the function body. Braces on this line are counted below.
-            currentFn = name;
           }
+          if (sm[4] === ";") {
+            advance = sm[0].length;
+          } else {
+            // A `,` terminator means the declarator list (or a call
+            // initializer) runs on; resume after the declaration's `;`.
+            const semi = seg.indexOf(";", sm[0].length);
+            advance = semi < 0 ? seg.length : semi + 1;
+          }
+          // fall through — counting braces below is still cheap and harmless.
+        } else {
+          if (firstAttempt) {
+            // Struct / function heads are only recognised at the start of a
+            // line, exactly as before — `firstAttempt` is true only while
+            // `scanFrom` is 0.
+            const stm = RE_STRUCT.exec(code);
+            if (stm) {
+              const name = stm[1]!;
+              const col = code.indexOf(name, code.indexOf("struct") + 6) + 1;
+              symbols.push({
+                name,
+                type: "struct",
+                kind: "struct",
+                line: lineNo,
+                column: col,
+                scope: null,
+              });
+              structDepth += 1;
+              // Count remaining braces on this line below.
+            } else {
+              const fm = RE_FUNCTION_HEADER.exec(code);
+              if (
+                fm &&
+                !NOT_A_FUNCTION.has(fm[1]!) &&
+                !NOT_A_FUNCTION.has(fm[2]!)
+              ) {
+                const returnType = fm[1]!;
+                const name = fm[2]!;
+                const paramsRaw = fm[3]!;
+                const params = parseFunctionParameters(paramsRaw);
+                const col =
+                  code.indexOf(
+                    name,
+                    code.indexOf(returnType) + returnType.length,
+                  ) + 1;
+                symbols.push({
+                  name,
+                  type: returnType,
+                  kind: "function",
+                  line: lineNo,
+                  column: col,
+                  scope: null,
+                  parameters: formatParameters(params),
+                });
+                // Parameters belong inside the function body; they are
+                // recorded on the header's line at their own column. Two
+                // anchors keep that column honest: a running cursor so
+                // parameter N is searched after parameter N-1's name, and each
+                // parameter's own type token so the search starts *after* the
+                // type. Without them a bare `indexOf(name, afterParen)`
+                // matches inside an earlier token — `void f(mat3 m)` would
+                // report the `m` of `mat3`, and `void f(vec3 v, float f)` the
+                // `f` of `float`. Falls back to the function name's column
+                // when a parameter can't be located.
+                let searchFrom = code.indexOf("(") + 1;
+                for (const p of params) {
+                  const typeIdx = code.indexOf(p.type, searchFrom);
+                  const anchor =
+                    typeIdx >= 0 ? typeIdx + p.type.length : searchFrom;
+                  const pCol = code.indexOf(p.name, anchor);
+                  if (pCol >= 0) searchFrom = pCol + p.name.length;
+                  symbols.push({
+                    name: p.name,
+                    type: p.type,
+                    kind: "parameter",
+                    line: lineNo,
+                    column: pCol >= 0 ? pCol + 1 : col,
+                    scope: name,
+                  });
+                }
+                // Enter the function body. Braces on this line are counted
+                // below.
+                currentFn = name;
+              }
+            }
+          }
+          const semi = seg.indexOf(";");
+          if (semi < 0) break;
+          advance = semi + 1;
         }
+        firstAttempt = false;
+        lineDepth += bracketDepth(seg.slice(0, advance));
+        scanFrom += advance;
       }
     } else if (depth >= 1 && currentFn && structDepth === 0) {
       // Local variable declaration inside a function body. The first capture
@@ -627,7 +421,7 @@ function parseSymbolTable(source: string): SymbolTable {
             const tail = code.slice(lm[0].length);
             let cursor = code.indexOf(lm[0]) + lm[0].length;
             for (const declarator of splitTopLevelDeclarators(tail)) {
-              const m2 = IDENT_TOKEN.exec(declarator);
+              const m2 = IDENT_RE.exec(declarator);
               if (!m2) continue;
               const idx = code.indexOf(m2[0], cursor);
               if (idx < 0) continue;
@@ -697,108 +491,4 @@ function parseSymbolTable(source: string): SymbolTable {
   }
 
   return { symbols };
-}
-
-// Memoization (L21). `symbolsVisibleAt` is a pure function of (table, line)
-// but sits on the hottest path in the editor: `classifySemanticTokens` calls
-// `resolveSymbol` — hence this — once per *identifier*, and each uncached call
-// walks the whole symbol list twice (function scan + sort, then bucket) for
-// every identifier on the same line. Keyed by table **identity** (a WeakMap,
-// so the entry dies with the table) and then by line; keying on the line alone
-// would return one source's symbols for another's, which
-// `findReferencesAcrossStages` — two tables per call — would hit immediately.
-//
-// The cached array is never handed out directly: `symbolsVisibleAt` returns a
-// copy. `main.tsx` publishes this function on the DEV `window.__sp` bridge, so
-// E2E page code could otherwise sort or splice the cache in place.
-const VISIBLE_AT_CACHE = new WeakMap<SymbolTable, Map<number, GlslSymbol[]>>();
-
-/** Memoized inner form. Callers must not mutate the returned array. */
-function visibleAtCached(table: SymbolTable, line: number): GlslSymbol[] {
-  let perLine = VISIBLE_AT_CACHE.get(table);
-  if (perLine === undefined) {
-    perLine = new Map();
-    VISIBLE_AT_CACHE.set(table, perLine);
-  }
-  const hit = perLine.get(line);
-  if (hit !== undefined) return hit;
-  const computed = computeVisibleAt(table, line);
-  perLine.set(line, computed);
-  return computed;
-}
-
-/**
- * Returns symbols visible at the given line — globals plus any symbols whose
- * `scope` matches the function containing that line. The result is ordered:
- *   1. Locals of the enclosing function (declared on or before `line`).
- *   2. Parameters of the enclosing function.
- *   3. Globals (functions, structs, uniforms, ins/outs, etc.).
- * Duplicate names (e.g. a local shadowing a global) keep only the first
- * entry — which is the in-scope one — so consumers can treat the list as
- * deduplicated by name.
- *
- * Memoized per (table identity, line). The returned array is a fresh copy on
- * every call, so callers may sort or splice it freely.
- */
-export function symbolsVisibleAt(
-  table: SymbolTable,
-  line: number,
-): GlslSymbol[] {
-  return visibleAtCached(table, line).slice();
-}
-
-function computeVisibleAt(table: SymbolTable, line: number): GlslSymbol[] {
-  // Find the function whose declaration line is the latest one at or before
-  // `line` AND whose body still contains `line`. We approximate "body
-  // contains" by looking for the next function declaration after it: if
-  // there is one whose declaration line is also <= `line`, that one takes
-  // precedence. This works for sequential function definitions without
-  // having to track exact body end offsets.
-  const fns = table.symbols
-    .filter((s) => s.kind === "function")
-    .sort((a, b) => a.line - b.line);
-  let enclosing: string | null = null;
-  for (const fn of fns) {
-    if (fn.line <= line) enclosing = fn.name;
-    else break;
-  }
-
-  const locals: GlslSymbol[] = [];
-  const params: GlslSymbol[] = [];
-  const globals: GlslSymbol[] = [];
-  for (const s of table.symbols) {
-    if (s.scope === null) {
-      globals.push(s);
-    } else if (s.scope === enclosing) {
-      if (s.kind === "parameter") params.push(s);
-      else if (s.kind === "local" && s.line <= line) locals.push(s);
-    }
-  }
-
-  const out: GlslSymbol[] = [];
-  const seen = new Set<string>();
-  for (const s of [...locals, ...params, ...globals]) {
-    if (seen.has(s.name)) continue;
-    seen.add(s.name);
-    out.push(s);
-  }
-  return out;
-}
-
-/**
- * Resolve `name` at `line` to its declaration. Mirrors `symbolsVisibleAt`'s
- * priority: in-scope locals/parameters win over globals. Returns `null`
- * when no declaration matches.
- */
-export function resolveSymbol(
-  table: SymbolTable,
-  name: string,
-  line: number,
-): GlslSymbol | null {
-  // Reads the memoized array directly — no copy — because this loop only
-  // reads. Every identifier in the document funnels through here.
-  for (const s of visibleAtCached(table, line)) {
-    if (s.name === name) return s;
-  }
-  return null;
 }

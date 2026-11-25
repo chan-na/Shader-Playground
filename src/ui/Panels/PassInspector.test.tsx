@@ -1,39 +1,16 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComputeGraphNode, ShaderGraphNode } from "../../core/graph/types";
+import { computeNode, shaderNode } from "../../core/graph/testNodes";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
 import type { ComputePassRow, ShaderPassRow } from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
+import { resetAllStores } from "../../state/testStores";
 import { PassInspector } from "./PassInspector";
 
-const initialGraph = useGraphStore.getState();
-const initialPassPlan = usePassPlanStore.getState();
-const initialGpuTimer = useGpuTimerStore.getState();
-
-function shaderNode(id: string, name: string): ShaderGraphNode {
-  return {
-    id,
-    kind: "shader",
-    name,
-    vertexSource: "",
-    fragmentSource: "",
-    uniformValues: {},
-  };
-}
-
-function computeNode(id: string, name: string): ComputeGraphNode {
-  return {
-    id,
-    kind: "compute",
-    name,
-    vertexSource: "",
-    count: 1024,
-    primitive: "POINTS",
-    attributes: [],
-    uniformValues: {},
-  };
-}
+/** The one compute pass these tests publish; `count` shows up in the mesh
+ *  column ("POINTS ×1024"). */
+const PARTICLES = computeNode("compute1", { name: "Particles", count: 1024 });
 
 function computeRow(
   nodeId: string,
@@ -66,21 +43,19 @@ function shaderRow(
   };
 }
 
-function resetStores() {
-  useGraphStore.setState(initialGraph, true);
-  usePassPlanStore.setState(initialPassPlan, true);
-  useGpuTimerStore.setState(initialGpuTimer, true);
-}
-
-beforeEach(resetStores);
+beforeEach(resetAllStores);
 afterEach(() => {
   cleanup();
-  resetStores();
+  resetAllStores();
   vi.useRealTimers();
 });
 
 describe("PassInspector", () => {
   it("shows the empty state when there are no passes", () => {
+    // A *published* plan with no passes — the graph compiled and produced
+    // nothing. Distinct from "no renderer at all" below, which is why this
+    // now publishes rather than relying on the store's initial state.
+    usePassPlanStore.getState().publish([], {}, {});
     render(<PassInspector />);
     expect(
       screen.getByText("no passes — compile a shader node first"),
@@ -89,12 +64,36 @@ describe("PassInspector", () => {
     expect(screen.queryAllByTestId("pass-state-note")).toHaveLength(0);
   });
 
+  it("says the renderer is not running rather than claiming zero passes", () => {
+    // Viewport unmounted (panel closed): the rows survive for the surfaces
+    // that describe the *graph*, but this table describes *this frame*, so it
+    // must not list a disposed plan's passes — nor imply the graph has none.
+    useGraphStore.setState({
+      nodes: [shaderNode("noise1", { name: "Noise" })],
+    });
+    usePassPlanStore
+      .getState()
+      .publish([shaderRow({ nodeId: "noise1" })], {}, {});
+    usePassPlanStore.getState().markUnpublished();
+    render(<PassInspector />);
+
+    expect(
+      screen.getByText(
+        "renderer not running — open the Viewport panel to see this frame's passes",
+      ),
+    ).not.toBeNull();
+    expect(screen.queryAllByTestId("pass-row")).toHaveLength(0);
+    // The payload itself is untouched — this is a rendering decision, not a
+    // store reset (see passPlanStore.markUnpublished).
+    expect(usePassPlanStore.getState().rows).toHaveLength(1);
+  });
+
   it("renders rows in plan order with correct kind/FBO/mesh/sampler cells", () => {
     useGraphStore.setState({
       nodes: [
-        computeNode("compute1", "Particles"),
-        shaderNode("noise1", "Noise"),
-        shaderNode("blur1", "Blur"),
+        PARTICLES,
+        shaderNode("noise1", { name: "Noise" }),
+        shaderNode("blur1", { name: "Blur" }),
       ],
     });
     usePassPlanStore.getState().publish(
@@ -170,9 +169,47 @@ describe("PassInspector", () => {
     );
   });
 
+  // [12]: the Samplers column is the one surface whose premise is "what
+  // actually runs this frame" — an edge whose source has no texture must not
+  // read as a unit binding `execute.ts` never performs.
+  it("marks a sampler whose source produced no texture as 미바인딩, leaving sibling samplers alone", () => {
+    useGraphStore.setState({
+      nodes: [
+        shaderNode("blur1", { name: "Blur" }),
+        shaderNode("noise1", { name: "Noise" }),
+      ],
+    });
+    usePassPlanStore.getState().publish(
+      [
+        shaderRow({
+          nodeId: "blur1",
+          samplers: [
+            { uniformName: "u_tex", sourceNodeId: "img1", unit: 0 },
+            { uniformName: "u_prev", sourceNodeId: "noise1", unit: 1 },
+          ],
+          silentWarnings: [
+            { uniformName: "u_tex", kind: "sampler-source-empty" },
+          ],
+        }),
+      ],
+      {},
+      {},
+    );
+
+    render(<PassInspector />);
+
+    const cell = screen
+      .getByTestId("pass-row")
+      .querySelector('[data-testid="pass-samplers"]');
+    // img1 is not in the graph store, so nodeLabel falls back to the raw id.
+    expect(cell?.textContent).toBe(
+      "u_tex ← img1 (미바인딩), u_prev ← Noise (unit 1)",
+    );
+  });
+
   it("gives the compute row's State cell an explanatory title, no title on shader rows", () => {
     useGraphStore.setState({
-      nodes: [computeNode("compute1", "Particles"), shaderNode("s1", "S1")],
+      nodes: [PARTICLES, shaderNode("s1", { name: "S1" })],
     });
     usePassPlanStore
       .getState()
@@ -190,10 +227,7 @@ describe("PassInspector", () => {
 
   it("resolves a shader row's compute-driven mesh via the driving ComputePassRow", () => {
     useGraphStore.setState({
-      nodes: [
-        computeNode("compute1", "Particles"),
-        shaderNode("draw1", "Draw"),
-      ],
+      nodes: [PARTICLES, shaderNode("draw1", { name: "Draw" })],
     });
     usePassPlanStore.getState().publish(
       [
@@ -217,7 +251,7 @@ describe("PassInspector", () => {
   });
 
   it('falls back to "compute" when the driving ComputePassRow is missing', () => {
-    useGraphStore.setState({ nodes: [shaderNode("draw1", "Draw")] });
+    useGraphStore.setState({ nodes: [shaderNode("draw1", { name: "Draw" })] });
     usePassPlanStore.getState().publish(
       [
         shaderRow({
@@ -249,7 +283,9 @@ describe("PassInspector", () => {
   });
 
   it('renders "—" in the GPU ms column when the timer extension is unsupported', () => {
-    useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
+    useGraphStore.setState({
+      nodes: [shaderNode("noise1", { name: "Noise" })],
+    });
     usePassPlanStore
       .getState()
       .publish([shaderRow({ nodeId: "noise1" })], {}, {});
@@ -264,7 +300,9 @@ describe("PassInspector", () => {
   });
 
   it('renders "—" in the GPU ms column when the timer is disabled', () => {
-    useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
+    useGraphStore.setState({
+      nodes: [shaderNode("noise1", { name: "Noise" })],
+    });
     usePassPlanStore
       .getState()
       .publish([shaderRow({ nodeId: "noise1" })], {}, {});
@@ -279,7 +317,9 @@ describe("PassInspector", () => {
   });
 
   it("renders the formatted GPU ms when supported and enabled", () => {
-    useGraphStore.setState({ nodes: [shaderNode("noise1", "Noise")] });
+    useGraphStore.setState({
+      nodes: [shaderNode("noise1", { name: "Noise" })],
+    });
     usePassPlanStore
       .getState()
       .publish([shaderRow({ nodeId: "noise1" })], {}, {});
@@ -295,7 +335,7 @@ describe("PassInspector", () => {
 
   it("polls the live compute read side every 250ms while mounted, without any store publish", () => {
     vi.useFakeTimers();
-    useGraphStore.setState({ nodes: [computeNode("compute1", "Particles")] });
+    useGraphStore.setState({ nodes: [PARTICLES] });
     let read: "A" | "B" = "A";
     const rows = [computeRow("compute1", () => read)];
     usePassPlanStore.getState().publish(rows, {}, {});

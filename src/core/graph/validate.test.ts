@@ -1,20 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { meshNode, outputNode, shaderNode } from "./testNodes";
 import type { Graph } from "./types";
 import { isFatalValidation, topologicalOrder, validateGraph } from "./validate";
-
-const shader = (id: string) => ({
-  id,
-  kind: "shader" as const,
-  vertexSource: "",
-  fragmentSource: "",
-  uniformValues: {},
-});
-const mesh = (id: string) => ({
-  id,
-  kind: "mesh" as const,
-  primitive: "cube" as const,
-});
-const out = (id: string) => ({ id, kind: "output" as const });
 
 describe("validateGraph", () => {
   it("passes for empty graph", () => {
@@ -23,7 +10,13 @@ describe("validateGraph", () => {
 
   it("flags more than 4 Output nodes", () => {
     const g: Graph = {
-      nodes: [out("o1"), out("o2"), out("o3"), out("o4"), out("o5")],
+      nodes: [
+        outputNode("o1"),
+        outputNode("o2"),
+        outputNode("o3"),
+        outputNode("o4"),
+        outputNode("o5"),
+      ],
       edges: [],
     };
     const errors = validateGraph(g);
@@ -32,7 +25,13 @@ describe("validateGraph", () => {
 
   it("allows up to 4 Output nodes (split viewport)", () => {
     const g: Graph = {
-      nodes: [shader("s1"), out("o1"), out("o2"), out("o3"), out("o4")],
+      nodes: [
+        shaderNode("s1"),
+        outputNode("o1"),
+        outputNode("o2"),
+        outputNode("o3"),
+        outputNode("o4"),
+      ],
       edges: [],
     };
     expect(validateGraph(g).filter((e) => e.code !== "missing_node")).toEqual(
@@ -42,7 +41,7 @@ describe("validateGraph", () => {
 
   it("flags N:1 multi-input edges", () => {
     const g: Graph = {
-      nodes: [shader("a"), shader("b"), shader("c")],
+      nodes: [shaderNode("a"), shaderNode("b"), shaderNode("c")],
       edges: [
         {
           id: "e1",
@@ -68,7 +67,12 @@ describe("validateGraph", () => {
     // multi_input is scoped per (target, targetHandle): three sources feeding
     // three different sampler handles on one shader is a valid composite.
     const g: Graph = {
-      nodes: [shader("a"), shader("b"), shader("c"), shader("dst")],
+      nodes: [
+        shaderNode("a"),
+        shaderNode("b"),
+        shaderNode("c"),
+        shaderNode("dst"),
+      ],
       edges: [
         {
           id: "e1",
@@ -98,7 +102,7 @@ describe("validateGraph", () => {
 
   it("detects cycles", () => {
     const g: Graph = {
-      nodes: [shader("a"), shader("b")],
+      nodes: [shaderNode("a"), shaderNode("b")],
       edges: [
         {
           id: "e1",
@@ -121,7 +125,7 @@ describe("validateGraph", () => {
 
   it("flags edges referencing missing nodes", () => {
     const g: Graph = {
-      nodes: [shader("a")],
+      nodes: [shaderNode("a")],
       edges: [
         {
           id: "e1",
@@ -137,7 +141,7 @@ describe("validateGraph", () => {
 
   it("1:N fanout is allowed", () => {
     const g: Graph = {
-      nodes: [shader("a"), shader("b"), shader("c")],
+      nodes: [shaderNode("a"), shaderNode("b"), shaderNode("c")],
       edges: [
         {
           id: "e1",
@@ -166,7 +170,7 @@ describe("isFatalValidation", () => {
 
   it("is false when validation found nothing", () => {
     const g: Graph = {
-      nodes: [shader("s"), out("o")],
+      nodes: [shaderNode("s"), outputNode("o")],
       edges: [
         {
           id: "e1",
@@ -184,7 +188,7 @@ describe("isFatalValidation", () => {
 
   it("is true for a cycle", () => {
     const g: Graph = {
-      nodes: [shader("a"), shader("b")],
+      nodes: [shaderNode("a"), shaderNode("b")],
       edges: [
         {
           id: "e1",
@@ -207,7 +211,7 @@ describe("isFatalValidation", () => {
 
   it("is true for an N:1 multi-input", () => {
     const g: Graph = {
-      nodes: [shader("a"), shader("b"), shader("c")],
+      nodes: [shaderNode("a"), shaderNode("b"), shaderNode("c")],
       edges: [
         {
           id: "e1",
@@ -230,7 +234,13 @@ describe("isFatalValidation", () => {
 
   it("is true past the Output-node limit", () => {
     const g: Graph = {
-      nodes: [out("o1"), out("o2"), out("o3"), out("o4"), out("o5")],
+      nodes: [
+        outputNode("o1"),
+        outputNode("o2"),
+        outputNode("o3"),
+        outputNode("o4"),
+        outputNode("o5"),
+      ],
       edges: [],
     };
     expect(isFatalValidation(validateGraph(g))).toBe(true);
@@ -243,7 +253,7 @@ describe("isFatalValidation", () => {
     // must NOT treat this graph as fatal, or every plan-derived surface freezes
     // on stale data for as long as the dangling edge survives.
     const g: Graph = {
-      nodes: [shader("a")],
+      nodes: [shaderNode("a")],
       edges: [
         {
           id: "e1",
@@ -263,7 +273,7 @@ describe("isFatalValidation", () => {
   it("is true when a fatal code accompanies a dangling edge", () => {
     // Any-not-all: one fatal code among non-fatal ones still aborts.
     const g: Graph = {
-      nodes: [shader("a"), shader("b")],
+      nodes: [shaderNode("a"), shaderNode("b")],
       edges: [
         {
           id: "e1",
@@ -297,7 +307,12 @@ describe("isFatalValidation", () => {
 describe("topologicalOrder", () => {
   it("orders nodes so sources precede sinks", () => {
     const g: Graph = {
-      nodes: [shader("c"), shader("a"), shader("b"), out("o")],
+      nodes: [
+        shaderNode("c"),
+        shaderNode("a"),
+        shaderNode("b"),
+        outputNode("o"),
+      ],
       edges: [
         {
           id: "e1",
@@ -332,7 +347,13 @@ describe("topologicalOrder", () => {
     // Three sources feeding distinct sampler handles on one shader must all
     // precede it so their FBOs are rendered before the composite samples them.
     const g: Graph = {
-      nodes: [shader("dst"), shader("a"), shader("b"), shader("c"), out("o")],
+      nodes: [
+        shaderNode("dst"),
+        shaderNode("a"),
+        shaderNode("b"),
+        shaderNode("c"),
+        outputNode("o"),
+      ],
       edges: [
         {
           id: "e1",
@@ -374,7 +395,7 @@ describe("topologicalOrder", () => {
 
   it("handles disconnected nodes", () => {
     const g: Graph = {
-      nodes: [shader("a"), mesh("m")],
+      nodes: [shaderNode("a"), meshNode("m")],
       edges: [],
     };
     const order = topologicalOrder(g)
@@ -393,8 +414,8 @@ describe("topologicalOrder", () => {
           width: 300,
           height: 200,
         },
-        shader("s"),
-        out("o"),
+        shaderNode("s"),
+        outputNode("o"),
       ],
       edges: [
         {
@@ -420,7 +441,7 @@ describe("topologicalOrder", () => {
     // passes again (which is exactly what the [a, d, e, c, b] case below cannot
     // catch on its own).
     const g: Graph = {
-      nodes: [shader("a"), shader("b")],
+      nodes: [shaderNode("a"), shaderNode("b")],
       edges: [
         {
           id: "e1",
@@ -444,7 +465,13 @@ describe("topologicalOrder", () => {
     // (`a → ghost` is what queues `ghost`, so this graph alone does NOT catch a
     // completely unfiltered accumulation loop — hence the separate case above.)
     const g: Graph = {
-      nodes: [shader("a"), shader("d"), shader("e"), shader("c"), shader("b")],
+      nodes: [
+        shaderNode("a"),
+        shaderNode("d"),
+        shaderNode("e"),
+        shaderNode("c"),
+        shaderNode("b"),
+      ],
       edges: [
         {
           id: "e1",
@@ -503,7 +530,7 @@ describe("topologicalOrder", () => {
           width: 200,
           height: 150,
         },
-        shader("s"),
+        shaderNode("s"),
       ],
       edges: [],
     };

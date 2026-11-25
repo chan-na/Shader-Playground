@@ -7,7 +7,7 @@ import { useHistoryStore } from "../../state/historyStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { AddNodePill } from "./AddNodePill";
 
-// Setup order matches AppToolbar.test.tsx:1-24 — reset() itself pushes the
+// Setup order matches AppToolbar.test.tsx's `beforeEach` — reset() itself pushes the
 // pre-reset state onto history, so clear() must run after it.
 beforeEach(() => {
   useGraphStore.getState().reset();

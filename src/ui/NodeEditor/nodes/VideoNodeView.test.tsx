@@ -1,19 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import type { NodeProps } from "@xyflow/react";
-import { ReactFlowProvider } from "@xyflow/react";
-import type { ReactElement } from "react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { VideoGraphNode } from "../../../core/graph/types";
+import { nodeProps, renderInFlow } from "../testFlow";
 import { VideoNodeView } from "./VideoNodeView";
-
-function mockProps(id: string, node: VideoGraphNode): NodeProps {
-  return { id, data: { node } } as unknown as NodeProps;
-}
-
-/** ReactFlow's Handle requires ReactFlowProvider context to mount. */
-function renderInFlow(element: ReactElement) {
-  return render(<ReactFlowProvider>{element}</ReactFlowProvider>);
-}
 
 afterEach(() => {
   cleanup();
@@ -30,7 +19,7 @@ describe("VideoNodeView — letterbox preview (V2-U3)", () => {
       muted: true,
     };
 
-    renderInFlow(<VideoNodeView {...mockProps("v1", node)} />);
+    renderInFlow(<VideoNodeView {...nodeProps("v1", node)} />);
 
     expect(screen.getAllByText("no asset").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("video-play-glyph")).toBeNull();
@@ -47,7 +36,7 @@ describe("VideoNodeView — letterbox preview (V2-U3)", () => {
       muted: true,
     };
 
-    renderInFlow(<VideoNodeView {...mockProps("v1", node)} />);
+    renderInFlow(<VideoNodeView {...nodeProps("v1", node)} />);
 
     const glyph = screen.getByTestId("video-play-glyph");
     expect(glyph).not.toBeNull();
@@ -76,7 +65,7 @@ describe("VideoNodeView — letterbox preview (V2-U3)", () => {
       muted: true,
     };
 
-    renderInFlow(<VideoNodeView {...mockProps("v1", node)} />);
+    renderInFlow(<VideoNodeView {...nodeProps("v1", node)} />);
 
     expect(screen.queryByTestId("video-play-glyph")).toBeNull();
     expect(screen.getByTestId("video-scrub")).not.toBeNull();

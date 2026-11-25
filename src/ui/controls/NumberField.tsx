@@ -16,9 +16,10 @@ export interface NumberFieldProps {
   disabled?: boolean;
 }
 
-/** Native numeric input skinned per design/Side Panel.dc.html L257.
+/** Native numeric input skinned per design/Side Panel.dc.html "Select ·
+ * inputs".
  *
- * [#14] The visible text is a local draft, not a direct binding to `value`.
+ * The visible text is a local draft, not a direct binding to `value`.
  * Callers hand us a formatted string (`num.toFixed(3)`) derived from what we
  * last committed, so committing an unparseable entry would immediately bounce
  * a formatted number back down and wipe what the user was typing: entering

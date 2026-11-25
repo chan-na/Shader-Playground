@@ -62,6 +62,9 @@ test.describe("Phase 33 — GIF quality", () => {
     });
   }
 
+  // These are the recorder's default options (GIF_DEFAULTS in
+  // src/state/gifRecorder.ts), so this is also the live capture → encode →
+  // decode check for an ordinary recording.
   test("per-frame local palette + dithering decodes in the browser", async ({
     page,
   }) => {
@@ -78,6 +81,10 @@ test.describe("Phase 33 — GIF quality", () => {
     expect(result?.width ?? 0).toBeGreaterThan(0);
     expect(result?.width ?? 999).toBeLessThanOrEqual(64);
     expect(result?.height ?? 0).toBeGreaterThan(0);
+    expect(result?.height ?? 999).toBeLessThanOrEqual(64);
+    expect(await readSp(page, (sp) => sp.gifRecorder.getState().status)).toBe(
+      "idle",
+    );
   });
 
   test("global shared palette path still decodes (localPalette off)", async ({

@@ -151,16 +151,25 @@ function kindCounts(graph: Graph): Partial<Record<GraphNodeKind, number>> {
   return out;
 }
 
-// F-2 (T3): every demo now carries lesson Group nodes + a parents map.
+// F-2 (docs/learnability-plan-2026-08.md T3): every demo carries lesson Group
+// nodes + a parents map.
 // Parametrized across all 5 factories so the same invariants (group-before-
 // children ordering, parents pointing at real groups, unchanged functional
 // node composition, non-empty labels) are pinned once instead of five times.
 // `groupLabels` is the step copy itself — the whole payload of the feature,
 // so it is asserted verbatim rather than merely "non-empty".
+//
+// `expectedParents` is likewise verbatim: every other parents assertion below
+// iterates the map itself, so a *dropped* entry removes its own check and the
+// whole suite stays green while the child silently reverts to a top-level node
+// whose group-relative position is reinterpreted as absolute (overlapping the
+// group box it used to sit in). Spelling the map out here also makes the
+// deliberate omissions (particle's `output1`) visible as intent, not accident.
 const DEMOS: Array<{
   name: string;
   factory: () => Graph;
   parents: ParentsMap;
+  expectedParents: ParentsMap;
   expectedKinds: Partial<Record<GraphNodeKind, number>>;
   groupLabels: string[];
 }> = [
@@ -168,6 +177,11 @@ const DEMOS: Array<{
     name: "sphere",
     factory: createDemoGraph,
     parents: DEMO_PARENTS,
+    expectedParents: {
+      mesh1: "grp_mesh",
+      shader1: "grp_shader",
+      output1: "grp_output",
+    },
     expectedKinds: { mesh: 1, shader: 1, output: 1 },
     groupLabels: [
       "1 · Mesh — 정점 데이터 (a_position·a_normal·a_uv)",
@@ -179,6 +193,11 @@ const DEMOS: Array<{
     name: "torus",
     factory: createTorusDemoGraph,
     parents: TORUS_DEMO_PARENTS,
+    expectedParents: {
+      mesh1: "grp_torus_mesh",
+      shader1: "grp_torus_shader",
+      output1: "grp_torus_output",
+    },
     expectedKinds: { mesh: 1, shader: 1, output: 1 },
     groupLabels: [
       "1 · Mesh — torus 정점 데이터, a_uv가 표면을 감싼다",
@@ -190,6 +209,12 @@ const DEMOS: Array<{
     name: "chain",
     factory: createChainDemoGraph,
     parents: CHAIN_DEMO_PARENTS,
+    expectedParents: {
+      noise1: "grp_chain_generate",
+      blur1: "grp_chain_filter",
+      tonemap1: "grp_chain_filter",
+      output1: "grp_chain_display",
+    },
     expectedKinds: { shader: 3, output: 1 },
     groupLabels: [
       "1 · Generate — mesh 없음 → fullscreen quad",
@@ -201,6 +226,14 @@ const DEMOS: Array<{
     name: "split",
     factory: createSplitDemoGraph,
     parents: SPLIT_DEMO_PARENTS,
+    expectedParents: {
+      noise1: "grp_split_pipeline",
+      blur1: "grp_split_pipeline",
+      tonemap1: "grp_split_pipeline",
+      out_noise: "grp_split_outputs",
+      out_blur: "grp_split_outputs",
+      out_tone: "grp_split_outputs",
+    },
     expectedKinds: { shader: 3, output: 3 },
     groupLabels: [
       "파이프라인 — noise → blur → tonemap",
@@ -211,6 +244,11 @@ const DEMOS: Array<{
     name: "particle",
     factory: createParticleDemoGraph,
     parents: PARTICLE_DEMO_PARENTS,
+    // `output1` is deliberately absent — it stays top-level (demoGraph.ts:460).
+    expectedParents: {
+      compute1: "grp_particle_compute",
+      render1: "grp_particle_render",
+    },
     expectedKinds: { compute: 1, shader: 1, output: 1 },
     groupLabels: [
       "1 · Compute — transform feedback ping-pong (A/B)",
@@ -222,6 +260,7 @@ const DEMOS: Array<{
 describe.each(DEMOS)("learnability lesson groups (T3/F-2) — $name", ({
   factory,
   parents,
+  expectedParents,
   expectedKinds,
   groupLabels,
 }) => {
@@ -253,6 +292,14 @@ describe.each(DEMOS)("learnability lesson groups (T3/F-2) — $name", ({
     for (const groupId of Object.values(parents)) {
       expect(groupIds.has(groupId)).toBe(true);
     }
+  });
+
+  it("pins the exact parents map (a dropped entry deletes its own check)", () => {
+    // Every other parents assertion here iterates `parents`, so removing an
+    // entry removes the assertion too. Only a whole-map comparison against a
+    // literal written *outside* demoGraph.ts catches a deletion, a node added
+    // without a parent, or a child re-pointed at the wrong existing group.
+    expect(parents).toEqual(expectedParents);
   });
 
   it("every parents key references a real node in this graph", () => {

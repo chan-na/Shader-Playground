@@ -407,7 +407,7 @@ void main() {
 });
 
 /**
- * CRLF in the paired stage (F3) — the *call site*, not the helper.
+ * CRLF in the paired stage — the *call site*, not the helper.
  *
  * `findReferencesOf`'s offsets are exercised by `references.test.ts`, but the
  * damage happened here: `resolveCrossStageContext` reads `otherStageSource`
@@ -417,9 +417,8 @@ void main() {
  * through `applyBothStages`. A one-character-per-line drift therefore wrote
  * mangled GLSL into the store and into graph history.
  *
- * How CRLF reached the store back then: `deserializeProject` passed shader
- * sources through verbatim. It no longer does — F22 normalises them at the
- * import boundary, so no production path puts `\r\n` in the store today. These
+ * `deserializeProject` now normalises shader sources to LF at the import
+ * boundary, so no production path puts `\r\n` in the store today. These
  * cases are kept as defence for the writers that still accept it (the `__sp`
  * dev hook, any future importer that bypasses `sanitizeGraphNode`): the offset
  * arithmetic must stay correct whether or not anything currently exercises it.
@@ -502,16 +501,16 @@ void main() {
     expect(captured.other).toBe(fragCrlf.replace(/u_amount/g, "u_gain"));
     // The origin commit follows CodeMirror's document, so it is LF. When CRLF
     // does reach the store through a non-import writer, this rename is one of
-    // the places that leaves the node with per-stage line endings (F23) — the
+    // the places that leaves the node with per-stage line endings — the
     // helper's job is to rewrite correctly, not to reconcile the two. Import is
-    // normalised (F22), so production never gets here with a mixed node.
+    // normalised, so production never gets here with a mixed node.
     expect(captured.origin).toBe(FRAG_LF.replace(/u_amount/g, "u_gain"));
     view.destroy();
   });
 });
 
 /**
- * F2 while the editor is read-only (A-1).
+ * F2 while the editor is read-only (auto-vertex).
  *
  * The Code panel substitutes `fullscreen.vert` into the vertex tab when the
  * node's mesh input does not resolve, and marks the editor read-only. The
@@ -624,7 +623,8 @@ void main() {
     });
     useSelectionStore.getState().select("s1");
     // The F2 keymap builds its cross-stage context from the live stores, so the
-    // vertex tab has to be the active one for this to be the A-1 situation.
+    // vertex tab has to be the active one for this to be the auto-vertex
+    // situation.
     useEditorStore.getState().setStage("vertex");
     // Without a working prompt the pre-fix path would bail as `prompt-cancelled`
     // and this suite would pass for the wrong reason.

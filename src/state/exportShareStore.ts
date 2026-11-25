@@ -1,11 +1,9 @@
 import { create } from "zustand";
 
 /**
- * Export & Share dialog's target surface. `gif`/`webm` rail items exist from
- * M6-U3 onward (the rail always shows all four), but their recording
- * configure/encoding flow is out of scope here — only `html`/`link` render a
- * functional configure panel this unit (M6-U4 is expected to wire up
- * recording, hence the union already reserves the two keys).
+ * Export & Share dialog's target surface. The rail always shows all four
+ * targets; `gif`/`webm` drive the recording flow, `html`/`link` render the
+ * export/share configure panels.
  */
 export type ExportTarget = "gif" | "webm" | "html" | "link";
 

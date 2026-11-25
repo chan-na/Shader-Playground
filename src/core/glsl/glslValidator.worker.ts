@@ -17,9 +17,9 @@
  *     request — the client treats this as "no diagnostics available" and
  *     keeps relying on the authoritative recompile path.
  *
- * M0 measurement (tests/measure/glsl-validator.spec.ts) verified that the
- * log produced by an OffscreenCanvas WebGL2 context matches the main-thread
- * context byte-for-byte across syntax / undeclared-identifier / type-mismatch
+ * A measurement spike (commit 83d5f2f; the tests/measure harness has since
+ * been removed) verified that the log produced by an OffscreenCanvas WebGL2
+ * context matches the main-thread context byte-for-byte across syntax / undeclared-identifier / type-mismatch
  * cases on Chromium+SwiftShader.
  */
 

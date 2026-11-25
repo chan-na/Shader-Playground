@@ -12,7 +12,7 @@ import { BlockedBadge } from "./BlockedBadge";
 import { NodeCardHeader } from "./NodeCardHeader";
 import { PORT_TOP_PAD, PortHandle } from "./PortHandle";
 
-// 16:9 letterbox card (dc L288-296): 74px outer container, 56px inner frame.
+// 16:9 letterbox card (dc "Webcam" card): 74px outer container, 56px inner frame.
 const LETTERBOX_H = 74;
 const FRAME_H = 56;
 const POLL_MS = 200;
@@ -56,7 +56,8 @@ export function WebcamNodeView({ id, data }: NodeProps) {
         v.playsInline = true;
         // play() may reject (autoplay policy) OR throw synchronously/return
         // undefined (jsdom's HTMLMediaElement.play is not implemented) —
-        // same non-fatal handling as registry.ts's startWebcam/applyVideoSpec.
+        // same non-fatal handling as webcam.ts's startWebcam /
+        // video.ts's applyVideoSpec.
         try {
           const p = v.play();
           if (p && typeof p.catch === "function") p.catch(() => {});
@@ -134,8 +135,8 @@ export function WebcamNodeView({ id, data }: NodeProps) {
                   width: 22,
                   height: 22,
                   borderRadius: "50%",
-                  // dc L291의 렌즈 링(#6fd6a3)이 nodeCategory.sourceBright로
-                  // 정본화됐다 — source 알파 파생 근사를 대체 [D8·B-3].
+                  // dc Webcam 카드의 렌즈 링(#6fd6a3)이 nodeCategory.sourceBright로
+                  // 정본화됐다 — source 알파 파생 근사를 대체.
                   background: withAlpha(tokens.nodeCategory.sourceBright, 0.16),
                   border: `1px solid ${withAlpha(tokens.nodeCategory.sourceBright, 0.5)}`,
                   pointerEvents: "none",

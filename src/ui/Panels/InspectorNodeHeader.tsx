@@ -14,13 +14,13 @@ export interface InspectorNodeHeaderProps {
 
 /**
  * Common Inspector header shared by every node kind (design/Side Panel.dc.html
- * L60-72): icon box + title, category/kind meta line, and a chip row (GPU ms
- * + kind). The design also shows an 84×84 render thumbnail to the left of the
- * title — deliberately omitted here: `ThumbnailScheduler` (see
- * design-refactor notes §4) only supports a single subscriber per node, and
- * the node card already scrolled into the graph view owns that slot. A second
- * subscriber for the same node in the Inspector would starve one of the two
- * of readbacks, so the Inspector stays text-only.
+ * "node header (common)"): icon box + title, category/kind meta line, and a
+ * chip row (GPU ms + kind). The design also shows an 84×84 render thumbnail to
+ * the left of the title — deliberately omitted here: `ThumbnailScheduler` only
+ * supports a single subscriber per node, and the node card already scrolled
+ * into the graph view owns that slot. A second subscriber for the same node
+ * in the Inspector would starve one of the two of readbacks, so the Inspector
+ * stays text-only.
  */
 export function InspectorNodeHeader({ node }: InspectorNodeHeaderProps) {
   const supported = useGpuTimerStore((s) => s.supported);
@@ -30,7 +30,7 @@ export function InspectorNodeHeader({ node }: InspectorNodeHeaderProps) {
   const cat = categoryHexFor(node.kind);
   const title = displayNodeName(node);
 
-  // No node.id here [D15] — the internal id is an implementation detail,
+  // No node.id here — the internal id is an implementation detail,
   // not a user-facing label. `insp-gpu-ms-${node.id}` below is a
   // data-testid (a test hook), not display text, so it's unaffected.
   let meta = `${NODE_CATEGORY_OF[node.kind]} · ${node.kind}`;

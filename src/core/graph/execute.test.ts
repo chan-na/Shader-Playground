@@ -1,29 +1,39 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+// Test-only reach across layers (core ← ui): systemUniformStatus.ts is a leaf
+// module with no imports of its own, and the dependency graph dpdm walks is
+// rooted at src/main.tsx, so this adds no cycle to the app.
+import { systemUniformBinding } from "../../ui/Panels/systemUniformStatus";
 import { defaultCameraState } from "../camera/orbitCamera";
 import { disposeAllExternal } from "../external/registry";
 import { createFakeGl } from "../gl/fakeGl";
+import type { CompiledProgram } from "../gl/program";
 import { compileGraph } from "./compile";
-import { executePlan, type FrameContext, resetComposite } from "./execute";
-import type {
-  ComputeGraphNode,
-  Graph,
-  GraphNode,
-  ShaderGraphNode,
-} from "./types";
+import {
+  executePlan,
+  type FrameContext,
+  resetComposite,
+  splitLayout,
+} from "./execute";
+import {
+  computeNode as baseComputeNode,
+  outputNode,
+  shaderNode,
+} from "./testNodes";
+import type { ComputeGraphNode, Graph, ShaderGraphNode } from "./types";
 
 // Render-heart harness for executePlan. `createFakeGl` returns truthy handles so
 // `compileGraph` builds real ShaderPass/ComputePass objects (FBOs, VAOs, TF
 // objects); every draw/state call is a no-op we can spy on. This exercises the
 // ping-pong swap, compute-mesh VAO selection, sampler binding, composite vs
 // placeholder branch, and dispose — none of which had unit coverage before (the
-// full pipeline is otherwise only covered by Playwright + SwiftShader). (L35)
+// full pipeline is otherwise only covered by Playwright + SwiftShader).
 
 function makeGl(): WebGL2RenderingContext {
   // The fullscreen quad needs `a_position`; compute passes read `a_pos`. All
   // sampler/system uniforms the tests touch must be "active" so getUniformLocation
   // resolves them.
   // `u_mouse` must be listed or getUniformLocation never resolves it and the
-  // pass-space transform assertions below would silently check nothing (#19).
+  // pass-space transform assertions below would silently check nothing.
   return createFakeGl({
     attributes: ["a_position", "a_pos"],
     uniforms: ["u_time", "u_resolution", "u_src", "u_mouse"],
@@ -40,30 +50,12 @@ function frameCtx(graph?: Graph): FrameContext {
   };
 }
 
-function shaderNode(id: string): ShaderGraphNode {
-  return {
-    id,
-    kind: "shader",
-    vertexSource: "//v",
-    fragmentSource: "//f",
-    uniformValues: {},
-  };
-}
-
+/** A compute node reading `a_pos`, the attribute `makeGl` marks active. */
 function computeNode(id: string): ComputeGraphNode {
-  return {
-    id,
-    kind: "compute",
-    vertexSource: "//v",
+  return baseComputeNode(id, {
     count: 4,
-    primitive: "POINTS",
     attributes: [{ inName: "a_pos", outName: "v_pos", size: 3, seed: "zero" }],
-    uniformValues: {},
-  };
-}
-
-function outputNode(id: string): GraphNode {
-  return { id, kind: "output" };
+  });
 }
 
 type Edge = Graph["edges"][number];
@@ -535,7 +527,7 @@ describe("executePlan — render state (E-2)", () => {
     const disable = vi.spyOn(gl, "disable");
     executePlan(gl, plan, frameCtx(graph), 32, 32);
 
-    // L4: blend/cull are always off — neither is exposed as a node/port yet.
+    // Blend/cull are always off — neither is exposed as a node/port yet.
     // One disable(BLEND)/disable(CULL_FACE) call per shader pass (2 passes).
     expect(disable.mock.calls.filter((c) => c[0] === gl.BLEND)).toHaveLength(2);
     expect(
@@ -552,7 +544,135 @@ describe("executePlan — render state (E-2)", () => {
   });
 });
 
-// C-2 regression guard: the Viewport hot-patches
+// Cross-check: `ui/Panels/systemUniformStatus.ts` re-declares this file's
+// binding rules (VIEW_DEPENDENT / COMPUTE_BOUND) so the Inspector can tell the
+// user which system uniforms *this* frame's draw actually sets. Nothing joined
+// the two copies: every other test here activates only u_time/u_resolution/
+// u_src/u_mouse, so `setTypedUniform` returns early for the view-dependent
+// names and both directions of drift (dropping the `!meshIsFullscreen` gate,
+// or binding a new uniform in `bindComputeSystemUniforms`) stayed green while
+// the Inspector went on asserting the old rule. This runs one real frame with
+// all eight system uniforms active and compares what reached the GPU against
+// what the table predicts, per pass kind.
+describe("executePlan — system uniforms match the Inspector table (C-1)", () => {
+  const SYSTEM_UNIFORM_NAMES = [
+    "u_time",
+    "u_resolution",
+    "u_view",
+    "u_proj",
+    "u_model",
+    "u_camera",
+    "u_mouse",
+    "u_frame",
+  ] as const;
+
+  // Every entry point `setUniform`/`setTypedUniform` can reach; all of them
+  // take the location as argument 0. Spying the whole set (not just the ones
+  // today's shapes happen to use) is what makes an *added* compute binding
+  // observable no matter which upload shape it picks.
+  const UPLOAD_METHODS = [
+    "uniform1f",
+    "uniform2f",
+    "uniform3f",
+    "uniform4f",
+    "uniform1i",
+    "uniform2i",
+    "uniform3i",
+    "uniform4i",
+    "uniform1fv",
+    "uniform2fv",
+    "uniform3fv",
+    "uniform4fv",
+    "uniformMatrix3fv",
+    "uniformMatrix4fv",
+  ] as const;
+
+  /** One frame of a mesh shader + fullscreen shader + compute pass plan. */
+  function runFrame() {
+    const gl = createFakeGl({
+      attributes: ["a_position", "a_pos"],
+      uniforms: [...SYSTEM_UNIFORM_NAMES],
+    });
+    const graph: Graph = {
+      nodes: [
+        { id: "m1", kind: "mesh", primitive: "sphere" },
+        shaderNode("meshPass"),
+        shaderNode("fsPass"),
+        computeNode("c1"),
+        outputNode("o1"),
+        outputNode("o2"),
+      ],
+      edges: [
+        edge("e1", "m1", "meshPass", "mesh"),
+        edge("e2", "meshPass", "o1", "texture"),
+        edge("e3", "fsPass", "o2", "texture"),
+      ],
+    };
+    const plan = compileGraph(gl, graph, { width: 32, height: 32 });
+    const spies = UPLOAD_METHODS.map((m) => vi.spyOn(gl, m));
+    executePlan(gl, plan, frameCtx(graph), 32, 32);
+    // Locations are distinct objects per program, so a set of them identifies
+    // "this pass uploaded this uniform" without cross-talk between passes.
+    const uploaded = new Set<WebGLUniformLocation>();
+    for (const spy of spies) {
+      for (const call of spy.mock.calls) {
+        const loc = call[0];
+        if (loc) uploaded.add(loc);
+      }
+    }
+    return { plan, uploaded };
+  }
+
+  function expectMatchesTable(
+    program: CompiledProgram,
+    uploaded: Set<WebGLUniformLocation>,
+    ownerKind: "shader" | "compute",
+    isFullscreen: boolean,
+  ) {
+    for (const name of SYSTEM_UNIFORM_NAMES) {
+      const loc = program.uniforms[name];
+      // Guard, not a courtesy: an unresolved location makes every "not bound"
+      // row pass vacuously — exactly the blind spot this test exists to close.
+      if (!loc) throw new Error(`${name} location was not resolved`);
+      // `hasPass: true` — every case below located its pass in the plan, which
+      // is precisely the condition that argument reports.
+      expect({ name, bound: uploaded.has(loc) }).toEqual({
+        name,
+        bound: systemUniformBinding(name, ownerKind, isFullscreen, true).bound,
+      });
+    }
+  }
+
+  it("a mesh-connected shader pass binds all eight", () => {
+    const { plan, uploaded } = runFrame();
+    const p = plan.shaderPassByNode.get("meshPass");
+    if (!p) throw new Error("missing meshPass");
+    // The Inspector reads this same flag (via passPlanStore.fullscreenByNode),
+    // so pinning it here ties the table's input to the renderer's, too.
+    expect(p.meshIsFullscreen).toBe(false);
+    expectMatchesTable(p.program, uploaded, "shader", false);
+    plan.dispose();
+  });
+
+  it("a fullscreen shader pass skips u_view/u_proj/u_model/u_camera", () => {
+    const { plan, uploaded } = runFrame();
+    const p = plan.shaderPassByNode.get("fsPass");
+    if (!p) throw new Error("missing fsPass");
+    expect(p.meshIsFullscreen).toBe(true);
+    expectMatchesTable(p.program, uploaded, "shader", true);
+    plan.dispose();
+  });
+
+  it("a compute pass binds u_time/u_frame and nothing else", () => {
+    const { plan, uploaded } = runFrame();
+    const p = plan.passes.find((q) => q.nodeId === "c1");
+    if (!p || p.kind !== "compute") throw new Error("missing compute pass");
+    expectMatchesTable(p.program, uploaded, "compute", false);
+    plan.dispose();
+  });
+});
+
+// Regression guard: the Viewport hot-patches
 // `pass.uniformValues = node.uniformValues` on every RAF tick, *before* the
 // first executePlan. When compile.ts merged `@default` seeds directly into
 // `pass.uniformValues`, that assignment clobbered them — the seed never
@@ -641,5 +761,53 @@ describe("executePlan — dispose", () => {
     expect(delFbo).toHaveBeenCalled();
     expect(delBuffer).toHaveBeenCalled();
     expect(delTf).toHaveBeenCalled();
+  });
+});
+
+describe("splitLayout", () => {
+  it("1 → full canvas", () => {
+    const cells = splitLayout(1, 800, 600);
+    expect(cells).toEqual([{ x: 0, y: 0, w: 800, h: 600 }]);
+  });
+
+  it("2 → left/right halves", () => {
+    const cells = splitLayout(2, 800, 600);
+    expect(cells).toHaveLength(2);
+    expect(cells[0]!.x).toBe(0);
+    expect(cells[1]!.x).toBe(400);
+    expect(cells[0]!.w + cells[1]!.w).toBe(800);
+    expect(cells[0]!.h).toBe(600);
+  });
+
+  it("3 → 2 on top, 1 below", () => {
+    const cells = splitLayout(3, 800, 600);
+    expect(cells).toHaveLength(3);
+    // Top cells split horizontally
+    expect(cells[0]!.w + cells[1]!.w).toBe(800);
+    expect(cells[0]!.h).toBe(cells[1]!.h);
+    // Bottom cell spans full width
+    expect(cells[2]!.w).toBe(800);
+    // Stack
+    expect(cells[0]!.y + cells[0]!.h).toBe(600);
+    expect(cells[2]!.y).toBe(0);
+  });
+
+  it("4 → 2×2 grid", () => {
+    const cells = splitLayout(4, 800, 600);
+    expect(cells).toHaveLength(4);
+    // Each cell ~400×300
+    for (const c of cells) {
+      expect(c.w).toBeGreaterThanOrEqual(399);
+      expect(c.h).toBeGreaterThanOrEqual(299);
+    }
+  });
+
+  it("5+ clamps to 4", () => {
+    expect(splitLayout(7, 800, 600)).toHaveLength(4);
+  });
+
+  it("odd canvas sizes still tile losslessly horizontally", () => {
+    const cells = splitLayout(2, 801, 600);
+    expect(cells[0]!.w + cells[1]!.w).toBe(801);
   });
 });

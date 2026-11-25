@@ -54,9 +54,9 @@ export function ShaderNodeView({ id, data }: NodeProps) {
       <div className="node-card__body" style={{ padding: "9px 0" }}>
         {/* Thumbnail insets by the 46px port rail on both sides so the live
          * preview never overlaps the rail labels (design/Node Editor.dc.html
-         * L188: `margin:0 46px;height:96px`). Height follows the input-port
+         * Fresnel thumbnail: `margin:0 46px;height:96px`). Height follows the input-port
          * span once a shader declares enough uniforms to outgrow the 96px
-         * default — dc's 6-port 'Noise' card is the reference [C-3]. */}
+         * default — dc's 6-port 'Noise' card is the reference. */}
         <div style={{ margin: "0 46px" }}>
           <NodeThumbnail
             nodeId={id}

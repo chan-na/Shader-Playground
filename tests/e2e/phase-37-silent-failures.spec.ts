@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { bootApp, setGraph, trivialMeshGraph } from "./helpers/fixtures";
+import {
+  bootApp,
+  selectNode,
+  setGraph,
+  trivialMeshGraph,
+} from "./helpers/fixtures";
 import { readSp, withSp } from "./helpers/sp";
 
 /**
@@ -57,6 +62,42 @@ function samplerUnconnectedGraph() {
     edges: [
       {
         id: "e1",
+        source: "s1",
+        sourceHandle: "texture",
+        target: "o1",
+        targetHandle: "texture",
+      },
+    ],
+  };
+}
+
+/** Image node with no file chosen yet (the state `Add node → Image` and a
+ *  restored session whose asset went missing both land in) wired straight
+ *  into a sampler port. `isValidConnection` only checks port types, so the
+ *  edge exists while `bindSamplers` skips the unit entirely. */
+function emptyImageSourceGraph() {
+  return {
+    nodes: [
+      { id: "img1", kind: "image" as const, assetId: null },
+      {
+        id: "s1",
+        kind: "shader" as const,
+        vertexSource: BASIC_VERT,
+        fragmentSource: SAMPLER_UNCONNECTED_FRAG,
+        uniformValues: {},
+      },
+      { id: "o1", kind: "output" as const },
+    ],
+    edges: [
+      {
+        id: "e1",
+        source: "img1",
+        sourceHandle: "texture",
+        target: "s1",
+        targetHandle: "u_tex",
+      },
+      {
+        id: "e2",
         source: "s1",
         sourceHandle: "texture",
         target: "o1",
@@ -142,6 +183,35 @@ test.describe("Phase 37 — silent failure diagnostics", () => {
     await expect(ghostRow).toContainText("u_ghost");
   });
 
+  // E-1 extension: an edge is not a binding. The source has no texture, so
+  // `bindSamplers` issues neither uniform1i nor bindTexture for that unit —
+  // Problems must say so, and the Pass Inspector must not print a unit number
+  // that was never assigned.
+  test("E-1: a sampler wired to an image with no asset reports source-empty, not a binding", async ({
+    page,
+  }) => {
+    await setGraph(page, emptyImageSourceGraph(), {});
+
+    const statusProblems = page.getByTestId("status-problems");
+    await expect(statusProblems).toHaveText(/1 problem/);
+
+    await statusProblems.click();
+    const emptyRow = page.locator(
+      '[data-testid="silent-warning-row"][data-kind="sampler-source-empty"][data-uniform-name="u_tex"]',
+    );
+    await expect(emptyRow).toBeVisible();
+    await expect(emptyRow).not.toContainText("연결된 입력이 없습니다");
+
+    await page.getByTestId("status-passes").click();
+    await expect(page.getByTestId("passes-overlay")).toBeVisible();
+    const samplersCell = page.locator(
+      '[data-testid="pass-row"][data-node-id="s1"] [data-testid="pass-samplers"]',
+    );
+    await expect(samplersCell).toContainText("u_tex");
+    await expect(samplersCell).toContainText("미바인딩");
+    await expect(samplersCell).not.toContainText("unit");
+  });
+
   test("B-2: mesh attribute skip warnings track the connected consumer's actual bindings", async ({
     page,
   }) => {
@@ -156,7 +226,7 @@ test.describe("Phase 37 — silent failure diagnostics", () => {
     await expect(skipped).toContainText("a_uv");
     await expect(skipped).not.toContainText("a_position");
 
-    await withSp(page, (sp) => sp.selection.getState().select("m1"), undefined);
+    await selectNode(page, "m1");
 
     const meshAttrs = page.getByTestId("mesh-attributes");
     await expect(meshAttrs).toBeVisible();

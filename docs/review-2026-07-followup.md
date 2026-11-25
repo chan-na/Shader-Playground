@@ -69,7 +69,7 @@
 | **F4** | 접힌 조상 아래의 보이지 않는 그룹이 여전히 유효한 드롭 타깃이다(`groupBoxes`에 `hasCollapsedAncestor` 필터 없음). | `src/ui/NodeEditor/index.tsx` |
 | **F5** | 출력 4개 초과 그래프의 **저작·임포트 구멍**이 남아 있다 — `cloneNode`가 MAX_OUTPUTS를 강제하지 않고, `deserializeProject`는 경고만 한다. standalone 플레이어 쪽 클램프만 이번에 넣었다. | `graphStore.ts` / `serialization.ts` |
 | **F6** | GIF 레코더에 `visibilitychange` 처리가 없다. 프레임 지연 상한 클램프만 넣었으므로, 탭을 백그라운드로 두고 녹화하면 여전히 짧고 시간이 왜곡된 클립이 나온다. | `src/state/gifRecorder.ts` |
-| **F7** | 비디오 로드 중 스크럽은 여전히 반영되지 않는다. `currentTime`만 바뀌면 `isScrubOnly` 분기가 `uniformRev`만 올려 `reconcileExternal`이 돌지 않는 선행 갭. | `src/core/external/registry.ts` |
+| **F7** | 비디오 로드 중 스크럽은 여전히 반영되지 않는다. `currentTime`만 바뀌면 `isScrubOnly` 분기가 `uniformRev`만 올려 `reconcileExternal`이 돌지 않는 선행 갭. | `src/state/graphStoreNodeConfig.ts`(`isScrubOnly`) · `src/core/external/registry.ts` |
 
 ### 가드 공백 (되돌려도 게이트가 안 잡음)
 
@@ -107,6 +107,8 @@ F1/F3 자체는 해소됐다. 아래는 그 과정에서 **실증까지 끝났�
 ---
 
 ## 5. 상시 주의사항
+
+> **2026-11 기준 정정** — 아래 본문은 2026-07 라운드 당시의 기록이다. 현재 번들 게이트는 학습 가시성 T0 이후 **entry 청크 375 KiB + 전체 430 KiB** 두 가지다(`scripts/check-bundle-size.mjs` `LIMITS_KIB`, 이력은 `docs/archive/bundle-budget-history.md`). 따라서 아래의 "한도 396 KiB · 여유 0.88 KiB" 는 더 이상 현행 수치가 아니다. `src/ui/KeyboardShortcuts.tsx` 에는 이제 `KeyboardShortcuts.test.tsx` 가 있다. 라인 커버리지 0% 로 남은 파일은 `src/ui/Viewport/index.tsx` 다. "Node 22로 잰다" 원칙은 그대로 유효하다.
 
 ### 번들 게이트는 반드시 Node 22로 잰다
 

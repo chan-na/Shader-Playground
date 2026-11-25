@@ -12,7 +12,7 @@
 
 ### Phase 35 — 도킹 레이아웃 (트리 도크 모델, 디자인 핸드오프 v1.3/v1.4) (완료)
 고정 4분할 레이아웃을 **트리 기반 도크**로 교체 — 디자인 핸드오프 v1.3/v1.4(`design/CHANGELOG.md` §v1.3·§v1.4, `design/README.md` §M)가 정본. `Docking Prototype.dc.html`을 구현 스코프로 승격하면서 나온 모순·기능 삭제·사양 부재 결정(R1~R15) 중 도킹 모델 자체에 해당하는 R1·R4·R5·R6·R7·R8·R9·R11 을 반영한다.
-- **모델**: 트리 기반 도크(`split{dir,ratio,a,b}` / `leaf{tabs[],active,collapsed}`), 도킹 5종(nodeEditor/viewport/inspector/code/assets — R5: problems/diagnostics 제외), 기본 트리 = `col 0.717 [ row 0.587 [nodeEditor | col 0.556 [viewport | (inspector,assets)]] | code(하단 전폭) ]`(src/ui/dock/tree.ts `createDefaultDockTree`).
+- **모델**: 트리 기반 도크(`split{dir,ratio,a,b}` / `leaf{tabs[],active,collapsed}`), 도킹 5종(nodeEditor/viewport/inspector/code/assets — R5: problems/diagnostics 제외), 기본 트리 = `row 0.25 [ code(좌측 풀하이트, 접기 가능) | row 0.6 [ nodeEditor | col 0.52 [ viewport | (inspector,assets) ] ] ]`(`src/ui/dock/tree.ts` `createDefaultDockTree`. Phase 35 착수 당시의 `col 0.717 [… | code(하단 전폭)]` 은 디자인 핸드오프 v2.0 레이아웃 재설계에서 이 형태로 바뀌었고 스냅샷 `version` 도 2 로 올랐다).
 - **드래그/드롭 규칙**: ⣿=leaf 전체, 탭=그 탭만. pointer* 이벤트 전용(R10). 판정 우선순위 — (1) region 상단 34px 탭바 존(`TAB_BAR_DROP_PX`) 탭 병합이 **셸 바깥 42px 밴드(`OUTER_DROP_BAND_PX`)보다 우선**, (2) 바깥 밴드 → 전체 가장자리 도킹, (3) region 내부 가장자리 22%(`REGION_EDGE_DROP_FRAC`) → 스플릿(프리뷰 라벨 `Split <zone>`), 그 외 중앙 병합. 드롭 타깃 없이 release → 첫 region으로 강제 도킹(R1 — 플로팅 없음, `fallbackDropTarget`).
 - **접기/최대화(R4)**: leaf 단위, 접힌 leaf = split 방향 고정 34px strip + 그 split의 divider 비활성(렌더 제거), 복원 버튼은 strip 안에서 실포인터 도달 가능.
 - **닫기(R6)**: 헤더 ✕ = 패널 전체(모든 탭), 탭별 ✕ = 그 탭만(비활성 탭도 활성화 없이).

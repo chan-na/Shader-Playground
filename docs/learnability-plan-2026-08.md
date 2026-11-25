@@ -42,7 +42,7 @@
 | 사실 | 근거 |
 |---|---|
 | mesh 입력이 없으면 `vertexSource`가 조용히 `fullscreen.vert`로 교체됨 | `src/core/graph/compile.ts:576-578` |
-| 그런데 새 Shader 노드는 **항상 `basic.vert`를 들고 태어남** | `src/ui/NodeEditor/AddNodePill.tsx:99`, `src/ui/CommandPalette/index.tsx:231·277·675` |
+| 그런데 새 Shader 노드는 **항상 `basic.vert`를 들고 태어남** | `src/ui/NodeEditor/AddNodePill.tsx` `AddNodePill`, `src/ui/CommandPalette/commands.ts` `buildCommands`(starter·템플릿 셰이더 추가 명령) |
 | → `vertex.glsl` 탭에 보이는 코드가 **실행되지 않는 코드**. 편집해도 화면 불변. UI 표시 0건 | `src/ui/` 전체에 사용자 노출 "fullscreen" 문자열 0건 |
 | vertex 에러 발췌는 `compiledVertexSource`(= fullscreen.vert)에서 뽑음 → **에디터에 보이는 소스와 다른 파일의 라인 번호**가 오버레이에 뜸 | `src/ui/Viewport/compileErrorInfo.ts:127-134` (주석이 이 사실을 인지하고 있음) |
 | `createChainDemoGraph`의 noise/blur/tonemap 3개 노드가 정확히 이 상태 | `src/state/demoGraph.ts:59·69·78` |
@@ -69,7 +69,7 @@
 
 **(b) `u_baseColor`는 시스템 유니폼이 아님.** `starter.frag`가 선언한 평범한 사용자
 유니폼. 선언은 소스에 보이므로 추적 가능하다. 진짜 출처 불명은 **`[0.5, 0.7, 1.0]`이라는
-값** — 코드 어디에도 근거가 없다 (`AddNodePill.tsx:101`).
+값** — 코드 어디에도 근거가 없다 (`AddNodePill.tsx` `AddNodePill`).
 
 ### 추가 발견 8건
 
@@ -81,7 +81,7 @@
 | **L4** | **블렌딩이 아예 존재하지 않음**. `gl.enable(gl.BLEND)` 호출 0건. `CULL_FACE` 항상 disable. depth test는 fullscreen 여부로 자동 on/off. ⚠ 2026-08 실측으로 정정: **알파 자체는 무시되지 않는다** — 패스 안 블렌딩만 없고 `outColor.a`는 FBO에 기록되어 다운스트림 샘플링에 쓰이며 캔버스 합성(`alpha:true` + `premultipliedAlpha:false`)에도 반영된다 | `execute.ts:344-351`, `core/gl/context.ts:4-8` |
 | **L5** | **실행 파이프라인을 보여주는 뷰가 없음** ← 프로젝트 목표와 정면 충돌. 위상 순서·패스 수·FBO 해상도·텍스처 유닛 배정·ping-pong read 측이 전부 `ExecutionPlan` 안에만 있음 | `compile.ts` `ExecutionPlan`, StatusBar는 fps/draws/GPU 합계뿐 |
 | **L6** | 미연결·미사용 유니폼이 조용함 → "검은 화면, 원인 불명" | `gl/uniforms.ts:20`(`loc === null` → return), `execute.ts` `bindSamplers` 미발견 시 스킵. Architecture.md §2.2·§3.2가 명시 |
-| **L7** | Output 분할 레이아웃이 암묵적. 3개일 때 "상단 2칸 + 하단 전폭 1칸"은 추측 불가 | `validate.ts:3`(`MAX_OUTPUTS=4`), `graph/splitLayout.ts`. 툴팁 한 줄이 전부 |
+| **L7** | Output 분할 레이아웃이 암묵적. 3개일 때 "상단 2칸 + 하단 전폭 1칸"은 추측 불가 | `validate.ts:3`(`MAX_OUTPUTS=4`), `core/graph/execute.ts` `splitLayout`. 툴팁 한 줄이 전부 |
 | **L8** | 앱 안에 학습 자료가 사실상 없음. HelpModal은 단축키만, "왜"를 설명하는 인앱 텍스트는 시스템 유니폼 hover 8줄이 전부 | `src/ui/NodeEditor/HelpModal.tsx`, `uniformParser.ts:83` |
 
 ---
@@ -417,8 +417,8 @@ uniform vec3 u_baseColor;
 로 적고, 노드 생성 시의 `uniformValues: { u_baseColor: [...] }` 하드코딩을 제거하면
 **"시스템이 몰래 넣는 값"이 문자 그대로 사라진다.** 파서 변경 불필요.
 
-- 파일: `src/shaders/templates/starter.frag`, `src/ui/NodeEditor/AddNodePill.tsx:101`,
-  `src/ui/CommandPalette/index.tsx:233·279·677`, `src/state/demoGraph.ts`
+- 파일: `src/shaders/templates/starter.frag`, `src/ui/NodeEditor/AddNodePill.tsx` `AddNodePill`,
+  `src/ui/CommandPalette/commands.ts` `buildCommands`(starter·템플릿 셰이더 추가 명령), `src/state/demoGraph.ts`
 - **주의**: 기존 저장 프로젝트(autosave/share URL)에 이미 `uniformValues`가 들어 있다.
   하위 호환 확인 — 저장된 값이 `@default`를 이기는 게 맞다(현재 동작과 동일).
 - 검증: `src/state/shareUrl.test.ts:18`이 `u_baseColor`를 가정 → 갱신 필요.

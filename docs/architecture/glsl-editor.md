@@ -155,7 +155,7 @@ CodeMirror 와이어링 (glslSetup.ts)
 - **F12 / Cmd+Click 분기**: 키맵은 `view.state.selection.main.head` 기준, 클릭 핸들러는 `posAtCoords(clientXY)` 로 doc offset 계산. modifier(`metaKey || ctrlKey`) 가 없으면 무시 — CM 기본 selection 동작 보존. 미정의 식별자(builtin / keyword / no-binding) 는 silently no-op.
 - **Rename UX**: 기본 prompt 는 `window.prompt` (가장 마찰 적은 경로). 검증은 `^[A-Za-z_][A-Za-z0-9_]*$` + `GLSL_KEYWORDS ∪ GLSL_TYPES` 예약어 set. 결과는 `RenameResult` discriminated union — `applied: true` 면 `{ sites, otherStageSites, newName }`(`otherStageSites` = 다른 stage 에서 교체된 site 수, single-document rename 은 0), false 면 `{ reason }` 로 5 종 skip 사유(`not-on-identifier` / `no-binding` / `prompt-cancelled` / `unchanged` / `invalid-name`).
 - **Active highlight**: 단일 site(decl 만 존재)면 `Decoration.none` — 노이즈 회피. 비용은 cursor 이동마다 `buildSymbolTable + findReferences` 한 번이지만 playground 규모에서 < 1ms 추정이라 debounce 없음.
-- **CodeEditor observation bridge (`ui/CodeEditor/currentView.ts`)**: CodeEditor.tsx 가 mount/unmount 시 `setCurrentView(view)` / `setCurrentView(null)` 로 module-level ref 갱신. 프로덕션 코드는 의존하지 않고, `__sp.codeEditor = { getCursorLine, focus }` (DEV 한정) 으로 E2E 가 cursor 위치를 직접 읽는다 — F12 점프 결과 검증을 CM DOM 추측 없이 line number 비교로 처리.
+- **CodeEditor observation bridge (`ui/CodeEditor/currentView.ts`)**: `ui/CodeEditor/index.tsx` 가 mount/unmount 시 `setCurrentView(view)` / `setCurrentView(null)` 로 module-level ref 갱신. 프로덕션 코드는 의존하지 않고, `__sp.codeEditor = { getCursorLine, focus }` (DEV 한정) 으로 E2E 가 cursor 위치를 직접 읽는다 — F12 점프 결과 검증을 CM DOM 추측 없이 line number 비교로 처리.
 - **DEV bridge 추가**: `window.__sp.glslSymbols.findReferences` (references finder), `window.__sp.codeEditor` (cursor introspection). 기존 Phase 25 의 `glslSymbols` 객체에 한 함수만 더해 형태가 일관된다.
 
 #### 8.7.1 Cross-stage rename (Phase 28)

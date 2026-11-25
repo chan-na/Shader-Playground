@@ -71,56 +71,14 @@ npm run test:e2e                       # Playwright E2E
 npm run build && npm run size:check    # gzip 번들 크기 예산 (CI bundle-size 잡)
 ```
 
-## 디렉토리 구조 (src/ 기준)
+## 디렉토리 구조
 
-```
-src/
-├─ main.tsx              # React 엔트리, App 마운트
-├─ App.tsx               # 셸 (AppToolbar → DockLayout → StatusBar + 오버레이/다이얼로그)
-│
-├─ core/                 # ── React/Zustand 비의존 순수 TS ──
-│  ├─ gl/                # WebGL2 래퍼 (program / texture / framebuffer / mesh / uniforms)
-│  ├─ graph/             # compile / execute / validate / uniformParser / diagnostics
-│  ├─ nodes/             # 노드 레지스트리 + utility 노드(Math/Swizzle/Combine) CPU 평가
-│  ├─ thumbnail/         # 동기 readPixels + 비동기 PBO readback + 10Hz 스케줄러
-│  ├─ camera/            # OrbitCamera 상태/입력 바인딩
-│  └─ assets/            # 프리미티브 / OBJ·GLTF·이미지 로더 / IndexedDB 캐시
-│
-├─ state/                # ── Zustand 스토어 22개(녹화 컨트롤러 포함) + 직렬화/공유/자동저장 ──
-│  ├─ graphStore.ts      # nodes/edges/positions + rev/uniformRev
-│  ├─ assetStore.ts      # 메시/이미지 런타임 핸들 카탈로그
-│  ├─ selectionStore.ts  # selectedNodeId
-│  ├─ editorStore.ts     # vertex/fragment 탭 + 라인 점프 요청
-│  ├─ diagnosticsStore.ts# GLSL Diagnostic 컬렉션
-│  ├─ cameraStore.ts / viewportStore.ts / timeStore.ts / rendererStore.ts
-│  ├─ historyStore.ts    # Undo/Redo 최대 100건
-│  ├─ recorder.ts        # MediaRecorder → WebM/mp4
-│  ├─ gifRecorder.ts     # 애니메이션 GIF 녹화 (Web Worker 인코딩, Phase 31~34)
-│  ├─ autoSave.ts        # 30초 디바운스 IndexedDB 저장
-│  ├─ shareUrl.ts        # gzip + base64url + #share=...
-│  └─ serialization.ts   # 프로젝트 JSON v1
-│
-├─ ui/                   # ── React 18 컴포넌트 ──
-│  ├─ NodeEditor/        # React Flow 캔버스, 커스텀 노드 뷰
-│  ├─ CodeEditor/        # CodeMirror 6 + GLSL(호버/정의 이동/이름 변경/자동완성/시맨틱 하이라이트) + lint 어댑터
-│  ├─ Viewport/          # <canvas> + RAF 루프 + asyncReadback 펌프
-│  ├─ CommandPalette/    # Cmd+K — 노드/프리셋/유틸 추가
-│  ├─ Panels/            # SidePanel (Inspector ↔ Assets ↔ Problems) + StatusBar
-│  ├─ BootstrapGate.tsx  # share / autosave 복구 / 데모 분기 + 다이얼로그
-│  └─ KeyboardShortcuts.tsx
-│
-├─ export/               # 의존성 0 단일 HTML export + standalone player
-├─ shaders/              # 빌트인 GLSL (fullscreen.vert, color.frag, templates/*)
-└─ utils/                # debounce, id
-```
+디렉토리별 책임과 주요 진입 파일의 단일 정본은 [Architecture.md §12](./Architecture.md#12-디렉토리-맵)다. 최상위만 요약하면 다음과 같다.
 
-레이어 원칙:
+- `src/core/`: React/Zustand에 의존하지 않는 순수 TS(그래프 컴파일·실행, WebGL2 래퍼, GLSL 분석, 에셋, 외부 소스, GIF). `src/state/`: Zustand 스토어와 영속화. `src/ui/`: React 컴포넌트(도킹 셸은 `src/ui/dock/`). `src/styles/`: CSS 파셜.
+- `src/export/`·`src/shaders/`·`src/utils/`·`src/build/`: 단일 HTML export, 빌트인 GLSL, 공용 유틸, Vite 플러그인. `tests/e2e/`: Playwright 스펙. `docs/`: Phase별 스펙과 아키텍처 보조 문서.
 
-- **`core/`는 React/Zustand를 모른다.** `src/export/standalonePlayer.js`가 같은 알고리즘을 의존성 0으로 다시 구현할 수 있는 근거.
-- **UI는 Core를 직접 부르지 않는다.** UI는 스토어에 패치를 보내고, RAF 루프가 매 프레임 `snapshotGraph()` / `snapshotAssets()`로 스냅샷을 떠서 Core에 넘긴다.
-- **렌더 루프는 React 외부에서 RAF로 독립 구동.** Viewport의 `useEffect` 한 번에서 시작되고, 컴포넌트 리렌더와 무관하게 회전한다.
-
-전체 트리(`.test.ts` 동거 포함)와 모듈별 책임은 [Architecture.md §12](./Architecture.md#12-디렉토리-트리-phase-34-기준) 참조.
+레이어 원칙(`core`는 React를 모르고, UI는 스토어를 거치며, RAF 루프는 React 밖에서 돈다)은 [Architecture.md §1](./Architecture.md#1-레이어-구분)에 있다.
 
 ## 기술 스택
 

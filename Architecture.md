@@ -1,6 +1,6 @@
 # ShaderPlayground 아키텍처
 
-> 본 문서는 **현재 코드(Phase 34)** 의 실제 동작을 설명한다. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
+> 본 문서는 **현재 코드(Phase 39 + 2026-11 구조 정리 이후)** 의 실제 동작을 설명한다. 디렉토리 지도는 §12, 도킹 모델은 §13. 기술 스택을 *왜* 골랐는지·페이즈 진행 이력은 [SPEC.md](./SPEC.md) 를 참고하라.
 
 ---
 
@@ -8,23 +8,28 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ UI Layer (React 18)                             │
-│   App / NodeEditor / Viewport / CodeEditor      │
-│   SidePanel · CommandPalette · BootstrapGate    │
+│ UI Layer (React 18 · src/ui)                    │
+│   App → AppToolbar / DockLayout / StatusBar     │
+│   DockLayout leaf = NodeEditor · Viewport ·     │
+│     CodeEditor · SidePanel (ui/dock, §13)       │
+│   overlays: CommandPalette · ExportShareDialog  │
+│     BootstrapGate · Toasts · GpuBlockScreen     │
 └──────────────┬──────────────────────────────────┘
                │ commands · selectors
 ┌──────────────▼──────────────────────────────────┐
 │ State Layer (Zustand stores · src/state)        │
-│   graph · asset · selection · renderer          │
+│   graph(+slices) · asset · selection · renderer │
 │   camera · viewport · time · history · editor   │
 │   diagnostics · autoSave · recorder · shareUrl  │
+│   (+ ui/dock/dockStore — §13.6 예외)            │
 └──────────────┬──────────────────────────────────┘
                │ snapshotGraph()  snapshotAssets()
 ┌──────────────▼──────────────────────────────────┐
 │ Core Layer (pure TS · src/core)                 │
 │   graph (compile/execute/validate/parser)       │
 │   gl (program/texture/framebuffer/mesh/uniform) │
-│   camera · thumbnail · nodes · assets           │
+│   glsl · external · nodes · assets · camera     │
+│   thumbnail · gif                               │
 └──────────────┬──────────────────────────────────┘
                │ WebGL2 calls
 ┌──────────────▼──────────────────────────────────┐
@@ -380,7 +385,7 @@ poll(gl):
 
 ## 7. 상태 스토어 (Zustand)
 
-`src/state/*` 의 16 개 스토어. 책임 분리가 분명하므로 다음 표가 가장 빠른 인덱스다.
+`src/state/*` 의 Zustand 스토어는 22 개다(도킹 스토어 `ui/dock/dockStore` 는 §13). 아래 표는 렌더 파이프라인과 맞물리는 핵심 스토어의 인덱스다. 나머지(bootstrap·commandPalette·connectionUi·exportShare·helpModal·passPlan 등 UI 상태 스토어)는 파일 머리 주석을 보면 된다.
 
 | Store | 보관 | recompile? | history? | 비고 |
 |---|---|---|---|---|
@@ -618,246 +623,101 @@ state/gifRecorder.ts    # 캡처 오케스트레이션 (recorder.ts 와 형제)
 
 ---
 
-## 12. 디렉토리 트리 (Phase 34 기준)
+## 12. 디렉토리 맵
 
-> `.test.ts` 파일은 같은 디렉토리에 동거하며, 단위 테스트가 존재하는 모듈은 끝에 `(+ test)` 로 표기.
+> 디렉토리 단위 지도다. 파일별 책임은 각 파일 머리 주석이 정본이므로 `ls`·`grep` 으로 확인한다. 단위 테스트 `*.test.ts(x)` 는 대상 모듈과 같은 디렉토리에 둔다.
 
-```
-ShaderPlayground/
-├─ index.html
-├─ vite.config.ts
-├─ vitest.config.ts
-├─ tsconfig.json
-├─ biome.json                        # Biome 린트/포맷 설정
-├─ knip.json                         # Knip 데드코드 설정
-├─ playwright.config.ts              # Playwright E2E 러너 (SwiftShader chromium)
-├─ package.json
-├─ SPEC.md
-├─ Architecture.md
-├─ README.md
-├─ CLAUDE.md                         # Claude 작업 규약 / 품질 게이트
-├─ tests/e2e/                        # Playwright E2E 스펙 (40 파일 / 151 테스트 — Phase 1~39, 도킹은 phase-35-*)
-│  └─ helpers/                      # fixtures·sp(window.__sp)·dom·editor·render·canvas 공용 헬퍼
-└─ src/
-   ├─ main.tsx                       # React 엔트리, App 마운트
-   ├─ App.tsx                        # 셸 (NodeEditor / Viewport / CodeEditor / SidePanel / StatusBar + overlay)
-   ├─ index.css                      # 전역 스타일 진입점 — styles/의 영역별 파셜을 @import
-   ├─ styles/                        # 영역별 CSS 파셜 (base·dock·toolbar·palette·statusbar·viewport·welcome·export·skeleton·modal)
-   ├─ test-setup.ts                  # Vitest + jsdom 부트스트랩
-   ├─ vite-env.d.ts
-   │
-   ├─ build/                         # ── 빌드 전용 (Vite 플러그인) ─────
-   │  └─ cspMetaPlugin.ts            # 프로덕션 HTML 에만 CSP meta 주입 (dev/E2E 제외) (+ test)
-   │
-   ├─ core/                          # ── React 비의존 ──────────────────
-   │  ├─ gl/
-   │  │  ├─ context.ts               # WebGL2 컨텍스트 생성/검증 (+ test)
-   │  │  ├─ program.ts               # 컴파일/링크 + InfoLog 노출 (+ test)
-   │  │  ├─ texture.ts               # 텍스처 생성/포맷 (+ test)
-   │  │  ├─ framebuffer.ts           # FBO + 컬러/깊이 어태치먼트 (+ test)
-   │  │  ├─ mesh.ts                  # VBO/VAO 업로드/draw (+ test)
-   │  │  ├─ uniforms.ts              # 유니폼 setter 디스패처 (+ test)
-   │  │  ├─ gpuTimer.ts              # Phase 15 — EXT_disjoint_timer_query_webgl2 풀 (+ test)
-   │  │  ├─ glError.ts               # DEV 전용 gl.getError() 표면화 (셋업 무조건 / 드로우 스로틀) (+ test)
-   │  │  └─ fakeGl.ts                # 테스트 전용 가짜 WebGL2 컨텍스트 (GL 모듈 단위 테스트용)
-   │  │
-   │  ├─ camera/
-   │  │  ├─ orbitCamera.ts           # OrbitCameraState + view/proj/orbit/pan/zoom (+ test)
-   │  │  └─ input.ts                 # createCameraController — pointer/wheel 부착 (+ test)
-   │  │
-   │  ├─ graph/
-   │  │  ├─ types.ts                 # GraphNode/Edge/Port + Param·Math·Swizzle·Combine·Compute·Group
-   │  │  ├─ compile.ts               # graph → ExecutionPlan (ShaderPass | ComputePass) (+ test)
-   │  │  ├─ execute.ts               # executePlan + splitLayout + TF dispatch
-   │  │  ├─ validate.ts              # cycle / multi_input / multiple_outputs (+ test)
-   │  │  ├─ diagnostics.ts           # GLSL 로그 파서 (+ test)
-   │  │  ├─ uniformParser.ts         # uniform + 주석 힌트 (+ test)
-   │  │  ├─ uniformCache.ts          # 패스별 유니폼 값 변경 감지 (엄격 비교 — 재업로드 스킵) (+ test)
-   │  │  ├─ computeSeed.ts           # sphere/cube/random/zero seed 생성기 (+ test)
-   │  │  ├─ parents.ts               # Phase 29/30 — parent map + abs/relative 좌표 + cycle 가드 + hasCollapsedAncestor (+ test)
-   │  │  └─ splitLayout.test.ts      # 분할 뷰포트 단위 테스트
-   │  │
-   │  ├─ thumbnail/
-   │  │  ├─ readback.ts              # 동기 readPixels + 96×96 다운샘플 (폴백)
-   │  │  ├─ asyncReadback.ts         # PBO + fenceSync 비동기 readback (+ test)
-   │  │  └─ scheduler.ts             # 10Hz 스로틀 + 가시성 큐 (+ test)
-   │  │
-   │  ├─ external/                   # Phase 14a — 라이브 외부 텍스처 소스
-   │  │  ├─ registry.ts              # singleton handle pool · reconcile/update/dispose · 종류별 디스패치 (+ test)
-   │  │  ├─ types.ts                 # ExternalSpec / 핸들 타입 (leaf)
-   │  │  ├─ resolvers.ts             # 주입 훅 — getUserMedia · video/audio blob resolver · AudioContext factory (leaf)
-   │  │  ├─ videoFrame.ts            # <video> 생성 + 프레임 텍스처 업로드 (webcam·video 공용)
-   │  │  ├─ webcam.ts                # webcam acquire/update/release
-   │  │  ├─ video.ts                 # video acquire/in-place 적용/update/release
-   │  │  └─ audio.ts                 # audio(mic·file) acquire/in-place 적용/FFT 업로드/release
-   │  │
-   │  ├─ gif/                        # Phase 31~34 — 의존성 0 애니메이션 GIF 인코더 (worker 오프로드 · per-frame 팔레트 · 진행률)
-   │  │  ├─ quantize.ts              # median-cut 팔레트 + nearest / Floyd–Steinberg 디더 매핑 (+ test)
-   │  │  ├─ lzw.ts                   # GIF 가변폭 LZW 압축 (+ test)
-   │  │  ├─ encode.ts                # GIF89a 조립 (palette + NETSCAPE loop + frames + onProgress) (+ test)
-   │  │  ├─ gifEncoderClient.ts      # Phase 32 — 워커 클라이언트 (lazy · Promise · 실패 시 인라인 폴백) (+ test)
-   │  │  └─ gifEncoder.worker.ts     # Phase 32 — encodeGif 를 워커에서 실행 (?worker · reqId RPC)
-   │  │
-   │  ├─ glsl/                       # Phase 24/25/26/27/28 — 라이브 GLSL 검증 + LSP-like 정적 분석
-   │  │  ├─ glslValidator.ts         # main-thread 클라이언트 (lazy worker · Promise API · 실패 시 [] resolve) (+ test)
-   │  │  ├─ glslValidator.worker.ts  # OffscreenCanvas WebGL2 컴파일 워커 (?worker)
-   │  │  ├─ symbolTable.ts           # Phase 25 — uniform/in/out/const/local/parameter/function/struct 파서 + 소스별 LRU 캐시 (+ test)
-   │  │  ├─ glslDecl.ts              # 선언자 분할 · struct 멤버 이름 오프셋 · precededByDot · 파라미터 리스트 파서 (+ test)
-   │  │  ├─ symbolScope.ts           # symbolsVisibleAt / resolveSymbol — 라인별 scope 쿼리 (+ test)
-   │  │  ├─ ident.ts                 # GLSL 식별자 정규식 단일 정의 (IDENT_RE · IDENT_EXACT_RE · identScanner)
-   │  │  ├─ builtins.ts              # Phase 25 — GLSL_FUNCTIONS 시그니처/설명 + KEYWORD_DESCRIPTIONS (+ test)
-   │  │  ├─ semanticTokens.ts        # Phase 26 — 식별자 역할 분류기 (symbolTable + builtins + SYSTEM_UNIFORMS) (+ test)
-   │  │  └─ references.ts            # Phase 27/28 — findReferences + findReferencesAcrossStages (cross-stage rename) (+ test)
-   │  │
-   │  ├─ nodes/
-   │  │  ├─ registry.ts              # 노드별 PortSpec + 동적 포트(Shader/Math/Swizzle/Combine) (+ test)
-   │  │  └─ utility.ts               # resolveValueFor + Math/Swizzle/Combine CPU 평가 (+ test)
-   │  │
-   │  └─ assets/
-   │     ├─ primitives.ts            # cube/sphere/plane/torus/quad 생성기 (+ test)
-   │     ├─ objLoader.ts             # @loaders.gl/obj 래퍼 (+ test)
-   │     ├─ gltfLoader.ts            # @loaders.gl/gltf 래퍼 (지오메트리만) (+ test)
-   │     ├─ imageLoader.ts           # createImageBitmap 래퍼 (+ test)
-   │     ├─ videoLoader.ts           # Phase 14b — mp4/webm 메타 프로빙 + Blob (+ test)
-   │     ├─ audioLoader.ts           # Phase 14c — decodeAudioData 메타 프로빙 + Blob (+ test)
-   │     ├─ cache.ts                 # IndexedDB 에셋 캐시 (mesh ArrayBuffer / image·video·audio Blob) (+ test)
-   │     └─ types.ts                 # GeometryHandle, ImageHandle, VideoAssetHandle, AudioAssetHandle
-   │
-   ├─ state/                         # ── Zustand 스토어 ────────────────
-   │  ├─ types.ts                    # 공유 상태 타입 (NodePosition 등)
-   │  ├─ graphStore.ts               # nodes/edges/positions + rev/uniformRev — 슬라이스 조립 + 코어/소스 액션 (+ test)
-   │  ├─ graphStoreTypes.ts          # GraphState (스토어 공개 형태, 슬라이스가 공유하는 리프 모듈)
-   │  ├─ graphStoreHelpers.ts        # pushHistory · reconciled(포트 재조정) · 다중 nudge 조상 판정
-   │  ├─ graphStoreGroups.ts         # 그룹 슬라이스 (addGroup/groupSelected/setParent/removeGroup/접기 …)
-   │  ├─ graphStoreNodeConfig.ts     # 노드 종류별 설정 setter 슬라이스 (math/combine/compute/video/audio …)
-   │  ├─ assetStore.ts               # 메시/이미지 카탈로그 (런타임 핸들) (+ test)
-   │  ├─ assetActions.ts             # import + IndexedDB hydrate (+ test)
-   │  ├─ selectionStore.ts           # selectedNodeIds[] + primary selectedNodeId (+ test)
-   │  ├─ rendererStore.ts            # fps/frame/drawCalls/errors (+ test)
-   │  ├─ cameraStore.ts              # OrbitCameraState 보관 + reset (+ test)
-   │  ├─ viewportStore.ts            # background rgb (+ test)
-   │  ├─ mouseStore.ts               # u_mouse 포인터 위치 (framebuffer px · bottom-left · xy 현재 / zw 마지막 down) (+ test)
-   │  ├─ timeStore.ts                # simTime/playing/speed/advance (+ test)
-   │  ├─ diagnosticsStore.ts         # byNode[id]={vertex/fragment/link} (+ test)
-   │  ├─ editorStore.ts              # activeStage + jumpRequest(rev) (+ test)
-   │  ├─ historyStore.ts             # Undo/Redo 100건 + suppressNext (+ test)
-   │  ├─ demoGraph.ts                # 부트스트랩/프리셋 그래프 시드 (+ test)
-   │  ├─ serialization.ts            # 프로젝트 JSON v1 (+ test)
-   │  ├─ projectSanitize.ts          # 비신뢰 프로젝트(share/import/autosave) 하드 캡 검증 (+ test)
-   │  ├─ shareUrl.ts                 # gzip + base64url + URL hash (+ test)
-   │  ├─ autoSave.ts                 # 30s debounce IndexedDB 자동저장 (+ test)
-   │  ├─ recorder.ts                 # MediaRecorder → WebM/mp4 (+ test)
-   │  ├─ gifRecorder.ts              # Phase 31~34 — 캔버스 프레임 캡처 → core/gif 인코드 → GIF Blob (+ encodeProgress) (+ test)
-   │  ├─ thumbnailScheduler.ts       # core/thumbnail/scheduler 싱글톤 (+ test)
-   │  ├─ gpuTimerStore.ts            # Phase 15 — byNode EMA ms + totalMs + supported/enabled (+ test)
-   │  ├─ toastStore.ts               # 사용자 토스트 큐 (info/success/warning/error) (+ test)
-   │  ├─ helpModalStore.ts           # 단축키 도움말 모달 open/toggle (+ test)
-   │  └─ debugUiStore.ts             # 진단 패널 open + level/category 필터 (leaf store — log 타입만 의존) (+ test)
-   │
-   ├─ ui/                            # ── React 컴포넌트 ────────────────
-   │  ├─ BootstrapGate.tsx           # share / autosave 복구 / 데모 분기 + 다이얼로그
-   │  ├─ KeyboardShortcuts.tsx       # 전역 단축키 — Cmd+Z/Y(undo/redo), Cmd+D(복제), Cmd+A(전체 선택), 화살표(선택 일괄 이동, Phase 23), Space(play/pause — 텍스트 입력 + 활성화 가능 컨트롤(button/a[href]/summary/role=button·menuitem·tab) 포커스 시 제외), Cmd+K
-   │  ├─ ErrorBoundary.tsx           # 최상위 에러 경계 → RecoveryDialog + 로그 export (+ test)
-   │  ├─ RecoveryDialog.tsx          # 크래시 복구 다이얼로그 (ESC 격리 · 로그 복사) (+ test)
-   │  ├─ Toasts.tsx                  # toastStore 구독 → ToastRow 리스트
-   │  ├─ ToastRow.tsx                # 단일 토스트 행 (kind 아이콘 + dismiss) (+ test)
-   │  │
-   │  ├─ NodeEditor/
-   │  │  ├─ index.tsx                # React Flow 캔버스 + graphStore 양방향
-   │  │  ├─ Toolbar.tsx              # 노드 팔레트 / 저장 / Share / Record / Export HTML
-   │  │  ├─ NodeThumbnail.tsx        # 카드 <canvas> + IntersectionObserver
-   │  │  ├─ nodeUiRegistry.ts        # GraphNodeKind → NodeView 컴포넌트 매핑 (+ test)
-   │  │  ├─ HelpModal.tsx            # 단축키/도움말 모달 (helpModalStore 구독) (+ test)
-   │  │  ├─ nodeCard.css
-   │  │  └─ nodes/
-   │  │     ├─ MeshNodeView.tsx
-   │  │     ├─ ImageNodeView.tsx
-   │  │     ├─ WebcamNodeView.tsx    # Phase 14a — live <video> preview + getExternalStream polling
-   │  │     ├─ VideoNodeView.tsx     # Phase 14b — live <video> preview + status
-   │  │     ├─ AudioNodeView.tsx     # Phase 14c — source kind / fftSize / status 메타
-   │  │     ├─ ShaderNodeView.tsx    # FBO 라이브 썸네일 + 핸들/라벨
-   │  │     ├─ OutputNodeView.tsx
-   │  │     ├─ ParamNodeView.tsx     # Float/Vec3/Color/Time
-   │  │     ├─ UtilityNodeViews.tsx  # Math/Swizzle/Combine
-   │  │     ├─ ComputeNodeView.tsx   # TF 컴퓨트 — count/primitive/attribute 메타 표시
-   │  │     ├─ GroupNodeView.tsx     # Phase 29/30 — 그룹 카드 + NodeResizer + collapse 토글 + 라벨 인라인 편집
-   │  │     ├─ GpuTimerChip.tsx      # Phase 15 — 카드 우상단 ms 칩
-   │  │     ├─ PortHandle.tsx        # 포트 핸들 (React Flow Handle 래퍼)
-   │  │     ├─ ValueInput.tsx        # 숫자 입력 위젯 (라이브 커밋) (+ test)
-   │  │     └─ paramNodeViewHelpers.ts # 파람 값 → 카드 표시 문자열 (Time scale/offset) (+ test)
-   │  │
-   │  ├─ CodeEditor/
-   │  │  ├─ index.tsx                # CodeMirror 6 + jumpRequest + lint sync + 라이브 검증 + currentView 등록
-   │  │  ├─ StageTabs.tsx            # vertex / fragment + 에러 닷
-   │  │  ├─ glslSetup.ts             # CM extensions 묶음 (lint + autocomplete + hover + semantic tokens + refs/goto/rename + theme)
-   │  │  ├─ autocomplete.ts          # Phase 25 — scope-aware 자동완성 (symbolTable + builtins) (+ test)
-   │  │  ├─ hover.ts                 # Phase 25 — hoverTooltip + lookupHover (+ test)
-   │  │  ├─ semanticHighlight.ts     # Phase 26 — ViewPlugin + Decoration.mark + visibleRanges walker (+ test)
-   │  │  ├─ gotoDef.ts               # Phase 27 — F12 keymap + Cmd/Ctrl+Click DOM 핸들러 (+ test)
-   │  │  ├─ rename.ts                # Phase 27 — F2 keymap + single-transaction rewrite + reserved-word 검증 (+ test)
-   │  │  ├─ referenceHighlight.ts    # Phase 27 — StateField → Decoration set (커서 위 심볼의 occurrence 페인트) (+ test)
-   │  │  ├─ currentView.ts           # Phase 27 — module-level EditorView ref (DEV bridge 관찰 전용)
-   │  │  ├─ editorNode.ts            # 편집 대상 노드 선택 규칙 (index.tsx ↔ rename.ts 공용 leaf, #10) (+ test)
-   │  │  └─ lintAdapter.ts
-   │  │
-   │  ├─ Viewport/
-   │  │  └─ index.tsx                # <canvas> + RAF + asyncReadback 펌프 + cameraCtl
-   │  │
-   │  ├─ CommandPalette/
-   │  │  ├─ index.tsx                # Cmd+K 팔레트 컴포넌트 — 검색·랭킹·그룹 렌더 (+ test)
-   │  │  ├─ commands.ts              # buildCommands — 노드/프리셋/Math/Swizzle/Combine/앱 커맨드 카탈로그
-   │  │  └─ helpers.ts               # fuzzyMatch 등 검색 스코어링 (+ test)
-   │  │
-   │  └─ Panels/
-   │     ├─ SidePanel.tsx            # Inspector ↔ Assets ↔ Problems 탭 컨테이너
-   │     ├─ Inspector.tsx            # 디스패처 (Shader/Param/Utility/Mesh/Webcam/Video/Audio)
-   │     ├─ UniformControl.tsx       # slider / multi / color
-   │     ├─ UniformHintEditor.tsx    # Phase 21 — ⚙ 주석 힌트 GUI (range/step/default/label)
-   │     ├─ uniformFilter.ts         # 유니폼 검색 쿼리 정규화/필터 (+ test)
-   │     ├─ ParamInspector.tsx
-   │     ├─ UtilityInspector.tsx
-   │     ├─ WebcamInspector.tsx      # Phase 14a — device dropdown + live status
-   │     ├─ VideoInspector.tsx       # Phase 14b — 에셋 선택 / play·loop·mute / seek
-   │     ├─ AudioInspector.tsx       # Phase 14c — mic↔file / fftSize / smoothing / play·loop
-   │     ├─ useExternalStatus.ts     # Webcam/Video/Audio 인스펙터 공용 — 외부 소스 상태 500ms 폴링 훅
-   │     ├─ GroupInspector.tsx       # Phase 29 — label/color 편집 + ungroup / delete-with-children
-   │     ├─ ViewportControls.tsx     # 카메라 Reset/FOV + 배경색 + 시간 (+ test)
-   │     ├─ ProblemsPanel.tsx        # 진단 → select + setStage + requestJump
-   │     ├─ DiagnosticsPanel.tsx     # 개발자 진단 패널 — 로그/GL 정보 + 버그리포트 스냅샷 (+ test)
-   │     ├─ diagnosticsReport.ts     # 버그리포트 스냅샷 순수 조립기 (주입식 · store 무의존) (+ test)
-   │     ├─ AssetBrowser.tsx
-   │     └─ StatusBar.tsx            # (+ test)
-   │
-   ├─ export/                        # ── 정적 HTML export ──────────────
-   │  ├─ htmlExport.ts               # Project JSON → 단일 파일 HTML (+ test)
-   │  └─ standalonePlayer.js         # 의존성 0 미니 런타임 (Vite `?raw` 임베드)
-   │
-   ├─ shaders/                       # ── 빌트인 GLSL ───────────────────
-   │  ├─ fullscreen.vert
-   │  ├─ basic.vert
-   │  ├─ color.frag
-   │  ├─ tfNoop.frag                 # 컴퓨트 패스의 dummy fragment (RASTERIZER_DISCARD 와 짝)
-   │  ├─ particles/
-   │  │  ├─ particle.vert            # 컴퓨트 — sin 기반 noise field 시뮬
-   │  │  └─ particleRender.vert      # 컴퓨트 출력 attribute 를 받는 ShaderNode vertex
-   │  └─ templates/
-   │     ├─ unlit.frag
-   │     ├─ uvDebug.frag
-   │     ├─ blur.frag
-   │     ├─ noise.frag
-   │     ├─ tonemap.frag
-   │     ├─ blend.frag               # 두 sampler + u_mix + u_mode(0=mix/1=add/2=mul/3=screen)
-   │     ├─ mask.frag                # base/overlay/mask 3-sampler 마스킹 합성
-   │     ├─ composite3.frag          # 3-sampler 가중 합성 (u_a/u_b/u_c + u_wa/u_wb/u_wc)
-   │     └─ particlePoint.frag       # 컴퓨트 점 렌더용 fragment
-   │
-   └─ utils/
-      ├─ debounce.ts                 # (+ test)
-      ├─ id.ts                       # (+ test)
-      ├─ log.ts                      # 개발자용 런타임 로거 (store 무의존 · 단방향) (+ test)
-      └─ assertNever.ts              # discriminated union exhaustiveness 가드
-```
+| 경로 | 내용 · 주요 진입 파일 |
+|---|---|
+| 루트 | 게이트 설정(`tsconfig`·`biome`·`knip`·`vitest.config`·`playwright.config`), `scripts/check-bundle-size.mjs`(gzip 번들 예산) |
+| `src/` | `main.tsx`(엔트리: 테마 변수·리졸버 배선, 도킹 영속화 시작 후 `App` 마운트) · `App.tsx`(셸) · `theme.ts`(토큰) · `index.css`(파셜 `@import` 만) |
+| `src/styles/` | `NN-*.css` 영역별 파셜. 번호가 cascade 순서다: 10 base · 20~22 dock · 30 toolbar · 40 palette · 50 statusbar · 60 viewport · 70 welcome · 80 export · 90~93 skeleton/pill/empty/modal |
+| `src/build/` | Vite 빌드 플러그인: `cspMetaPlugin.ts`, `minifyStandalonePlayer.ts` |
+| `src/core/graph/` | 그래프 모델·컴파일·실행(§2~§4): `types.ts` · `compile.ts`(→ `ExecutionPlan`) · `execute.ts`(`executePlan`·`splitLayout`) · `validate.ts` · `uniformParser.ts` · `diagnostics.ts` · `parents.ts` 외 보조 모듈 |
+| `src/core/gl/` | WebGL2 래퍼: `context` · `program` · `texture` · `framebuffer` · `mesh` · `uniforms` · `gpuTimer` · `glError` |
+| `src/core/glsl/` | 검증 워커 `glslValidator(.worker).ts` + 정적 분석: `symbolTable.ts`(← `glslDecl`·`symbolScope`·`ident`), `builtins`·`semanticTokens`·`references`·`varyingContract`. 상세 [glsl-editor.md](./docs/architecture/glsl-editor.md) |
+| `src/core/external/` | 웹캠·비디오·오디오 라이브 텍스처. `registry.ts`(핸들 풀, reconcile), 종류별 `webcam.ts`·`video.ts`·`audio.ts`(+ `videoFrame.ts`), leaf 모듈 `types.ts`·`resolvers.ts`(주입 훅) |
+| `src/core/nodes/` | `registry.ts`: 노드별 PortSpec과 동적 포트의 단일 원본(§2.2). `utility.ts`: Math/Swizzle/Combine CPU 평가 |
+| `src/core/assets/` | 프리미티브, OBJ/glTF/이미지/비디오/오디오 로더, `meshContract.ts`, IndexedDB `cache.ts` |
+| `src/core/{camera,thumbnail,gif}/` | 오빗 카메라(§5), 썸네일 readback과 스케줄러(§6), 의존성 0 GIF 인코더와 워커(§11) |
+| `src/state/` | Zustand 스토어 22개 + 디스패치 모듈(§7). `graphStore.ts`(조립·코어 액션) + `graphStoreTypes`·`graphStoreGroups`·`graphStoreNodeConfig`·`graphStoreHelpers`. 영속화: `serialization`·`projectSanitize`·`shareUrl`·`autoSave`(그래프 IndexedDB + 도킹 localStorage) |
+| `src/ui/` | 셸 조각: `AppToolbar` · `BootstrapGate` · `KeyboardShortcuts` · `ErrorBoundary`/`RecoveryDialog` · `Toasts` · `WelcomeOverlay` · `GpuBlockScreen` · `GraphEmptyState` · `motion.ts` |
+| `src/ui/dock/` | 도킹 서브시스템 전체: 모델, 스토어, 렌더러(§13) |
+| `src/ui/NodeEditor/` | React Flow 캔버스 `index.tsx`, `nodes/*NodeView.tsx`(매핑은 `nodeUiRegistry.ts`), `AddNodePill` · `HelpModal` · `NodeThumbnail` |
+| `src/ui/CodeEditor/` | CodeMirror 6 `index.tsx`, 확장 묶음 `glslSetup.ts`, 기능별 모듈(hover·autocomplete·gotoDef·rename·하이라이트·lint), 편집 대상 규칙 `editorNode.ts` |
+| `src/ui/Viewport/` | `index.tsx` 단일 RAF 루프(§4.1) + 캔버스 헬퍼·분할 오버레이·`TransportBar`·에러 오버레이 |
+| `src/ui/Panels/` | `SidePanel.tsx`(Inspector/Assets 탭), `Inspector.tsx` 디스패처와 `*Inspector.tsx`, `ProblemsPanel` · `DiagnosticsPanel` · `StatusBar` |
+| `src/ui/CommandPalette/` | `index.tsx`(팔레트 UI) · `commands.ts`(`buildCommands` 카탈로그) · `helpers.ts`(퍼지 매칭) |
+| `src/ui/ExportShare/` | `ExportShareDialog.tsx` · `ExportSharePanels.tsx` · `useExportRecording.ts` · `recordConfig.ts` |
+| `src/ui/controls/` | 공용 폼 컨트롤: Slider · NumberField · ColorField · Toggle 등 |
+| `src/export/` | 단일 HTML export `htmlExport.ts`, 의존성 0 런타임 `standalonePlayer.js`(§10) |
+| `src/shaders/` | 빌트인 GLSL(`?raw` import). `templates/`, `particles/` |
+| `src/utils/` | `log` · `debounce` · `id` · `assertNever` · `downloadBlob` |
+| `tests/e2e/` | Playwright `phase-N-*.spec.ts`(40 파일 / 151 테스트). 공용 헬퍼는 `helpers/`(fixtures · sp · dom · editor · render · canvas · types) |
+
+**테스트 전용 헬퍼** (프로덕션에서 import 하지 않는다):
+
+- `src/state/testStores.ts`: `resetAllStores()`. 도킹 스토어를 포함한 모든 스토어를 생성 시점 상태로 되돌린다
+- `src/core/graph/testNodes.ts`: 노드 종류별 최소 유효 노드 팩토리
+- `src/ui/NodeEditor/testFlow.tsx`: `ReactFlowProvider` 로 감싼 렌더와 `nodeProps`
+- `src/ui/dock/testDockTree.ts`: `asSplit` narrowing
+- `src/core/gl/fakeGl.ts`: `createFakeGl()` 가짜 WebGL2 컨텍스트
 
 ### 12.1 초안과 달라진 지점
 
-초기 SPEC 초안의 디렉토리 설계와 실제 구현이 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 분할 폐기, SidePanel 단일화, export 신설 등)는 역사 자료라 [docs/archive/architecture-history.md](./docs/archive/architecture-history.md) 로 옮겼다. 현재 구조는 위 트리와 §1~§11 이 정본이다.
+초기 SPEC 초안의 디렉토리 설계가 실제 구현에서 어떻게 달라졌는지(노드 모듈 통합, edges 패키지 폐기, Viewport 분할 폐기, SidePanel 단일화, export 신설 등)는 역사 자료이므로 [docs/archive/architecture-history.md](./docs/archive/architecture-history.md) 로 옮겼다. 현재 구조의 정본은 위 맵과 §1~§11, §13 이다.
+
+---
+
+## 13. 도킹 레이아웃 (`src/ui/dock/`)
+
+앱 셸 가운데 영역은 트리 기반 도크다. 모델, 스토어, 렌더러가 모두 `src/ui/dock/` 안에 있다. 사양과 Phase 기록은 [docs/spec/layout.md](./docs/spec/layout.md) Phase 35 에 있다.
+
+### 13.1 데이터 모델 (`tree.ts`)
+
+- 순수 JSON 트리다. `DockSplit {dir: "row"|"col", ratio, a, b}` 와 `DockLeaf {id, tabs[], active, collapsed?}` 로 구성되고, 위치는 `DockPath = ("a"|"b")[]` 로 지정한다. React와 zustand에 의존하지 않는다.
+- 도킹 가능한 패널은 `DockPanelId` 5종(`nodeEditor`·`viewport`·`inspector`·`code`·`assets`)이다. problems/diagnostics 는 도킹 탭이 아니다.
+- `createDefaultDockTree()` 의 구조는 `row 0.25 [ code(l4) | row 0.6 [ nodeEditor(l3) | col 0.52 [ viewport(l1) | inspector+assets(l2) ] ] ]` 이다.
+- 불변 갱신 헬퍼로 `getNodeAt` · `setNodeAt` · `removePanel` · `findLeafPath` · `findTabLeafPath` · `collectPanelIds` · `firstMergeableLeafPath` 가 있다. leaf 가 비어 소멸하면 부모 split 은 형제 노드로 축약된다.
+- `canMergeDockTabs`: `viewport`·`code` 는 이종 leaf 에 병합되지 않는다. WebGL 컨텍스트와 CodeMirror 재마운트를 막기 위해서다.
+- 형제 모듈은 `tree.ts` 만 바라보는 단방향 구조다.
+
+### 13.2 기하 배치 (`geometry.ts`)
+
+`layoutDockTree(tree, w, h)` 는 트리를 픽셀 `DockRegion[]`(leaf 영역)과 `DockDivider[]` 로 배치한다. 상수는 `DIVIDER_PX` 6, 접힌 strip `COLLAPSED_STRIP_PX` 34, 최소 leaf 크기 `MIN_LEAF_WIDTH/HEIGHT` 240×160 이다. 직계 leaf 자식이 접힌 split 에서는 divider 를 만들지 않는다. `clampDividerRatio` 는 비율을 0.15~0.85 로 묶고 픽셀 하한도 적용한다. 이 결과는 드래그 히트테스트에만 쓰고, 화면 렌더는 flex 로 한다(§13.5).
+
+### 13.3 드롭 판정 (`drop.ts`)
+
+- `computeDropTarget(x, y, w, h, regions)` 는 `DropHit {target, preview, label}` 을 반환한다. 판정 우선순위는 다음과 같다.
+  1. region 상단 34px 탭바 존: 탭 병합
+  2. 셸 바깥 42px 밴드: 외곽 도킹
+  3. region 내부 가장자리 22%: 스플릿
+  4. 그 밖의 region 안쪽: 중앙 병합
+- 드롭 타깃이 없으면 `fallbackDropTarget` 이 첫 region 에 강제로 도킹한다. 떠 있는(floating) 상태는 없다.
+- `insertDetachedLeaf` 는 분리된 leaf 를 타깃 위치에 불변 삽입한다.
+
+### 13.4 스토어 (`dockStore.ts`)
+
+`useDockStore` 의 상태는 `{tree: DockNode | null, maximized: leafId | null, nextLeafId}` 이며 전부 JSON 직렬화가 가능하다. `tree: null` 은 모든 패널을 닫은 상태로, 이것도 유효하다. 액션은 다음과 같다.
+
+- `setActiveTab` · `setDividerRatio`
+- `toggleCollapsed` · `setCollapsed(panelId)` · `toggleMaximized`
+- `closeTab` · `closePanel` · `addPanel` · `resetLayout`
+- 드래그용 `detachForDrag`(트리에서 분리) / `dockDetached(tabs, active, target)`(새 leaf `l${nextLeafId}` 로 재도킹)
+
+트리는 반드시 `tree`/`geometry`/`drop` 의 불변 함수로만 바꾼다. 이 스토어는 다른 스토어를 import 하지 않는다.
+
+### 13.5 렌더링 (`DockLayout.tsx` · `DockPanelHeader.tsx` · `Splitter.tsx`)
+
+- `DockLayout` 은 트리를 중첩 flex(`${ratio} 1 0px`)로 재귀 렌더한다. 각 leaf 는 `leafPanelKind`(`dockLayoutModel.ts`, 순수 파생 함수)에 따라 NodeEditor · Viewport · SidePanel · CodeEditor 중 하나를 렌더한다.
+- **패널은 언마운트하지 않는다.** 접기는 `.shell-slot--collapsed`, 최대화는 형제의 `.shell-slot--hidden` 클래스로 표현한다. CSS 정본은 `src/styles/20-dock-shell.css` 이다.
+- 드래그는 `pointer*` 이벤트만 쓴다. 4px 임계를 넘으면 고스트로 전환하고, `computeDropTarget` 프리뷰를 거쳐 release 시 `dockDetached` 를 호출한다. `DockLayout` 루트가 드래그 전체를 소유한다.
+- 시작 트리거는 `dockDragContext.ts` 로, leaf 의 `{leafId, path}` 는 `dockLeafContext.ts` 로 내려보낸다. 두 컨텍스트를 별도 모듈로 둔 이유는 `DockLayout → NodeEditor → DockPanelHeader` 순환을 피하기 위해서다.
+- `DockPanelHeader` 는 모든 패널이 공유하는 헤더다(grab ⣿ · 탭 · 메타 배지 · 접기 · 최대화 · 닫기). `Splitter` 는 divider 로, 키보드 화살표를 지원한다.
+- 컴팩트 모드(≤990px)에서는 도킹을 끄고 고정 스택으로 폴백한다. 이때 트리는 바꾸지 않는다.
+
+### 13.6 영속화와 의존 방향
+
+- `state/autoSave.ts` 의 `startDockLayoutPersistence()` 는 `main.tsx` 가 렌더 전에 1회 호출한다.
+- localStorage `shader-playground.dock-layout` 에서 읽은 값은 `snapshot.ts` 의 `sanitizeDockLayoutSnapshot` 으로 검증한다(`version: 2`, 하나라도 어긋나면 `null` 이 되어 조용히 기본 트리로 돌아간다). 통과하면 하이드레이션하고, 이후 변경은 500ms 디바운스로 저장한다. 그래프 IndexedDB 오토세이브와는 완전히 별개다.
+- **의존 방향 예외(수용됨)**: 원칙은 `ui → state` 단방향이지만, `state/autoSave.ts` · `state/codeAutoOpen.ts`(노드 선택 → `setCollapsed("code")`) · `state/testStores.ts` 는 `ui/dock` 을 import 한다. 도킹 기능은 스토어까지 포함해 `src/ui/dock` 안에 자기완결적으로 두었고, 그 dock 모듈들은 React 컴포넌트 쪽을 다시 import 하지 않는다(`dockStore`·`snapshot`·`tree` 는 React 비의존). 따라서 순환은 생기지 않는다(`npm run circular` 0건).

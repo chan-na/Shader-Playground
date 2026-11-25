@@ -29,8 +29,8 @@
   - `// @color`: vec3/vec4 에 강제로 컬러 피커. 이름이 `*Color` 가 아니어도 작동. 이전 추론이 다축 슬라이더였다면 범위를 `0..1`, 디폴트를 흰색 벡터로 자동 승격(사용자가 `@default` 를 같이 지정하면 그 값이 우선).
   - `// @slider`, `// @multi`: 컬러 추론을 되돌리거나, 컬러 → 다축 슬라이더로 강제. sampler/matrix/bool 타입에는 적용되지 않는다.
   - 동일 토큰이 여러 번 등장하면 마지막이 이김(예: `@color @slider` → slider).
-  - 원칙: **명시적 주석이 이름 패턴 추론보다 항상 우선** (SPEC §2.2.2 의 후행 메모를 본격 채택).
-- **Math/Swizzle/Combine 유틸 노드**: 위 §2.2 표에 추가된 세 종류의 CPU 평가 노드. ShaderNode 비-샘플러 uniform 입력에 연결되어 프레임마다 평가되고, 그 결과로 uniform 을 덮어쓴다. CommandPalette 에 `Add Math: <op>` × 8, `Add Swizzle: .<mask>` × 8 프리셋, `Add Combine: Float×N → vec N` × 3 등록.
+  - 원칙: **명시적 주석이 이름 패턴 추론보다 항상 우선** (초기 SPEC 초안의 후행 메모를 본격 채택 — 현재 힌트 규약은 [Architecture.md §4.5](../../Architecture.md#45-유니폼-자동-노출-srccoregraphuniformparserts)).
+- **Math/Swizzle/Combine 유틸 노드**: [Architecture.md §2.1](../../Architecture.md#21-노드와-포트) 노드 표에 추가된 세 종류의 CPU 평가 노드. ShaderNode 비-샘플러 uniform 입력에 연결되어 프레임마다 평가되고, 그 결과로 uniform 을 덮어쓴다. CommandPalette 에 `Add Math: <op>` × 8, `Add Swizzle: .<mask>` × 8 프리셋, `Add Combine: Float×N → vec N` × 3 등록.
 - **썸네일 readback PBO 비동기화**: 기존 `gl.readPixels` 동기 호출을 WebGL2 PBO + `fenceSync` 로 교체. 매 프레임 `clientWaitSync(timeout=0)` 로 완료된 슬롯만 `getBufferSubData`→다운샘플→`scheduler.commit`. 미완료 슬롯은 그대로 유지되므로 메인 스레드 stall 이 사라진다(N 프레임 지연 허용). 노드당 in-flight 1건, 컴파일로 사라진 노드는 PBO 해제. 96×96 해상도, 10 Hz throttle 그대로 유지.
 - **검증**: Vitest 추가 51건(`asyncReadback` 8, `autoSave` 7, `editorStore` 3, `utility` 25, `uniformParser` +8, 합계 182 통과). Chrome 자동화로 (a) Problems 항목 클릭 → 정확한 라인 활성화, (b) 자동저장 → 리로드 → 복구 다이얼로그 양 경로, (c) `@color` 가 컬러 피커로 즉시 전환, (d) Param→Math→Combine→Swizzle 체인이 sphere 색을 변경, (e) Chain 프리셋(3 노드)의 96×96 썸네일 라이브 갱신을 확인.
 

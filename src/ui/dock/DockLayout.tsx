@@ -657,7 +657,7 @@ function DockLeafView({
         leaf.collapsed === true && "shell-slot--collapsed",
         hidden && "shell-slot--hidden",
       )}
-      // R11: 인라인 style이 CSS보다 우선 적용되므로(specificity와 무관하게
+      // 인라인 style이 CSS보다 우선 적용되므로(specificity와 무관하게
       // 항상 이긴다), 컴팩트 고정 스택 flex는 CSS가 아니라 여기서 분기한다
       // — `.dock-root--compact .dock-leaf { height: 46vh }`(src/styles/20-dock-shell.css)는
       // 세로 스택 각 항목의 높이만 담당하고, 폭 방향으로 늘어나지 않게

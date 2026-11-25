@@ -130,11 +130,10 @@ export function DockPanelHeader({
         <span
           className="dock-header-grab"
           aria-hidden="true"
-          // R10/B4-U4: ⣿ grab handle drags the whole leaf (every tab) — dc
-          // `grabDown` (Docking Prototype.dc.html L558). `aria-hidden` stays —
-          // R10 confirms docking rearrangement is pointer-only (no keyboard
-          // alternative needed), so this handler intentionally has no
-          // keyboard-reachable equivalent.
+          // ⣿ grab handle drags the whole leaf (every tab) — design/App
+          // Shell.dc.html `grabDown`. `aria-hidden` stays: docking
+          // rearrangement is pointer-only by design (design/CHANGELOG.md),
+          // so this handler intentionally has no keyboard equivalent.
           //
           // compact(≤990px) sets dragEnabled:false — the handle is
           // removed from the DOM entirely (not just visually hidden) so a
@@ -179,10 +178,9 @@ export function DockPanelHeader({
       )}
       {!isRail && leaf !== null && leaf.type === "leaf" && (
         <div
-          // R8: dc L557 tabMask 정본 — leaf.tabs(dock 탭) 개수만 센다. 이
-          // 컨테이너 안쪽은 dock 탭뿐이다(R5 완료: problems/diagnostics는
-          // 도킹 탭이 아니라 상태바 진입 오버레이라 이 카운트/마스크
-          // 대상이 아니다).
+          // dc `tabMask` 정본 — leaf.tabs(dock 탭) 개수만 센다. 이 컨테이너
+          // 안쪽은 dock 탭뿐이다(problems/diagnostics는 도킹 탭이 아니라
+          // 상태바 진입 오버레이라 이 카운트/마스크 대상이 아니다).
           className={
             leaf.tabs.length > 3
               ? "dock-header-tabs dock-header-tabs--masked"
@@ -202,10 +200,10 @@ export function DockPanelHeader({
                 data-testid={`tab-${id}`}
                 className={active ? "panel-tab panel-tab--active" : "panel-tab"}
                 onClick={() => selectTab(id)}
-                // B4-U4: this tab alone detaches and drags — dc `down`
-                // (Docking Prototype.dc.html L544, `startTabDrag({mode:"tab"
-                // ,...})`). The tab ✕'s own onPointerDown (below) calls
-                // stopPropagation, so it never reaches this handler.
+                // This tab alone detaches and drags — dc `down` →
+                // `startTabDrag({mode:"tab",...})`. The tab ✕'s own
+                // onPointerDown (below) calls stopPropagation, so it never
+                // reaches this handler.
                 onPointerDown={(e) => startTabDrag(id, e)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -227,11 +225,10 @@ export function DockPanelHeader({
                   type="button"
                   className="panel-tab-close"
                   aria-label={`Close ${PANEL_TITLES[id]} tab`}
-                  // dc t.xDown(Docking Prototype.dc.html L546) 이식 — B4
-                  // 드래그 시작(pointerdown)이 ✕까지 먹지 않도록 여기서
-                  // 끊는다(탭 선택 onClick과는 별개로 지금 넣는다).
+                  // dc `t.xDown` 이식 — 탭 드래그 시작(pointerdown)이 ✕까지
+                  // 먹지 않도록 여기서 끊는다(탭 선택 onClick과는 별개).
                   onPointerDown={(e) => e.stopPropagation()}
-                  // R10(design/CHANGELOG.md §v1.4): 탭 ✕는 키보드로 도달
+                  // 탭 ✕는 키보드로 도달
                   // 가능해야 한다. 부모 탭의 onKeyDown이 Enter/Space에
                   // preventDefault를 걸어 이 버튼의 네이티브 활성화(그리고
                   // 뒤따르는 click)를 삼키므로, 활성화 키에 한해 전파를

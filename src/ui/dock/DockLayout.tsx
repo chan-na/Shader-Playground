@@ -4,7 +4,7 @@
  *
  * dc(`Docking Prototype.dc.html`)의 absolute 픽셀 배치 대신 **중첩 flex
  * 재귀**를 쓴다 — 이유: (1) 현행 CSS/셀렉터 계약(`.shell-left` 등) 보존,
- * (2) ResizeObserver 없이 픽셀 동치, (3) `dockTree.layoutDockTree`는 B4
+ * (2) ResizeObserver 없이 픽셀 동치, (3) `geometry.ts`의 `layoutDockTree`는 B4
  * 드래그 히트테스트용으로 별도 남는다. flex 수식 `${ratio} 1 0px`은 dc
  * `_layout`의 `aw=(w-D)*ratio`와 동치(playwright viewport 1440×900).
  *
@@ -20,7 +20,7 @@
  * SidePanel이 언마운트되고 NodeEditor가 마운트된다) — 이건 CSS
  * display:none이 아니라 진짜 조건부 렌더링 분기 전환이라 위 불변식이 지키는
  * "컴포넌트는 항상 마운트 유지"가 그 leaf 내부에서는 깨진다. 다만 T1
- * (`dockTree.ts`의 `canMergeDockTabs`)이 viewport/code를 이종 병합
+ * (`tree.ts`의 `canMergeDockTabs`)이 viewport/code를 이종 병합
  * 자체에서 배제하므로, WebGL(Viewport)·CodeMirror(CodeEditor)처럼 재초기화
  * 비용이 큰 두 패널은 애초에 이종 leaf에 들어갈 수 없다 — 이 완화가 실제로
  * 영향을 주는 건 nodeEditor/inspector/assets 조합뿐이고, 그중 재마운트
@@ -48,25 +48,11 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useDockStore } from "../state/dockStore";
-import {
-  computeDropTarget,
-  DIVIDER_PX,
-  type DockDropTarget,
-  type DockLeaf,
-  type DockNode,
-  type DockPanelId,
-  type DockPath,
-  type DockRegion,
-  type DockSplit,
-  type DropHit,
-  dockPathsEqual,
-  fallbackDropTarget,
-  findLeafPath,
-  layoutDockTree,
-} from "../state/dockTree";
-import { tokens, withAlpha } from "../theme";
-import { CodeEditor } from "./CodeEditor";
+import { tokens, withAlpha } from "../../theme";
+import { CodeEditor } from "../CodeEditor";
+import { NodeEditor } from "../NodeEditor";
+import { SidePanel } from "../Panels/SidePanel";
+import { Viewport } from "../Viewport";
 import { DockDragContext } from "./dockDragContext";
 import {
   GHOST_POINTER_OFFSET,
@@ -79,10 +65,24 @@ import {
   splitterLabel,
 } from "./dockLayoutModel";
 import { DockLeafContext } from "./dockLeafContext";
-import { NodeEditor } from "./NodeEditor";
-import { SidePanel } from "./Panels/SidePanel";
+import { useDockStore } from "./dockStore";
+import {
+  computeDropTarget,
+  type DockDropTarget,
+  type DropHit,
+  dockPathsEqual,
+  fallbackDropTarget,
+} from "./drop";
+import { DIVIDER_PX, type DockRegion, layoutDockTree } from "./geometry";
 import { Splitter } from "./Splitter";
-import { Viewport } from "./Viewport";
+import {
+  type DockLeaf,
+  type DockNode,
+  type DockPanelId,
+  type DockPath,
+  type DockSplit,
+  findLeafPath,
+} from "./tree";
 
 /** 조건부 className을 공백으로 이어붙이는 최소 헬퍼(falsy는 생략). 이전
  * App.tsx의 동일 헬퍼를 이 파일로 복제(그 하드코딩 마크업은 사라졌으므로

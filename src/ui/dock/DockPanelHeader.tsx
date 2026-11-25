@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
-import { useDiagnosticsStore } from "../state/diagnosticsStore";
-import { useDockStore } from "../state/dockStore";
-import { type DockPanelId, getNodeAt } from "../state/dockTree";
-import { useGraphStore } from "../state/graphStore";
-import { useSelectionStore } from "../state/selectionStore";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useGraphStore } from "../../state/graphStore";
+import { useSelectionStore } from "../../state/selectionStore";
 import { useDockDragStart } from "./dockDragContext";
 import {
   collapseChevron,
@@ -12,6 +10,8 @@ import {
   PANEL_TITLES,
 } from "./dockLayoutModel";
 import { useDockLeaf } from "./dockLeafContext";
+import { useDockStore } from "./dockStore";
+import { type DockPanelId, getNodeAt } from "./tree";
 
 export interface DockPanelHeaderProps {
   /** mono 메타 배지(예: "5N · 4E", "GLSL · ES 3.0"). */
@@ -58,7 +58,7 @@ export interface DockPanelHeaderProps {
  * prop은 폐기됐다(탭이 라벨 자리를 대신한다). 탭 자체는 기존 Side Panel
  * 밑줄형 `.panel-tab` idiom을 재사용하고(README §M), 컨테이너(dot/✕)만
  * 신설했다. R5 완료: problems/diagnostics는 도킹 탭이 아니다(상태바 진입
- * 오버레이) — dockTree.DockPanelId 5종(nodeEditor/viewport/code/inspector/
+ * 오버레이) — `tree.ts`의 DockPanelId 5종(nodeEditor/viewport/code/inspector/
  * assets)이 전부다. `badges`(SidePanel assets)는 유지한다. `children`
  * (범용 슬롯)은 v2.0부터 CodeEditor의 stage 탭이 더 이상 채우지 않는다 —
  * 그쪽은 본문 하위 `.code-stage-strip`으로 옮겼다(§v2.0 Changed, 이 헤더가

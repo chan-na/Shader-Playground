@@ -12,7 +12,7 @@
  */
 
 import { createContext, useContext } from "react";
-import type { DockPath } from "../state/dockTree";
+import type { DockPath } from "./tree";
 
 export interface DockLeafValue {
   leafId: string;

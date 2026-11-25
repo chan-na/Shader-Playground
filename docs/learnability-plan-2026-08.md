@@ -137,7 +137,7 @@ npm run test:e2e   # Playwright, 별도 실행 필수
 **도킹 패널을 6번째로 추가하는 것은 디자인 정본 이탈**이다:
 
 ```
-src/state/dockTree.ts:25-30
+src/ui/dock/tree.ts — DockPanelId
 export type DockPanelId = "nodeEditor" | "viewport" | "inspector" | "code" | "assets";
 ```
 

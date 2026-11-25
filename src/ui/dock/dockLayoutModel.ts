@@ -4,19 +4,19 @@
  * React 비의존 — 이 파일이 커버리지 확보처(순수 함수 전수 테스트는
  * `dockLayoutModel.test.ts`).
  *
- * import는 `../state/dockTree`의 타입 + `COLLAPSED_STRIP_PX`/`getNodeAt`만.
+ * import는 `./tree`의 타입·`getNodeAt` + `./geometry`의 `COLLAPSED_STRIP_PX`만.
  * raw hex/토큰 직접 사용 없음(이 파일은 클래스명/flex 문자열/라벨만 다룬다).
  */
 
+import { COLLAPSED_STRIP_PX } from "./geometry";
 import {
-  COLLAPSED_STRIP_PX,
   type DockLeaf,
   type DockNode,
   type DockPanelId,
   type DockPath,
   type DockSplit,
   getNodeAt,
-} from "../state/dockTree";
+} from "./tree";
 
 /** leaf가 어떤 레거시 슬롯(App.tsx 하드코딩 4패널) 역할을 하는지. B2에서는
  * SidePanel 컴포넌트 하나가 inspector/assets 두 탭을 함께 담당하므로 둘 다

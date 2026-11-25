@@ -8,20 +8,20 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ShaderGraphNode } from "../core/graph/types";
-import { useDiagnosticsStore } from "../state/diagnosticsStore";
-import { useDockStore } from "../state/dockStore";
+import type { ShaderGraphNode } from "../../core/graph/types";
+import { useDiagnosticsStore } from "../../state/diagnosticsStore";
+import { useGraphStore } from "../../state/graphStore";
+import { useSelectionStore } from "../../state/selectionStore";
+import { DockPanelHeader } from "./DockPanelHeader";
+import { DockDragContext, type DockDragStart } from "./dockDragContext";
+import { DockLeafContext, useDockLeaf } from "./dockLeafContext";
+import { useDockStore } from "./dockStore";
 import {
   collectPanelIds,
   createDefaultDockTree,
   type DockPanelId,
   getNodeAt,
-} from "../state/dockTree";
-import { useGraphStore } from "../state/graphStore";
-import { useSelectionStore } from "../state/selectionStore";
-import { DockPanelHeader } from "./DockPanelHeader";
-import { DockDragContext, type DockDragStart } from "./dockDragContext";
-import { DockLeafContext, useDockLeaf } from "./dockLeafContext";
+} from "./tree";
 
 const initial = useDockStore.getState();
 

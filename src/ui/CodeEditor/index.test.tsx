@@ -8,20 +8,20 @@ import type { ShaderGraphNode } from "../../core/graph/types";
 import fullscreenVert from "../../shaders/fullscreen.vert?raw";
 import type { NodeDiagnostics } from "../../state/diagnosticsStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
-import { useDockStore } from "../../state/dockStore";
-import {
-  createDefaultDockTree,
-  type DockPath,
-  findTabLeafPath,
-  getNodeAt,
-} from "../../state/dockTree";
 import { useEditorStore } from "../../state/editorStore";
 import { undoGraph, useGraphStore } from "../../state/graphStore";
 import { useHistoryStore } from "../../state/historyStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { deserializeProject } from "../../state/serialization";
-import { DockLeafContext } from "../dockLeafContext";
+import { DockLeafContext } from "../dock/dockLeafContext";
+import { useDockStore } from "../dock/dockStore";
+import {
+  createDefaultDockTree,
+  type DockPath,
+  findTabLeafPath,
+  getNodeAt,
+} from "../dock/tree";
 import { getCurrentView } from "./currentView";
 import { CodeEditor } from "./index";
 

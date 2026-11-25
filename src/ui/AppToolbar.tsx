@@ -16,8 +16,6 @@ import {
   TORUS_DEMO_LAYOUT,
   TORUS_DEMO_PARENTS,
 } from "../state/demoGraph";
-import { useDockStore } from "../state/dockStore";
-import { collectPanelIds, DOCK_PANEL_IDS } from "../state/dockTree";
 import { useExportShareStore } from "../state/exportShareStore";
 import { useGifRecorderStore } from "../state/gifRecorder";
 import { redoGraph, undoGraph, useGraphStore } from "../state/graphStore";
@@ -27,7 +25,9 @@ import { useRendererStore } from "../state/rendererStore";
 import { deserializeProject, serializeProject } from "../state/serialization";
 import { toast } from "../state/toastStore";
 import { tokens, withAlpha } from "../theme";
-import { PANEL_DOTS, PANEL_TITLES } from "./dockLayoutModel";
+import { PANEL_DOTS, PANEL_TITLES } from "./dock/dockLayoutModel";
+import { useDockStore } from "./dock/dockStore";
+import { collectPanelIds, DOCK_PANEL_IDS } from "./dock/tree";
 import { useHelpModalStore } from "./NodeEditor/HelpModal";
 
 const isMac =

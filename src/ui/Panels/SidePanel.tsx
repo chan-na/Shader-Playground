@@ -1,9 +1,9 @@
 import { useAssetStore } from "../../state/assetStore";
 import { useBootstrapStore } from "../../state/bootstrapStore";
-import { useDockStore } from "../../state/dockStore";
-import { getNodeAt } from "../../state/dockTree";
-import { DockPanelHeader } from "../DockPanelHeader";
-import { useDockLeaf } from "../dockLeafContext";
+import { DockPanelHeader } from "../dock/DockPanelHeader";
+import { useDockLeaf } from "../dock/dockLeafContext";
+import { useDockStore } from "../dock/dockStore";
+import { getNodeAt } from "../dock/tree";
 import { AssetBrowser } from "./AssetBrowser";
 import { Inspector } from "./Inspector";
 import { PanelSkeleton } from "./PanelSkeleton";

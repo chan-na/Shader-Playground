@@ -39,7 +39,7 @@ import { useTimeStore } from "../../state/timeStore";
 import { toast } from "../../state/toastStore";
 import { useViewportStore } from "../../state/viewportStore";
 import { log, normalizeError } from "../../utils/log";
-import { DockPanelHeader } from "../DockPanelHeader";
+import { DockPanelHeader } from "../dock/DockPanelHeader";
 import { CompileErrorOverlay } from "./CompileErrorOverlay";
 import { EmptyState } from "./EmptyState";
 import { PaneOverlay } from "./PaneOverlay";

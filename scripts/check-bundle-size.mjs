@@ -19,7 +19,7 @@ const ASSETS_DIR = "dist/assets";
 // ~5 KiB headroom absorbs gzip variance across Node versions (CI runs 22).
 //
 // Design handoff v1.4 docking (Phase B): bumped 385 → 393. Turning the fixed
-// 4-panel layout into the tree-based dock model (dockTree/dockStore, drag-drop
+// 4-panel layout into the tree-based dock model (src/ui/dock/: tree/dockStore, drag-drop
 // engine, status-bar overlays, header chrome) is genuinely new surface —
 // measured 388.48 KiB locally. Same rationale as the reskin bump: core layout
 // code, not deferrable behind a dynamic import. Raised with explicit user

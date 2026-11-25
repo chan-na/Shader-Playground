@@ -4,10 +4,11 @@ import { bootApp, setDockTree } from "./helpers/fixtures";
 
 // Phase 35 — dock header/divider chrome: header ✕ vs tab ✕ close semantics,
 // the Code leaf's width-collapsed rail, divider clamping, and tab overflow.
-// Default tree and geometry: `dockTree.createDefaultDockTree` (Code | Node
-// Editor | Viewport over Inspector/Assets); layout rules in
-// `dockLayoutModel.ts` (`collapsesToRail`, `splitChildFlex`) and
-// `dockTree.ts` (`clampDividerRatio`). Every test boots a fresh page.
+// Default tree and geometry: `src/ui/dock/tree.ts` `createDefaultDockTree`
+// (Code | Node Editor | Viewport over Inspector/Assets); layout rules in
+// `src/ui/dock/dockLayoutModel.ts` (`collapsesToRail`, `splitChildFlex`) and
+// `src/ui/dock/geometry.ts` (`clampDividerRatio`). Every test boots a fresh
+// page.
 test.describe("Phase 35 — dock header chrome: close semantics, collapse rail, divider clamp, tab overflow", () => {
   test("R6: header ✕ closes the whole panel, tab ✕ closes only that tab without activating it", async ({
     page,
@@ -40,7 +41,7 @@ test.describe("Phase 35 — dock header chrome: close semantics, collapse rail, 
     // The default inspector+assets leaf has `active: "inspector"` — closing
     // the *inactive* assets tab via its own ✕ must remove only that tab,
     // leaving inspector active (a non-active tab's ✕ never forces
-    // activation; see dockTree.ts removePanel).
+    // activation; see tree.ts removePanel).
     await page.getByTestId("tab-assets").locator(".panel-tab-close").click();
     await expect(page.getByTestId("status-docked")).toHaveText(
       "4 panels docked",

@@ -1,10 +1,10 @@
-import { debounce } from "../utils/debounce";
-import { log, normalizeError } from "../utils/log";
-import { useDockStore } from "./dockStore";
+import { useDockStore } from "../ui/dock/dockStore";
 import {
   type DockLayoutSnapshot,
   sanitizeDockLayoutSnapshot,
-} from "./dockTree";
+} from "../ui/dock/snapshot";
+import { debounce } from "../utils/debounce";
+import { log, normalizeError } from "../utils/log";
 import { useGraphStore } from "./graphStore";
 import { type SerializedProject, serializeProject } from "./serialization";
 import { toast } from "./toastStore";

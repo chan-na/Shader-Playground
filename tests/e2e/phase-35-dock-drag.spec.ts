@@ -7,8 +7,8 @@ import { bootApp } from "./helpers/fixtures";
 // Every release force-docks somewhere ("no floating panels"), so each test
 // ends with zero drag ghosts and, for pure re-docks, an unchanged
 // "5 panels docked" count. Drop-target priority and thresholds live in
-// `dockTree.ts` (`computeDropTarget`, `insertDetachedLeaf`,
-// `canMergeDockTabs`). Every test boots a fresh page.
+// `src/ui/dock/drop.ts` (`computeDropTarget`, `insertDetachedLeaf`) and
+// `src/ui/dock/tree.ts` (`canMergeDockTabs`). Every test boots a fresh page.
 test.describe("Phase 35 — dock drag & drop", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");

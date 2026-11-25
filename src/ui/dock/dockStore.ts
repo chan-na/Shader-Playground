@@ -9,19 +9,20 @@
  * 추가했다 — 트랜지언트 고스트 자체(위치/사이즈/렌더링)는 B4-U3의 책임이고,
  * 이 스토어는 dc `onMove`/`dockGhost`의 트리 변형 절반만 담당한다.
  *
- * 모든 트리 갱신은 `./dockTree`의 불변 함수(`getNodeAt`/`setNodeAt`/
- * `removePanel`/`findLeafPath`/`findTabLeafPath`/`firstMergeableLeafPath`/
- * `collectPanelIds`/`clampDividerRatio`/`insertDetachedLeaf`) 경유 — 이
+ * 모든 트리 갱신은 `./tree`·`./geometry`·`./drop`의 불변 함수(`getNodeAt`/
+ * `setNodeAt`/`removePanel`/`findLeafPath`/`findTabLeafPath`/
+ * `firstMergeableLeafPath`/`collectPanelIds`/`clampDividerRatio`/
+ * `insertDetachedLeaf`) 경유 — 이
  * 파일 안에서 트리 노드를 직접 변이하지 않는다. 순환 의존성 방지를 위해
  * 다른 store는 import하지 않는다.
  */
 
 import { create } from "zustand";
+import { type DockDropTarget, insertDetachedLeaf } from "./drop";
+import { clampDividerRatio } from "./geometry";
 import {
-  clampDividerRatio,
   collectPanelIds,
   createDefaultDockTree,
-  type DockDropTarget,
   type DockLeaf,
   type DockNode,
   type DockPanelId,
@@ -30,10 +31,9 @@ import {
   findTabLeafPath,
   firstMergeableLeafPath,
   getNodeAt,
-  insertDetachedLeaf,
   removePanel,
   setNodeAt,
-} from "./dockTree";
+} from "./tree";
 
 export interface DockState {
   /** 도킹 트리. `null` = 모든 패널이 닫힌 empty state. */

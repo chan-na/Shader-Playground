@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { computeNode, meshNode, shaderNode } from "../core/graph/testNodes";
+import { useDockStore } from "../ui/dock/dockStore";
+import {
+  createDefaultDockTree,
+  findTabLeafPath,
+  getNodeAt,
+} from "../ui/dock/tree";
 import { startCodeAutoOpen } from "./codeAutoOpen";
-import { useDockStore } from "./dockStore";
-import { createDefaultDockTree, findTabLeafPath, getNodeAt } from "./dockTree";
 import { useEditorStore } from "./editorStore";
 import { useGraphStore } from "./graphStore";
 import { useSelectionStore } from "./selectionStore";

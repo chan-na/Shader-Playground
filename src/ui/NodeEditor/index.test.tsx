@@ -8,7 +8,7 @@ import type {
 } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGraphStore } from "../../state/graphStore";
-import { DockLeafContext } from "../dockLeafContext";
+import { DockLeafContext } from "../dock/dockLeafContext";
 import { MOTION_MAX_MS } from "../motion";
 import { NodeEditor } from "./index";
 

@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { confidentVaryingWarnings } from "../../core/glsl/varyingContract";
 import { useDebugUiStore } from "../../state/debugUiStore";
 import { useDiagnosticsStore } from "../../state/diagnosticsStore";
-import { useDockStore } from "../../state/dockStore";
-import { collectPanelIds } from "../../state/dockTree";
 import { useGpuTimerStore } from "../../state/gpuTimerStore";
 import { useGraphStore } from "../../state/graphStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
 import { useTimeStore } from "../../state/timeStore";
 import { tokens, withAlpha } from "../../theme";
+import { useDockStore } from "../dock/dockStore";
+import { collectPanelIds } from "../dock/tree";
 import { type StatusTone, statusSummary } from "./statusSummary";
 
 /** Left status pill text color per tone (App Shell.dc.html L402 pattern). */
@@ -117,7 +117,7 @@ export function StatusBar() {
   // force-expanding it so the *tab* would be visible) no longer applies: the
   // overlay renders outside the dock tree entirely, so there's nothing to
   // un-collapse. toggleDiag is wired directly.
-  // B6-U2 (R9): dockStore/dockTree are imported again, but only for the
+  // B6-U2 (R9): dockStore/tree are imported again, but only for the
   // 'N panels docked' count below — `collectPanelIds(s.tree).length` is a
   // number, so the selector is reference-stable and safe to subscribe
   // directly (no useMemo needed, unlike AppToolbar's closedPanels array).

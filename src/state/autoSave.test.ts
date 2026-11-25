@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useDockStore } from "../ui/dock/dockStore";
+import { createDefaultDockTree, type DockNode } from "../ui/dock/tree";
 import {
   clearSession,
   createAutoSaveScheduler,
@@ -7,8 +9,6 @@ import {
   startDockLayoutPersistence,
   stopAutoSave,
 } from "./autoSave";
-import { useDockStore } from "./dockStore";
-import { createDefaultDockTree, type DockNode } from "./dockTree";
 import { useGraphStore } from "./graphStore";
 import type { SerializedProject } from "./serialization";
 import { useToastStore } from "./toastStore";
@@ -481,7 +481,7 @@ describe("startDockLayoutPersistence — R9 (B6-U1)", () => {
     const setItemSpy = vi.spyOn(localStorage, "setItem");
 
     // ["b", "b"] is the viewport|inspector-assets col split in the v2.0
-    // default tree (same fixture path used in dockTree.test.ts's
+    // default tree (same fixture path used in dock/drop.test.ts's
     // insertDetachedLeaf specs).
     for (let ratio = 0.3; ratio <= 0.6; ratio += 0.05) {
       useDockStore.getState().setDividerRatio(["b", "b"], ratio, 1000, 800);

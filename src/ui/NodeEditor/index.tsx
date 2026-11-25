@@ -34,7 +34,7 @@ import { useGraphStore } from "../../state/graphStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
 import { nextId } from "../../utils/id";
-import { DockPanelHeader } from "../DockPanelHeader";
+import { DockPanelHeader } from "../dock/DockPanelHeader";
 import { MOTION_MAX_MS } from "../motion";
 import { WelcomeOverlay } from "../WelcomeOverlay";
 import { AddNodePill } from "./AddNodePill";

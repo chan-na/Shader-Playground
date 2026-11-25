@@ -27,7 +27,7 @@ import { usePassPlanStore } from "../../state/passPlanStore";
 import { useSelectionStore } from "../../state/selectionStore";
 import { tokens, withAlpha } from "../../theme";
 import { debounce } from "../../utils/debounce";
-import { DockPanelHeader } from "../DockPanelHeader";
+import { DockPanelHeader } from "../dock/DockPanelHeader";
 import { NODE_GLYPH } from "../NodeEditor/nodeTheme";
 import { AutoOpenToggle } from "./AutoOpenToggle";
 import { setCurrentView } from "./currentView";

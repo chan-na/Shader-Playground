@@ -6,7 +6,8 @@ import {
   screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useDockStore } from "../state/dockStore";
+import { useDockDragStart } from "./dockDragContext";
+import { useDockStore } from "./dockStore";
 import {
   collectPanelIds,
   createDefaultDockTree,
@@ -14,8 +15,7 @@ import {
   type DockNode,
   type DockPath,
   findTabLeafPath,
-} from "../state/dockTree";
-import { useDockDragStart } from "./dockDragContext";
+} from "./tree";
 
 /** 테스트 전용 순회 헬퍼 — v2.0에서 프로덕션의 `firstLeafPath`(무조건 첫
  * leaf)는 병합 대상만 찾는 `firstMergeableLeafPath`(addPanel 전용, S5/T1)로
@@ -37,7 +37,7 @@ function anyLeafPath(node: DockNode | null): DockPath | null {
 // mocked here, so importing it directly inside this factory is fine (it
 // isn't itself subject to `vi.mock` hoisting rules the way `./NodeEditor`
 // is).
-vi.mock("./NodeEditor", () => ({
+vi.mock("../NodeEditor", () => ({
   NodeEditor: () => {
     const drag = useDockDragStart();
     return (
@@ -51,13 +51,13 @@ vi.mock("./NodeEditor", () => ({
     );
   },
 }));
-vi.mock("./Viewport", () => ({
+vi.mock("../Viewport", () => ({
   Viewport: () => <div data-testid="stub-viewport" />,
 }));
-vi.mock("./Panels/SidePanel", () => ({
+vi.mock("../Panels/SidePanel", () => ({
   SidePanel: () => <div data-testid="stub-side-panel" />,
 }));
-vi.mock("./CodeEditor", () => ({
+vi.mock("../CodeEditor", () => ({
   CodeEditor: () => <div data-testid="stub-code-editor" />,
 }));
 

@@ -79,7 +79,7 @@ test.describe("Phase 35 — dock persistence, ＋ Panel, empty state, compact vi
   });
 
   // Schema-level corruption is unit-tested by `sanitizeDockLayoutSnapshot`
-  // (src/state/dockTree.test.ts), which only ever sees already-parsed input.
+  // (src/ui/dock/snapshot.test.ts), which only ever sees already-parsed input.
   // This covers the one failure mode it can't: `JSON.parse` itself throwing,
   // which loadDockLayout's try/catch alone absorbs.
   test("R9: corrupted localStorage layout falls back to the default tree, and saving recovers", async ({

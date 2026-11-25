@@ -9,10 +9,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GeometryHandle, ImageHandle } from "../../core/assets/types";
 import { useAssetStore } from "../../state/assetStore";
 import { useBootstrapStore } from "../../state/bootstrapStore";
-import { useDockStore } from "../../state/dockStore";
-import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
 import { resetAllStores } from "../../state/testStores";
-import { DockLeafContext } from "../dockLeafContext";
+import { DockLeafContext } from "../dock/dockLeafContext";
+import { useDockStore } from "../dock/dockStore";
+import { createDefaultDockTree, getNodeAt } from "../dock/tree";
 import { SidePanel } from "./SidePanel";
 
 const meshHandle: GeometryHandle = {

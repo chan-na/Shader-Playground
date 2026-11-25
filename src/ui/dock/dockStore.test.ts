@@ -1,16 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useDockStore } from "./dockStore";
+import { type DockDropTarget, OUTER_DOCK_RATIO } from "./drop";
+import { clampDividerRatio } from "./geometry";
 import {
-  clampDividerRatio,
   collectPanelIds,
   createDefaultDockTree,
   DOCK_PANEL_IDS,
-  type DockDropTarget,
   type DockNode,
   type DockPath,
   getNodeAt,
-  OUTER_DOCK_RATIO,
-} from "./dockTree";
+} from "./tree";
 
 /** 테스트 전용 순회 헬퍼 — 이전엔 `firstLeafPath`(무조건 첫 leaf)로 이
  * 루프들을 구동했지만, v2.0에서 그 함수는 병합 대상만 찾는

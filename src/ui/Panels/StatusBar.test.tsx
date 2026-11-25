@@ -13,11 +13,11 @@ import {
   emptyDiagnostics,
   useDiagnosticsStore,
 } from "../../state/diagnosticsStore";
-import { useDockStore } from "../../state/dockStore";
-import { createDefaultDockTree, getNodeAt } from "../../state/dockTree";
 import type { ShaderPassRow } from "../../state/passPlanStore";
 import { usePassPlanStore } from "../../state/passPlanStore";
 import { useRendererStore } from "../../state/rendererStore";
+import { useDockStore } from "../dock/dockStore";
+import { createDefaultDockTree, getNodeAt } from "../dock/tree";
 import { StatusBar } from "./StatusBar";
 
 function shaderRowFixture(overrides: Partial<ShaderPassRow>): ShaderPassRow {

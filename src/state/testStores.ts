@@ -9,11 +9,11 @@
 // action: those bump `rev`/`graphEpoch` and push undo history, which is app
 // behavior, not test isolation.
 import type { StoreApi } from "zustand";
+import { useDockStore } from "../ui/dock/dockStore";
 import { useAssetStore } from "./assetStore";
 import { useBootstrapStore } from "./bootstrapStore";
 import { useDebugUiStore } from "./debugUiStore";
 import { useDiagnosticsStore } from "./diagnosticsStore";
-import { useDockStore } from "./dockStore";
 import { useEditorStore } from "./editorStore";
 import { useGpuTimerStore } from "./gpuTimerStore";
 import { useGraphStore } from "./graphStore";

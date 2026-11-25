@@ -20,7 +20,7 @@
 
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { createContext, useContext } from "react";
-import type { DockPanelId, DockPath } from "../state/dockTree";
+import type { DockPanelId, DockPath } from "./tree";
 
 export interface DockDragStart {
   /** leaf 헤더의 ⣿ grab handle에서 호출 — leaf의 모든 탭을 통째로 분리해

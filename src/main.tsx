@@ -32,7 +32,6 @@ import { startDockLayoutPersistence } from "./state/autoSave";
 import { useCameraStore } from "./state/cameraStore";
 import { startCodeAutoOpen } from "./state/codeAutoOpen";
 import { useDiagnosticsStore } from "./state/diagnosticsStore";
-import { useDockStore } from "./state/dockStore";
 import { useEditorStore } from "./state/editorStore";
 import { useGifRecorderStore } from "./state/gifRecorder";
 import { useGpuTimerStore } from "./state/gpuTimerStore";
@@ -44,6 +43,7 @@ import { useSelectionStore } from "./state/selectionStore";
 import { useTimeStore } from "./state/timeStore";
 import { useViewportStore } from "./state/viewportStore";
 import { cssVars } from "./theme";
+import { useDockStore } from "./ui/dock/dockStore";
 import { log, normalizeError } from "./utils/log";
 
 // 전역 안전망: 잡히지 않은 에러/거부를 로거에 기록 (Debugging-Plan P2).

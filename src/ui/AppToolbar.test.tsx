@@ -1,14 +1,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCommandPaletteStore } from "../state/commandPaletteStore";
-import { useDockStore } from "../state/dockStore";
-import { collectPanelIds } from "../state/dockTree";
 import { useGifRecorderStore } from "../state/gifRecorder";
 import { useGraphStore } from "../state/graphStore";
 import { useHistoryStore } from "../state/historyStore";
 import { useRendererStore } from "../state/rendererStore";
 import { useToastStore } from "../state/toastStore";
 import { AppToolbar } from "./AppToolbar";
+import { useDockStore } from "./dock/dockStore";
+import { collectPanelIds } from "./dock/tree";
 
 beforeEach(() => {
   // Same reset order as graphStore.test.ts: reset() itself pushes the

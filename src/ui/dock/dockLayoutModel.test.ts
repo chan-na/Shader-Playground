@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  COLLAPSED_STRIP_PX,
-  createDefaultDockTree,
-  type DockLeaf,
-  type DockSplit,
-} from "../state/dockTree";
-import {
   collapseChevron,
   collapsesToRail,
   ghostSize,
@@ -14,6 +8,8 @@ import {
   splitChildFlex,
   splitterLabel,
 } from "./dockLayoutModel";
+import { COLLAPSED_STRIP_PX } from "./geometry";
+import { createDefaultDockTree, type DockLeaf, type DockSplit } from "./tree";
 
 function leaf(
   tabs: DockLeaf["tabs"],

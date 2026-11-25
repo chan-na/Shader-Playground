@@ -305,8 +305,9 @@ export function CodeEditor() {
   }, [isMulti, selectedIds, allNodes, diagsByNode]);
 
   // Live (pre-recompile) diagnostics from the OffscreenCanvas WebGL2 worker —
-  // see Architecture §8.4. Scoped to the currently-edited (node, stage); we
-  // clear it on switch (the validator may still be flying for the old doc).
+  // see docs/architecture/glsl-editor.md §8.4. Scoped to the currently-edited
+  // (node, stage); we clear it on switch (the validator may still be flying
+  // for the old doc).
   const [liveDiags, setLiveDiags] = useState<GLSLDiagnostic[]>([]);
   const setLiveDiagsRef = useRef(setLiveDiags);
   setLiveDiagsRef.current = setLiveDiags;

@@ -15,7 +15,7 @@
 2. **§5 미결 결정**에 이번 티어와 관련된 항목이 있으면 **사용자에게 먼저 확인**한다.
 3. **§6 트래커**에서 이번에 할 티어를 확인하고, 끝나면 트래커를 갱신한 뒤 커밋한다.
 4. 게이트는 `CLAUDE.md` 규약대로 `npm run check` + `npm run test:e2e` 둘 다 green.
-5. 신규 기능은 `SPEC.md`에 Phase 항목을 추가한다. **현재 최신은 Phase 35** → 신규는 36부터.
+5. 신규 기능은 Phase 항목으로 추가한다 — 본문은 `docs/spec/<영역>.md`, 한 줄 요약은 `SPEC.md` 인덱스 표. **이 라운드 시작 시 최신은 Phase 35** → 신규는 36부터(라운드 종료 후 최신 Phase 39).
 
 ---
 
@@ -365,7 +365,7 @@ UI 선례가 있다.
 ---
 
 **T1 완료 조건**: 위 4개 + `npm run check` + `npm run test:e2e` green + 번들 천장 준수
-+ `SPEC.md` Phase 항목 추가 + 이 문서 §6 트래커 갱신.
++ `docs/spec/diagnostics-learnability.md` Phase 본문 추가 + `SPEC.md` 인덱스 행 추가 + 이 문서 §6 트래커 갱신.
 
 ---
 
@@ -430,7 +430,7 @@ uniform vec3 u_baseColor;
   `outColor.a`는 FBO에 기록되어 다운스트림 샘플링에 쓰이고, 최종 캔버스 합성
   (`alpha:true` + `premultipliedAlpha:false`)을 거쳐 페이지 배경과 합성된다 —
   `outColor.a = 0.0`이면 뷰포트가 페이지 배경으로 뚫린다. 구현은 이 정정된
-  사실을 Pass Inspector 각주에 반영했다(SPEC Phase 38).
+  사실을 Pass Inspector 각주에 반영했다(`docs/spec/diagnostics-learnability.md` Phase 38).
 - 선택: 블렌딩을 실제로 노출할지는 별도 논의(포트/노드 옵션 추가 = 범위 확대).
 
 #### E-3 · 텍스처 파라미터 표시/조작 (L2)
@@ -491,19 +491,19 @@ uniform vec3 u_baseColor;
 | **T0** | **T0-1 게이트를 엔트리 청크 기준으로** | ✅ 완료 | feat/learnability-2026-08 | **T1의 선행 조건** |
 | **T0** | **T0-2 loaders.gl 동적 import** | ✅ 완료 | feat/learnability-2026-08 | 엔트리 −43 KiB 실측 완료 |
 | **T0** | **T0-3 shareUrl import 충돌 해소** | ✅ 완료 | feat/learnability-2026-08 | 기존 버그 |
-| T1 | A-1 풀스크린 대체 표시 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 |
-| T1 | D-1 Pass Inspector | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 |
-| T1 | C-1 시스템 유니폼 섹션 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 (유닛 U4) |
-| T1 | B-1 Mesh attribute 노출 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 36 (유닛 U4) |
-| T2 | E-1 미연결/미사용 경고 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
-| T2 | E-4 연결된 슬라이더 표시 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
-| T2 | B-2 attribute 소비 체크 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 37 |
-| T3 | C-2 `@default` 이관 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U1) |
-| T3 | E-2 렌더 상태 표시 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U2) |
-| T3 | E-3 텍스처 파라미터 | ✅ 완료 (표시 전용) | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U3). ⚠ D-4 권장("조작 가능")과 **반대** 방향 — D-4는 미결로 남아 있다 |
-| T3 | F-1 좌표계 카드 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U4) |
-| T3 | F-2 데모 레슨화 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 38 (유닛 U1) |
-| T4 | A-2 varying 브리지 | ✅ 완료 | feat/learnability-2026-08 | SPEC Phase 39 |
+| T1 | A-1 풀스크린 대체 표시 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 36 |
+| T1 | D-1 Pass Inspector | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 36 |
+| T1 | C-1 시스템 유니폼 섹션 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 36 (유닛 U4) |
+| T1 | B-1 Mesh attribute 노출 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 36 (유닛 U4) |
+| T2 | E-1 미연결/미사용 경고 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 37 |
+| T2 | E-4 연결된 슬라이더 표시 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 37 |
+| T2 | B-2 attribute 소비 체크 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 37 |
+| T3 | C-2 `@default` 이관 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 38 (유닛 U1) |
+| T3 | E-2 렌더 상태 표시 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 38 (유닛 U2) |
+| T3 | E-3 텍스처 파라미터 | ✅ 완료 (표시 전용) | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 38 (유닛 U3). ⚠ D-4 권장("조작 가능")과 **반대** 방향 — D-4는 미결로 남아 있다 |
+| T3 | F-1 좌표계 카드 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 38 (유닛 U4) |
+| T3 | F-2 데모 레슨화 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 38 (유닛 U1) |
+| T4 | A-2 varying 브리지 | ✅ 완료 | feat/learnability-2026-08 | spec/diagnostics-learnability.md Phase 39 |
 | T4 | A-3 노드 분리 | ⬜ 보류 | — | A-2 결과 후 판단 — `temp/learnability-followup.md` §5·§6-4 참조(A-3 대신 **파서를 정규식→토크나이저/AST로** 올리는 쪽을 권고) |
 | — | 머지 후 코드리뷰 라운드 | ✅ 완료 | review/learnability-2026-08 | 확정 28건 → 중복 제외 23건 수정. 상세는 `temp/learnability-followup.md` §6 (로컬 전용, 아래 6-2 참고) |
 | — | 2차 코드리뷰 라운드(머지 전량 재검토) | ✅ 완료 | review/learnability-2026-08-round2 | 10차원 병렬 + 적대적 검증으로 제기 37건 → **확정 32건**. 코드 수정 + 문서 정정. 상세는 `temp/learnability-followup.md` §7 |
@@ -532,7 +532,7 @@ uniform vec3 u_baseColor;
 ## 7. 참고
 
 - `Architecture.md` — §2.2(포트 동적 생성) · §3.1(컴파일 절차) · §3.2(sampler vs param) · §4.4(시스템 유니폼)
-- `SPEC.md` — Phase별 명세 (이 라운드가 Phase 36~39 추가, 최신 Phase 39)
+- `SPEC.md` — Phase 인덱스. 본문은 `docs/spec/*.md` (이 라운드의 Phase 36~39 는 `docs/spec/diagnostics-learnability.md`, 최신 Phase 39)
 - `CLAUDE.md` — 품질 게이트 규약, 게이트 우회 금지 목록
 - `design/CHANGELOG.md` — UI 정본 v2.0/v2.1/v2.2
 - `scripts/check-bundle-size.mjs` — 번들 천장의 역사와 측정 주의사항

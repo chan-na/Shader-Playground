@@ -8,7 +8,7 @@ WebGL2 기반 노드 그래프 셰이더 플레이그라운드. React Flow 캔�
 
 ## 사전 요구사항
 
-- **Node.js 22** — CI(`.github/workflows/check.yml`)가 Node 22로 `check`와 `e2e`를 검증한다. 로컬도 22 권장. `package.json`에 `engines`나 저장소에 `.nvmrc`는 없다.
+- **Node.js 22** — CI(`.github/workflows/check.yml`)가 Node 22로 `check`와 `e2e`를 검증한다. 로컬도 22 권장 — 저장소 루트의 `.nvmrc`가 `22`를 고정하므로 `nvm use`로 맞출 수 있다. `package.json`에 `engines`는 없다.
 - **npm** — Node에 동봉된 버전 사용 (워크플로도 `actions/setup-node@v4`의 기본).
 - **E2E를 돌리려면 Playwright Chromium**:
   ```bash
@@ -59,43 +59,24 @@ npm run test:e2e:ui       # Playwright UI 모드 (대화형 디버깅)
 npm run test:e2e:headed   # 브라우저 창을 띄워 실행
 ```
 
-Phase 1~34 핵심 시나리오가 `tests/e2e/`의 30개 스펙 파일에 있다. dev 서버는 `playwright.config.ts`의 `webServer.command`로 자동 기동되며, 이미 `npm run dev`가 떠 있으면 재사용한다 (chromium / SwiftShader / workers 1 / 직렬 실행).
+Phase 1~39 핵심 시나리오와 도킹 레이아웃 시나리오(`m1~m7-*.spec.ts`)가 `tests/e2e/`의 45개 스펙 파일(172 테스트)에 있다. dev 서버는 `playwright.config.ts`의 `webServer.command`로 자동 기동되며, 이미 `npm run dev`가 떠 있으면 재사용한다 (chromium / SwiftShader / workers 1 / 직렬 실행).
 
 ## 품질 게이트
 
-머지 전 반드시 셋 다 초록이어야 한다. CI는 `check`·`e2e`·`bundle-size` 세 잡으로 분리해 동일한 게이트를 검증한다.
+게이트 정의·임계치·우회 금지 규약·`biome-ignore` 정책의 정본은 [CLAUDE.md](./CLAUDE.md)다. 머지 전 아래가 모두 초록이어야 한다 (CI는 `check`·`e2e`·`bundle-size` 세 잡).
 
 ```bash
-npm run check       # typecheck → lint → deadcode → circular → unit test (순차, 첫 실패에서 즉시 중단)
-npm run test:e2e    # Playwright (Phase 1~34, 30개 스펙)
-npm run build && npm run size:check    # gzip 번들 크기 예산 가드 (CI bundle-size 잡)
+npm run check                          # typecheck → lint → deadcode → circular → unit test
+npm run test:e2e                       # Playwright E2E
+npm run build && npm run size:check    # gzip 번들 크기 예산 (CI bundle-size 잡)
 ```
-
-`npm run check`가 묶는 단계:
-
-| 단계        | 명령                                                  | 도구 / 기준                                                          |
-| ----------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
-| typecheck   | `tsc --noEmit`                                        | TypeScript 5.6 — `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` |
-| lint        | `biome check`                                         | Biome 2.4 — errors **0** / warnings **0**                            |
-| deadcode    | `knip`                                                | Knip 6 — 미사용 export / type / dep **0**                            |
-| circular    | `dpdm --no-warning --no-tree --exit-code circular:1 src/main.tsx` | dpdm 4 — 순환 의존성 **0**                                   |
-| test        | `vitest run`                                          | Vitest 4 — 유닛 통과 + 커버리지 임계치 만족                          |
-
-자동 수정이 필요할 때:
-
-```bash
-npm run lint:fix    # biome check --write
-npm run format      # biome format --write
-```
-
-게이트의 도입 경위·우회 금지 규약·`biome-ignore` 정책은 [CLAUDE.md](./CLAUDE.md) §0~§3 참조.
 
 ## 디렉토리 구조 (src/ 기준)
 
 ```
 src/
 ├─ main.tsx              # React 엔트리, App 마운트
-├─ App.tsx               # 셸 (NodeEditor / Viewport / CodeEditor / SidePanel / StatusBar)
+├─ App.tsx               # 셸 (AppToolbar → DockLayout → StatusBar + 오버레이/다이얼로그)
 │
 ├─ core/                 # ── React/Zustand 비의존 순수 TS ──
 │  ├─ gl/                # WebGL2 래퍼 (program / texture / framebuffer / mesh / uniforms)
@@ -105,7 +86,7 @@ src/
 │  ├─ camera/            # OrbitCamera 상태/입력 바인딩
 │  └─ assets/            # 프리미티브 / OBJ·GLTF·이미지 로더 / IndexedDB 캐시
 │
-├─ state/                # ── Zustand 스토어 16개(녹화 컨트롤러 포함) + 직렬화/공유/자동저장 ──
+├─ state/                # ── Zustand 스토어 22개(녹화 컨트롤러 포함) + 직렬화/공유/자동저장 ──
 │  ├─ graphStore.ts      # nodes/edges/positions + rev/uniformRev
 │  ├─ assetStore.ts      # 메시/이미지 런타임 핸들 카탈로그
 │  ├─ selectionStore.ts  # selectedNodeId
@@ -120,7 +101,7 @@ src/
 │  └─ serialization.ts   # 프로젝트 JSON v1
 │
 ├─ ui/                   # ── React 18 컴포넌트 ──
-│  ├─ NodeEditor/        # React Flow 캔버스, Toolbar, 커스텀 노드 뷰
+│  ├─ NodeEditor/        # React Flow 캔버스, 커스텀 노드 뷰
 │  ├─ CodeEditor/        # CodeMirror 6 + GLSL(호버/정의 이동/이름 변경/자동완성/시맨틱 하이라이트) + lint 어댑터
 │  ├─ Viewport/          # <canvas> + RAF 루프 + asyncReadback 펌프
 │  ├─ CommandPalette/    # Cmd+K — 노드/프리셋/유틸 추가
